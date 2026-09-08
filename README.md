@@ -24,3 +24,19 @@ Python dependencies and external application installers are not embedded. Remote
 SHA-256: `81e801a4a42953a61d8559105a156e78a8a717a494f39f800143107ed04449f1`
 
 This private bundle contains internal employee, machine and floor-plan data. Restrict repository access accordingly.
+
+## Read-only network demo
+
+[Office-Atlas-ReadOnly-Demo.txt](Office-Atlas-ReadOnly-Demo.txt) is a separate **15,635,235-byte** package. Rename it to `.py` and run it, set `Python_Settings.bat`, then run `Start-Atlas-Demo.bat`. Visitors open `http://HOST-PC-IP:8771`; host firewall and network routing must allow TCP 8771. The full IT version stays on localhost:8770.
+
+The map links to a read-only IT directory: users, linked computers, official/previous seating, recorded relationships and histories, package metadata, hosting settings and downloadable Excel templates. Remote tool capabilities are listed with actions disabled. No live software/process scans, deployments, uninstall/repair, cache cleanup, imports or database changes are performed.
+
+Set `package_repository` in the demo's `demo_config.json` to the package root available on the hosting PC. Package folders and recognised script filenames can be inspected; installer files and script contents are not served or embedded. An unavailable repository is reported explicitly.
+
+The included directory is a snapshot. For your latest data, start the demo with `--atlas-folder "C:\Path\Office-Atlas-IT"` to read a consistent snapshot of that installation's database and its package repository setting. Restart the demo to refresh. The source database is opened read-only. `--repository "C:\Packages"` overrides the repository path.
+
+Anyone who can reach this demo can view its internal employee, machine, desk and history data; there is no login or HTTPS. Use it for the intended internal audience only.
+
+Demo SHA-256: `b45d17add2f5d0adb8a07a4b2c6146dfaa0693e6059d2d077d4c5c39ac927e73`.
+
+Validated extraction integrity, HTTP read-only boundaries, data pagination/relationships, package metadata inspection and unchanged source database. JavaScript syntax checked; full browser validation remains outstanding because a test browser could not be downloaded.
