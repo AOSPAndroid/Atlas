@@ -1,0 +1,37 @@
+OFFICE ATLAS 6.5 - CONSERVATIVE OPTIMIZATION
+
+Changes
+- Bind detail-panel toggle handlers once, preventing accumulation after updates.
+- Limit compact-panel and simplification observers to relevant panels.
+- Process only newly added checkbox elements instead of rescanning the whole document.
+- Add expression indexes for exact email and employee-number search at startup.
+  Existing installations receive the indexes automatically. Search SQL and matching
+  semantics are unchanged; no user, machine, seating or history rows are removed.
+- Complete machine reports now read the current progressive-health snapshot,
+  including CPU, RAM, GPU, storage and timestamps. Pending or failed checks are
+  distinguished from a confirmed negative result. Another target's data is excluded.
+- Restore the warning for uptime strictly greater than eight days in both the
+  console health widget and specifications dialog. Refresh clears stale warnings.
+
+Validation
+- Database upgrade tested twice on a temporary copy; all application-table rows
+  preserved and exact-search results identical across sampled field values.
+- Query plan uses indexes instead of a users-table scan.
+- Focused JavaScript checks cover handler duplication, report target isolation,
+  zero/failed readings, uptime boundary/reset, progressive loading and stale replies.
+- Four health service tests and fifteen existing WMI tests passed with mocks.
+- No live Windows/domain queries or full rendered-browser verification performed.
+
+Scope
+WMI transport, deployment execution, software inventory, package scanning and
+read-only demo are unchanged. The intermittent software-inventory issue remains
+separately deferred. No smartphone import is included in this release.
+
+Upgrade
+Download Office-Atlas-Latest.txt, rename it Office-Atlas-Latest.py and run Python.
+Finish active jobs and stop the old application before switching installations.
+Back up the full existing office_atlas.db. Extract into a NEW folder, replace its
+seeded office_atlas.db with your full database backup, and carry over your
+Python_Settings and configuration/launcher customizations. Keep the old folder
+until the new installation is verified. Seating-only exports are not full backups.
+Start the new app; the two search indexes are created automatically if missing.
