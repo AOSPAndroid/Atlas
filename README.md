@@ -40,3 +40,18 @@ Anyone who can reach this demo can view its internal employee, machine, desk and
 Demo SHA-256: `b45d17add2f5d0adb8a07a4b2c6146dfaa0693e6059d2d077d4c5c39ac927e73`.
 
 Validated extraction integrity, HTTP read-only boundaries, data pagination/relationships, package metadata inspection and unchanged source database. JavaScript syntax checked; full browser validation remains outstanding because a test browser could not be downloaded.
+
+## Required script-name compatibility patch
+
+After extracting either package above, apply [Atlas-Script-Names-Fix.txt](Atlas-Script-Names-Fix.txt). The base transfer packages above have not been rebuilt with this fix.
+
+Stop the application after active jobs finish. Rename the patch to `Atlas-Script-Names-Fix.py`, place it inside the extracted application folder beside `package_catalog.py`, and run it with your configured Python. Repeat in the other installation, or use `--folder` followed by both folder paths. Restart the application afterward.
+
+Recognises case-insensitive PS1/VBS suffixes:
+- Install: `_i`, `_install`, `_installs`
+- Uninstall: `_u`, `_uninstall`, `_uninstalls`
+- Repair: `_r`, `_repair`, `_repairs`
+
+Includes nested package folders. Updates package metadata inspection, script listing and deployment action validation; uninstall scripts cannot match Install. Does not add EXE execution support. Makes source backups and refuses unexpected source versions. Database contents, package files, read-only restrictions and BAT port settings are preserved.
+
+Validated mixed-case and legacy suffixes, nested folders, unsupported-file rejection, wrong-action rejection and repeat application.
