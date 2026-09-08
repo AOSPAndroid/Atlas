@@ -1,8 +1,14 @@
 # Office Atlas + IT
 
+## Full IT application — version 6.4
+
+Progressive machine health, specification views and separate Assigned / Last logged-on badges. Includes the script-name compatibility fix.
+
+[Read the 6.4 changelog](Office-Atlas-6.4-Changelog.txt). The intermittent software-inventory issue is deferred.
+
 ## Download one file
 
-Download [Office-Atlas-IT-Software-Actions.txt](Office-Atlas-IT-Software-Actions.txt) using GitHub's raw-file download control. The complete file is **40,598,629 bytes**; no joining is required.
+Download [Office-Atlas-IT-Software-Actions.txt](Office-Atlas-IT-Software-Actions.txt) using GitHub's raw-file download control. The complete file is **40,611,550 bytes**; no joining is required.
 
 Enable filename extensions in Windows Explorer, rename the file to `Office-Atlas-IT-Software-Actions.py`, and run it with Python 3.12. Follow the extracted README and Python_Settings instructions to install dependencies and start the application. The extractor verifies the embedded files; it does not launch remote operations.
 
@@ -21,7 +27,7 @@ Python dependencies and external application installers are not embedded. Remote
 
 ## Integrity
 
-SHA-256: `81e801a4a42953a61d8559105a156e78a8a717a494f39f800143107ed04449f1`
+SHA-256: `6519684601b47bec76bed221e5351bf7a8df2ef33c731a26cd280f1c24e95c0a`
 
 This private bundle contains internal employee, machine and floor-plan data. Restrict repository access accordingly.
 
@@ -41,17 +47,12 @@ Demo SHA-256: `b45d17add2f5d0adb8a07a4b2c6146dfaa0693e6059d2d077d4c5c39ac927e73`
 
 Validated extraction integrity, HTTP read-only boundaries, data pagination/relationships, package metadata inspection and unchanged source database. JavaScript syntax checked; full browser validation remains outstanding because a test browser could not be downloaded.
 
-## Required script-name compatibility patch
+## Older full IT installations
 
-After extracting either package above, apply [Atlas-Script-Names-Fix.txt](Atlas-Script-Names-Fix.txt). The base transfer packages above have not been rebuilt with this fix.
+The script-name fix is included in version 6.4; a separate patch is not needed. [Atlas-Script-Names-Fix.txt](Atlas-Script-Names-Fix.txt) remains available for older full IT installations. The standalone demo is frozen and should not be patched.
 
-Stop the application after active jobs finish. Rename the patch to `Atlas-Script-Names-Fix.py`, place it inside the extracted application folder beside `package_catalog.py`, and run it with your configured Python. Repeat in the other installation, or use `--folder` followed by both folder paths. Restart the application afterward.
+For upgrades, follow the changelog to preserve your database, Python path, repository configuration and any custom launcher settings. Live Windows hardware queries and full browser rendering remain to be validated in the target environment.
 
-Recognises case-insensitive PS1/VBS suffixes:
-- Install: `_i`, `_install`, `_installs`
-- Uninstall: `_u`, `_uninstall`, `_uninstalls`
-- Repair: `_r`, `_repair`, `_repairs`
+## Release archive
 
-Includes nested package folders. Updates package metadata inspection, script listing and deployment action validation; uninstall scripts cannot match Install. Does not add EXE execution support. Makes source backups and refuses unexpected source versions. Database contents, package files, read-only restrictions and BAT port settings are preserved.
-
-Validated mixed-case and legacy suffixes, nested folders, unsupported-file rejection, wrong-action rejection and repeat application.
+Previous full IT releases are retained in [old](old/). Version [6.3](old/6.3/) includes its original package, README and script-name patch. Future releases should archive the outgoing version before replacing the current package.
