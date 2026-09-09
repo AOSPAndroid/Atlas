@@ -1,0 +1,10 @@
+{
+  "name": "office-atlas-ui-tests",
+  "private": true,
+  "scripts": {
+    "test:palette": "node --experimental-vm-modules tests/shared_palette_dom.cjs"
+  },
+  "devDependencies": {
+    "jsdom": "^29.1.1"
+  }
+}

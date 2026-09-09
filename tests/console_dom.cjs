@@ -1,5 +1,5 @@
-// Actual DOM and event handlers; local fixture only, no live administration.
-const fs=require('fs'),path=require('path'),assert=require('assert/strict');
+// Run with node --experimental-vm-modules. Actual DOM and event handlers; local fixture only, no live administration.
+const fs=require('fs'),path=require('path'),assert=require('assert/strict'),vm=require('node:vm');
 const {JSDOM,VirtualConsole}=require(process.env.JSDOM_MODULE||'jsdom');
 const root=path.resolve(__dirname,'..'),base='http://127.0.0.1:8892';
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
@@ -8,7 +8,16 @@ async function until(fn){for(let i=0;i<100;i++){if(fn())return;await sleep(30)}t
  const errors=[],vc=new VirtualConsole();vc.on('jsdomError',e=>errors.push(e.message));
  const dom=new JSDOM(fs.readFileSync(path.join(root,'frontend/index.html'),'utf8'),{url:base+'/installer',runScripts:'outside-only',pretendToBeVisual:true,virtualConsole:vc}),w=dom.window;
  w.fetch=(url,o)=>fetch(new URL(url,base),o);w.confirm=()=>false;w.matchMedia=()=>({matches:false,addEventListener(){}});
- w.eval(fs.readFileSync(path.join(root,'frontend/assets/app.js'),'utf8'));
+ w.HTMLElement.prototype.scrollIntoView=function(){};
+ w.HTMLDialogElement.prototype.showModal=function(){this.open=true};w.HTMLDialogElement.prototype.close=function(){this.open=false;this.dispatchEvent(new w.Event('close'))};
+ w.AtlasHealth={cancel(){},badges(){return ''},mount(){return Promise.resolve()},report(){return []}};
+ const context=dom.getInternalVMContext(),modules=new Map();
+ async function moduleFor(spec){
+  const file=path.join(root,'atlas',path.basename(spec));
+  if(modules.has(file))return modules.get(file);
+  const promise=(async()=>{const mod=new vm.SourceTextModule(fs.readFileSync(file,'utf8'),{context,identifier:file});await mod.link(moduleFor);await mod.evaluate();return mod})();modules.set(file,promise);return promise;
+ }
+ vm.runInContext(fs.readFileSync(path.join(root,'frontend/assets/app.js'),'utf8'),context,{importModuleDynamically:moduleFor});
  await until(()=>w.document.querySelector('#identity').textContent==='LOCAL UI TEST');
  await until(()=>w.document.querySelector('#pkg').value==='Example App');
  for(const page of ['admin','bulk','history','workspace']){w.document.querySelector(`[data-page="${page}"]`).click();assert(w.document.querySelector('#'+page).classList.contains('active'));assert(w.document.querySelector('#pageTitle').textContent.trim().length>0)}
@@ -23,9 +32,11 @@ async function until(fn){for(let i=0;i<100;i++){if(fn())return;await sleep(30)}t
  const trigger=w.document.querySelector('#targetActions .toolmenu-btn');trigger.click();assert.equal(trigger.getAttribute('aria-expanded'),'true');trigger.click();assert.equal(trigger.getAttribute('aria-expanded'),'false');trigger.click();w.document.body.click();assert.equal(trigger.getAttribute('aria-expanded'),'false');
  assert.equal(w.document.querySelector('nav [aria-current="page"]').dataset.page,'workspace');
  assert.equal(w.document.querySelector('#pageTitle').textContent,'Workspace');
- const commandButton=w.document.querySelector('#openCommands');commandButton.focus();commandButton.click();assert(!w.document.querySelector('#commandOverlay').classList.contains('hidden'));
- const commandSearch=w.document.querySelector('#commandSearch');commandSearch.value='history';commandSearch.dispatchEvent(new w.Event('input',{bubbles:true}));assert.equal(w.document.querySelectorAll('#commandList button').length,1);commandSearch.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Enter',bubbles:true}));await sleep(20);assert(w.document.querySelector('#history').classList.contains('active'));assert.equal(w.document.activeElement,commandButton);
- w.document.dispatchEvent(new w.KeyboardEvent('keydown',{key:'k',ctrlKey:true,bubbles:true}));assert(!w.document.querySelector('#commandOverlay').classList.contains('hidden'));commandSearch.value='zzzznonexistent';commandSearch.dispatchEvent(new w.Event('input',{bubbles:true}));assert(w.document.querySelector('.command-empty'));w.document.querySelector('#closeCommands').click();
+ await until(()=>w.document.querySelector('.atlas-palette-mount')?.shadowRoot);
+ const palette=w.document.querySelector('.atlas-palette-mount').shadowRoot,commandButton=palette.querySelector('#atlas-commands'),commandSearch=palette.querySelector('input');
+ commandButton.focus();commandButton.click();await until(()=>palette.querySelector('dialog').open);
+ await sleep(100);commandSearch.value='> history';commandSearch.dispatchEvent(new w.Event('input',{bubbles:true}));assert.equal(palette.querySelectorAll('[role=option]').length,1);commandSearch.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Enter',bubbles:true}));await sleep(30);assert(w.document.querySelector('#history').classList.contains('active'));assert.equal(palette.activeElement,commandButton);
+ w.document.dispatchEvent(new w.KeyboardEvent('keydown',{key:'k',ctrlKey:true,bubbles:true}));await until(()=>palette.querySelector('dialog').open);await sleep(100);commandSearch.value='> zzzznonexistent';commandSearch.dispatchEvent(new w.Event('input',{bubbles:true}));assert.equal(palette.querySelectorAll('[role=option]').length,0);palette.querySelector('.palette-close').click();
  w.document.querySelector('#openShortcuts').click();assert(!w.document.querySelector('#shortcutHelp').classList.contains('hidden'));w.document.querySelector('#closeShortcutHelp').click();
  w.document.querySelector('[data-page="workspace"]').click();
  const users=await(await fetch(base+'/api/search?term=smith')).json();assert(users.users.length);

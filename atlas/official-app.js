@@ -412,7 +412,15 @@ function renderPlan(){
 setFloor(2);setView(view);
 
 if(!readOnly){
- const sheet=document.createElement('link');sheet.rel='stylesheet';sheet.href='/command-palette.css';document.head.append(sheet);
  const {installCommandPalette}=await import('./command-palette.js');
- installCommandPalette({getRecords:()=>records,onSelect:id=>{ $('#search').value='';$('#scope').value='all';$('#team').value='all';selectRecord(id)},toast});
+ const {commandUrl,MAP_COMMANDS}=await import('./command-registry.js');
+ const handlers={atlas:()=>{},catalogue:()=>$('#ops-catalog').click(),settings:()=>$('#ops-settings').click(),database:()=>location.assign('/manage-database'),view:()=>$('#three-d-toggle').click(),reset:()=>$('#reset').click(),refresh:()=>location.reload()};
+ const runCommand=id=>{if(handlers[id])handlers[id]();else location.assign(commandUrl(id,operations.getTarget()||(!selected?new URLSearchParams(location.search).get('machine'):'')||''))};
+ installCommandPalette({getRecords:()=>records,onSelect:id=>{ $('#search').value='';$('#scope').value='all';$('#team').value='all';selectRecord(id)},toast,runCommand,triggerParent:document.querySelector('.header-right'),openPerson:value=>location.assign('/installer?'+new URLSearchParams({person:value})),openMachine:value=>location.assign('/installer?'+new URLSearchParams({machine:value}))});
+ const params=new URLSearchParams(location.search),desk=params.get('desk'),command=params.get('command');
+ if(desk&&records.some(r=>r.id===desk))selectRecord(desk);
+ if(command&&MAP_COMMANDS.has(command)){
+  const url=new URL(location.href);url.searchParams.delete('command');history.replaceState(null,'',url);
+  runCommand(command);
+ }
 }

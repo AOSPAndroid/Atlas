@@ -15,3 +15,5 @@ config.json
 # Historical transfer builders are no longer distributed.
 Build-Transfer.py
 Build-Transfer.bat
+
+node_modules/

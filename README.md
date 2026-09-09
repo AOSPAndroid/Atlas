@@ -20,11 +20,11 @@ Use the host computer's Wi-Fi/Ethernet IPv4 address in place of `YOUR-IP`. The l
 
 To change ports, set `ATLAS_ADMIN_PORT` and `ATLAS_VIEWER_PORT` before launching; they must be different. Logs are in `logs/admin-startup.log` and `logs/viewer-startup.log`.
 
-## Admin command palette
+## One command palette across Atlas and the IT console
 
-Press **Ctrl+K** (or **Cmd+K** on a Mac browser), or click **Search Atlas** in the map header. Search people, machines, desk codes, teams and admin views in one place. Use arrow keys and Enter to open a result, and Escape to close.
+Press **Ctrl+K** (or **Cmd+K** on a Mac browser), or click **Search Atlas** in either header. Search people, machines, desk codes, teams and admin views in one place. Use arrow keys and Enter to open a result, and Escape to close.
 
-Use `person:`, `machine:`, `desk:` or `>` to narrow results. People with a single mapped desk open on the map; multiple locations offer a choice. Unmapped people and machines open selected in the existing IT console. Name-only desk matches are identified as unconfirmed. Actions open the existing admin interface and keep its review/confirmation flow. The shared viewer does not expose this admin palette.
+Use `person:`, `machine:`, `desk:` or `>` to narrow results. People with a single mapped desk open on the map; multiple locations offer a choice. Unmapped people and machines open selected in the existing IT console. Name-only desk matches are identified as unconfirmed. Actions open the existing admin interface and keep its review/confirmation flow. Both admin views load the same component, isolated stylesheet and 25-command catalogue. Commands belonging to the other view navigate there; selected machines carry across where available. Deployment, file-access and remote-operation commands open their existing controls for review. The shared viewer does not expose this admin palette.
 
 ## Shared viewer
 
@@ -55,3 +55,12 @@ py -3.12 launcher.py stop
 ```
 
 `backend/main.py` hosts admin routes; `backend/viewer.py` hosts shared read routes; `directory_lookup.py` shares database-only lookup queries; `atlas/official-app.js` renders the common map; `atlas/viewer.js` provides read-only user and machine inspection.
+
+UI regression checks (Node.js):
+
+```powershell
+npm ci
+npm run test:palette
+# With tests/serve_ui_fixture.py running in another terminal:
+node --experimental-vm-modules tests/console_dom.cjs
+```

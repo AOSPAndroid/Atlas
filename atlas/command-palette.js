@@ -1,24 +1,20 @@
+import {COMMANDS} from './command-registry.js';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const normalize=s=>String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
 
-export function installCommandPalette({getRecords,onSelect,toast}){
- const trigger=document.createElement('button');trigger.id='atlas-commands';trigger.innerHTML='Search Atlas <kbd>Ctrl K</kbd>';trigger.setAttribute('aria-label','Search Atlas commands (Ctrl+K)');document.querySelector('.header-right').prepend(trigger);
+export function installCommandPalette({getRecords,onSelect,toast,runCommand,openPerson,openMachine,prepare,triggerParent,replaceTrigger}){
+ const mount=document.createElement('span');mount.className='atlas-palette-mount';
+ if(replaceTrigger)replaceTrigger.replaceWith(mount);else triggerParent.prepend(mount);
+ const root=mount.attachShadow({mode:'open'});
+ const sheet=document.createElement('link');sheet.rel='stylesheet';sheet.href='/command-palette.css';root.append(sheet);
+ const trigger=document.createElement('button');trigger.id='atlas-commands';trigger.innerHTML='Search Atlas <kbd>Ctrl K</kbd>';trigger.setAttribute('aria-label','Search Atlas commands (Ctrl+K)');root.append(trigger);
  const dialog=document.createElement('dialog');dialog.className='atlas-palette';dialog.setAttribute('aria-label','Search Atlas');
  dialog.innerHTML='<div class="palette-input-row"><span aria-hidden="true">⌕</span><input id="atlas-command-input" placeholder="Search people, machines, desks or actions…" aria-label="Search people, machines, desks or actions" role="combobox" aria-autocomplete="list" aria-expanded="true" aria-controls="atlas-command-results" autocomplete="off"><button class="palette-close" aria-label="Close search">Esc</button></div><div id="atlas-command-status" role="status" aria-live="polite"></div><div id="atlas-command-results" role="listbox" aria-label="Atlas search results"></div><footer><span>↑ ↓ Navigate · Enter Open · Esc Close</span><span>Try person:, machine:, desk: or &gt; for actions</span></footer>';
- document.body.append(dialog);
+ root.append(dialog);
  const input=dialog.querySelector('input'),list=dialog.querySelector('[role=listbox]'),status=dialog.querySelector('[role=status]');
  let rows=[],active=0,generation=0,timer,controller,previousFocus;
- const openConsole=(key,value)=>location.assign('/installer?'+new URLSearchParams({[key]:value}));
- const actions=[
-  {title:'Package catalogue',detail:'Browse applications and scripts',keywords:'software packages apps catalogue',run:()=>document.querySelector('#ops-catalog').click()},
-  {title:'Settings',detail:'Configure the package repository',keywords:'settings configuration repository',run:()=>document.querySelector('#ops-settings').click()},
-  {title:'Deployment history',detail:'Review recent operations',keywords:'deployments history jobs results',run:()=>document.querySelector('#ops-history').click()},
-  {title:'IT console',detail:'Open deployment and remote administration tools',keywords:'deploy install repair uninstall remote admin tools console',run:()=>location.assign('/installer')},
-  {title:'Manage database',detail:'Open directory imports and seating tools',keywords:'database import excel seating move',run:()=>location.assign('/manage-database')},
-  {title:'Switch 2D / 3D map',detail:'Change the current map view',keywords:'map view 2d 3d',run:()=>document.querySelector('#three-d-toggle').click()},
-  {title:'Reset map view',detail:'Fit the current floor',keywords:'reset zoom floor map',run:()=>document.querySelector('#reset').click()},
-  {title:'Refresh records',detail:'Load the latest seating changes',keywords:'refresh reload records',run:()=>location.reload()}
- ].map(a=>({...a,kind:'Action'}));
+ const openConsole=(key,value)=>key==='person'?openPerson(value):openMachine(value);
+ const actions=COMMANDS.map(a=>({...a,run:()=>runCommand(a.id)}));
  function invalidate(){generation++;clearTimeout(timer);controller?.abort()}
  function close(){invalidate();dialog.close()}
  function setActive(index){
@@ -40,10 +36,10 @@ export function installCommandPalette({getRecords,onSelect,toast}){
     if(request!==generation||!dialog.open)return;
     const desks=data.desks.filter(d=>getRecords().some(r=>r.id===d.id));
     if(desks.length===1){close();onSelect(desks[0].id);if(desks[0].match!=='confirmed account link')toast('Desk matched by name; account link is not confirmed.');return}
-    if(!desks.length){close();openConsole('person',row.person);return}
+    if(!desks.length){close();await openConsole('person',row.person);return}
     render(desks.map(d=>({kind:'Desk',title:d.id,detail:`${row.title} · Floor ${d.floor} · ${d.match}`,run:()=>onSelect(d.id)})).concat({kind:'Person',title:'Open person in IT console',detail:row.title,run:()=>openConsole('person',row.person)}),'Multiple desk matches — choose a location.');
    }catch(e){if(e.name!=='AbortError'&&request===generation)status.textContent=e.message}
-  }else{close();try{row.run()}catch(e){toast(e.message)}}
+  }else{close();try{await row.run()}catch(e){toast(e.message)}}
  }
  function search(){
   invalidate();const request=generation,raw=input.value.trim();
@@ -68,11 +64,12 @@ export function installCommandPalette({getRecords,onSelect,toast}){
    }catch(e){if(e.name!=='AbortError'&&request===generation&&dialog.open)render(local,e.message)}
   },180);
  }
- function open(){
+ async function open(){
   if(dialog.open){input.focus();return}
   // Do not interrupt an existing edit/confirmation dialog.
   if(document.querySelector('dialog[open]'))return;
-  previousFocus=document.activeElement;dialog.showModal();input.value='';search();input.focus();
+  previousFocus=document.activeElement?.shadowRoot?.activeElement||document.activeElement;dialog.showModal();input.value='';search();input.focus();
+  if(prepare){try{await prepare();if(dialog.open)search()}catch{if(dialog.open)status.textContent='Map records unavailable. Directory and commands are still available.'}}
  }
  trigger.onclick=open;input.oninput=search;
  dialog.querySelector('.palette-close').onclick=close;
@@ -80,5 +77,7 @@ export function installCommandPalette({getRecords,onSelect,toast}){
  dialog.addEventListener('cancel',invalidate);
  dialog.addEventListener('click',e=>{const option=e.target.closest('[data-index]');if(option)choose(+option.dataset.index);else if(e.target===dialog){const box=dialog.getBoundingClientRect();if(e.clientX<box.left||e.clientX>box.right||e.clientY<box.top||e.clientY>box.bottom)close()}});
  dialog.addEventListener('keydown',e=>{if(e.isComposing)return;if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();setActive(active+(e.key==='ArrowDown'?1:-1))}else if(e.key==='Enter'&&e.target===input){e.preventDefault();choose(active)}});
+ root.addEventListener('keydown',e=>{if(dialog.open)e.stopPropagation()});
  window.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){e.preventDefault();open()}});
+ return {open,close,dialog,root};
 }

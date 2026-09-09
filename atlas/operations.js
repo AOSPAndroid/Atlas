@@ -120,5 +120,5 @@ export function createOperations({onSelect,token,getSelection,onChange,toast}){
    const d=await api('/api/atlas/import-db',{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:f});await onChange();toast(d.already_imported?'This backup was already imported':`${d.imported} desk records imported`);
   }catch(e){toast(e.message)}finally{e.target.value=''}
  };
- return {select,clear};
+ return {select,clear,getTarget:()=>target};
 }

@@ -97,21 +97,11 @@ async function pauseDeploymentQueue(){if(activeQueueId)await api('/api/queue/'+a
 function machineContext(event,index){event.preventDefault();event.stopPropagation();const m=S.machines[index],menu=document.querySelector('#machineMenu');menu.innerHTML=`<button data-cmd="target">Set as target</button><button data-cmd="copy">Copy hostname</button><button data-cmd="details">Copy machine details</button><button data-cmd="msra">Open MSRA</button><button data-cmd="cshare">Open C$</button><button data-cmd="temp">Open C:\\Temp</button><button data-cmd="packages">Open Packages</button><button data-cmd="admin">Remote Admin</button><button data-cmd="queue">Add deployment to queue</button><button data-cmd="clean">Clean package folder</button>`;menu.style.left=Math.min(event.clientX,window.innerWidth-210)+'px';menu.style.top=Math.min(event.clientY,window.innerHeight-360)+'px';menu.classList.remove('hidden');menu.querySelectorAll('[data-cmd]').forEach(b=>b.onclick=()=>{const cmd=b.dataset.cmd;setTarget(m.name,m.operational_status);if(cmd==='copy')copy(m.name,'Hostname');if(cmd==='details')copy(JSON.stringify(m,null,2),'Machine details');if(['msra','cshare','temp','packages'].includes(cmd))openTargetTool(cmd);if(cmd==='admin')page('admin');if(cmd==='queue')addQueue();if(cmd==='clean')cleanPackages();menu.classList.add('hidden')})}
 function bindMachineContext(){document.querySelectorAll('[data-machine]').forEach(card=>card.oncontextmenu=e=>machineContext(e,Number(card.dataset.machine)))}
 const machineObserverV24=new MutationObserver(bindMachineContext);const machineHostV24=document.querySelector('#machines');if(machineHostV24)machineObserverV24.observe(machineHostV24,{childList:true,subtree:true});
-const commands=[
- ['Focus search','/ ',()=>document.querySelector('#search').focus()],['Deploy package','Ctrl+D',()=>deploy('full')],['Copy package only','Ctrl+Shift+D',()=>deploy('copy')],['Add deployment to queue','',addQueue],['Open deployment queue','',()=>document.querySelector('#queueDrawer').classList.add('open')],['Open MSRA','Ctrl+M',()=>openTargetTool('msra')],['Open C$','Ctrl+Shift+C',()=>openTargetTool('cshare')],['Open Remote Admin','Ctrl+R',()=>page('admin')],['Check target health','',refreshTargetHealth],['Clean package folder','',cleanPackages],['Copy support summary','',()=>copy(supportSummary(),'Support summary')],['Open Bulk Deploy','',()=>page('bulk')],['Open History','',()=>page('history')]
-];
-let paletteFocus=null,paletteIndex=0;
-function openPalette(){const o=document.querySelector('#commandOverlay');if(o.classList.contains('hidden'))paletteFocus=document.activeElement;o.classList.remove('hidden');document.querySelector('#commandSearch').value='';renderCommands('');document.querySelector('#commandSearch').focus()}
-function closePalette(){const o=document.querySelector('#commandOverlay');if(o.classList.contains('hidden'))return;o.classList.add('hidden');if(paletteFocus?.isConnected)paletteFocus.focus();paletteFocus=null}
-function selectCommand(index){const rows=[...document.querySelectorAll('#commandList button')];paletteIndex=rows.length?(index+rows.length)%rows.length:0;rows.forEach((r,i)=>r.classList.toggle('command-selected',i===paletteIndex));}
-function renderCommands(q){
- const words=q.toLowerCase().trim().split(/\s+/);const seen=new Set();
- const list=commands.filter(x=>{const key=x[0].toLowerCase();if(seen.has(key))return false;seen.add(key);return words.every(w=>(key+' '+x[1].toLowerCase()).includes(w))});
- document.querySelector('#commandList').innerHTML=list.length?list.map(x=>`<button data-command="${commands.indexOf(x)}"><span>${esc(x[0])}</span>${x[1]?`<kbd>${esc(x[1])}</kbd>`:''}</button>`).join(''):'<p class="empty command-empty">No matching commands. Try “queue”, “search” or “history”.</p>';
- document.querySelectorAll('[data-command]').forEach(b=>b.onclick=()=>{closePalette();Promise.resolve().then(()=>commands[+b.dataset.command][2]()).catch(e=>toast(e.message))});selectCommand(0);
-}
+let sharedPalette=null,sharedPaletteReady;
+function openPalette(){return sharedPaletteReady?.then(p=>p.open()).catch(e=>toast(e.message))}
+function closePalette(){sharedPalette?.close()}
 function typing(){const a=document.activeElement;return a&&['INPUT','TEXTAREA','SELECT'].includes(a.tagName)}
-function bindV24(){loadFreshness();renderQueue();bindMachineContext();document.querySelector('#queueToggle').onclick=()=>document.querySelector('#queueDrawer').classList.toggle('open');document.querySelector('#closeQueue').onclick=()=>document.querySelector('#queueDrawer').classList.remove('open');document.querySelector('#startQueue').onclick=()=>startDeploymentQueue().catch(e=>toast(e.message));document.querySelector('#pauseQueue').onclick=()=>pauseDeploymentQueue().catch(e=>toast(e.message));document.querySelector('#clearQueue').onclick=()=>{if(queueRunning)return toast('Queue is running');deploymentQueue=deploymentQueue.filter(x=>x.state==='running');renderQueue()};document.querySelector('#commandSearch').oninput=e=>renderCommands(e.target.value);document.querySelector('#commandOverlay').onclick=e=>{if(e.target.id==='commandOverlay')closePalette()};document.addEventListener('click',()=>document.querySelector('#machineMenu').classList.add('hidden'));document.addEventListener('keydown',e=>{if(e.ctrlKey&&e.key.toLowerCase()==='k'){e.preventDefault();openPalette();return}if(e.key==='Escape'){closePalette();document.querySelector('#machineMenu').classList.add('hidden');return}if(typing())return;if(e.key==='/'){e.preventDefault();document.querySelector('#search').focus()}if(e.ctrlKey&&!e.shiftKey&&e.key.toLowerCase()==='d'){e.preventDefault();deploy('full')}if(e.ctrlKey&&e.shiftKey&&e.key.toLowerCase()==='d'){e.preventDefault();deploy('copy')}if(e.ctrlKey&&e.key.toLowerCase()==='m'){e.preventDefault();openTargetTool('msra')}if(e.ctrlKey&&e.shiftKey&&e.key.toLowerCase()==='c'){e.preventDefault();openTargetTool('cshare')}if(e.ctrlKey&&e.key.toLowerCase()==='r'){e.preventDefault();page('admin')}})}
+function bindV24(){loadFreshness();renderQueue();bindMachineContext();document.querySelector('#queueToggle').onclick=()=>document.querySelector('#queueDrawer').classList.toggle('open');document.querySelector('#closeQueue').onclick=()=>document.querySelector('#queueDrawer').classList.remove('open');document.querySelector('#startQueue').onclick=()=>startDeploymentQueue().catch(e=>toast(e.message));document.querySelector('#pauseQueue').onclick=()=>pauseDeploymentQueue().catch(e=>toast(e.message));document.querySelector('#clearQueue').onclick=()=>{if(queueRunning)return toast('Queue is running');deploymentQueue=deploymentQueue.filter(x=>x.state==='running');renderQueue()};document.addEventListener('click',()=>document.querySelector('#machineMenu').classList.add('hidden'));document.addEventListener('keydown',e=>{if(e.ctrlKey&&e.key.toLowerCase()==='k'){e.preventDefault();openPalette();return}if(e.key==='Escape'){closePalette();document.querySelector('#machineMenu').classList.add('hidden');return}if(typing())return;if(e.key==='/'){e.preventDefault();document.querySelector('#search').focus()}if(e.ctrlKey&&!e.shiftKey&&e.key.toLowerCase()==='d'){e.preventDefault();deploy('full')}if(e.ctrlKey&&e.shiftKey&&e.key.toLowerCase()==='d'){e.preventDefault();deploy('copy')}if(e.ctrlKey&&e.key.toLowerCase()==='m'){e.preventDefault();openTargetTool('msra')}if(e.ctrlKey&&e.shiftKey&&e.key.toLowerCase()==='c'){e.preventDefault();openTargetTool('cshare')}if(e.ctrlKey&&e.key.toLowerCase()==='r'){e.preventDefault();page('admin')}})}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bindV24);else bindV24();
 
 
@@ -256,12 +246,6 @@ function bindDeploymentMonitor(){
   document.querySelector('#refreshDeployments').onclick=()=>refreshDeploymentMonitor('active');
   document.querySelector('#showRecentDeployments').onclick=()=>refreshDeploymentMonitor('recent');
   document.querySelector('#autoDeployments').onchange=()=>refreshDeploymentMonitor(deploymentMonitorMode);
-  commands.push(
-    ['Open ongoing deployments','Ctrl+Shift+L',()=>openDeploymentMonitor('active')],
-    ['Open recent deployment logs','',()=>openDeploymentMonitor('recent')],
-    ['Refresh deployment monitor','',()=>refreshDeploymentMonitor('active')],
-    ['Open deployment queue','',()=>document.querySelector('#queueDrawer').classList.add('open')]
-  );
   document.addEventListener('keydown',event=>{
     if(event.ctrlKey&&event.shiftKey&&event.key.toLowerCase()==='l'){
       event.preventDefault();openDeploymentMonitor('active');
@@ -280,15 +264,6 @@ function bindBottomDock(){
   document.querySelectorAll('nav [data-page]').forEach(button=>{
     button.title=button.querySelector('.nav-label')?.textContent||button.textContent.trim();
   });
-  if(typeof commands!=='undefined'){
-    const existing=new Set(commands.map(item=>item[0]));
-    [
-      ['Go to Workspace','Alt+1',()=>page('workspace')],
-      ['Go to Remote Admin','Alt+2',()=>page('admin')],
-      ['Go to Bulk Deploy','Alt+3',()=>page('bulk')],
-      ['Go to History','Alt+4',()=>page('history')]
-    ].forEach(command=>{if(!existing.has(command[0]))commands.push(command)});
-  }
   document.addEventListener('keydown',event=>{
     if(!event.altKey||event.ctrlKey||event.shiftKey)return;
     const map={'1':'workspace','2':'admin','3':'bulk','4':'history'};
@@ -318,15 +293,6 @@ const shortcutRegistry=[
   {label:'Show keyboard shortcuts',keys:'?',run:()=>openShortcutHelp()}
 ];
 function normaliseKeys(value){return String(value||'').replace(/\s+/g,'').toLowerCase()}
-function ensurePaletteShortcuts(){
-  if(typeof commands==='undefined')return;
-  const byLabel=new Map(commands.map(item=>[String(item[0]).toLowerCase(),item]));
-  shortcutRegistry.forEach(shortcut=>{
-    const existing=byLabel.get(shortcut.label.toLowerCase());
-    if(existing){existing[1]=shortcut.keys;existing[2]=shortcut.run}
-    else commands.push([shortcut.label,shortcut.keys,shortcut.run]);
-  });
-}
 function renderShortcutHelp(){
   const host=document.querySelector('#shortcutHelpList');if(!host)return;
   host.innerHTML=shortcutRegistry.map(item=>`<button data-shortcut-label="${esc(item.label)}"><span>${esc(item.label)}</span><kbd>${esc(item.keys)}</kbd></button>`).join('');
@@ -347,10 +313,10 @@ function shortcutEventKey(event){
   let key=event.key.toLowerCase();if(key===' ')key='space';if(key==='?'&&!event.ctrlKey&&!event.altKey&&!event.metaKey)return '?';parts.push(key);return parts.join('+');
 }
 function bindPaletteShortcuts(){
-  ensurePaletteShortcuts();
   document.querySelector('#closeShortcutHelp').onclick=closeShortcutHelp;
   document.querySelector('#shortcutHelp').onclick=event=>{if(event.target.id==='shortcutHelp')closeShortcutHelp()};
   document.addEventListener('keydown',event=>{
+    if(event.composedPath().some(node=>node.classList?.contains('atlas-palette-mount')))return;
     if(event.key==='Escape'){closeAllOverlays();return}
     const active=document.activeElement;const isTyping=active&&['INPUT','TEXTAREA','SELECT'].includes(active.tagName);
     if(isTyping&&normaliseKeys(shortcutEventKey(event))!=='ctrl+k')return;
@@ -375,9 +341,7 @@ function bindTerminalUI(){
   updateTerminalStatus();setInterval(updateTerminalStatus,1000);
   const title=document.querySelector('#pageTitle');if(title&&!title.dataset.terminalTitle){title.dataset.terminalTitle='1'}
   const observer=new MutationObserver(updateTerminalStatus);const nav=document.querySelector('nav');if(nav)observer.observe(nav,{attributes:true,subtree:true,attributeFilter:['class']});
-  if(typeof commands!=='undefined'&&!commands.some(x=>x[0]==='Toggle terminal scanlines')){
-    commands.push(['Toggle terminal scanlines','',()=>document.body.classList.toggle('no-scanlines')]);
-  }
+
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bindTerminalUI);else bindTerminalUI();
 
@@ -423,7 +387,7 @@ function domainAccountFromDaaS(){const login=daasState?.user?.users?.[0]?.login_
 function injectDomainAccount(){const card=document.querySelector('#kyc .usercard');if(!card||card.querySelector('.domain-account-fact'))return;const login=domainAccountFromDaaS();if(!login)return;const facts=card.querySelector('.facts');if(facts){const span=document.createElement('span');span.className='domain-account-fact';span.innerHTML=`Domain account<b>${esc(login)}</b>`;facts.appendChild(span)}const bar=card.querySelector('.copybar');if(bar){const b=document.createElement('button');b.textContent='Copy domain account';b.onclick=()=>copy(login,'Domain account');bar.appendChild(b)}}
 const v28BaseRenderDaaSUser=renderDaaSUser;renderDaaSUser=function(){v28BaseRenderDaaSUser();injectDomainAccount()};
 const v28BaseMachineContext=machineContext;machineContext=function(event,index){v28BaseMachineContext(event,index);const menu=document.querySelector('#machineMenu'),m=S.machines[index];if(!menu||!m)return;const software=document.createElement('button');software.textContent='Software inventory';software.onclick=()=>{setTarget(m.name,m.operational_status);menu.classList.add('hidden');loadSoftware(m.name)};const report=document.createElement('button');report.textContent='Copy complete machine report';report.onclick=()=>{setTarget(m.name,m.operational_status);menu.classList.add('hidden');copy(completeMachineReport(),'Machine report')};menu.append(software,report)};
-function bindV28(){applyV28Dock();applySwitches();v28SwitchObserver.observe(document.body,{childList:true,subtree:true});document.querySelector('#closeSoftware').onclick=()=>document.querySelector('#softwareDrawer').classList.remove('open');document.querySelector('#refreshSoftware').onclick=()=>loadSoftware(v28.softwareTarget||S.target,true);document.querySelector('#copySoftware').onclick=()=>copy(softwareReport(),'Software report');document.querySelector('#exportSoftware').onclick=exportSoftwareCsv;document.querySelector('#softwareFilter').oninput=renderSoftware;document.querySelector('#pkg')?.addEventListener('change',updatePackagePresence);commands.push(['Open software inventory','Ctrl+Shift+I',()=>loadSoftware(S.target)],['Copy complete machine report','Ctrl+Shift+R',()=>copy(completeMachineReport(),'Machine report')]);document.addEventListener('keydown',event=>{if(event.ctrlKey&&event.shiftKey&&event.key.toLowerCase()==='i'){event.preventDefault();loadSoftware(S.target)}if(event.ctrlKey&&event.shiftKey&&event.key.toLowerCase()==='r'){event.preventDefault();copy(completeMachineReport(),'Machine report')}});if(S.target)refreshTargetHealth()}
+function bindV28(){applyV28Dock();applySwitches();v28SwitchObserver.observe(document.body,{childList:true,subtree:true});document.querySelector('#closeSoftware').onclick=()=>document.querySelector('#softwareDrawer').classList.remove('open');document.querySelector('#refreshSoftware').onclick=()=>loadSoftware(v28.softwareTarget||S.target,true);document.querySelector('#copySoftware').onclick=()=>copy(softwareReport(),'Software report');document.querySelector('#exportSoftware').onclick=exportSoftwareCsv;document.querySelector('#softwareFilter').oninput=renderSoftware;document.querySelector('#pkg')?.addEventListener('change',updatePackagePresence);document.addEventListener('keydown',event=>{if(event.ctrlKey&&event.shiftKey&&event.key.toLowerCase()==='i'){event.preventDefault();loadSoftware(S.target)}if(event.ctrlKey&&event.shiftKey&&event.key.toLowerCase()==='r'){event.preventDefault();copy(completeMachineReport(),'Machine report')}});if(S.target)refreshTargetHealth()}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bindV28);else bindV28();
 
 
@@ -697,21 +661,8 @@ function bindConsolePolish(){
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bindConsolePolish);else bindConsolePolish();
 
 function bindCommandDiscovery(){
- document.querySelector('#openCommands').onclick=openPalette;
  document.querySelector('#openShortcuts').onclick=openShortcutHelp;
- document.querySelector('#closeCommands').onclick=closePalette;
  document.querySelector('#closeShortcutHelp').setAttribute('aria-label','Close keyboard shortcuts');
- const overlay=document.querySelector('#commandOverlay');
- overlay.addEventListener('keydown',e=>{
-  const buttons=[...document.querySelectorAll('#commandList button')];
-  if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();const focused=buttons.indexOf(document.activeElement);selectCommand((focused<0?paletteIndex:focused)+(e.key==='ArrowDown'?1:-1));if(focused>=0)buttons[paletteIndex]?.focus();buttons[paletteIndex]?.scrollIntoView?.({block:'nearest'})}
-  if(e.key==='Enter'&&e.target.id==='commandSearch'){e.preventDefault();buttons[paletteIndex]?.click()}
-  if(e.key==='Tab'){const focusable=[...overlay.querySelectorAll('button,input')];const first=focusable[0],last=focusable[focusable.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}}
- });
- document.addEventListener('keydown',e=>{if(e.metaKey&&e.key.toLowerCase()==='k'){e.preventDefault();openPalette()}});
- // Retire duplicate navigation aliases and obsolete visual-only commands.
- const obsolete=new Set(['Toggle terminal scanlines','Go to Workspace','Go to Remote Admin','Go to Bulk Deploy','Go to History','Open Remote Admin','Open Bulk Deploy','Open History','Deploy package','Check target health']);
- for(let i=commands.length-1;i>=0;i--)if(obsolete.has(commands[i][0]))commands.splice(i,1);
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bindCommandDiscovery);else bindCommandDiscovery();
 
@@ -731,10 +682,61 @@ completeMachineReport=function(){
 /* Main-map palette links select records; they never execute remote actions. */
 async function openPaletteTarget(){
  const params=new URLSearchParams(location.search),person=params.get('person'),machine=params.get('machine');
- if(!person&&!machine)return;
+ if(!person&&!machine){await runInitialSharedCommand(params);return;}
  try{
   if(person){if(!/^id:\d+$/.test(person))throw Error('Invalid person link');clearLookup();await loadUser(person,++lookupSequence)}
   else{document.querySelector('#search').value='machine:'+machine;await search();if(S.machines.some(m=>m.name===machine))setTarget(machine,'Selected from Atlas map')}
+  await runInitialSharedCommand(params);
  }catch(error){toast('Could not open palette result: '+error.message)}
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>queueMicrotask(openPaletteTarget));else queueMicrotask(openPaletteTarget);
+
+// Shared palette adapter: the catalogue, renderer and shortcuts live in one module.
+async function runInitialSharedCommand(params){
+ const id=params.get('command');if(!id)return;
+ const {COMMANDS}=await import('/command-registry.js');
+ if(!COMMANDS.some(c=>c.id===id))return;
+ const url=new URL(location.href);url.searchParams.delete('command');window.history.replaceState(null,'',url);
+ await runSharedCommand(id);
+}
+async function runSharedCommand(id){
+ const {MAP_COMMANDS,commandUrl}=await import('/command-registry.js');
+ if(MAP_COMMANDS.has(id)){location.assign(commandUrl(id,S.target));return}
+ const focus=(selector,needsTarget=false)=>{
+  page('workspace');
+  if(needsTarget&&!S.target){toast('Select a machine first, then open this command again.');document.querySelector('#search').focus();return}
+  const control=document.querySelector(selector);control?.scrollIntoView({block:'center'});if(control&&!control.matches('button,input,select,textarea,a'))control.tabIndex=-1;control?.focus();
+ };
+ const toolMenu=(menuSelector,controlSelector)=>{
+  if(!S.target){focus('#search',true);return}
+  page('workspace');const menu=document.querySelector(menuSelector);
+  if(!menu.classList.contains('menu-open'))menu.querySelector('.toolmenu-btn').click();
+  menu.querySelector(controlSelector)?.focus();
+ };
+ const showReport=()=>{
+  if(!S.target){focus('#search',true);return}
+  const dialog=document.createElement('dialog');dialog.setAttribute('aria-label','Machine report');dialog.style.cssText='width:min(760px,94vw);max-height:85vh;padding:24px;border:1px solid #cbd5e1;border-radius:12px';
+  const title=document.createElement('h2');title.textContent='Machine report';const report=document.createElement('pre');report.style.whiteSpace='pre-wrap';report.textContent=completeMachineReport();
+  const button=document.createElement('button');button.textContent='Copy report';button.onclick=()=>copy(report.textContent,'Machine report');
+  const close=document.createElement('button');close.textContent='Close';close.onclick=()=>dialog.close();dialog.onclose=()=>dialog.remove();dialog.append(title,report,button,close);document.body.append(dialog);dialog.showModal();
+ };
+ const actions={
+  workspace:()=>page('workspace'),admin:()=>page('admin'),bulk:()=>page('bulk'),history:()=>page('history'),
+  active:()=>openDeploymentMonitor('active'),recent:()=>openDeploymentMonitor('recent'),queue:()=>document.querySelector('#queueDrawer').classList.add('open'),
+  deploy:()=>focus('#deploy'),copy:()=>focus('#copyOnly'),'queue-add':()=>toolMenu('#targetActions','[data-qol-action="queue"]'),
+  msra:()=>toolMenu('#targetTools','[data-tool="msra"]'),cshare:()=>toolMenu('#targetTools','[data-tool="cshare"]'),
+  health:()=>focus('#healthLine',true),cleanup:()=>focus('#cleanupPackages',true),summary:()=>focus('#copySupport',true),
+  software:()=>{page('admin');document.querySelector('#adminSoftware').focus()},report:showReport,shortcuts:openShortcutHelp
+ };
+ if(actions[id])actions[id]();
+}
+sharedPaletteReady=import('/command-palette.js').then(({installCommandPalette})=>{
+ let records=[];
+ sharedPalette=installCommandPalette({
+  getRecords:()=>records,prepare:async()=>{const state=await api('/api/official/state');records=state.records},toast,runCommand:runSharedCommand,
+  replaceTrigger:document.querySelector('#openCommands'),
+  onSelect:id=>location.assign('/?'+new URLSearchParams({desk:id})),
+  openPerson:async id=>{page('workspace');clearLookup();await loadUser(id,++lookupSequence)},
+  openMachine:async machine=>{page('workspace');document.querySelector('#search').value='machine:'+machine;await search();if(S.machines.some(m=>m.name===machine))setTarget(machine,'Selected from Atlas search')}
+ });return sharedPalette;
+});
