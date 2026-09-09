@@ -1,0 +1,657 @@
+from __future__ import annotations
+from datetime import datetime
+import base64, csv, io, json, logging, os, re, shutil, sqlite3, subprocess, threading, time, uuid
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
+from typing import Any, Literal
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, StreamingResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
+from directory_lookup import exact_users, linked_machines, search_directory, prepare_views
+
+ROOT=Path(__file__).resolve().parent.parent
+# V309_PATHS_START
+WEB=ROOT/'frontend'
+FRONTEND=WEB
+ASSETS=WEB/'assets'
+LOGS=ROOT/'logs'
+DATA=ROOT/'data'
+MASTER_DB=ROOT/'office_atlas.db'
+DB=MASTER_DB
+DAAS_DB=MASTER_DB
+HISTORY_DB=MASTER_DB
+LOGS.mkdir(parents=True,exist_ok=True)
+DATA.mkdir(parents=True,exist_ok=True)
+# V309_PATHS_END
+
+# V308_BOOTSTRAP_START
+# V308_BOOTSTRAP_END
+
+CONFIG=json.loads((ROOT/'config.json').read_text(encoding='utf-8')) if (ROOT/'config.json').exists() else {}
+REPO=Path(os.environ.get('WMI_PACKAGE_REPO') or CONFIG.get('package_repository') or str(Path.home()/'OneDrive - Barclays Bank PLC'/'Shortcuts'/'EPP_PACKAGE_REPO_BetaPackages - BetaPackages'))
+if not REPO.is_absolute(): REPO=ROOT/REPO
+REMOTE_ROOT=r'C:\Temp\Packages'; NW=0x08000000 if os.name=='nt' else 0
+logging.basicConfig(filename=LOGS/'application.log',level=logging.INFO,format='%(asctime)s %(levelname)s %(message)s')
+app=FastAPI(title='WMI Packager Web v2',docs_url='/api/docs',redoc_url=None)
+jobs:dict[str,dict[str,Any]]={}; lock=threading.Lock()
+NAME_RE=re.compile(r'^[A-Za-z0-9_.-]{1,64}$')
+
+def norm(v):
+ s=str(v or '').strip().lower()
+ if '\\' in s:s=s.rsplit('\\',1)[-1]
+ if '@' in s:s=s.split('@',1)[0]
+ return s
+def validate_pc(pc):
+ pc=pc.strip().upper()
+ if not NAME_RE.fullmatch(pc) or pc.startswith(('-', '.')) or '..' in pc:raise HTTPException(400,'Invalid computer name')
+ return pc
+def quote(v):return "'"+str(v).replace("'","''")+"'"
+def unc(pc,p='C:'):return rf'\\{validate_pc(pc)}\{p.replace(":","$",1).lstrip(chr(92))}'
+def run(args,check=True,timeout=120):
+ p=subprocess.run(args,text=True,capture_output=True,timeout=timeout,creationflags=NW)
+ if check and p.returncode:raise RuntimeError((p.stderr or p.stdout or f'Exit code {p.returncode}').strip())
+ return p
+def ps(script,timeout=120):
+ encoded=base64.b64encode(script.encode('utf-16le')).decode('ascii')
+ return run(['powershell.exe','-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-EncodedCommand',encoded],timeout=timeout).stdout.strip()
+def source_db():
+ return db()
+def hist_db():
+ c=sqlite3.connect(HISTORY_DB,timeout=20,factory=ClosingConnection);c.row_factory=sqlite3.Row
+ c.execute('''create table if not exists deployments(id text primary key,started text,finished text,operator text,target text,package text,action text,script text,mode text,state text,robocopy_code text,pid text,exit_code text,details text)''');c.commit();return c
+def history_create(j,target,package,action,script,mode):
+ with hist_db() as c:c.execute('insert into deployments(id,started,operator,target,package,action,script,mode,state) values(?,datetime("now","localtime"),?,?,?,?,?,?,?)',(j,identity(),target,package,action,script,mode,'queued'));c.commit()
+def history_update(j,**fields):
+ if not fields:return
+ with hist_db() as c:c.execute('update deployments set '+','.join(f'{k}=?' for k in fields)+' where id=?',(*fields.values(),j));c.commit()
+def identity():return run(['whoami.exe']).stdout.strip()
+def emit(j,message,state=None,**extra):
+ with lock:
+  job=jobs[j];job['events'].append({'time':time.strftime('%H:%M:%S'),'message':message,**extra})
+  if state:job['state']=state
+
+def copy_pkg(src,dst,fresh=False,threads=8):
+ if fresh and os.path.exists(dst):shutil.rmtree(dst)
+ os.makedirs(dst,exist_ok=True)
+ p=run(['robocopy.exe',src,dst,'/E',f'/MT:{threads}','/R:1','/W:1','/Z','/FFT','/COPY:DAT','/DCOPY:DAT','/NFL','/NDL','/NP','/NJH','/NJS'],False,timeout=int(CONFIG.get('deployment_timeout_seconds',3600)))
+ if p.returncode>7:raise RuntimeError(f'Robocopy failed: {p.returncode}\n{p.stderr or p.stdout}')
+ return p.returncode
+def wmi_create(pc,cmd):
+ out=ps(f'$r=Invoke-WmiMethod -ComputerName {quote(pc)} -Class Win32_Process -Name Create -ArgumentList {quote(cmd)} -EA Stop;if($r.ReturnValue-ne 0){{throw "WMI start failed: $($r.ReturnValue)"}};$r.ProcessId')
+ return int(out.splitlines()[-1])
+def wmi_running(pc,pid):
+ return ps(f'[bool](Get-WmiObject -ComputerName {quote(pc)} Win32_Process -Filter {quote("ProcessId="+str(int(pid)))} -EA Stop)',timeout=30).lower()=='true'
+def launch(pc,remote,pkg):
+ token=uuid.uuid4().hex
+ safe=re.sub(r'[^A-Za-z0-9_.-]','_',pkg)[:60]
+ log=rf'C:\Temp\{safe}_{token}.log';ex=rf'C:\Temp\{safe}_{token}.exitcode'
+ invoke=f'& {quote(remote)} *>&1 | Out-File -LiteralPath {quote(log)} -Encoding utf8' if remote.lower().endswith('.ps1') else f'& cscript.exe //B //NoLogo {quote(remote)} *>&1 | Out-File -LiteralPath {quote(log)} -Encoding utf8'
+ # EncodedCommand avoids nested cmd/PowerShell quoting. Each attempt owns its result files.
+ payload=f"""$ErrorActionPreference='Stop'
+$ec=1
+try {{
+ Set-Location -LiteralPath (Split-Path -LiteralPath {quote(remote)})
+ Get-ChildItem -LiteralPath (Split-Path -LiteralPath {quote(remote)}) -Recurse -File -Filter *.ps1 | Unblock-File
+ $global:LASTEXITCODE=0
+ {invoke}
+ $ec=$LASTEXITCODE
+}} catch {{
+ $_ | Out-File -LiteralPath {quote(log)} -Append -Encoding utf8
+ $ec=1
+}} finally {{
+ [string]$ec | Out-File -LiteralPath {quote(ex)} -Encoding ascii
+}}
+exit $ec
+"""
+ encoded=base64.b64encode(payload.encode('utf-16le')).decode('ascii')
+ cmd='powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand '+encoded
+ return wmi_create(pc,cmd),log,ex
+def monitor(pc,pid,log,ex):
+ deadline=time.monotonic()+int(CONFIG.get('deployment_timeout_seconds',3600))
+ while wmi_running(pc,pid):
+  if time.monotonic()>deadline:raise RuntimeError('Monitoring timed out; remote installation may still be running. Inspect target before retrying.')
+  time.sleep(2)
+ eu,lu=Path(unc(pc,ex)),Path(unc(pc,log))
+ # Brief grace period for SMB visibility; absence is never success.
+ for _ in range(5):
+  if eu.is_file():break
+  time.sleep(1)
+ values=eu.read_text(encoding='utf-8-sig',errors='replace').splitlines() if eu.is_file() else []
+ ec=values[0].strip() if values else 'not written'
+ lines=lu.read_text(encoding='utf-8-sig',errors='replace').splitlines()[-100:] if lu.is_file() else []
+ return ec,lines
+
+class Deploy(BaseModel):computer:str;folder:str;script:str;action:Literal['Install','Uninstall','Repair']='Install';fresh:bool=False;threads:int=Field(8,ge=1,le=128);mode:Literal['full','copy','execute']='full'
+class Bulk(BaseModel):computers:list[str]=Field(min_length=1,max_length=200);folder:str;script:str;action:Literal['Install','Uninstall','Repair']='Install';fresh:bool=False;threads:int=Field(8,ge=1,le=128);concurrency:int=Field(5,ge=1,le=10)
+class Kill(BaseModel):computer:str;value:str
+class Machine(BaseModel):computer:str
+class DaaSMachineBatch(BaseModel):
+ computers:list[str]
+class QueueItem(BaseModel):
+ computer:str;folder:str;script:str;action:Literal['Install','Uninstall','Repair']='Install';fresh:bool=False;threads:int=Field(8,ge=1,le=128);mode:Literal['full','copy','execute']='full'
+class QueueRequest(BaseModel):
+ items:list[QueueItem]
+
+target_locks={}
+def target_lock(pc):
+ with lock:return target_locks.setdefault(pc,threading.Lock())
+
+def outcome(ec):
+ code=str(ec).strip()
+ if code=='0':return 'complete','Installer reported exit code 0'
+ if code in ('3010','1641'):return 'complete','Installer reported success; reboot required or initiated ('+code+')'
+ return 'failed','Installer failed or outcome unavailable: '+code
+
+def deploy_worker(j,p):
+ acquired=False;guard=None
+ try:
+  validate_deployment(p);pc=p.computer;pkg=Path(p.folder).name
+  guard=target_lock(pc);acquired=guard.acquire(blocking=False)
+  if not acquired:raise RuntimeError('Another deployment or cleanup is active on this target')
+  remote=rf'{REMOTE_ROOT}\{pkg}\{p.script}'
+  emit(j,'Validating target access','running');history_update(j,state='running')
+  if not os.path.isdir(unc(pc)):raise RuntimeError('Target administrative share is unavailable')
+  if p.mode!='execute':
+   emit(j,'Copying package...');rc=copy_pkg(p.folder,unc(pc,rf'{REMOTE_ROOT}\{pkg}'),p.fresh,p.threads)
+   emit(j,f'Copy complete. Robocopy: {rc}');history_update(j,robocopy_code=str(rc))
+  if p.mode=='copy':
+   emit(j,'Copy-only completed','complete');history_update(j,state='complete',finished=time.strftime('%Y-%m-%d %H:%M:%S'));return
+  pid,log,ex=launch(pc,remote,pkg);emit(j,f'Started PID {pid}',pid=pid);history_update(j,pid=str(pid))
+  ec,lines=monitor(pc,pid,log,ex);state,message=outcome(ec)
+  emit(j,message,state,log=lines,exit_code=ec)
+  history_update(j,state=state,exit_code=str(ec),finished=time.strftime('%Y-%m-%d %H:%M:%S'),details=message+'\n'+'\n'.join(lines[-20:]))
+ except Exception as e:
+  emit(j,str(e),'failed')
+  try:history_update(j,state='failed',finished=time.strftime('%Y-%m-%d %H:%M:%S'),details=str(e))
+  except Exception:logging.exception('Could not persist failed deployment')
+  logging.exception('deployment failed')
+ finally:
+  if acquired:guard.release()
+
+def bulk_worker(j,p):
+ rows=[{'machine':pc,'copy':'Waiting','launch':'Waiting','pid':'','completion':'','exit_code':'','details':''} for pc in p.computers]
+ jobs[j].update(state='running',phase='deploy',results=rows)
+ def work(row):
+  child=uuid.uuid4().hex;jobs[child]={'state':'queued','events':[]}
+  item=Deploy(computer=row['machine'],folder=p.folder,script=p.script,action=p.action,fresh=p.fresh,threads=p.threads)
+  row.update(copy='Running',completion='Running',job=child)
+  try:
+   history_create(child,item.computer,Path(item.folder).name,item.action,item.script,item.mode)
+   deploy_worker(child,item)
+   events=jobs[child]['events'];end=events[-1] if events else {}
+   row.update(copy='Complete' if any('Copy complete' in e['message'] for e in events) else 'Failed',launch='Started' if any('pid' in e for e in events) else 'Not started',pid=next((e['pid'] for e in events if 'pid' in e),''),completion='Complete' if jobs[child]['state']=='complete' else 'Failed',exit_code=end.get('exit_code',''),details=end.get('message',''))
+  except Exception as exc:row.update(copy='Failed',launch='Not started',completion='Failed',details=str(exc));jobs[child]['state']='failed'
+ try:
+  with ThreadPoolExecutor(max_workers=p.concurrency) as pool:list(pool.map(work,rows))
+ finally:jobs[j].update(state='complete',phase='complete')
+
+class ClosingConnection(sqlite3.Connection):
+ def __exit__(self,*args):
+  try:return super().__exit__(*args)
+  finally:self.close()
+
+def master_db():
+ if not MASTER_DB.is_file():raise RuntimeError(f'MasterDB missing: {MASTER_DB}')
+ c=sqlite3.connect(MASTER_DB.resolve().as_uri()+'?mode=ro',uri=True,timeout=20,factory=ClosingConnection)
+ c.row_factory=sqlite3.Row
+ return c
+
+def db():
+ c=master_db()
+ prepare_views(c)
+ return c
+
+def daas_db():
+ c=db()
+ c.executescript("""
+ create temp view daas_users as select *,id as user_key,id as source_row,lower(employee_number) as brid_norm,department as team,organisational_unit as organisation_unit,job_role as employee_job_description,'' as persona,'' as corporate_grade,'' as ba2,'' as ba3,'' as ba4,'' as ba5,'' as ba6,'' as leaver,'' as out_of_office from legacy_users;
+ create temp view daas_devices as select *,id as device_key,operational_status as device_online,correlation_id as asset_number,last_logon_user as last_user,'' as data_centre,'' as hall,'' as cabinet,'' as shelf,'' as slot,'' as registered_status,'' as maintenance_mode,'' as hard_drive_capacity,'' as remaining_disk_space,'' as os_version,'' as cpu_model,'' as ema_status,'' as notes from legacy_machines;
+ create temp view daas_assignments as select a.*,a.id as source_row,u.id as user_key,u.user_id as login_id,u.user_id_norm as login_norm,m.machine_name,m.machine_name_norm,'' as last_connected from main.assignments a join main.users u on u.id=a.user_id_ref join main.machines m on m.id=a.machine_id;
+ create temp view daas_records as select *,id as source_row from daas_devices;
+ """)
+ return c
+
+@app.middleware('http')
+async def local_only(request:Request,call_next):
+ if request.client and request.client.host not in ('127.0.0.1','::1'):
+  return JSONResponse({'detail':'Local access only'},status_code=403)
+ if request.url.hostname not in ('127.0.0.1','localhost','::1'):
+  return JSONResponse({'detail':'Invalid host'},status_code=403)
+ origin=request.headers.get('origin')
+ if origin and origin != str(request.base_url).rstrip('/'):
+  return JSONResponse({'detail':'Cross-origin requests are not allowed'},status_code=403)
+ return await call_next(request)
+@app.get('/api/health')
+def health():
+ u=m=0
+ if DB.exists():
+  with source_db() as c:u=c.execute('select count(*) from users').fetchone()[0];m=c.execute('select count(*) from machines').fetchone()[0]
+ return {'identity':identity(),'users':u,'machines':m,'database':DB.exists(),'repository':REPO.is_dir(),'application':'Office Atlas','mode':'admin','version':'6.7','instance_id':os.environ.get('ATLAS_INSTANCE_ID'),'instance_root':str(ROOT)}
+
+
+
+@app.get('/api/search')
+def search(term:str):
+ with db() as c:return search_directory(c,term)
+@app.get('/api/user/{uid}')
+def user(uid:str):
+ with db() as c:
+  rows=c.execute('select * from legacy_users where id=?',(int(uid[3:]),)).fetchall() if uid.startswith('id:') and uid[3:].isdigit() else exact_users(c,uid)
+  if not rows:raise HTTPException(404,'User not found')
+  if len(rows)!=1:raise HTTPException(409,'Ambiguous identity; select a user from search results')
+  u=dict(rows[0]);return {'user':u,'machines':linked_machines(c,u['id'])}
+def package_root(folder):
+ base=REPO.resolve();raw=Path(folder);root=(raw if raw.is_absolute() else base/raw).resolve()
+ if root.parent!=base or not root.is_dir():raise HTTPException(400,'Select an available package within the configured repository')
+ return root
+
+def validate_deployment(p):
+ p.computer=validate_pc(p.computer)
+ root=package_root(p.folder);script=Path(p.script)
+ if not p.script or script.is_absolute() or '..' in script.parts or ':' in p.script:
+  raise HTTPException(400,'Invalid installer path')
+ target=(root/script).resolve()
+ suffix={'Install':('_i','_install','_installs'),'Uninstall':('_u','_uninstall','_uninstalls'),'Repair':('_r','_repair','_repairs')}[p.action]
+ if root not in target.parents or not target.is_file() or target.suffix.lower() not in ('.ps1','.vbs') or not target.stem.lower().endswith(suffix):
+  raise HTTPException(400,'Installer does not match the selected package and action')
+ p.folder=str(root);return p
+
+@app.get('/api/packages')
+def packages(term:str=''):
+ try:
+  if not REPO.is_dir():
+   return {'packages':[], 'repository':str(REPO), 'available':False, 'error':'Repository folder is unavailable. Check Settings and OneDrive sync.'}
+  names=sorted([x.name for x in REPO.iterdir() if x.is_dir() and term.lower() in x.name.lower()],key=str.lower)
+  return {'packages':names[:500], 'repository':str(REPO), 'available':True, 'total':len(names), 'truncated':len(names)>500}
+ except OSError:
+  return {'packages':[], 'repository':str(REPO), 'available':False, 'error':'Cannot read the repository. Check folder access and OneDrive sync.'}
+@app.get('/api/scripts')
+def scripts(package:str,action:str='Install'):
+ if action not in ('Install','Uninstall','Repair'):raise HTTPException(400,'Invalid action')
+ root=package_root(package);suffix={'Install':('_i','_install','_installs'),'Uninstall':('_u','_uninstall','_uninstalls'),'Repair':('_r','_repair','_repairs')}[action]
+ return {'scripts':sorted(str(x.relative_to(root)) for x in root.rglob('*') if x.is_file() and root in x.resolve().parents and x.suffix.lower() in ('.ps1','.vbs') and x.stem.lower().endswith(suffix))}
+@app.get('/api/preflight/{pc}')
+def preflight(pc:str):
+ pc=validate_pc(pc);checks={'ping':run(['ping.exe','-n','1','-w','1200',pc],False).returncode==0,'c_share':os.path.isdir(unc(pc))}
+ try:checks['wmi']=ps(f'[bool](Get-WmiObject -ComputerName {quote(pc)} Win32_OperatingSystem -EA Stop)').lower()=='true'
+ except:checks['wmi']=False
+ return checks
+@app.post('/api/deploy')
+def deploy(p:Deploy):
+ validate_deployment(p)
+ j=uuid.uuid4().hex;jobs[j]={'state':'queued','events':[]};history_create(j,p.computer,Path(p.folder).name,p.action,p.script,p.mode);threading.Thread(target=deploy_worker,args=(j,p),daemon=True).start();return {'job':j}
+@app.get('/api/job/{j}')
+def job(j:str):
+ if j not in jobs:raise HTTPException(404,'Job not found')
+ return jobs[j]
+@app.post('/api/bulk/deploy')
+def bulk_deploy(p:Bulk):
+ targets=list(dict.fromkeys(validate_pc(x) for x in p.computers))
+ for pc in targets:validate_deployment(Deploy(computer=pc,folder=p.folder,script=p.script,action=p.action,fresh=p.fresh,threads=p.threads))
+ p.computers=targets
+ j=uuid.uuid4().hex;jobs[j]={'state':'queued','phase':'queued','results':[],'events':[]}
+ threading.Thread(target=bulk_worker,args=(j,p),daemon=True).start();return {'job':j}
+@app.get('/api/bulk/job/{j}')
+def bulk_job(j:str):
+ if j not in jobs:raise HTTPException(404,'Job not found')
+ return jobs[j]
+@app.get('/api/history')
+def history(limit:int=100):
+ with hist_db() as c:return [dict(x) for x in c.execute('select * from deployments order by started desc limit ?', (max(1,min(limit,500)),))]
+@app.get('/api/ping/{pc}')
+def ping(pc:str):return {'online':run(['ping.exe','-n','1','-w','1200',validate_pc(pc)],False).returncode==0}
+@app.get('/api/access/{pc}')
+def access(pc:str):return {'available':os.path.isdir(unc(pc))}
+@app.get('/api/overview/{pc}')
+def overview(pc:str):
+ pc=validate_pc(pc);out=ps(f"$o=Get-WmiObject -ComputerName {quote(pc)} Win32_OperatingSystem;$c=Get-WmiObject -ComputerName {quote(pc)} Win32_ComputerSystem;[pscustomobject]@{{Computer=$o.CSName;OS=$o.Caption;LastBoot=$o.ConvertToDateTime($o.LastBootUpTime);LoggedOn=$c.UserName;MemoryGB=[math]::Round($c.TotalPhysicalMemory/1GB,1)}}|ConvertTo-Json -Compress");return json.loads(out)
+@app.get('/api/disk/{pc}')
+def disk(pc:str):
+ out=ps(f"Get-WmiObject -ComputerName {quote(validate_pc(pc))} Win32_LogicalDisk -Filter 'DriveType=3'|select DeviceID,@{{n='FreeGB';e={{[math]::Round($_.FreeSpace/1GB,1)}}}},@{{n='SizeGB';e={{[math]::Round($_.Size/1GB,1)}}}}|ConvertTo-Json -Compress");d=json.loads(out) if out else [];return d if isinstance(d,list) else [d]
+@app.get('/api/processes/{pc}')
+def processes(pc:str,kind:str='cpu'):
+ pc=validate_pc(pc);s=f"Get-WmiObject -ComputerName {quote(pc)} Win32_PerfFormattedData_PerfProc_Process|?{{$_.IDProcess-gt 0}}|sort PercentProcessorTime -Descending|select -First 30 @{{n='PID';e={{$_.IDProcess}}}},@{{n='Process';e={{$_.Name}}}},@{{n='CPU';e={{$_.PercentProcessorTime}}}},@{{n='MemoryMB';e={{[math]::Round($_.WorkingSetPrivate/1MB,1)}}}}|ConvertTo-Json -Compress" if kind=='cpu' else f"Get-WmiObject -ComputerName {quote(pc)} Win32_Process|sort WorkingSetSize -Descending|select -First 30 @{{n='PID';e={{$_.ProcessId}}}},@{{n='Process';e={{$_.Name}}}},@{{n='MemoryMB';e={{[math]::Round($_.WorkingSetSize/1MB,1)}}}},CommandLine|ConvertTo-Json -Compress";out=ps(s);d=json.loads(out) if out else [];return d if isinstance(d,list) else [d]
+@app.post('/api/kill')
+def kill(p:Kill):
+ pc=validate_pc(p.computer);v=p.value.strip()
+ if not re.fullmatch(r'[A-Za-z0-9_.-]+',v):raise HTTPException(400,'Invalid PID or executable name')
+ flt=f'ProcessId={v}' if v.isdigit() else "Name='"+(v if v.lower().endswith('.exe') else v+'.exe')+"'";return {'count':ps(f'$p=@(Get-WmiObject -ComputerName {quote(pc)} Win32_Process -Filter {quote(flt)});foreach($x in $p){{[void]$x.Terminate()}};$p.Count')}
+@app.post('/api/reboot')
+def reboot(p:Machine):return {'result':ps(f'$o=Get-WmiObject -ComputerName {quote(validate_pc(p.computer))} Win32_OperatingSystem -EnableAllPrivileges;$o.Reboot().ReturnValue')}
+
+
+def _start_local(args):
+    subprocess.Popen(args, creationflags=NW)
+
+def _start_msc(arguments):
+    subprocess.Popen(['mmc.exe'] + arguments, creationflags=NW)
+
+@app.post('/api/open-tool/{tool}/{pc}')
+def open_target_tool(tool:str,pc:str):
+    pc=validate_pc(pc)
+    allowed={'msra','rdp','compmgmt','eventvwr','cshare','temp','packages','quickassist','remotehelp'}
+    if tool not in allowed: raise HTTPException(400,'Unsupported tool')
+    if tool=='msra': _start_local([r'C:\Windows\System32\msra.exe','/offerra',pc])
+    elif tool=='rdp': _start_local([r'C:\Windows\System32\mstsc.exe','/v:'+pc])
+    elif tool=='compmgmt': _start_msc(['compmgmt.msc','/computer='+pc])
+    elif tool=='eventvwr': _start_msc(['eventvwr.msc','/computer='+pc])
+    elif tool=='cshare': _start_local(['explorer.exe',unc(pc)])
+    elif tool=='temp': _start_local(['explorer.exe',unc(pc,r'C:\Temp')])
+    elif tool=='packages': _start_local(['explorer.exe',unc(pc,REMOTE_ROOT)])
+    elif tool=='quickassist':
+        candidates=[r'C:\Windows\System32\quickassist.exe',r'C:\Windows\System32\QuickAssist.exe']
+        exe=next((x for x in candidates if Path(x).exists()),None)
+        if exe:_start_local([exe])
+        else:
+            app_id=ps("$a=Get-StartApps|Where-Object {$_.Name -match '^Quick Assist$'}|Select-Object -First 1 -ExpandProperty AppID;if($a){$a}")
+            if not app_id:raise RuntimeError('Quick Assist is not installed or not discoverable')
+            _start_local(['explorer.exe','shell:AppsFolder\\'+app_id])
+    elif tool=='remotehelp':
+        app_id=ps("$a=Get-StartApps|Where-Object {$_.Name -match '^Remote Help$'}|Select-Object -First 1 -ExpandProperty AppID;if($a){$a}")
+        if not app_id:raise RuntimeError('Microsoft Remote Help is not installed or not discoverable')
+        _start_local(['explorer.exe','shell:AppsFolder\\'+app_id])
+    logging.info('Opened tool=%s target=%s operator=%s',tool,pc,identity())
+    return {'launched':True,'tool':tool,'computer':pc}
+
+@app.get('/api/package-folder/{pc}')
+def package_folder_info(pc:str):
+    root=Path(unc(validate_pc(pc),REMOTE_ROOT))
+    if not root.exists():return {'exists':False,'folders':0,'files':0,'bytes':0}
+    folders=files=size=0
+    for item in root.rglob('*'):
+        try:
+            if item.is_dir():folders+=1
+            elif item.is_file():files+=1;size+=item.stat().st_size
+        except OSError:pass
+    return {'exists':True,'folders':folders,'files':files,'bytes':size}
+
+@app.post('/api/cleanup-packages/{pc}')
+def cleanup_package_folder(pc:str):
+    pc=validate_pc(pc);guard=target_lock(pc)
+    if not guard.acquire(blocking=False):raise HTTPException(409,"A deployment is active on this target")
+    try:return _cleanup_package_folder(pc)
+    finally:guard.release()
+
+def _cleanup_package_folder(pc:str):
+    pc=validate_pc(pc);root=Path(unc(pc,REMOTE_ROOT))
+    deleted=[];failed=[]
+    if not root.exists():return {'deleted':0,'failed':0,'items':[],'message':'Package folder does not exist'}
+    # Hard safety boundary: only children of the fixed C:\\Temp\\Packages root are removed.
+    for item in list(root.iterdir()):
+        try:
+            if item.is_dir():shutil.rmtree(item)
+            else:item.unlink()
+            deleted.append(item.name)
+        except Exception as exc:failed.append({'item':item.name,'error':str(exc)})
+    logging.warning('Package cleanup target=%s deleted=%s failed=%s operator=%s',pc,len(deleted),len(failed),identity())
+    return {'deleted':len(deleted),'failed':len(failed),'items':deleted,'errors':failed}
+
+
+
+queue_jobs={}
+
+def _queue_worker(queue_id,items):
+ q=queue_jobs[queue_id];q['state']='running'
+ try:
+  for index,item in enumerate(items):
+   if q.get('pause_requested'):q['state']='paused';return
+   row=q['items'][index];row['state']='running';child=uuid.uuid4().hex
+   jobs[child]={'state':'queued','events':[]};row['job']=child
+   try:
+    history_create(child,item.computer,Path(item.folder).name,item.action,item.script,item.mode)
+    deploy_worker(child,item)
+    row.update(state=jobs[child]['state'],events=jobs[child].get('events',[]))
+   except Exception as exc:
+    jobs[child]['state']='failed';row.update(state='failed',events=[{'message':str(exc)}])
+  q['state']='complete'
+ except Exception as exc:q.update(state='failed',error=str(exc))
+
+@app.post('/api/queue')
+def start_queue(request:QueueRequest):
+    if not request.items or len(request.items)>200:raise HTTPException(400,'Queue must contain 1 to 200 items')
+    for item in request.items:validate_deployment(item)
+    queue_id=uuid.uuid4().hex
+    queue_jobs[queue_id]={'id':queue_id,'state':'queued','pause_requested':False,'items':[{'target':x.computer,'package':Path(x.folder).name,'action':x.action,'mode':x.mode,'state':'waiting','events':[]} for x in request.items]}
+    threading.Thread(target=_queue_worker,args=(queue_id,request.items),daemon=True).start()
+    return {'queue':queue_id}
+
+@app.get('/api/queue/{queue_id}')
+def get_queue(queue_id:str):
+    if queue_id not in queue_jobs:raise HTTPException(404,'Queue not found')
+    return queue_jobs[queue_id]
+
+@app.post('/api/queue/{queue_id}/pause')
+def pause_queue(queue_id:str):
+    if queue_id not in queue_jobs:raise HTTPException(404,'Queue not found')
+    queue_jobs[queue_id]['pause_requested']=True
+    return {'pause_requested':True}
+
+@app.get('/api/database-freshness')
+def database_freshness():
+    excel=ROOT/'database040926.xlsx'
+    db=DB
+    return {'database_exists':db.exists(),'excel_exists':excel.exists(),'database_modified':datetime.fromtimestamp(db.stat().st_mtime).isoformat(sep=' ',timespec='seconds') if db.exists() else '', 'excel_modified':datetime.fromtimestamp(excel.stat().st_mtime).isoformat(sep=' ',timespec='seconds') if excel.exists() else '', 'excel_newer':bool(excel.exists() and db.exists() and excel.stat().st_mtime>db.stat().st_mtime), 'database_size':db.stat().st_size if db.exists() else 0}
+
+@app.get('/api/target-health/{pc}')
+def target_health(pc:str):
+    pc=validate_pc(pc)
+    result={'computer':pc,'ping':run(['ping.exe','-n','1','-w','1200',pc],False).returncode==0,'c_share':os.path.isdir(unc(pc)),'wmi':False,'free_gb':None,'logged_on':''}
+    try:
+        raw=ps(f"$o=Get-WmiObject -ComputerName {quote(pc)} Win32_OperatingSystem -EA Stop;$c=Get-WmiObject -ComputerName {quote(pc)} Win32_ComputerSystem -EA Stop;$d=Get-WmiObject -ComputerName {quote(pc)} Win32_LogicalDisk -Filter 'DeviceID=\"C:\"';[pscustomobject]@{{Wmi=$true;FreeGB=[math]::Round($d.FreeSpace/1GB,1);LoggedOn=$c.UserName}}|ConvertTo-Json -Compress")
+        data=json.loads(raw);result.update(wmi=bool(data.get('Wmi')),free_gb=data.get('FreeGB'),logged_on=data.get('LoggedOn') or '')
+    except Exception as exc:result['wmi_error']=str(exc)
+    return result
+
+
+
+@app.get('/api/daas/status')
+def daas_status():
+    result={'available':DAAS_DB.exists(),'path':str(DAAS_DB),'devices':0,'users':0,'assignments':0,'imported_at':''}
+    if not DAAS_DB.exists():return result
+    try:
+        with daas_db() as c:
+            result['devices']=c.execute('select count(*) from daas_devices').fetchone()[0]
+            result['users']=c.execute('select count(*) from daas_users').fetchone()[0]
+            result['assignments']=c.execute('select count(*) from daas_assignments').fetchone()[0]
+            row=c.execute("select value from metadata where key='imported_at'").fetchone()
+            result['imported_at']=row[0] if row else ''
+    except Exception as exc:result.update(available=False,error=str(exc))
+    return result
+
+@app.get('/api/daas/machine/{computer}')
+def daas_machine(computer:str):
+    machine=validate_pc(computer).lower()
+    if not DAAS_DB.exists():return {'available':False,'matched':False,'device':None,'assignments':[]}
+    with daas_db() as c:
+        device=c.execute('select * from daas_devices where machine_name_norm=?',(machine,)).fetchone()
+        assignments=c.execute("select a.*,u.brid,u.login_id,u.full_name,u.email,u.team,u.persona,u.organisation_unit,u.corporate_grade,u.employee_job_description,u.ba2,u.ba3,u.ba4,u.ba5,u.ba6,u.leaver,u.out_of_office from daas_assignments a left join daas_users u on u.user_key=a.user_key where a.machine_name_norm=? order by a.last_connected desc",(machine,)).fetchall()
+    return {'available':True,'matched':bool(device),'device':dict(device) if device else None,'assignments':[dict(x) for x in assignments]}
+
+@app.get('/api/daas/user/{user_value}')
+def daas_user(user_value:str):
+    raw=user_value.strip();login=norm(raw);email=raw.lower()
+    if not DAAS_DB.exists():return {'available':False,'matched':False,'users':[],'assignments':[],'devices':[]}
+    with daas_db() as c:
+        resolved=c.execute('select * from legacy_users where id=?',(int(raw[3:]),)).fetchall() if raw.startswith('id:') and raw[3:].isdigit() else exact_users(c,raw)
+        ids=[u['id'] for u in resolved]
+        users=c.execute('select * from daas_users where user_key in ('+','.join('?' for _ in ids)+')',ids).fetchall() if ids else []
+        keys=[r['user_key'] for r in users]
+        assignments=[];devices=[]
+        if keys:
+            marks=','.join('?' for _ in keys)
+            assignments=c.execute(f'select * from daas_assignments where user_key in ({marks}) order by last_connected desc',keys).fetchall()
+            machines=list(dict.fromkeys(r['machine_name_norm'] for r in assignments if r['machine_name_norm']))
+            if machines:
+                mm=','.join('?' for _ in machines)
+                devices=c.execute(f'select * from daas_devices where machine_name_norm in ({mm}) order by machine_name',machines).fetchall()
+    return {'available':True,'matched':bool(users),'users':[dict(x) for x in users],'assignments':[dict(x) for x in assignments],'devices':[dict(x) for x in devices]}
+
+
+
+@app.post('/api/daas/machines')
+def daas_machines_batch(request:DaaSMachineBatch):
+    names=list(dict.fromkeys(validate_pc(x).lower() for x in request.computers if x.strip()))[:200]
+    output={name:{'matched':False,'device':None,'assignments':[]} for name in names}
+    if not names or not DAAS_DB.exists():return {'available':DAAS_DB.exists(),'machines':output}
+    marks=','.join('?' for _ in names)
+    with daas_db() as c:
+        devices=c.execute(f'select * from daas_devices where machine_name_norm in ({marks})',names).fetchall()
+        assignments=c.execute(f"select a.*,u.brid,u.login_id,u.full_name,u.email,u.team,u.persona,u.organisation_unit,u.corporate_grade,u.employee_job_description,u.ba2,u.ba3,u.ba4,u.ba5,u.ba6,u.leaver,u.out_of_office from daas_assignments a left join daas_users u on u.user_key=a.user_key where a.machine_name_norm in ({marks}) order by a.last_connected desc",names).fetchall()
+    for row in devices:
+        name=row['machine_name_norm'];output[name]['matched']=True;output[name]['device']=dict(row)
+    for row in assignments:
+        output[row['machine_name_norm']]['assignments'].append(dict(row))
+    return {'available':True,'machines':output}
+
+
+
+@app.get('/api/deployments/active')
+def active_deployments():
+    active_states={'queued','running','launched','monitoring','paused'}
+    deployments=[]
+    for job_id,job_data in list(jobs.items()):
+        state=job_data.get('state','unknown')
+        if state not in active_states:continue
+        events=job_data.get('events',[])
+        deployments.append({
+            'id':job_id,
+            'kind':'single',
+            'state':state,
+            'events':events[-200:],
+            'last_message':events[-1].get('message','') if events else '',
+        })
+    for queue_id,queue_data in list(queue_jobs.items()):
+        state=queue_data.get('state','unknown')
+        if state not in active_states:continue
+        items=[]
+        for item in queue_data.get('items',[]):
+            items.append({
+                'target':item.get('target',''),
+                'package':item.get('package',''),
+                'action':item.get('action',''),
+                'state':item.get('state','waiting'),
+                'events':item.get('events',[])[-100:],
+            })
+        deployments.append({'id':queue_id,'kind':'queue','state':state,'items':items})
+    return {'count':len(deployments),'deployments':deployments}
+
+@app.get('/api/deployments/recent')
+def recent_deployments():
+    result=[]
+    for job_id,job_data in list(jobs.items())[-20:]:
+        events=job_data.get('events',[])
+        result.append({
+            'id':job_id,'kind':'single','state':job_data.get('state','unknown'),
+            'events':events[-200:],
+            'last_message':events[-1].get('message','') if events else ''
+        })
+    return {'deployments':result}
+
+
+
+@app.get('/api/v28/health/{pc}')
+def v28_target_health(pc:str):
+    pc=validate_pc(pc)
+    result={'computer':pc,'ping':run(['ping.exe','-n','1','-w','1200',pc],False).returncode==0,'c_share':os.path.isdir(unc(pc)),'wmi':False,'free_gb':None,'logged_on':'','last_boot':'','uptime_seconds':None}
+    try:
+        raw=ps(f"$o=Get-WmiObject -ComputerName {quote(pc)} Win32_OperatingSystem -EA Stop;$c=Get-WmiObject -ComputerName {quote(pc)} Win32_ComputerSystem -EA Stop;$d=Get-WmiObject -ComputerName {quote(pc)} Win32_LogicalDisk -Filter 'DeviceID=\"C:\"';$b=$o.ConvertToDateTime($o.LastBootUpTime);[pscustomobject]@{{Wmi=$true;FreeGB=[math]::Round($d.FreeSpace/1GB,1);LoggedOn=$c.UserName;LastBoot=$b.ToString('yyyy-MM-dd HH:mm:ss');UptimeSeconds=[int]((Get-Date)-$b).TotalSeconds}}|ConvertTo-Json -Compress")
+        data=json.loads(raw);result.update(wmi=bool(data.get('Wmi')),free_gb=data.get('FreeGB'),logged_on=data.get('LoggedOn') or '',last_boot=data.get('LastBoot') or '',uptime_seconds=data.get('UptimeSeconds'))
+    except Exception as exc:result['wmi_error']=str(exc)
+    return result
+
+@app.get('/api/v28/software/{pc}')
+def v28_software_inventory(pc:str):
+    pc=validate_pc(pc)
+    # WMI StdRegProv. The WMI moniker and registry paths below deliberately use
+    # the exact single-backslash form that works in an interactive PowerShell test.
+    script="""$ErrorActionPreference='Stop'
+$computer=__PC__
+$hklm=[uint32]2147483650
+$provider=[wmiclass]("\\\\$computer\\root\\default:StdRegProv")
+$paths=@(
+  @{Path='SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall';Arch='x64'},
+  @{Path='SOFTWARE\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall';Arch='x86'}
+)
+$items=New-Object System.Collections.Generic.List[object]
+function Read-RegString([string]$subKey,[string]$valueName){
+  try{
+    $result=$provider.GetStringValue($hklm,$subKey,$valueName)
+    if($result.ReturnValue -eq 0){ return [string]$result.sValue }
+  }catch{}
+  return ''
+}
+foreach($source in $paths){
+  $enum=$provider.EnumKey($hklm,$source.Path)
+  if($enum.ReturnValue -ne 0 -or -not $enum.sNames){ continue }
+  foreach($subName in $enum.sNames){
+    $subKey=$source.Path+'\\'+$subName
+    $name=Read-RegString $subKey 'DisplayName'
+    if([string]::IsNullOrWhiteSpace($name)){ continue }
+    $items.Add([pscustomobject]@{
+      Name=$name
+      Version=Read-RegString $subKey 'DisplayVersion'
+      Publisher=Read-RegString $subKey 'Publisher'
+    })
+  }
+}
+@($items | Sort-Object Name,Version,Publisher -Unique) | ConvertTo-Json -Compress -Depth 3
+""".replace('__PC__',quote(pc))
+    try:
+        raw=ps(script,timeout=180)
+        data=json.loads(raw) if raw else []
+        if isinstance(data,dict):data=[data]
+        return {'computer':pc,'method':'WMI StdRegProv Core','collected_at':datetime.now().isoformat(sep=' ',timespec='seconds'),'count':len(data),'software':data}
+    except Exception as exc:
+        raise HTTPException(502,f'WMI software inventory failed: {exc}')
+
+
+
+@app.get('/api/v2814/reverse/{computer}')
+def v2814_reverse_machine_lookup(computer:str):
+ computer=validate_pc(computer)
+ with db() as c:
+  m=c.execute('select * from legacy_machines where name_norm=?',(computer.lower(),)).fetchone()
+  if not m:return {'matched':False,'computer':computer,'reason':'machine_not_found'}
+  rows=c.execute('select distinct u.* from assignments a join legacy_users u on u.id=a.user_id_ref where a.machine_id=? order by u.id',(m['id'],)).fetchall()
+  result={'matched':True,'computer':computer,'machine':dict(m),'user_found':len(rows)==1,'ambiguous':len(rows)>1,'candidates':[r['user_name'] or r['name'] for r in rows]}
+  if len(rows)==1:result.update(user=dict(rows[0]),search_value=rows[0]['user_name'] or rows[0]['email'] or rows[0]['name'],matched_by='MasterDB relationship')
+  return result
+
+
+
+@app.get('/api/master/status')
+def master_status():
+    result={'available':MASTER_DB.exists(),'path':str(MASTER_DB),'users':0,'machines':0,'assignments':0}
+    if not MASTER_DB.exists():return result
+    try:
+        with master_db() as c:
+            result['users']=c.execute('select count(*) from users').fetchone()[0]
+            result['machines']=c.execute('select count(*) from machines').fetchone()[0]
+            result['assignments']=c.execute('select count(*) from assignments').fetchone()[0]
+            row=c.execute("select value from metadata where key='created_at'").fetchone();result['created_at']=row[0] if row else ''
+    except Exception as exc:result.update(available=False,error=str(exc))
+    return result
+
+@app.get('/api/master/resolve/{value}')
+def master_resolve(value:str):
+ raw=value.strip();q=raw.casefold().rstrip('.')
+ with db() as c:
+  machine=c.execute('select * from legacy_machines where machine_name_norm=?',(q,)).fetchone()
+  if machine:
+   rows=c.execute('select distinct u.* from assignments a join legacy_users u on u.id=a.user_id_ref where a.machine_id=? order by u.id',(machine['id'],)).fetchall()
+  else:rows=exact_users(c,raw)
+  if len(rows)!=1:return {'matched':False,'ambiguous':len(rows)>1,'query':raw,'machine':dict(machine) if machine else None}
+  u=dict(rows[0]);return {'matched':True,'resolved_by':'machine' if machine else 'identity','user':u,'search_value':u['user_name'] or u['email'] or u['full_name'],'user_key':'id:'+str(u['id']),'requested_machine':machine['machine_name'] if machine else '', 'machines':[r['name'] for r in linked_machines(c,u['id'])]}
+
+app.mount('/assets',StaticFiles(directory=WEB/'assets'),name='assets')
+@app.get('/installer')
+def index():return FileResponse(WEB/'index.html')
+
+from atlas_api import register_atlas
+register_atlas(app)
+
+# Independent live health results; retains the application's local-only middleware.
+from machine_health import register_machine_health
+import sys as _health_sys
+machine_health_checks=register_machine_health(app,_health_sys.modules[__name__])

@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+logs/
+data/
+backups/
+*.db-wal
+*.db-shm
+*.db-journal
+config.json
+.env
+.env.*
+!.env.example
+# Historical transfer builders are no longer distributed.
+Build-Transfer.py
+Build-Transfer.bat

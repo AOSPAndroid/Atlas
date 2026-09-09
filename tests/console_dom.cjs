@@ -1,0 +1,37 @@
+// Actual DOM and event handlers; local fixture only, no live administration.
+const fs=require('fs'),path=require('path'),assert=require('assert/strict');
+const {JSDOM,VirtualConsole}=require(process.env.JSDOM_MODULE||'jsdom');
+const root=path.resolve(__dirname,'..'),base='http://127.0.0.1:8892';
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+async function until(fn){for(let i=0;i<100;i++){if(fn())return;await sleep(30)}throw Error('Condition timed out')}
+(async()=>{
+ const errors=[],vc=new VirtualConsole();vc.on('jsdomError',e=>errors.push(e.message));
+ const dom=new JSDOM(fs.readFileSync(path.join(root,'frontend/index.html'),'utf8'),{url:base+'/installer',runScripts:'outside-only',pretendToBeVisual:true,virtualConsole:vc}),w=dom.window;
+ w.fetch=(url,o)=>fetch(new URL(url,base),o);w.confirm=()=>false;w.matchMedia=()=>({matches:false,addEventListener(){}});
+ w.eval(fs.readFileSync(path.join(root,'frontend/assets/app.js'),'utf8'));
+ await until(()=>w.document.querySelector('#identity').textContent==='LOCAL UI TEST');
+ await until(()=>w.document.querySelector('#pkg').value==='Example App');
+ for(const page of ['admin','bulk','history','workspace']){w.document.querySelector(`[data-page="${page}"]`).click();assert(w.document.querySelector('#'+page).classList.contains('active'));assert(w.document.querySelector('#pageTitle').textContent.trim().length>0)}
+ assert.equal(w.document.querySelectorAll('nav .nav-label').length,4);
+ for(const [toggle,drawer,close] of [['queueToggle','queueDrawer','closeQueue'],['deploymentsToggle','deploymentsDrawer','closeDeployments']]){w.document.querySelector('#'+toggle).click();assert(w.document.querySelector('#'+drawer).classList.contains('open'));w.document.querySelector('#'+close).click();assert(!w.document.querySelector('#'+drawer).classList.contains('open'))}
+ // Disclosure clicks, panel exclusivity, Escape, and focus restoration.
+ const q=w.document.querySelector('#queueToggle'),live=w.document.querySelector('#deploymentsToggle');
+ q.focus();q.click();await sleep(20);assert.equal(q.getAttribute('aria-expanded'),'true');
+ live.click();await sleep(20);assert(!w.document.querySelector('#queueDrawer').classList.contains('open'));assert.equal(live.getAttribute('aria-expanded'),'true');
+ live.click();await sleep(20);assert.equal(live.getAttribute('aria-expanded'),'false');assert.equal(w.document.activeElement,q);
+ q.click();await sleep(20);w.document.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));await sleep(20);assert.equal(q.getAttribute('aria-expanded'),'false');
+ const trigger=w.document.querySelector('#targetActions .toolmenu-btn');trigger.click();assert.equal(trigger.getAttribute('aria-expanded'),'true');trigger.click();assert.equal(trigger.getAttribute('aria-expanded'),'false');trigger.click();w.document.body.click();assert.equal(trigger.getAttribute('aria-expanded'),'false');
+ assert.equal(w.document.querySelector('nav [aria-current="page"]').dataset.page,'workspace');
+ assert.equal(w.document.querySelector('#pageTitle').textContent,'Workspace');
+ const commandButton=w.document.querySelector('#openCommands');commandButton.focus();commandButton.click();assert(!w.document.querySelector('#commandOverlay').classList.contains('hidden'));
+ const commandSearch=w.document.querySelector('#commandSearch');commandSearch.value='history';commandSearch.dispatchEvent(new w.Event('input',{bubbles:true}));assert.equal(w.document.querySelectorAll('#commandList button').length,1);commandSearch.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Enter',bubbles:true}));await sleep(20);assert(w.document.querySelector('#history').classList.contains('active'));assert.equal(w.document.activeElement,commandButton);
+ w.document.dispatchEvent(new w.KeyboardEvent('keydown',{key:'k',ctrlKey:true,bubbles:true}));assert(!w.document.querySelector('#commandOverlay').classList.contains('hidden'));commandSearch.value='zzzznonexistent';commandSearch.dispatchEvent(new w.Event('input',{bubbles:true}));assert(w.document.querySelector('.command-empty'));w.document.querySelector('#closeCommands').click();
+ w.document.querySelector('#openShortcuts').click();assert(!w.document.querySelector('#shortcutHelp').classList.contains('hidden'));w.document.querySelector('#closeShortcutHelp').click();
+ w.document.querySelector('[data-page="workspace"]').click();
+ const users=await(await fetch(base+'/api/search?term=smith')).json();assert(users.users.length);
+ const search=w.document.querySelector('#search');search.value=users.users[0].user_name;search.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Enter',bubbles:true}));
+ await until(()=>w.document.querySelector('#kyc .usercard'));assert(w.document.querySelector('.lookup-column #kyc .usercard'));
+ assert(w.document.querySelector('.deployment-panel #deploy'));
+ const ids=[...w.document.querySelectorAll('[id]')].map(e=>e.id);assert.equal(ids.length,new Set(ids).size,'unique control IDs');
+ await sleep(200);assert.equal(errors.length,0,errors.join('\n'));console.log('PASS: console initialization, labelled navigation, four pages, queue/live drawers, real directory lookup, new layout anchors, unique IDs');w.close();
+})().catch(e=>{console.error(e);process.exit(1)});
