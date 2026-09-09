@@ -20,6 +20,12 @@ Use the host computer's Wi-Fi/Ethernet IPv4 address in place of `YOUR-IP`. The l
 
 To change ports, set `ATLAS_ADMIN_PORT` and `ATLAS_VIEWER_PORT` before launching; they must be different. Logs are in `logs/admin-startup.log` and `logs/viewer-startup.log`.
 
+## Admin command palette
+
+Press **Ctrl+K** (or **Cmd+K** on a Mac browser), or click **Search Atlas** in the map header. Search people, machines, desk codes, teams and admin views in one place. Use arrow keys and Enter to open a result, and Escape to close.
+
+Use `person:`, `machine:`, `desk:` or `>` to narrow results. People with a single mapped desk open on the map; multiple locations offer a choice. Unmapped people and machines open selected in the existing IT console. Name-only desk matches are identified as unconfirmed. Actions open the existing admin interface and keep its review/confirmation flow. The shared viewer does not expose this admin palette.
+
 ## Shared viewer
 
 - Explore the same ten-floor 2D/3D map, search seating, inspect desk records, and export the displayed records.

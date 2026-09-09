@@ -133,6 +133,24 @@ def register_atlas(app):
    c.execute('insert into package_catalog values(?,?,?,?,?,?) on conflict(repository,folder) do update set display_name=excluded.display_name,version=excluded.version,revision=excluded.revision,updated_at=excluded.updated_at',(repo,root.name,name.strip(),version.strip(),revision+1,now()))
   return {'saved':True,'revision':revision+1}
 
+ @app.get('/api/palette/person/{uid}')
+ def palette_person(uid:str):
+  if not uid.startswith('id:') or not uid[3:].isdigit():raise HTTPException(400,'Select a directory result')
+  with wmi.db() as c:
+   person=c.execute('select * from legacy_users where id=?',(int(uid[3:]),)).fetchone()
+   if not person:raise HTTPException(404,'Person not found')
+   mapped=[dict(row) for row in c.execute("select distinct o.id,o.body from desk_user_links l left join official_seating_mappings m on m.legacy_id=l.desk_id join official_records o on o.id=coalesce(m.official_id,l.desk_id) where l.user_key=?",(person['canonical_key'],))]
+   if mapped:return {'desks':[{'id':r['id'],'floor':json.loads(r['body'])['floor'],'match':'confirmed account link'} for r in mapped]}
+   # Name matches are navigation suggestions, never saved account links.
+   key=name_key(person['full_name'])
+   desks=[]
+   for row in c.execute('select body from official_records'):
+    r=json.loads(row[0])
+    if r.get('occupancy')!='vacant' and key and name_key(r['name'])==key:
+     linked=c.execute('select user_key from desk_user_links where desk_id=?',(r['id'],)).fetchone()
+     if not linked:desks.append({'id':r['id'],'floor':r['floor'],'match':'matching name; account not confirmed'})
+   return {'desks':desks}
+
  @app.get('/api/state')
  def state():
   with store.connect() as c:return {'records':store.all_records(c),'token':TOKEN,'storage':'SQLite','database':store.DB.name}
@@ -317,7 +335,7 @@ def register_atlas(app):
 
  @app.get('/{filename}')
  def atlas_asset(filename:str):
-  allowed={'official-app.js','official-data.json','official.css','app.js','style.css','data.json','operations.js','operations.css'}|{'floor-'+str(n)+'.jpg' for n in range(2,8)}
+  allowed={'command-palette.js','command-palette.css','official-app.js','official-data.json','official.css','app.js','style.css','data.json','operations.js','operations.css'}|{'floor-'+str(n)+'.jpg' for n in range(2,8)}
   allowed|={'official-floor-'+str(n)+ext for n in range(-1,9) for ext in ('.jpg','.pdf')}
   allowed|={'studio-floor-'+str(n)+'.svg' for n in range(-1,9)}
   if filename not in allowed:raise HTTPException(404,'Not found')

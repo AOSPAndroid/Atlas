@@ -1,0 +1,29 @@
+import unittest
+from fastapi.testclient import TestClient
+from backend import main,viewer
+
+class PaletteTests(unittest.TestCase):
+ def setUp(self):
+  self.client=TestClient(main.app,base_url='http://127.0.0.1',client=('127.0.0.1',12345))
+ def tearDown(self):self.client.close()
+ def test_confirmed_person_resolves_official_desks(self):
+  with main.db() as c:
+   person=c.execute('select id from legacy_users where canonical_key in (select user_key from desk_user_links where desk_id="04R024065")').fetchone()
+  self.assertIsNotNone(person)
+  response=self.client.get('/api/palette/person/id:'+str(person[0]));self.assertEqual(response.status_code,200)
+  rows=response.json()['desks'];self.assertIn('04R024065',[r['id'] for r in rows]);self.assertTrue(all(not r['id'].startswith('L') for r in rows))
+  self.assertTrue(all(r['match']=='confirmed account link' for r in rows))
+ def test_bad_or_missing_person(self):
+  self.assertEqual(self.client.get('/api/palette/person/id:999999999').status_code,404)
+  self.assertEqual(self.client.get('/api/palette/person/not-an-id').status_code,400)
+ def test_admin_assets_and_remote_boundary(self):
+  for path in ('/command-palette.js','/command-palette.css'):
+   self.assertEqual(self.client.get(path).status_code,200)
+  with TestClient(main.app,base_url='http://127.0.0.1',client=('192.0.2.10',12345)) as remote:
+   self.assertEqual(remote.get('/api/palette/person/id:1').status_code,403)
+ def test_viewer_does_not_expose_admin_palette(self):
+  with TestClient(viewer.app) as client:
+   for path in ('/command-palette.js','/command-palette.css','/api/palette/person/id:1'):
+    self.assertEqual(client.get(path).status_code,404)
+
+if __name__=='__main__':unittest.main()

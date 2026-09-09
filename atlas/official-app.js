@@ -410,3 +410,9 @@ function renderPlan(){
 }
 
 setFloor(2);setView(view);
+
+if(!readOnly){
+ const sheet=document.createElement('link');sheet.rel='stylesheet';sheet.href='/command-palette.css';document.head.append(sheet);
+ const {installCommandPalette}=await import('./command-palette.js');
+ installCommandPalette({getRecords:()=>records,onSelect:id=>{ $('#search').value='';$('#scope').value='all';$('#team').value='all';selectRecord(id)},toast});
+}

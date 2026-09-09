@@ -727,3 +727,14 @@ completeMachineReport=function(){
  const lines=reportBeforeProgressiveHealth().split('\n').filter(line=>! /^(Ping:|C\$:|WMI:|Free C:|Last boot:|Uptime:|Logged on:)/.test(line));
  return lines.concat(AtlasHealth.report(document.querySelector('#healthLine'),S.target)).join('\n');
 };
+
+/* Main-map palette links select records; they never execute remote actions. */
+async function openPaletteTarget(){
+ const params=new URLSearchParams(location.search),person=params.get('person'),machine=params.get('machine');
+ if(!person&&!machine)return;
+ try{
+  if(person){if(!/^id:\d+$/.test(person))throw Error('Invalid person link');clearLookup();await loadUser(person,++lookupSequence)}
+  else{document.querySelector('#search').value='machine:'+machine;await search();if(S.machines.some(m=>m.name===machine))setTarget(machine,'Selected from Atlas map')}
+ }catch(error){toast('Could not open palette result: '+error.message)}
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>queueMicrotask(openPaletteTarget));else queueMicrotask(openPaletteTarget);
