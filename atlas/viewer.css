@@ -1,4 +1,13 @@
 /* Viewer navigation is present from first paint, before the map loads. */
+.atlas-brand .atlas-demo-badge {
+  padding: 3px 8px;
+  border: 1px solid #b9deeb;
+  border-radius: 999px;
+  background: #eaf7fc;
+  color: #007ca6;
+  font: 600 11px/1.4 var(--atlas-font);
+  letter-spacing: 0.02em;
+}
 .atlas-return,
 #ops-audit,
 #ops-catalog,
