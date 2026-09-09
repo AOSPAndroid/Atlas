@@ -1,3 +1,4 @@
+import { createCameraMotion } from "./camera-motion.js";
 const readOnly =
   document.querySelector('meta[name="atlas-mode"]')?.content === "viewer";
 const { createOperations } = readOnly
@@ -137,7 +138,94 @@ let records = data.records,
   placing = false,
   lastMatches = [],
   cam = { yaw: -0.14, tilt: 1.0, scale: 1, cx: 0, cz: 0 };
-let focusFrame = 0;
+const motionPreference = {
+  get matches() {
+    return AtlasUI.motion.isReduced();
+  },
+};
+AtlasUI.motion.install($(".view-switch"));
+const cameraMotion = createCameraMotion({
+  read: () => cam,
+  write: (value) => {
+    cam = value;
+  },
+  requestFrame: () => draw(),
+  reduced: () => motionPreference.matches,
+});
+const mapEffects = new Map();
+function revealMap(element = canvas) {
+  mapEffects.get(element)?.cancel();
+  if (motionPreference.matches || !element.animate) return;
+  const animation = element.animate([{ opacity: 0.45 }, { opacity: 1 }], {
+    duration: 260,
+    easing: "ease-out",
+  });
+  mapEffects.set(element, animation);
+  animation.onfinish = () => mapEffects.delete(element);
+}
+const locator = document.createElement("div");
+locator.className = "map-locator";
+locator.hidden = true;
+locator.setAttribute("aria-hidden", "true");
+locator.innerHTML =
+  '<span class="locator-ring"></span><span class="locator-core"></span>';
+$("#viewport").append(locator);
+let locatorAnimation;
+function clearLocator() {
+  locatorAnimation?.cancel();
+  locatorAnimation = null;
+  locator.hidden = true;
+}
+function locateBeacon() {
+  clearLocator();
+  if (motionPreference.matches || !locator.animate) return;
+  locator.hidden = false;
+  positionLocator();
+  const ring = locator.querySelector(".locator-ring");
+  locatorAnimation = ring.animate(
+    [
+      { transform: "scale(.45)", opacity: 0 },
+      { transform: "scale(.7)", opacity: 0.9, offset: 0.25 },
+      { transform: "scale(1)", opacity: 0.65, offset: 0.6 },
+      { transform: "scale(1.45)", opacity: 0 },
+    ],
+    { duration: 1500, easing: "ease-out" },
+  );
+  locatorAnimation.onfinish = clearLocator;
+}
+function positionLocator() {
+  if (locator.hidden) return;
+  if (!selected || selected.floor !== floor) {
+    clearLocator();
+    return;
+  }
+  const p = world(selected);
+  const [x, y] = projected([p[0], view === "3d" ? 1.95 : 0, p[2]]);
+  locator.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+}
+window.addEventListener("atlas-motion-change", () => {
+  if (!motionPreference.matches) return;
+  cameraMotion.finish();
+  clearLocator();
+  for (const animation of mapEffects.values()) animation.cancel();
+  mapEffects.clear();
+});
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    cameraMotion.finish();
+    clearLocator();
+  }
+});
+window.addEventListener("pagehide", () => {
+  cameraMotion.cancel();
+  clearLocator();
+  for (const animation of mapEffects.values()) animation.cancel();
+  mapEffects.clear();
+  clearTimeout(motionTimer);
+  clearTimeout(searchTimer);
+  if (pendingDraw) cancelAnimationFrame(pendingDraw);
+  pendingDraw = 0;
+});
 let showNameTags = true;
 try {
   showNameTags = localStorage.getItem("atlas-show-name-tags") !== "false";
@@ -338,6 +426,9 @@ function search() {
   draw();
 }
 function setFloor(n, reset = true) {
+  const changed = floor !== n;
+  stopFocus();
+  clearLocator();
   floor = n;
   const f = data.floors.find((x) => x.level === n);
   $("#floor-title").innerHTML = `Floor ${f.label}<span>${esc(f.title)}</span>`;
@@ -348,12 +439,15 @@ function setFloor(n, reset = true) {
   });
   $("#floor-stats").textContent =
     `L${n}  /  ${records.filter((r) => r.floor === n).length} mapped locations`;
-  if (reset) resetCam();
+  if (reset) resetCam(false);
   search();
+  if (changed) {
+    revealMap();
+    revealMap($("#floor-title"));
+  }
 }
 function stopFocus() {
-  if (focusFrame) cancelAnimationFrame(focusFrame);
-  focusFrame = 0;
+  cameraMotion.cancel();
 }
 function focusTarget(r) {
   const saved = cam,
@@ -361,7 +455,6 @@ function focusTarget(r) {
     h = canvas.clientHeight;
   const unit = Math.min(w / 112, h / 78),
     deskPixels = w < 600 ? 55 : 65;
-  const f = data.floors.find((f) => f.level === r.floor);
   const goal = {
     yaw: view === "plan" ? 0 : -0.14,
     tilt: view === "plan" ? Math.PI / 2 : 1.12,
@@ -378,13 +471,15 @@ function focusTarget(r) {
 }
 function focusPerson(r) {
   stopFocus();
-  cam = focusTarget(r);
+  cameraMotion.to(focusTarget(r), { duration: 720, panoramic: true });
+  locateBeacon();
   draw();
 }
 
 function selectRecord(id) {
   const r = records.find((x) => x.id === id);
   if (!r) return;
+  clearTimeout(searchTimer);
   stopFocus();
   selected = r;
   if (r.floor !== floor) setFloor(r.floor);
@@ -653,9 +748,10 @@ function locateMatches() {
   const points = lastMatches.filter((r) => r.floor === floor).map(world),
     xs = points.map((p) => p[0]),
     zs = points.map((p) => p[2]);
-  cam.cx = (Math.min(...xs) + Math.max(...xs)) / 2;
-  cam.cz = (Math.min(...zs) + Math.max(...zs)) / 2;
-  cam.scale = Math.min(
+  const goal = { ...cam };
+  goal.cx = (Math.min(...xs) + Math.max(...xs)) / 2;
+  goal.cz = (Math.min(...zs) + Math.max(...zs)) / 2;
+  goal.scale = Math.min(
     4,
     Math.max(
       1,
@@ -667,7 +763,7 @@ function locateMatches() {
         ),
     ),
   );
-  draw();
+  cameraMotion.to(goal, { duration: 620, panoramic: true });
 }
 
 $(".floor-rail").onclick = (e) => {
@@ -680,7 +776,7 @@ $("#clear").onclick = () => {
   $("#team").value = "all";
   search();
 };
-function setView(v) {
+function setView(v, animate = false) {
   if (v !== "plan" && v !== "3d") v = "plan";
   stopFocus();
   if (v === "3d") init3d();
@@ -692,6 +788,7 @@ function setView(v) {
     $("#webgl-error").hidden = false;
     return;
   }
+  const changed = view !== v;
   view = v;
   canvas = v === "plan" ? planCanvas : glCanvas;
   applyNameVisibility();
@@ -699,16 +796,25 @@ function setView(v) {
   glCanvas.hidden = v !== "3d";
   planCanvas.hidden = v !== "plan";
   $("#three-d-toggle").checked = v === "3d";
-  cam.yaw = v === "plan" ? 0 : -0.14;
-  cam.tilt = v === "plan" ? Math.PI / 2 : 1;
+  const goal = {
+    ...cam,
+    yaw: v === "plan" ? 0 : -0.14,
+    tilt: v === "plan" ? Math.PI / 2 : 1,
+  };
+  if (animate && changed) {
+    revealMap();
+    if (v === "3d") cameraMotion.to(goal, { duration: 480, kind: "view" });
+    else cam = goal;
+  } else cam = goal;
   draw();
 }
 
 $("#three-d-toggle").onchange = (e) =>
-  setView(e.target.checked ? "3d" : "plan");
-function resetCam() {
+  setView(e.target.checked ? "3d" : "plan", true);
+function resetCam(animate = true) {
   stopFocus();
-  cam = {
+  clearLocator();
+  const goal = {
     yaw: view === "plan" ? 0 : -0.14,
     tilt: view === "plan" ? Math.PI / 2 : 1,
     scale: 1.06,
@@ -717,28 +823,35 @@ function resetCam() {
   };
   const g = data.floors.find((f) => f.level === floor).geometry,
     points = g.outline.map((p) => modelPoint(...p));
-  cam.cz =
+  goal.cz =
     (Math.min(...points.map((p) => p[2])) +
       Math.max(...points.map((p) => p[2]))) /
     2;
+  if (animate) cameraMotion.to(goal, { duration: 550, kind: "reset" });
+  else cam = goal;
   draw();
 }
-$("#reset").onclick = resetCam;
-$("#zoom-in").onclick = () => {
-  stopFocus();
-  cam.scale = Math.min(16, cam.scale * 1.25);
-  draw();
-};
-$("#zoom-out").onclick = () => {
-  stopFocus();
-  cam.scale = Math.max(0.5, cam.scale / 1.25);
-  draw();
-};
+$("#reset").onclick = () => resetCam();
+function zoomCamera(factor, anchor) {
+  const goal = cameraMotion.destination("zoom");
+  goal.scale = Math.max(0.5, Math.min(16, goal.scale * factor));
+  if (anchor) {
+    const saved = cam;
+    const before = inversePoint(...anchor);
+    cam = goal;
+    const after = inversePoint(...anchor);
+    goal.cx += before[0] - after[0];
+    goal.cz += before[1] - after[1];
+    cam = saved;
+  }
+  cameraMotion.to(goal, { duration: 200, kind: "zoom" });
+}
+$("#zoom-in").onclick = () => zoomCamera(1.25);
+$("#zoom-out").onclick = () => zoomCamera(1 / 1.25);
 $("#rotate").onclick = () => {
-  stopFocus();
-  if (view === "source") setView("plan");
-  cam.yaw += Math.PI / 8;
-  draw();
+  const goal = cameraMotion.destination("rotate");
+  goal.yaw += Math.PI / 8;
+  cameraMotion.to(goal, { duration: 340, kind: "rotate" });
 };
 $("#add").onclick = () => {
   if (!databaseReady) return toast("Launch the Python app to add desks");
@@ -1366,9 +1479,12 @@ let pendingDraw = 0,
   deskVertices = [];
 function draw() {
   if (!ready || pendingDraw) return;
-  pendingDraw = requestAnimationFrame(() => {
+  pendingDraw = requestAnimationFrame((time) => {
     pendingDraw = 0;
+    cameraMotion.step(time);
     renderFrame();
+    positionLocator();
+    if (cameraMotion.active) draw();
   });
 }
 function renderFrame() {
@@ -1769,6 +1885,7 @@ const pointers = new Map();
 let pinchDistance = 0;
 onMap("pointerdown", (e) => {
   stopFocus();
+  clearLocator();
   canvas.setPointerCapture(e.pointerId);
   pointers.set(e.pointerId, [e.clientX, e.clientY]);
   if (pointers.size === 2) {
@@ -1884,13 +2001,15 @@ onMap("contextmenu", (e) => {
 onMap(
   "wheel",
   (e) => {
-    stopFocus();
     e.preventDefault();
-    cam.scale = Math.min(
-      16,
-      Math.max(0.5, cam.scale * Math.exp(-e.deltaY * 0.001)),
-    );
-    draw();
+    clearLocator();
+    const rect = canvas.getBoundingClientRect();
+    const pixels =
+      e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? rect.height : 1);
+    zoomCamera(Math.exp(-Math.max(-400, Math.min(400, pixels)) * 0.001), [
+      e.clientX - rect.left,
+      e.clientY - rect.top,
+    ]);
   },
   { passive: false },
 );
@@ -2036,7 +2155,7 @@ function finishFrame(start) {
           Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))
         ].toFixed(1)
       : "—";
-  output.textContent = `Atlas 6.6 · studio map · ${view === "plan" ? "Canvas 2D" : "Simple WebGL"}\nDraw + labels: ${metrics.renderMs.toFixed(1)} ms\nLabel layout: ${metrics.labelsMs.toFixed(1)} ms\nMovement frame interval p95: ${p95} ms\nBuffer: ${canvas.width} × ${canvas.height}\n${moving ? "Moving · names follow desks" : "Idle"}\nFrame interval includes event scheduling.\nRemote-display latency is not measured.`;
+  output.textContent = `Atlas 6.9 · studio map · ${view === "plan" ? "Canvas 2D" : "Simple WebGL"}\nDraw + labels: ${metrics.renderMs.toFixed(1)} ms\nLabel layout: ${metrics.labelsMs.toFixed(1)} ms\nMovement frame interval p95: ${p95} ms\nBuffer: ${canvas.width} × ${canvas.height}\n${moving ? "Moving · names follow desks" : "Idle"}\nFrame interval includes event scheduling.\nRemote-display latency is not measured.`;
 }
 
 function planBackground() {

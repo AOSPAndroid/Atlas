@@ -784,8 +784,8 @@ tbody tr:hover {
   overflow: auto;
   box-shadow: -12px 0 50px #17334618;
   transition:
-    transform 0.15s,
-    visibility 0.15s;
+    transform var(--atlas-motion-enter) var(--atlas-ease),
+    visibility var(--atlas-motion-enter);
 }
 .software-drawer {
   width: 800px;
@@ -1081,12 +1081,6 @@ tbody tr:hover {
   }
   .detailgrid {
     grid-template-columns: 1fr;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  * {
-    transition: none !important;
-    scroll-behavior: auto !important;
   }
 }
 

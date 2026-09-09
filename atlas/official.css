@@ -1,26 +1,327 @@
-.floor-rail{max-height:85%;overflow:auto}.floor-rail button{min-height:30px;height:30px}#viewport{background:#f3f6f8}.view-switch a{padding:8px 12px;font-size:12px}#previous-person{width:100%;margin:10px 0}#map-previous{margin-bottom:10px}.ops-desk-editor p{font-size:12px;line-height:1.5}.ops-desk-editor a{display:block;margin:8px 0}@media(max-width:760px){.floor-rail button{height:27px;min-height:27px}.floor-rail{top:80px}}
-.brand b,.brandmark{font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif}.header-right .atlas-return{font-size:12px;text-decoration:none;border:1px solid #dce5ec;border-radius:7px;padding:8px 10px;background:#fff}label:has(input[name="angle"]),#reposition{display:none!important}
-#viewport{background:radial-gradient(ellipse at 48% 35%,#f9fbfc 0%,#e9f0f5 72%,#e3edf3 100%)}
-.map-name{border-radius:9px!important;border-color:#d7e3eb!important;background:rgba(255,255,255,.94)!important;box-shadow:0 3px 12px #284d6710!important;font-family:system-ui,-apple-system,"Segoe UI",sans-serif!important}
-.map-name.chosen{border-color:#0089b5!important;box-shadow:0 4px 18px #007ca525!important}
-#hover{font:12px/1.4 system-ui,sans-serif;border-radius:8px;padding:9px 12px;box-shadow:0 6px 20px #284d6725;max-width:280px;pointer-events:none}
+.floor-rail {
+  max-height: 85%;
+  overflow: auto;
+}
+.floor-rail button {
+  min-height: 30px;
+  height: 30px;
+}
+#viewport {
+  background: #f3f6f8;
+}
+.view-switch a {
+  padding: 8px 12px;
+  font-size: 12px;
+}
+#previous-person {
+  width: 100%;
+  margin: 10px 0;
+}
+#map-previous {
+  margin-bottom: 10px;
+}
+.ops-desk-editor p {
+  font-size: 12px;
+  line-height: 1.5;
+}
+.ops-desk-editor a {
+  display: block;
+  margin: 8px 0;
+}
+@media (max-width: 760px) {
+  .floor-rail button {
+    height: 27px;
+    min-height: 27px;
+  }
+  .floor-rail {
+    top: 80px;
+  }
+}
+.brand b,
+.brandmark {
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Arial,
+    sans-serif;
+}
+.header-right .atlas-return {
+  font-size: 12px;
+  text-decoration: none;
+  border: 1px solid #dce5ec;
+  border-radius: 7px;
+  padding: 8px 10px;
+  background: #fff;
+}
+label:has(input[name="angle"]),
+#reposition {
+  display: none !important;
+}
+#viewport {
+  background: radial-gradient(
+    ellipse at 48% 35%,
+    #f9fbfc 0%,
+    #e9f0f5 72%,
+    #e3edf3 100%
+  );
+}
+.map-name {
+  border-radius: 9px !important;
+  border-color: #d7e3eb !important;
+  background: rgba(255, 255, 255, 0.94) !important;
+  box-shadow: 0 3px 12px #284d6710 !important;
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    sans-serif !important;
+}
+.map-name.chosen {
+  border-color: #0089b5 !important;
+  box-shadow: 0 4px 18px #007ca525 !important;
+}
+#hover {
+  font:
+    12px/1.4 system-ui,
+    sans-serif;
+  border-radius: 8px;
+  padding: 9px 12px;
+  box-shadow: 0 6px 20px #284d6725;
+  max-width: 280px;
+  pointer-events: none;
+}
 
-.map-name.chosen,.map-name.chosen strong{color:#133f55!important}.map-name.chosen span{color:#53758b!important}
+.map-name.chosen,
+.map-name.chosen strong {
+  color: #133f55 !important;
+}
+.map-name.chosen span {
+  color: #53758b !important;
+}
 
 /* Atlas control family: identical action shapes, explicit boolean switches. */
-.atlas-wordmark{font:700 28px/1.15 system-ui,-apple-system,"Segoe UI",sans-serif!important;letter-spacing:-1px;color:#123e54!important;text-decoration:none;gap:0!important}
-button,.header-right a,.ops-header-link,.atlas-return{border-radius:12px!important;font-family:inherit;transition:background-color .15s,border-color .15s,box-shadow .15s}
-button:focus-visible,a:focus-visible{outline:2px solid #0086b0;outline-offset:3px}
-header button,.header-right a{min-height:36px;padding:8px 13px!important;border:1px solid #d5e2ea;background:#fff;color:#16465e;text-decoration:none;font-size:12px;display:inline-flex;align-items:center;justify-content:center}
-header button:hover,.header-right a:hover{background:#edf7fb;border-color:#a9cedd}
-.name-toggle{border-radius:12px;padding:10px 13px;min-height:38px;box-sizing:border-box;font-weight:500}
-.switch-track{width:36px;height:22px;background:#93a4af}.switch-track:after{width:18px;height:18px;top:2px;left:2px}.name-toggle input:checked+.switch-track:after{transform:translateX(14px)}
-.view-switch{background:transparent!important;border:0!important;padding:0!important}.view-toggle{margin:0}
-.floor-rail{border-radius:16px}.floor-rail button{border-radius:10px!important}.map-tools button{border-radius:12px!important}
-@media(prefers-reduced-motion:reduce){button,.switch-track:after{transition:none!important}}
+.atlas-wordmark {
+  font:
+    700 28px/1.15 system-ui,
+    -apple-system,
+    "Segoe UI",
+    sans-serif !important;
+  letter-spacing: -1px;
+  color: #123e54 !important;
+  text-decoration: none;
+  gap: 0 !important;
+}
+button,
+.header-right a,
+.ops-header-link,
+.atlas-return {
+  border-radius: 12px !important;
+  font-family: inherit;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid #0086b0;
+  outline-offset: 3px;
+}
+header button,
+.header-right a {
+  min-height: 36px;
+  padding: 8px 13px !important;
+  border: 1px solid #d5e2ea;
+  background: #fff;
+  color: #16465e;
+  text-decoration: none;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+header button:hover,
+.header-right a:hover {
+  background: #edf7fb;
+  border-color: #a9cedd;
+}
+.name-toggle {
+  border-radius: 12px;
+  padding: 10px 13px;
+  min-height: 38px;
+  box-sizing: border-box;
+  font-weight: 500;
+}
+.switch-track {
+  width: 36px;
+  height: 22px;
+  background: #93a4af;
+}
+.switch-track:after {
+  width: 18px;
+  height: 18px;
+  top: 2px;
+  left: 2px;
+}
+.name-toggle input:checked + .switch-track:after {
+  transform: translateX(14px);
+}
+.view-switch {
+  background: transparent !important;
+  border: 0 !important;
+  padding: 0 !important;
+}
+.view-toggle {
+  margin: 0;
+}
+.floor-rail {
+  border-radius: 16px;
+}
+.floor-rail button {
+  border-radius: 10px !important;
+}
+.map-tools button {
+  border-radius: 12px !important;
+}
 
+[hidden] {
+  display: none !important;
+}
 
+.floor2-layers {
+  position: absolute;
+  left: 16px;
+  bottom: 18px;
+  z-index: 12;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: #fff;
+  border: 1px solid #b7c9d6;
+  border-radius: 10px;
+  box-shadow: 0 3px 12px #14365018;
+  font: 13px system-ui;
+}
+.floor2-layers[hidden],
+.floor2-labels[hidden] {
+  display: none;
+}
+.floor2-layers label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.floor2-labels {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9;
+  overflow: hidden;
+}
+.facility-label {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  padding: 5px 8px;
+  border: 1px solid #526b7c;
+  border-radius: 6px;
+  background: #fff;
+  color: #173344;
+  font: 600 12px system-ui;
+  white-space: nowrap;
+  box-shadow: 0 2px 5px #102e4320;
+}
+.facility-label.lift {
+  background: #e1efff;
+  border-color: #2565a0;
+  color: #174c80;
+}
+.facility-label.wc {
+  background: #e0f5eb;
+  border-color: #277555;
+  color: #145c3d;
+}
+.facility-label.room {
+  background: #efe7ff;
+  border-color: #725399;
+  color: #573775;
+}
+@media (max-width: 600px) {
+  .floor2-layers {
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    gap: 8px;
+    font-size: 12px;
+  }
+  .facility-label {
+    font-size: 11px;
+    padding: 3px 5px;
+  }
+}
 
-[hidden]{display:none!important}
-
-.floor2-layers{position:absolute;left:16px;bottom:18px;z-index:12;display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:10px 14px;background:#fff;border:1px solid #b7c9d6;border-radius:10px;box-shadow:0 3px 12px #14365018;font:13px system-ui}.floor2-layers[hidden],.floor2-labels[hidden]{display:none}.floor2-layers label{display:flex;align-items:center;gap:5px}.floor2-labels{position:absolute;inset:0;pointer-events:none;z-index:9;overflow:hidden}.facility-label{position:absolute;transform:translate(-50%,-50%);padding:5px 8px;border:1px solid #526b7c;border-radius:6px;background:#fff;color:#173344;font:600 12px system-ui;white-space:nowrap;box-shadow:0 2px 5px #102e4320}.facility-label.lift{background:#e1efff;border-color:#2565a0;color:#174c80}.facility-label.wc{background:#e0f5eb;border-color:#277555;color:#145c3d}.facility-label.room{background:#efe7ff;border-color:#725399;color:#573775}@media(max-width:600px){.floor2-layers{left:8px;right:8px;bottom:8px;gap:8px;font-size:12px}.facility-label{font-size:11px;padding:3px 5px}}
+/* The locator follows the projected desk; only its ring animates. */
+.map-locator {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  z-index: 8;
+  pointer-events: none;
+}
+.locator-ring {
+  position: absolute;
+  left: -38px;
+  top: -38px;
+  width: 76px;
+  height: 76px;
+  border: 2px solid #e99037;
+  border-radius: 50%;
+  background: radial-gradient(circle, transparent 45%, #f7ad4720 100%);
+  box-shadow: 0 0 0 7px #f7ad4710;
+}
+.locator-core {
+  position: absolute;
+  left: -4px;
+  top: -4px;
+  width: 8px;
+  height: 8px;
+  background: #ed963b;
+  border: 2px solid white;
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px #e9903730;
+}
+.map-tools button {
+  transition:
+    transform var(--atlas-motion-fast),
+    background-color var(--atlas-motion-fast),
+    box-shadow var(--atlas-motion-fast);
+}
+@media (hover: hover) {
+  .map-tools button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 12px #1733461c;
+  }
+}
+.map-tools button:active {
+  transform: scale(0.94);
+}
+.floor-rail button {
+  transition:
+    background-color var(--atlas-motion-fast),
+    color var(--atlas-motion-fast),
+    box-shadow var(--atlas-motion-fast);
+}
+.floor-rail button.active {
+  box-shadow: 0 3px 10px #007eae25;
+}
+html[data-atlas-motion="reduce"] .map-locator {
+  display: none !important;
+}
+html[data-atlas-motion="reduce"] .map-tools button:hover,
+html[data-atlas-motion="reduce"] .map-tools button:active {
+  transform: none;
+}

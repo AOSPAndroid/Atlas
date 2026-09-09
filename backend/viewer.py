@@ -49,7 +49,7 @@ async def read_only(request: Request, call_next):
 def health():
     with connect() as con:
         con.execute('select body from official_records limit 1').fetchone()
-    return {'application': 'Office Atlas', 'mode': 'viewer', 'version': '6.7', 'read_only': True, 'instance_id': os.environ.get('ATLAS_INSTANCE_ID')}
+    return {'application': 'Office Atlas', 'mode': 'viewer', 'version': '6.9', 'read_only': True, 'instance_id': os.environ.get('ATLAS_INSTANCE_ID')}
 
 
 @app.get('/api/capabilities')
@@ -112,7 +112,7 @@ def shared_asset(filename:str):
 
 @app.get('/{filename}')
 def asset(filename: str):
-    allowed = {'official-app.js', 'official-data.json', 'official.css', 'style.css', 'operations.css', 'viewer.js', 'viewer.css'}
+    allowed = {'official-app.js','camera-motion.js', 'official-data.json', 'official.css', 'style.css', 'operations.css', 'viewer.js', 'viewer.css'}
     if filename not in allowed and not re.fullmatch(r'(official-floor-(-1|[0-8])\.(jpg|pdf)|studio-floor-(-1|[0-8])\.svg)', filename):
         raise HTTPException(404, 'Not available in the shared viewer')
     return FileResponse(ATLAS / filename)

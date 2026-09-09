@@ -1,4 +1,4 @@
-# Atlas 6.8
+# Atlas 6.9
 
 Office maps, people, machines and IT administration. This repository is now a normal project tree: Python source, browser assets, floor plans, templates, tests and the existing database. No TXT-to-Python extraction is needed. Previous transfer packages remain in Git history.
 
@@ -57,7 +57,7 @@ py -3.12 launcher.py stop
 
 `backend/main.py` hosts admin routes; `backend/viewer.py` hosts shared read routes; `directory_lookup.py` shares database-only lookup queries; `atlas/official-app.js` renders the common map; `atlas/viewer.js` provides read-only user and machine inspection.
 
-The test runner uses disposable database copies, starts isolated UI fixtures on ports 8892/8893, and runs 71 Python tests plus eight Node DOM suites. Remote operations are simulated. `npm run format:check` verifies formatting of the maintained browser sources.
+The test runner uses disposable database copies, starts isolated UI fixtures on ports 8892/8893, and runs 71 Python tests plus nine Node DOM suites. Remote operations are simulated. `npm run format:check` verifies formatting of the maintained browser sources.
 
 ## Optimization changes
 
@@ -71,4 +71,10 @@ The test runner uses disposable database copies, starts isolated UI fixtures on 
 - Workbook shared strings belong to each workbook operation; imports release connections and temporary resources. Static assets revalidate through normal browser caching while API responses remain uncached.
 - Removed the unused previous-map renderer and superseded stylesheet; historical seating data and import support remain available.
 
-No frontend runtime library was added. Map camera animations are a separate next step; existing geometry caching is covered by a 60-frame regression check.
+## Motion and map navigation
+
+Search or select a person to glide to their desk with a brief location highlight. Longer moves pull back slightly before closing in, so the destination stays in context. Search groups are framed smoothly; zoom buttons, cursor-anchored wheel zoom, reset, and rotation share the same camera controller. Switching to 3D tilts the map into place, while floor changes fade in briefly.
+
+Palettes, dialogs, person cards, console pages, and drawers use the same short motion timings. Both the admin map and shared viewer receive the map effects. Dragging immediately cancels automatic movement; repeated searches replace the previous destination. The **Motion** selector is available beside the map view controls and in the console header. **System** follows reduced-motion preferences (the default), **On** explicitly enables animations within Atlas, and **Off** skips them. Your choice is saved for that browser and Atlas address; the viewer has its own preference. Changes apply immediately, including during a camera flight.
+
+No frontend runtime library was added. Camera movement shares the existing render loop and stops when settled. Cached geometry is reused throughout animations. Regression checks cover rapid selection, manual interruption, cursor anchoring, reduced motion, and rendering after the animation ends.

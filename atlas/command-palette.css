@@ -43,6 +43,35 @@
   background: #061e35a8;
   backdrop-filter: blur(5px);
 }
+.atlas-palette[open] {
+  animation: palette-enter var(--atlas-motion-enter, 260ms)
+    var(--atlas-ease, cubic-bezier(0.22, 1, 0.36, 1));
+}
+.atlas-palette[open]::backdrop {
+  animation: palette-backdrop var(--atlas-motion-fast, 160ms) ease-out;
+}
+@keyframes palette-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes palette-backdrop {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.palette-result {
+  transition: background-color var(--atlas-motion-fast, 160ms);
+}
+
 .palette-input-row {
   display: flex;
   align-items: center;

@@ -7,6 +7,9 @@
   --atlas-focus: #69b8da;
   --atlas-surface: #fff;
   --atlas-font: system-ui, sans-serif;
+  --atlas-motion-fast: 160ms;
+  --atlas-motion-enter: 260ms;
+  --atlas-ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
 .atlas-person {
   display: grid;
@@ -96,4 +99,81 @@
 .atlas-dialog :focus-visible {
   outline: 3px solid var(--atlas-focus);
   outline-offset: 2px;
+}
+
+/* Short, event-driven transitions: no idle animation or layout tweening. */
+@keyframes atlas-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes atlas-dialog-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes atlas-backdrop-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+dialog[open] {
+  animation: atlas-dialog-enter var(--atlas-motion-enter) var(--atlas-ease);
+}
+dialog[open]::backdrop {
+  animation: atlas-backdrop-enter var(--atlas-motion-fast) ease-out;
+}
+.page.active,
+.atlas-person,
+#detail.open > .record-head,
+#toast > .toast {
+  animation: atlas-reveal var(--atlas-motion-enter) var(--atlas-ease);
+}
+.ops-machine,
+.result,
+.machine,
+.viewer-machine {
+  transition:
+    background-color var(--atlas-motion-fast),
+    border-color var(--atlas-motion-fast);
+}
+html[data-atlas-motion="reduce"] {
+  --atlas-motion-fast: 0ms;
+  --atlas-motion-enter: 0ms;
+}
+html[data-atlas-motion="reduce"] *,
+html[data-atlas-motion="reduce"] *::before,
+html[data-atlas-motion="reduce"] *::after {
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}
+.atlas-motion-select {
+  font: 12px var(--atlas-font);
+  color: var(--atlas-text);
+  background: var(--atlas-surface);
+  border: 1px solid var(--atlas-line);
+  border-radius: var(--atlas-radius);
+  padding: 9px 8px;
+  max-width: 150px;
+  cursor: pointer;
+}
+.view-switch {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
 }

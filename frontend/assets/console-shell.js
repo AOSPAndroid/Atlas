@@ -693,6 +693,7 @@ sharedPaletteReady = import("/command-palette.js").then(
   },
 );
 document.addEventListener("DOMContentLoaded", () => {
+  AtlasUI.motion.install(document.querySelector(".header-actions"));
   (() => {
     const searchInput = document.getElementById("search");
     searchInput.disabled = false;

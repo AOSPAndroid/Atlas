@@ -1,5 +1,60 @@
 /* Shared display primitives. This module performs no network or privileged actions. */
 (() => {
+  const motionMedia = window.matchMedia("(prefers-reduced-motion: reduce)");
+  const motionKey = "atlas-motion";
+  let motionChoice = "system";
+  try {
+    motionChoice = localStorage.getItem(motionKey) || "system";
+  } catch {}
+  const isReduced = () =>
+    motionChoice === "reduce" ||
+    (motionChoice !== "full" && motionMedia.matches);
+  function applyMotion() {
+    document.documentElement.dataset.atlasMotion = isReduced()
+      ? "reduce"
+      : "full";
+    document.querySelectorAll(".atlas-motion-select").forEach((el) => {
+      el.value = motionChoice;
+    });
+    window.dispatchEvent(new Event("atlas-motion-change"));
+  }
+  motionMedia.addEventListener?.("change", applyMotion);
+  window.addEventListener("storage", (event) => {
+    if (event.key === motionKey || event.key === null) {
+      try {
+        motionChoice = localStorage.getItem(motionKey) || "system";
+      } catch {}
+      applyMotion();
+    }
+  });
+  applyMotion();
+  function motionControl(parent) {
+    if (!parent || parent.querySelector(".atlas-motion-select")) return;
+    const select = document.createElement("select");
+    select.className = "atlas-motion-select";
+    select.setAttribute("aria-label", "Animations");
+    select.title =
+      "Map and interface animations. System follows your accessibility preference.";
+    for (const [value, text] of [
+      ["system", "Motion: System"],
+      ["full", "Motion: On"],
+      ["reduce", "Motion: Off"],
+    ]) {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = text;
+      select.append(option);
+    }
+    select.value = motionChoice;
+    select.onchange = () => {
+      motionChoice = select.value;
+      try {
+        localStorage.setItem(motionKey, motionChoice);
+      } catch {}
+      applyMotion();
+    };
+    parent.append(select);
+  }
   const esc = (value) =>
     String(value ?? "").replace(
       /[&<>"']/g,
@@ -72,5 +127,10 @@
     element.showModal();
     return { element, body };
   }
-  window.AtlasUI = { esc, person, dialog };
+  window.AtlasUI = {
+    esc,
+    person,
+    dialog,
+    motion: { isReduced, install: motionControl },
+  };
 })();

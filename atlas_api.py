@@ -306,7 +306,7 @@ def register_atlas(app):
 
  @app.get('/{filename}')
  def atlas_asset(filename:str):
-  allowed={'command-registry.js','command-palette.js','command-palette.css','official-app.js','official-data.json','official.css','style.css','data.json','operations.js','operations.css'}|{'floor-'+str(n)+'.jpg' for n in range(2,8)}
+  allowed={'command-registry.js','command-palette.js','command-palette.css','official-app.js','camera-motion.js','official-data.json','official.css','style.css','data.json','operations.js','operations.css'}|{'floor-'+str(n)+'.jpg' for n in range(2,8)}
   allowed|={'official-floor-'+str(n)+ext for n in range(-1,9) for ext in ('.jpg','.pdf')}
   allowed|={'studio-floor-'+str(n)+'.svg' for n in range(-1,9)}
   if filename not in allowed:raise HTTPException(404,'Not found')
