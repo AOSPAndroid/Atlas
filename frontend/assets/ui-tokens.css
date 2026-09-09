@@ -58,6 +58,58 @@
   font-size: 12px;
   margin-bottom: 8px;
 }
+.atlas-machine-details {
+  margin-top: 12px;
+  min-width: 0;
+  font: 12px/1.5 var(--atlas-font);
+  color: var(--atlas-text);
+}
+.atlas-machine-details > summary {
+  cursor: pointer;
+  padding: 6px 0;
+  color: var(--atlas-accent);
+  font-size: 12px;
+}
+.atlas-machine-inventory > p {
+  color: var(--atlas-muted);
+  font-size: 11px;
+  margin: 4px 0 12px;
+}
+.atlas-machine-inventory section + section {
+  border-top: 1px solid var(--atlas-line);
+  padding-top: 12px;
+  margin-top: 12px;
+}
+.atlas-machine-inventory h4 {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: var(--atlas-text);
+}
+.atlas-machine-inventory dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 16px;
+  margin: 0;
+}
+.atlas-machine-inventory .atlas-machine-wide {
+  grid-column: 1 / -1;
+}
+.atlas-machine-inventory dt {
+  margin: 0;
+  color: var(--atlas-muted);
+  font-size: 11px;
+}
+.atlas-machine-inventory dd {
+  margin: 3px 0 0;
+  color: var(--atlas-text);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+.ops-machine-entry > .atlas-machine-details {
+  margin: 0 0 14px;
+  padding: 0 10px;
+}
 .atlas-dialog {
   width: min(760px, 94vw);
   max-height: 85vh;

@@ -25,6 +25,11 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
     model_id: "Fixture laptop",
     operational_status: "Operational",
     assigned_relationship: 1,
+    serial_number: "SERIAL-1",
+    manufacturer: "Fixture manufacturer",
+    correlation_id: "CI-1",
+    infrastructure_itsi: "WINDOWS VIRTUAL DESKTOPS",
+    discovery_source: "Fixture discovery",
   };
   const requests = [];
   const f = await fixture({
@@ -169,6 +174,29 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   dialog = w.document.querySelector(".viewer-lookup-dialog");
   assert(dialog.textContent.includes("Fixture laptop"));
   assert(dialog.textContent.includes("Assigned to user"));
+  const details = dialog.querySelector(".atlas-machine-details");
+  assert(details.open);
+  assert.equal(details.querySelector("summary").textContent, "Machine details");
+  assert(details.textContent.includes("SERIAL-1"));
+  assert(details.textContent.includes("CI-1"));
+  assert(details.textContent.includes("Fixture discovery"));
+  let copied = "";
+  Object.defineProperty(w.navigator, "clipboard", {
+    value: {
+      writeText: async (value) => {
+        copied = value;
+      },
+    },
+    configurable: true,
+  });
+  details.open = false;
+  dialog.querySelector("[data-copy-report]").click();
+  await sleep(0);
+  assert(
+    copied.includes("Serial number: SERIAL-1"),
+    "copy includes collapsed inventory",
+  );
+  assert(copied.includes("Correlation ID: CI-1"));
   dialog.querySelector("[data-person]").click();
   await sleep(20);
   assert(dialog.textContent.includes("Alice Example"));

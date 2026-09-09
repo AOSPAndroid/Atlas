@@ -38,7 +38,7 @@ let deploymentQueue = [];
 let activeQueueId = null;
 let sharedPalette = null,
   sharedPaletteReady;
-let daasState = { status: null, user: null, machines: {} };
+let daasState = { status: null, user: null };
 let daasUserKey = "";
 let deploymentMonitorTimer = null;
 let deploymentMonitorMode = "active";

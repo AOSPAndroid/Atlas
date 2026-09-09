@@ -24,23 +24,7 @@ function machinesCard(machines, inspect = true) {
     (machines
       .map((m) => {
         const name = m.name || m.machine_name;
-        const fields = [
-          ["Status", m.operational_status],
-          ["Model", m.model_id || m.model],
-          ["Serial", m.serial_number],
-          ["Last discovered", m.last_discovered],
-          ["Updated", m.updated_on],
-          ["Assigned to", m.assigned_to],
-          ["Last logon", m.last_logon_user],
-          ["Description", m.short_description],
-          ["Class", m.sys_class_name],
-        ];
-        return `<article class="viewer-machine"><b>${esc(name)}</b><p class="ops-muted">${esc(relationship(m))}</p><dl class="viewer-facts">${fields
-          .filter(([, v]) => v)
-          .map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`)
-          .join(
-            "",
-          )}</dl>${inspect ? `<button type="button" data-machine="${esc(name)}">Inspect machine</button>` : ""}</article>`;
+        return `<article class="viewer-machine"><b>${esc(name)}</b><p class="ops-muted">${esc(relationship(m))}</p><p>${esc(m.model_id || "Model not supplied")} · ${esc(m.operational_status || "Status not supplied")} (inventory)</p>${AtlasUI.machineDetails(m, { open: !inspect })}${inspect ? `<button type="button" data-machine="${esc(name)}">Inspect machine</button>` : ""}</article>`;
       })
       .join("") || "<p>No linked machines recorded.</p>")
   );
@@ -138,9 +122,7 @@ export function createViewerOperations({ onSelect, toast }) {
       if (copy)
         copy.onclick = async () => {
           try {
-            await navigator.clipboard.writeText(
-              current.results.innerText.replace(copy.textContent, ""),
-            );
+            await navigator.clipboard.writeText(copy.dataset.copyReport);
             toast("Stored inventory report copied");
           } catch {
             toast("Copy unavailable. Select the report text to copy it.");
@@ -182,7 +164,7 @@ export function createViewerOperations({ onSelect, toast }) {
       "/api/machine/" + encodeURIComponent(name),
       (data) =>
         machinesCard([data.machine], false) +
-        '<button type="button" data-copy-report>Copy stored report</button><h3>Linked people</h3><p class="ops-muted">Recorded assignment and logon relationships; not a live sign-in check.</p>' +
+        `<button type="button" data-copy-report="${esc(AtlasUI.machineReport(data.machine) + "\n\nLinked people\n" + data.users.map((u) => `${u.full_name || u.name} · ${u.user_name || u.user_id} · ${relationship(u)}`).join("\n") + "\n\nRecorded desks\n" + data.desks.map((d) => `${d.id} · L${d.floor}`).join("\n"))}">Copy stored report</button><h3>Linked people</h3><p class="ops-muted">Recorded assignment and logon relationships; not a live sign-in check.</p>` +
         (userButtons(data.users) || "<p>No linked people recorded.</p>") +
         deskButtons(data.desks),
       "machine:" + name,

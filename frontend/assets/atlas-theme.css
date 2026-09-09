@@ -538,6 +538,7 @@ kbd {
 }
 .machinegrid {
   display: grid;
+  align-items: start;
   grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
   gap: 12px;
 }

@@ -138,16 +138,10 @@ function renderMachines() {
   document.querySelectorAll("#machines [data-machine]").forEach((card) => {
     const m = S.machines[Number(card.dataset.machine)];
     card.insertAdjacentHTML("beforeend", AtlasHealth.badges(m));
-    daasState.machines[m.name] = {
-      matched: true,
-      device: {
-        ...m,
-        device_online: m.operational_status,
-        last_user: m.last_logon_user,
-      },
-    };
+    card.insertAdjacentHTML("beforeend", AtlasUI.machineDetails(m));
+    card.querySelector(".atlas-machine-details").onclick = (event) =>
+      event.stopPropagation();
   });
-  renderDaaSMachines();
   applyCompactWorkspace();
 }
 function targetPrefs() {
@@ -307,22 +301,6 @@ function renderDaaSUser() {
       }),
   );
 }
-function renderDaaSMachines() {
-  document.querySelectorAll("#machines [data-machine]").forEach((card) => {
-    const m = S.machines[Number(card.dataset.machine)];
-    if (!m) return;
-    const old = card.querySelector(".daas-machine-details");
-    if (old) old.remove();
-    const d = daasState.machines[m.name];
-    if (!d || !d.matched || !d.device) return;
-    const x = d.device;
-    const details = document.createElement("details");
-    details.className = "daas-machine-details";
-    details.innerHTML = `<summary>DaaS details</summary><div class="daas-grid machine-daas-grid">${daasField("Location", [x.data_centre, x.hall, x.cabinet, x.shelf, x.slot].filter(Boolean).join(" / "))}${daasField("Asset", x.asset_tag)}${daasField("Serial", x.serial)}${daasField("Device type", x.device_type)}${daasField("Scope", x.scope_allocation)}${daasField("Online", x.device_online, true)}${daasField("Citrix", x.registered_status, true)}${daasField("Last connected", x.last_connected)}${daasField("Last user", x.last_user)}${daasField("Maintenance", x.maintenance_mode, true)}${daasField("Storage", x.hard_drive_capacity)}${daasField("Free disk", x.free_disk_space)}${daasField("CPU", x.cpu)}${daasField("CPU temp", x.cpu_temp)}${daasField("OS", x.os_version)}${daasField("BIOS", x.bios)}${daasField("EMA", x.ema_provisioning, true)}${daasField("Power outlet", x.power_outlet)}${daasField("Switch", x.switch_name)}${daasField("Removal flag", x.device_to_remove, true)}${daasField("Comments", x.comments)}</div>`;
-    details.onclick = (e) => e.stopPropagation();
-    card.appendChild(details);
-  });
-}
 function mergeUserDetailPanels() {
   const directory = document.querySelector(
     "#kyc details.details:not(.daas-details)",
@@ -355,9 +333,7 @@ function completeMachineReport() {
     "User: " + (u.name || ""),
     "Account: " + (u.user_name || ""),
     "Email: " + (u.email || ""),
-    "Stored status: " + (m.operational_status || ""),
-    "Model: " + (m.model_id || ""),
-    "Serial: " + (m.serial_number || ""),
+    AtlasUI.machineReport({ ...m, name: S.target }),
     "Software inventory: " +
       (inventory
         ? inventory.software.length + " applications"

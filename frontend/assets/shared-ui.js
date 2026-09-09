@@ -104,6 +104,74 @@
         .join(""),
     )}</div><div><h2>${esc(name)}</h2><div class="facts">${fields(facts)}</div><details class="details"><summary>Person details</summary><div class="detailgrid">${fields(details)}</div></details></div></div>`;
   }
+  // Only fields actually supplied by the directory export. No live-state aliases.
+  function machineSections(machine) {
+    const supplied = (value) =>
+      value !== null && value !== undefined && String(value).trim() !== "";
+    return [
+      [
+        "Identity",
+        [
+          ["Infrastructure", machine.infrastructure_itsi],
+          ["Manufacturer", machine.manufacturer],
+          ["Model", machine.model_id],
+          ["Serial number", machine.serial_number],
+          ["Correlation ID", machine.correlation_id],
+          ["Record class", machine.sys_class_name],
+          ["Description", machine.short_description],
+        ],
+      ],
+      [
+        "Ownership",
+        [
+          ["Assigned to", machine.assigned_to || "Not supplied"],
+          ["Last logged-on user", machine.last_logon_user || "Not supplied"],
+        ],
+      ],
+      [
+        "Discovery",
+        [
+          ["Inventory status", machine.operational_status],
+          ["Discovery source", machine.discovery_source],
+          ["Last discovered", machine.last_discovered],
+          ["Record updated", machine.updated_on],
+        ],
+      ],
+    ]
+      .map(([title, fields]) => [
+        title,
+        fields.filter(([, value]) => supplied(value)),
+      ])
+      .filter(([, fields]) => fields.length);
+  }
+  const machineNote =
+    "Stored inventory. Status and last logged-on user do not confirm current connectivity or sign-in.";
+  function machineDetails(machine, { open = false } = {}) {
+    const sections = machineSections(machine)
+      .map(
+        ([title, fields]) =>
+          `<section><h4>${esc(title)}</h4><dl>${fields
+            .map(
+              ([label, value]) =>
+                `<div${["Infrastructure", "Serial number", "Description"].includes(label) ? ' class="atlas-machine-wide"' : ""}><dt>${esc(label)}</dt><dd>${esc(value)}</dd></div>`,
+            )
+            .join("")}</dl></section>`,
+      )
+      .join("");
+    return `<details class="atlas-machine-details"${open ? " open" : ""}><summary>Machine details</summary><div class="atlas-machine-inventory"><p>${machineNote}</p>${sections}</div></details>`;
+  }
+  function machineReport(machine) {
+    return [
+      "Stored machine details",
+      "Machine: " + (machine.name || machine.machine_name || "Not supplied"),
+      machineNote,
+      ...machineSections(machine).flatMap(([title, fields]) => [
+        "",
+        title,
+        ...fields.map(([label, value]) => `${label}: ${value}`),
+      ]),
+    ].join("\n");
+  }
   function dialog(title) {
     const previous =
         document.activeElement?.shadowRoot?.activeElement ||
@@ -137,6 +205,8 @@
   window.AtlasUI = {
     esc,
     person,
+    machineDetails,
+    machineReport,
     dialog,
     motion: { isReduced, install: motionControl },
   };
