@@ -12,7 +12,21 @@ const assert=require('node:assert/strict');const {fixture}=require('./ui_fixture
  const fields=Object.fromEntries([...details.querySelectorAll('dl > div')].map(el=>[el.querySelector('dt').textContent,el.querySelector('dd').textContent]));
  assert.equal(fields['Serial number'],'SERIAL<&>');assert.equal(fields['Correlation ID'],'CI-123');assert.equal(fields.Infrastructure,'WINDOWS VIRTUAL DESKTOPS');assert.equal(fields['Assigned to'],'Not supplied');assert.equal(fields['Last logged-on user'],'Example User');assert.equal(fields['Inventory status'],'Operational');
  for(const absent of ['Online','Citrix','CPU','CPU temp','Free disk','Asset','Description'])assert(!(absent in fields),absent);
- assert(!details.querySelector('script'));run("S.target='PC-A'");assert(run('completeMachineReport()').includes('Serial number: SERIAL<&>'));run("S.target='PC-B'");assert(!run('completeMachineReport()').includes('CI-123'));run('clearLookup()');hold=true;
+ assert(!details.querySelector('script'));run("S.target='PC-A'");assert(run('completeMachineReport()').includes('Serial number: SERIAL<&>'));run("S.target='PC-B'");assert(!run('completeMachineReport()').includes('CI-123'));
+ // The entire menu is measured at screen edges, and every action remains keyboard reachable.
+ const menu=w.document.querySelector('#machineMenu'),card=w.document.querySelector('[data-machine="0"]');
+ menu.getBoundingClientRect=()=>({width:260,height:680});
+ const openMenu=()=>card.dispatchEvent(new w.MouseEvent('contextmenu',{bubbles:true,cancelable:true,clientX:1023,clientY:767}));
+ const beforeMenu=calls.length;openMenu();assert.equal(calls.length,beforeMenu);assert.equal(run('S.target'),'PC-B');
+ assert.equal(menu.style.left,'756px');assert.equal(menu.style.top,'80px');assert.equal(menu.querySelectorAll('[role="menuitem"]').length,17);
+ for(const label of ['Refresh health','Remote Desktop','Computer Management','Event Viewer','Copy complete machine report'])assert([...menu.querySelectorAll('button')].some(b=>b.textContent===label));
+ const key=value=>menu.dispatchEvent(new w.KeyboardEvent('keydown',{key:value,bubbles:true,cancelable:true}));
+ key('End');assert.equal(w.document.activeElement.dataset.cmd,'report');key('Home');assert.equal(w.document.activeElement.dataset.cmd,'target');key('ArrowUp');assert.equal(w.document.activeElement.dataset.cmd,'report');key('Escape');assert(menu.classList.contains('hidden'));assert.equal(w.document.activeElement,card.querySelector('.copyhost'));
+ const healthCount=()=>calls.filter(url=>url.startsWith('/api/machine-health/PC-A/')).length;
+ for(let i=0;i<2;i++){openMenu();const count=healthCount();menu.querySelector('[data-cmd="health"]').click();await sleep();await sleep();assert.equal(run('S.target'),'PC-A');assert.equal(healthCount()-count,8,'exactly one health pass, including after target change');assert(menu.classList.contains('hidden'))}
+ for(const tool of ['rdp','compmgmt','eventvwr']){run("S.target='PC-B'");openMenu();const count=calls.length;menu.querySelector(`[data-cmd="${tool}"]`).click();await sleep();await sleep();assert.equal(run('S.target'),'PC-A');assert.deepEqual(calls.slice(count).filter(url=>url.startsWith('/api/open-tool/')),[`/api/open-tool/${tool}/PC-A`]);assert(menu.classList.contains('hidden'))}
+ const viewport={width:w.innerWidth,height:w.innerHeight};w.innerWidth=320;w.innerHeight=240;menu.getBoundingClientRect=()=>({width:304,height:224});openMenu();assert.equal(menu.style.left,'8px');assert.equal(menu.style.top,'8px');key('End');assert.equal(w.document.activeElement.dataset.cmd,'report');key('Escape');w.innerWidth=viewport.width;w.innerHeight=viewport.height;
+ run('clearLookup()');hold=true;
  // Floating context follows scroll/selection without starting another health request.
  const settle=()=>new Promise(resolve=>setTimeout(resolve,35));
  run('installSupportDock()');

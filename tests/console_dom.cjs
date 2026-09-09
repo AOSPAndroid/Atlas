@@ -23,6 +23,9 @@ async function until(fn){for(let i=0;i<100;i++){if(fn())return;await sleep(30)}t
  vm.runInContext(fs.readFileSync(path.join(root,'frontend/assets/remote-software.js'),'utf8'),context);
  await until(()=>w.document.querySelector('#identity').textContent==='LOCAL UI TEST');
  await until(()=>w.document.querySelector('#pkg').value==='Example App');
+ assert.equal(w.document.querySelector('.header-actions .atlas-motion-toggle'),null);
+ await vm.runInContext("runSharedCommand('animations')",context);assert(w.AtlasUI.motion.isReduced());assert.equal(w.localStorage.getItem('atlas-motion'),'reduce');
+ await vm.runInContext("runSharedCommand('animations')",context);assert(!w.AtlasUI.motion.isReduced());assert.equal(w.localStorage.getItem('atlas-motion'),'full');
  for(const page of ['admin','bulk','history','workspace']){w.document.querySelector(`[data-page="${page}"]`).click();assert(w.document.querySelector('#'+page).classList.contains('active'));assert(w.document.querySelector('#pageTitle').textContent.trim().length>0)}
  assert.equal(w.document.querySelectorAll('nav .nav-label').length,4);
  for(const [toggle,drawer,close] of [['queueToggle','queueDrawer','closeQueue'],['deploymentsToggle','deploymentsDrawer','closeDeployments']]){w.document.querySelector('#'+toggle).click();assert(w.document.querySelector('#'+drawer).classList.contains('open'));w.document.querySelector('#'+close).click();assert(!w.document.querySelector('#'+drawer).classList.contains('open'))}

@@ -31,6 +31,13 @@
     }
   });
   applyMotion();
+  function setMotion(enabled) {
+    motionChoice = enabled ? "full" : "reduce";
+    try {
+      localStorage.setItem(motionKey, motionChoice);
+    } catch {}
+    applyMotion();
+  }
   function motionControl(parent) {
     if (!parent || parent.querySelector(".atlas-motion-toggle")) return;
     const label = document.createElement("label");
@@ -50,13 +57,7 @@
     state.className = "atlas-motion-state";
     state.setAttribute("aria-hidden", "true");
     state.textContent = isReduced() ? "Off" : "On";
-    input.onchange = () => {
-      motionChoice = input.checked ? "full" : "reduce";
-      try {
-        localStorage.setItem(motionKey, motionChoice);
-      } catch {}
-      applyMotion();
-    };
+    input.onchange = () => setMotion(input.checked);
     label.append(input, track, text, state);
     parent.append(label);
   }
@@ -208,6 +209,10 @@
     machineDetails,
     machineReport,
     dialog,
-    motion: { isReduced, install: motionControl },
+    motion: {
+      isReduced,
+      install: motionControl,
+      toggle: () => setMotion(isReduced()),
+    },
   };
 })();

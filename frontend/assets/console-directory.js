@@ -284,44 +284,99 @@ function machineContext(event, index) {
   event.stopPropagation();
   const m = S.machines[index],
     menu = document.querySelector("#machineMenu");
-  menu.innerHTML = `<button data-cmd="target">Set as target</button><button data-cmd="copy">Copy hostname</button><button data-cmd="details">Copy machine details</button><button data-cmd="msra">Open MSRA</button><button data-cmd="cshare">Open C$</button><button data-cmd="temp">Open C:\\Temp</button><button data-cmd="packages">Open Packages</button><button data-cmd="admin">Remote Admin</button><button data-cmd="queue">Add deployment to queue</button><button data-cmd="clean">Clean package folder</button>`;
-  menu.style.left = Math.min(event.clientX, window.innerWidth - 210) + "px";
-  menu.style.top = Math.min(event.clientY, window.innerHeight - 360) + "px";
-  menu.classList.remove("hidden");
-  menu.querySelectorAll("[data-cmd]").forEach(
-    (b) =>
-      (b.onclick = () => {
-        const cmd = b.dataset.cmd;
-        setTarget(m.name, m.operational_status);
-        if (cmd === "copy") copy(m.name, "Hostname");
-        if (cmd === "details")
-          copy(JSON.stringify(m, null, 2), "Machine details");
-        if (["msra", "cshare", "temp", "packages"].includes(cmd))
-          openTargetTool(cmd);
-        if (cmd === "admin") page("admin");
-        if (cmd === "queue") addQueue();
-        if (cmd === "clean") cleanPackages();
-        menu.classList.add("hidden");
-      }),
-  );
-  const add = (label, run) => {
+  if (!m || !menu) return;
+  menu.replaceChildren();
+  menu.setAttribute("role", "menu");
+  menu.setAttribute("aria-label", "Actions for " + m.name);
+  const close = () => menu.classList.add("hidden");
+  const add = (cmd, label, run, select = true) => {
     const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.cmd = cmd;
+    button.setAttribute("role", "menuitem");
+    button.tabIndex = -1;
     button.textContent = label;
-    button.onclick = () => {
-      menu.classList.add("hidden");
-      run();
+    button.onclick = async () => {
+      close();
+      try {
+        const wasTarget = S.target === m.name.trim().toUpperCase();
+        if (select) setTarget(m.name, m.operational_status);
+        await run(wasTarget);
+      } catch (error) {
+        toast(error.message);
+      }
     };
     menu.append(button);
   };
-  add("View specifications", () => AtlasHealth.specs(m.name));
-  add("Software inventory", () => {
-    setTarget(m.name, m.operational_status);
-    loadSoftware(m.name);
+  add("target", "Set as target", () => {});
+  add("health", "Refresh health", (wasTarget) => {
+    // Selecting a different target already starts its health checks.
+    if (wasTarget) return refreshTargetHealth();
   });
-  add("Copy complete machine report", () => {
-    setTarget(m.name, m.operational_status);
-    copy(completeMachineReport(), "Machine report");
-  });
+  add("copy", "Copy hostname", () => copy(m.name, "Hostname"));
+  add("details", "Copy machine details", () =>
+    copy(JSON.stringify(m, null, 2), "Machine details"),
+  );
+  for (const [tool, label] of [
+    ["msra", "Open MSRA"],
+    ["rdp", "Remote Desktop"],
+    ["compmgmt", "Computer Management"],
+    ["eventvwr", "Event Viewer"],
+    ["cshare", "Open C$"],
+    ["temp", "Open C:\\Temp"],
+    ["packages", "Open Packages"],
+  ])
+    add(tool, label, () => openTargetTool(tool));
+  add("admin", "Remote Admin", () => page("admin"));
+  add("queue", "Add deployment to queue", () => addQueue());
+  add("clean", "Clean package folder", () => cleanPackages());
+  add("specs", "View specifications", () => AtlasHealth.specs(m.name), false);
+  add("software", "Software inventory", () => loadSoftware(m.name));
+  add("report", "Copy complete machine report", () =>
+    copy(completeMachineReport(), "Machine report"),
+  );
+  menu.classList.remove("hidden");
+  menu.scrollTop = 0;
+  const gap = 8;
+  menu.style.left = menu.style.top = gap + "px";
+  // Measure after all actions are present, including the constrained height.
+  const bounds = menu.getBoundingClientRect();
+  menu.style.left =
+    Math.max(
+      gap,
+      Math.min(event.clientX, window.innerWidth - bounds.width - gap),
+    ) + "px";
+  menu.style.top =
+    Math.max(
+      gap,
+      Math.min(event.clientY, window.innerHeight - bounds.height - gap),
+    ) + "px";
+  const buttons = [...menu.querySelectorAll("button")];
+  menu.onkeydown = (e) => {
+    const current = buttons.indexOf(document.activeElement);
+    let next;
+    if (e.key === "ArrowDown") next = (current + 1) % buttons.length;
+    if (e.key === "ArrowUp")
+      next = (current - 1 + buttons.length) % buttons.length;
+    if (e.key === "Home") next = 0;
+    if (e.key === "End") next = buttons.length - 1;
+    if (next !== undefined) {
+      e.preventDefault();
+      e.stopPropagation();
+      buttons[next].focus({ preventScroll: true });
+      buttons[next].scrollIntoView({ block: "nearest", behavior: "instant" });
+    }
+    if (e.key === "Escape" || e.key === "Tab") {
+      close();
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        const card = document.querySelector(`[data-machine="${index}"]`);
+        card?.querySelector(".copyhost")?.focus({ preventScroll: true });
+      }
+    }
+  };
+  buttons[0].focus({ preventScroll: true });
 }
 function bindMachineContext() {
   document

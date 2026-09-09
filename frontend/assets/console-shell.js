@@ -140,6 +140,9 @@ function bindQueueControls() {
   document.addEventListener("click", () =>
     $("#machineMenu").classList.add("hidden"),
   );
+  window.addEventListener("resize", () =>
+    $("#machineMenu").classList.add("hidden"),
+  );
 }
 function statusAccent(value) {
   const text = String(value ?? "")
@@ -556,8 +559,7 @@ async function runInitialSharedCommand(params) {
   await runSharedCommand(id);
 }
 async function runSharedCommand(id) {
-  if (id === "animations")
-    return document.querySelector(".atlas-motion-toggle input").click();
+  if (id === "animations") return AtlasUI.motion.toggle();
   const { MAP_COMMANDS, commandUrl } = await import("/command-registry.js");
   if (MAP_COMMANDS.has(id)) {
     location.assign(commandUrl(id, S.target));
@@ -696,7 +698,6 @@ sharedPaletteReady = import("/command-palette.js").then(
   },
 );
 document.addEventListener("DOMContentLoaded", () => {
-  AtlasUI.motion.install(document.querySelector(".header-actions"));
   installSupportDock();
   (() => {
     const searchInput = document.getElementById("search");
