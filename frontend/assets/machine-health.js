@@ -214,5 +214,70 @@
       );
     });
   }
-  window.AtlasHealth = { mount, cancel, specs, badges, format, report };
+  function compact(host, pc) {
+    const snapshot = snapshots.get(host);
+    return Object.entries(labels).map(([key, label]) => {
+      const metric = snapshot?.pc === pc ? snapshot.metrics[key] : null;
+      const d = metric?.data || {};
+      let text = !metric
+        ? "Checking…"
+        : metric.state !== "ready"
+          ? "Unavailable"
+          : format(key, d);
+      if (metric?.state === "ready") {
+        if (key === "cpu")
+          text =
+            num(d.processors?.[0]?.LoadPercentage) === null
+              ? "Unavailable"
+              : d.processors[0].LoadPercentage + "%";
+        if (key === "ram")
+          text =
+            num(d.usable_kib) > 0 &&
+            num(d.free_kib) !== null &&
+            num(d.free_kib) >= 0 &&
+            num(d.free_kib) <= num(d.usable_kib)
+              ? Math.round((1 - d.free_kib / d.usable_kib) * 100) + "% used"
+              : "Unavailable";
+        if (key === "storage")
+          text =
+            num(d.free_bytes) === null
+              ? "Unavailable"
+              : gib(d.free_bytes) + " free";
+        if (key === "gpu")
+          text = (d.adapters || []).length
+            ? d.adapters.length + " adapter(s)"
+            : "Unavailable";
+        if (key === "system")
+          text =
+            num(d.uptime_seconds) === null
+              ? "Unavailable"
+              : Math.floor(d.uptime_seconds / 86400) +
+                "d " +
+                Math.floor((d.uptime_seconds % 86400) / 3600) +
+                "h uptime";
+      }
+      return {
+        label,
+        text,
+        warning:
+          text === "Unavailable" ||
+          d.available === false ||
+          (key === "system" && num(d.uptime_seconds) > 8 * 86400),
+        title:
+          (metric?.state === "ready" ? format(key, d) : metric?.error || text) +
+          (metric?.checked_at
+            ? " · Checked " + new Date(metric.checked_at).toLocaleString()
+            : ""),
+      };
+    });
+  }
+  window.AtlasHealth = {
+    mount,
+    cancel,
+    specs,
+    badges,
+    format,
+    report,
+    compact,
+  };
 })();

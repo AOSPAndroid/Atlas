@@ -13,6 +13,19 @@ const assert=require('node:assert/strict');const {fixture}=require('./ui_fixture
  assert.equal(fields['Serial number'],'SERIAL<&>');assert.equal(fields['Correlation ID'],'CI-123');assert.equal(fields.Infrastructure,'WINDOWS VIRTUAL DESKTOPS');assert.equal(fields['Assigned to'],'Not supplied');assert.equal(fields['Last logged-on user'],'Example User');assert.equal(fields['Inventory status'],'Operational');
  for(const absent of ['Online','Citrix','CPU','CPU temp','Free disk','Asset','Description'])assert(!(absent in fields),absent);
  assert(!details.querySelector('script'));run("S.target='PC-A'");assert(run('completeMachineReport()').includes('Serial number: SERIAL<&>'));run("S.target='PC-B'");assert(!run('completeMachineReport()').includes('CI-123'));run('clearLookup()');hold=true;
+ // Floating context follows scroll/selection without starting another health request.
+ const settle=()=>new Promise(resolve=>setTimeout(resolve,35));
+ run('installSupportDock()');
+ const kyc=w.document.querySelector('#kyc'),health=w.document.querySelector('#healthLine'),dock=w.document.querySelector('#supportDock');
+ let bottom=-20;kyc.getBoundingClientRect=health.getBoundingClientRect=()=>({bottom});
+ w.document.querySelector('.lookup-column').getBoundingClientRect=()=>({left:240,width:500});
+ run("S.user={name:'Alice <Example>',user_name:'alice',email:'alice@example.test'};renderKyc();S.target='PC-A'");
+ await w.AtlasHealth.mount(health,'PC-A');const healthCalls=calls.length;
+ w.dispatchEvent(new w.Event('scroll'));await settle();
+ assert(!dock.hidden);assert(dock.textContent.includes('Alice <Example>'));assert(dock.textContent.includes('PC-A'));assert(dock.textContent.includes('Unavailable'));assert.equal(dock.querySelectorAll('.support-health-metrics > span').length,8);assert.equal(calls.length,healthCalls);
+ bottom=300;w.dispatchEvent(new w.Event('scroll'));await settle();assert(dock.hidden);
+ bottom=-20;run("S.target='PC-B'");w.dispatchEvent(new w.Event('scroll'));await settle();assert(dock.textContent.includes('PC-B'));assert(dock.querySelector('.support-health-metrics').textContent.includes('Checking'));assert(!dock.textContent.includes('PC-A'));
+ run("page('admin')");await settle();assert(dock.hidden);run("page('workspace');clearLookup()");await settle();assert(dock.hidden);
  // Old lookup must not replace a newer selection.
  w.document.querySelector('#search').value='first';const first=run('search()');w.document.querySelector('#search').value='second';const second=run('search()');pending[1].resolve({matched:false});await second;pending[0].resolve({matched:true,user_key:'id:1'});await first;assert.equal(run('S.target'),'');
  // Cleanup's preview is invalid after changing target.

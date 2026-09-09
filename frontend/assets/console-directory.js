@@ -144,6 +144,96 @@ function renderMachines() {
   });
   applyCompactWorkspace();
 }
+function installSupportDock() {
+  if (document.querySelector("#supportDock")) return;
+  const workspace = $("#workspace"),
+    column = $(".lookup-column"),
+    user = $("#kyc"),
+    health = $("#healthLine");
+  const dock = document.createElement("div");
+  dock.id = "supportDock";
+  dock.hidden = true;
+  dock.setAttribute("aria-label", "Current person and machine health");
+  dock.innerHTML =
+    '<button type="button" class="support-person" aria-label="Return to full user details" hidden></button><div class="support-health" hidden><button type="button" class="support-health-title" aria-label="Return to full machine health"></button><div class="support-health-metrics"></div></div>';
+  document.body.append(dock);
+  const person = dock.querySelector(".support-person"),
+    panel = dock.querySelector(".support-health"),
+    heading = dock.querySelector(".support-health-title"),
+    metrics = dock.querySelector(".support-health-metrics");
+  const back = (element) => {
+    element.style.scrollMarginTop = "16px";
+    element.scrollIntoView({
+      block: "start",
+      behavior: AtlasUI.motion.isReduced() ? "instant" : "smooth",
+    });
+    const focus = element.querySelector("button, summary");
+    focus?.focus({ preventScroll: true });
+  };
+  person.onclick = () => back(user);
+  heading.onclick = () => back(health);
+  let frame = 0,
+    lastPerson = "",
+    lastHealth = "";
+  function update() {
+    frame = 0;
+    const active = workspace.classList.contains("active");
+    const showPerson =
+      active &&
+      !!S.user &&
+      !!user.firstElementChild &&
+      user.getBoundingClientRect().bottom <= 12;
+    const showHealth =
+      active &&
+      !!S.target &&
+      !health.classList.contains("hidden") &&
+      health.getBoundingClientRect().bottom <= 12;
+    person.hidden = !showPerson;
+    panel.hidden = !showHealth;
+    dock.hidden = !showPerson && !showHealth;
+    if (dock.hidden) return;
+    const bounds = column.getBoundingClientRect();
+    dock.style.left = Math.max(8, bounds.left) + "px";
+    dock.style.width = Math.min(bounds.width, window.innerWidth - 16) + "px";
+    if (showPerson) {
+      const u = S.user;
+      const html = `<b>${esc(u.full_name || u.name || u.user_name)}</b><span>${esc([u.user_name, u.email].filter(Boolean).join(" · "))}</span><small>${esc([u.department || u.business_unit, u.location].filter(Boolean).join(" · "))}</small>`;
+      if (html !== lastPerson) {
+        person.innerHTML = html;
+        lastPerson = html;
+      }
+    }
+    if (showHealth) {
+      heading.textContent = S.target + " · Health ↗";
+      const html = (AtlasHealth.compact?.(health, S.target) || [])
+        .map(
+          (row) =>
+            `<span class="${row.warning ? "warning" : ""}" title="${esc(row.title)}"><b>${esc(row.label)}</b> ${esc(row.text)}</span>`,
+        )
+        .join("");
+      if (html !== lastHealth) {
+        metrics.innerHTML = html;
+        lastHealth = html;
+      }
+    }
+  }
+  const schedule = () => {
+    if (!frame) frame = requestAnimationFrame(update);
+  };
+  window.addEventListener("scroll", schedule, { passive: true });
+  window.addEventListener("resize", schedule, { passive: true });
+  const observer = new MutationObserver(schedule);
+  for (const host of [user, health, $("#deployTarget")])
+    observer.observe(host, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+  observer.observe(workspace, { attributes: true, attributeFilter: ["class"] });
+  schedule();
+}
 function targetPrefs() {
   return JSON.parse(localStorage.getItem("wmiTargetPrefs") || '{"recent":[]}');
 }

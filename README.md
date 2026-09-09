@@ -57,6 +57,8 @@ The host must remain awake and network-reachable. Windows Firewall or your organ
 
 ## Machine details
 
+In the IT console, scrolling past the full person card or live-health panel reveals a compact floating version above the machine list. The person card keeps name, account, email, team and office visible; health chips show the selected target's existing readings. Click either heading to return to the full panel. The cards disappear when their original panels return into view, the lookup is cleared, or you leave Workspace. Scrolling does not run additional health checks; refresh the full health panel when needed. Hover a health chip for the full reading and its check time.
+
 Expand **Machine details** in the IT console, admin map or shared viewer to inspect the machine's stored export fields. Identity shows infrastructure category, manufacturer, model, serial number, correlation ID, record class and description when supplied. Ownership distinguishes the assigned person from the inventory's last logged-on user. Discovery shows the inventory status, discovery source and the discovery/update timestamps. Machine reports use the same fields.
 
 Empty optional fields are omitted. An absent assignment or last user is labelled **Not supplied**. **Operational** is an inventory status, not proof that the machine is online; last logged-on user does not identify a current session. The current computers export does not supply CPU, disk capacity/free space, BIOS, Citrix registration or maintenance state. Available live specifications remain in the admin health/specifications tools.
