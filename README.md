@@ -1,66 +1,32 @@
-# Office Atlas + IT
+# Atlas
 
-**[Download the latest complete Atlas package](Office-Atlas-Latest.txt)** · [Changelog](Office-Atlas-6.6-Changelog.txt) · [Demo](demo/) · [Old releases](old/)
+An IT support toolbox for office maps, people, machines and software.
 
-## Full IT application — version 6.6
+**[Download Atlas 6.6](Office-Atlas-Latest.txt)** · [Changelog](Office-Atlas-6.6-Changelog.txt) · [Read-only demo](demo/) · [Old releases](old/)
 
-This is the complete Office Atlas toolbox. The previous filename, `Office-Atlas-IT-Software-Actions.txt`, referred to this same full package; it was not a separate software-only tool. References to that filename inside the 6.4 package and changelog still refer to this download.
+## Features
 
-Version 6.6 adds detailed walls and 3D doors across all ten floors, name tags that follow camera movement, and map layer controls. It retains the 6.5 optimizations, machine specifications, user relationship badges and full editing and IT operations. Door angles illustrate the source plan; they are not live door states. Elevator area shading is annotated on Level 02.
+- **2D and 3D maps** — ten floors, detailed walls and doors, searchable desks and moving name tags.
+- **People and seating** — user–machine links, desk moves and saved changes.
+- **Excel imports** — ready-to-fill templates and seating change previews.
+- **Machine health** — CPU, RAM, GPU, storage, uptime and connectivity checks.
+- **Software tools** — package discovery, remote deployment, installed-software lists and supported uninstall/repair actions.
+- **Shared database** — directory, seating and operation history in one place.
 
-[Read the 6.6 changelog](Office-Atlas-6.6-Changelog.txt). The intermittent software-inventory issue is deferred.
+## Run
 
-## Download one file
+Download the single TXT, rename it to `.py`, and run it with Python 3.12. Follow the extracted `README.txt` and `Python_Settings.bat` instructions. Python dependencies and external installers are not embedded.
 
-Download [Office-Atlas-Latest.txt](Office-Atlas-Latest.txt) using GitHub's raw-file download control. The complete file is **43,080,806 bytes**; no joining is required.
+**Upgrading:** back up your full database, stop Atlas and extract into a new folder. Carry over your database and configuration before starting. Keep the old installation until verified.
 
-Enable filename extensions in Windows Explorer, rename the file to `Office-Atlas-Latest.py`, and run it with Python 3.12. Follow the extracted README and Python_Settings instructions to install dependencies and start the application. The extractor verifies the embedded files; it does not launch remote operations.
+The standalone demo is frozen. See its extracted README for hosting instructions. Live Windows operations still require validation on a test machine; software inventory can need a refresh.
 
-## Existing installations
+<details>
+<summary>Package integrity</summary>
 
-Finish active jobs, back up the full existing database, and stop the old application. Extract into a new folder. Replace the seeded `office_atlas.db` with your full database backup and carry over your Python_Settings configuration. Check Settings before use and keep the old installation intact until verified. A seating-only export is not a full database backup.
-
-## Included
-
-- Office Atlas maps, assets, shared database and application source.
-- Excel templates for users, desks and directory data, with seating change previews and import.
-- Installed-software actions for supported remote uninstall and repair operations.
-- MSI cache metadata inspection. Cache deletion is disabled.
-
-Python dependencies and external application installers are not embedded. Remote Windows uninstall and repair have not been tested on a real target; validate them on a designated test machine.
-
-## Integrity
-
+Size: **43,080,806 bytes**  
 SHA-256: `ff91711c3442bc15be39e4f4f9449d582f919bf13f1c843de11eac5ca2672675`
 
-This private bundle contains internal employee, machine and floor-plan data. Restrict repository access accordingly.
+</details>
 
-## Read-only network demo
-
-[Office-Atlas-ReadOnly-Demo.txt](demo/Office-Atlas-ReadOnly-Demo.txt) is a separate **15,635,235-byte** package. Rename it to `.py` and run it, set `Python_Settings.bat`, then run `Start-Atlas-Demo.bat`. Visitors open `http://HOST-PC-IP:8771`; host firewall and network routing must allow TCP 8771. The full IT version stays on localhost:8770.
-
-The map links to a read-only IT directory: users, linked computers, official/previous seating, recorded relationships and histories, package metadata, hosting settings and downloadable Excel templates. Remote tool capabilities are listed with actions disabled. No live software/process scans, deployments, uninstall/repair, cache cleanup, imports or database changes are performed.
-
-Set `package_repository` in the demo's `demo_config.json` to the package root available on the hosting PC. Package folders and recognised script filenames can be inspected; installer files and script contents are not served or embedded. An unavailable repository is reported explicitly.
-
-The included directory is a snapshot. For your latest data, start the demo with `--atlas-folder "C:\Path\Office-Atlas-IT"` to read a consistent snapshot of that installation's database and its package repository setting. Restart the demo to refresh. The source database is opened read-only. `--repository "C:\Packages"` overrides the repository path.
-
-Anyone who can reach this demo can view its internal employee, machine, desk and history data; there is no login or HTTPS. Use it for the intended internal audience only.
-
-Demo SHA-256: `b45d17add2f5d0adb8a07a4b2c6146dfaa0693e6059d2d077d4c5c39ac927e73`.
-
-Validated extraction integrity, HTTP read-only boundaries, data pagination/relationships, package metadata inspection and unchanged source database. JavaScript syntax checked; full browser validation remains outstanding because a test browser could not be downloaded.
-
-## Older full IT installations
-
-The script-name fix is included in version 6.6; a separate patch is not needed. [Atlas-Script-Names-Fix.txt](old/6.3/Atlas-Script-Names-Fix.txt) remains available for older full IT installations. The standalone demo is frozen and should not be patched.
-
-For upgrades, follow the changelog to preserve your database, Python path, repository configuration and any custom launcher settings. Live Windows hardware queries and full browser rendering remain to be validated in the target environment.
-
-## Release archive
-
-Previous full IT releases are retained in [old](old/). Version [6.3](old/6.3/) includes its original package, README and script-name patch. Future releases should archive the outgoing version before replacing the current package.
-
-Version [6.4](old/6.4/) is also archived with its original package, changelog and README. The demo package is unchanged.
-
-Version [6.5](old/6.5/) is archived with its unchanged original package, changelog and README.
+Private repository: the package includes internal directory and floor-plan data.
