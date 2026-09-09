@@ -2,7 +2,7 @@
 import argparse,sqlite3,tempfile,sys
 from datetime import datetime
 from pathlib import Path
-from Build_MasterDB_From_database040926 import build,workbook_parts,iter_rows,canonical_header,rowdict,clean,norm
+from Build_MasterDB_From_database040926 import build,workbook_parts,iter_rows,canonical_header,rowdict,clean,norm,workbook_scope
 from merge_data import merge_directory
 from atlas_store import ClosingConnection
 ROOT=Path(__file__).resolve().parent
@@ -11,6 +11,7 @@ def counts(path):
  with sqlite3.connect(Path(path).resolve().as_uri()+'?mode=ro',uri=True,factory=ClosingConnection) as c:
   return {t:c.execute('select count(*) from '+t).fetchone()[0] for t in ('users','machines','assignments')}
 
+@workbook_scope
 def prepare(source,candidate):
  source=Path(source)
  if not source.is_file():raise ValueError('Extract file not found: '+str(source))
@@ -40,7 +41,8 @@ def apply_refresh(target,candidate,backup_folder):
 
 def main():
  p=argparse.ArgumentParser(description=__doc__);p.add_argument('--source',type=Path,default=ROOT/'database040926.xlsx');p.add_argument('--check-only',action='store_true');args=p.parse_args()
- target=ROOT/'office_atlas.db'
+ from runtime_paths import database_path
+ target=database_path()
  with tempfile.TemporaryDirectory() as tmp:
   candidate=Path(tmp)/'directory.db';new=prepare(args.source,candidate);old=counts(target)
   print('\nEUROPE DIRECTORY REFRESH — full snapshot replacement, not an incremental import')

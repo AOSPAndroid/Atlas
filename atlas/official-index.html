@@ -1,5 +1,178 @@
-<!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Atlas</title><link rel="stylesheet" href="style.css?v=7"><link rel="stylesheet" href="operations.css?v=1"><link rel="stylesheet" href="official.css?v=66"><link rel="stylesheet" href="/assets/machine-health.css"><script src="/assets/machine-health.js"></script></head><body>
-<header><a class="brand atlas-wordmark" href="./" aria-label="Atlas home">Atlas</a><div class="header-right"><a class="atlas-return" href="/manage-database">Manage Database</a><button id="ops-audit" hidden>Review previous mappings</button><button id="ops-catalog">Package catalogue</button><button id="ops-settings">Settings</button><button id="ops-history">Deployments</button><a class="ops-header-link" href="/installer" target="_blank" rel="noopener">IT console ↗</a><button id="ops-import-atlas">Import previous seating .db</button><input id="ops-db-file" type="file" accept=".db,.sqlite" hidden><span class="edition">SEATING REGISTER</span><button id="export">Export records ↗</button><button id="import">Import records</button><input type="file" id="file" accept="application/json" hidden></div></header>
-<div class="workspace"><aside class="directory"><div class="side-head"><span class="eyebrow">PARIS OFFICE MAP</span><h1>Find your people.</h1><label class="search"><span>⌕</span><input id="search" type="search" placeholder="Find a person, team or room…" aria-label="Search all floors"><kbd>/</kbd></label><div class="filter-row"><select id="scope" aria-label="Search floor"><option value="all">All Paris floors</option></select><select id="team" aria-label="Filter by team"><option value="all">All teams</option></select></div></div><div class="list-title"><span id="resultcount"></span><button id="clear">Clear</button></div><div id="results" role="list" aria-label="Search results"></div><div class="directory-foot"><span class="eyebrow">SOURCE & COVERAGE</span><p>Paris · 10 official plans · B1–08</p><small>Official desk codes from the PDFs. Hover or select a desk for its official number. Seating names carry across from the previous register.</small></div></aside>
-<main><div class="map-heading"><div><span class="eyebrow">EXPLORE THE OFFICE</span><h2 id="floor-title">Level 3 <span>Markets</span></h2></div><div class="view-switch" aria-label="Map view"><label class="name-toggle view-toggle"><input id="three-d-toggle" type="checkbox" role="switch" aria-label="3D view"><span class="switch-track" aria-hidden="true"></span><span>3D view</span></label></div></div><div id="viewport"><div id="map-labels" aria-label="Names on the map"></div><svg id="label-lines" aria-hidden="true"></svg><div id="location-banner" role="status" aria-live="polite" hidden></div><canvas id="canvas" aria-label="Interactive official office plan. Select a name from the directory for keyboard access."></canvas><div id="source" hidden><img id="source-image" alt="Original scanned floor plan"></div><div class="map-top"><span class="pill">PARIS · OFFICIAL DESK POSITIONS</span><div class="map-display-controls"><label class="name-toggle"><input id="name-tags" type="checkbox" role="switch" checked><span class="switch-track" aria-hidden="true"></span><span>Name tags</span></label><button id="add" hidden>＋ Add location</button></div></div><nav class="floor-rail" aria-label="Floor selection"></nav><div class="map-tools"><button id="zoom-in" aria-label="Zoom in">＋</button><button id="zoom-out" aria-label="Zoom out">−</button><button id="reset" aria-label="Reset view">⌖</button><button id="rotate" aria-label="Rotate view">↻</button></div><output id="map-metrics" hidden></output><div id="hover" hidden></div><div class="map-bottom"><div class="legend"><i></i>Desk / person <i class="area"></i>Room / team <i class="selected"></i>Selected</div><span id="hint">Drag to pan · Scroll or pinch to zoom</span></div><div id="webgl-error" hidden>3D is unavailable in this browser. Use Fast map to inspect the plan; directory search and records remain available.</div></div><footer><span id="floor-stats"></span><span>Paris map · Europe-wide directory</span></footer></main>
-<aside id="detail"><div class="empty-detail"><span class="crosshair">⌖</span><span class="eyebrow">LOCATION INSPECTOR</span><h2>Every desk.<br>A place to start.</h2><p>Select an official desk code to assign a colleague, choose a machine and deploy an application.</p><div class="detail-info"><b>Rebuilt from your floor plans</b><p>Keep seating changes, user links and deployment results together.</p></div><small>One shared database for desks, directory users, machines and deployment history. Right-click a desk to edit, move an occupant or view history.</small></div></aside></div><div id="toast" role="status" aria-live="polite"></div><script type="module" src="official-app.js?v=66"></script></body></html>
+<!doctype html>
+<html lang="en">
+  <head>
+    <link rel="stylesheet" href="/assets/ui-tokens.css" />
+    <script src="/assets/shared-ui.js"></script>
+    <script src="/assets/client.js"></script>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Atlas</title>
+    <link rel="stylesheet" href="style.css?v=7" />
+    <link rel="stylesheet" href="operations.css?v=1" />
+    <link rel="stylesheet" href="official.css?v=66" />
+    <link rel="stylesheet" href="/assets/machine-health.css" />
+    <script src="/assets/machine-health.js"></script>
+  </head>
+  <body>
+    <header>
+      <a class="brand atlas-wordmark" href="./" aria-label="Atlas home"
+        >Atlas</a
+      >
+      <div class="header-right">
+        <a class="atlas-return" href="/manage-database">Manage Database</a
+        ><button id="ops-audit" hidden>Review previous mappings</button
+        ><button id="ops-catalog">Package catalogue</button
+        ><button id="ops-settings">Settings</button
+        ><button id="ops-history">Deployments</button
+        ><a
+          class="ops-header-link"
+          href="/installer"
+          target="_blank"
+          rel="noopener"
+          >IT console ↗</a
+        ><button id="ops-import-atlas">Import previous seating .db</button
+        ><input id="ops-db-file" type="file" accept=".db,.sqlite" hidden /><span
+          class="edition"
+          >SEATING REGISTER</span
+        ><button id="export">Export records ↗</button
+        ><button id="import">Import records</button
+        ><input type="file" id="file" accept="application/json" hidden />
+      </div>
+    </header>
+    <div class="workspace">
+      <aside class="directory">
+        <div class="side-head">
+          <span class="eyebrow">PARIS OFFICE MAP</span>
+          <h1>Find your people.</h1>
+          <label class="search"
+            ><span>⌕</span
+            ><input
+              id="search"
+              type="search"
+              placeholder="Find a person, team or room…"
+              aria-label="Search all floors"
+            /><kbd>/</kbd></label
+          >
+          <div class="filter-row">
+            <select id="scope" aria-label="Search floor">
+              <option value="all">All Paris floors</option></select
+            ><select id="team" aria-label="Filter by team">
+              <option value="all">All teams</option>
+            </select>
+          </div>
+        </div>
+        <div class="list-title">
+          <span id="resultcount"></span><button id="clear">Clear</button>
+        </div>
+        <div id="results" role="list" aria-label="Search results"></div>
+        <div class="directory-foot">
+          <span class="eyebrow">SOURCE & COVERAGE</span>
+          <p>Paris · 10 official plans · B1–08</p>
+          <small
+            >Official desk codes from the PDFs. Hover or select a desk for its
+            official number. Seating names carry across from the previous
+            register.</small
+          >
+        </div>
+      </aside>
+      <main>
+        <div class="map-heading">
+          <div>
+            <span class="eyebrow">EXPLORE THE OFFICE</span>
+            <h2 id="floor-title">Level 3 <span>Markets</span></h2>
+          </div>
+          <div class="view-switch" aria-label="Map view">
+            <label class="name-toggle view-toggle"
+              ><input
+                id="three-d-toggle"
+                type="checkbox"
+                role="switch"
+                aria-label="3D view"
+              /><span class="switch-track" aria-hidden="true"></span
+              ><span>3D view</span></label
+            >
+          </div>
+        </div>
+        <div id="viewport">
+          <div id="map-labels" aria-label="Names on the map"></div>
+          <svg id="label-lines" aria-hidden="true"></svg>
+          <div
+            id="location-banner"
+            role="status"
+            aria-live="polite"
+            hidden
+          ></div>
+          <canvas
+            id="canvas"
+            aria-label="Interactive official office plan. Select a name from the directory for keyboard access."
+          ></canvas>
+          <div id="source" hidden>
+            <img id="source-image" alt="Original scanned floor plan" />
+          </div>
+          <div class="map-top">
+            <span class="pill">PARIS · OFFICIAL DESK POSITIONS</span>
+            <div class="map-display-controls">
+              <label class="name-toggle"
+                ><input
+                  id="name-tags"
+                  type="checkbox"
+                  role="switch"
+                  checked
+                /><span class="switch-track" aria-hidden="true"></span
+                ><span>Name tags</span></label
+              ><button id="add" hidden>＋ Add location</button>
+            </div>
+          </div>
+          <nav class="floor-rail" aria-label="Floor selection"></nav>
+          <div class="map-tools">
+            <button id="zoom-in" aria-label="Zoom in">＋</button
+            ><button id="zoom-out" aria-label="Zoom out">−</button
+            ><button id="reset" aria-label="Reset view">⌖</button
+            ><button id="rotate" aria-label="Rotate view">↻</button>
+          </div>
+          <output id="map-metrics" hidden></output>
+          <div id="hover" hidden></div>
+          <div class="map-bottom">
+            <div class="legend">
+              <i></i>Desk / person <i class="area"></i>Room / team
+              <i class="selected"></i>Selected
+            </div>
+            <span id="hint">Drag to pan · Scroll or pinch to zoom</span>
+          </div>
+          <div id="webgl-error" hidden>
+            3D is unavailable in this browser. Use Fast map to inspect the plan;
+            directory search and records remain available.
+          </div>
+        </div>
+        <footer>
+          <span id="floor-stats"></span
+          ><span>Paris map · Europe-wide directory</span>
+        </footer>
+      </main>
+      <aside id="detail">
+        <div class="empty-detail">
+          <span class="crosshair">⌖</span
+          ><span class="eyebrow">LOCATION INSPECTOR</span>
+          <h2>Every desk.<br />A place to start.</h2>
+          <p>
+            Select an official desk code to assign a colleague, choose a machine
+            and deploy an application.
+          </p>
+          <div class="detail-info">
+            <b>Rebuilt from your floor plans</b>
+            <p>
+              Keep seating changes, user links and deployment results together.
+            </p>
+          </div>
+          <small
+            >One shared database for desks, directory users, machines and
+            deployment history. Right-click a desk to edit, move an occupant or
+            view history.</small
+          >
+        </div>
+      </aside>
+    </div>
+    <div id="toast" role="status" aria-live="polite"></div>
+    <script type="module" src="official-app.js?v=66"></script>
+  </body>
+</html>

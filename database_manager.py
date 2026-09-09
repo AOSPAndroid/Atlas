@@ -35,14 +35,16 @@ def register_database_manager(app,wmi,check_token):
  from urllib.parse import unquote
  root=Path(__file__).parent;staged={};gate=asyncio.Lock()
  with sqlite3.connect(wmi.MASTER_DB,factory=ClosingConnection) as c:c.execute('create table if not exists directory_import_history(id text primary key,at text,source text,backup text,report text)')
- def busy():return any(j.get('state') not in ('complete','failed','cancelled') for pool in (wmi.jobs,wmi.queue_jobs) for j in list(pool.values()))
+ def busy():return any(j.get('state') not in ('complete','failed','cancelled','interrupted','unknown') for pool in (wmi.jobs,wmi.queue_jobs) for j in list(pool.values()))
  def clean():
   for id,s in list(staged.items()):
    if time.time()-s['created']>3600:shutil.rmtree(s['folder'],ignore_errors=True);del staged[id]
  # Serialize mutations with imports so a new deployment cannot start between the job check and commit.
  @app.middleware('http')
  async def directory_mutation_gate(request,call_next):
-  if request.method in ('POST','PUT','PATCH','DELETE'):
+  # Inventory runs against immutable scan data; directory reads do not mutate.
+  independent=request.url.path in ('/api/software-tools/inventory','/api/software-tools/preview','/api/daas/machines','/api/kill','/api/reboot') or request.url.path.startswith(('/api/open-tool/','/api/cleanup-packages/'))
+  if request.method in ('POST','PUT','PATCH','DELETE') and not independent:
    async with gate:return await call_next(request)
   return await call_next(request)
  def stage(folder,source,candidate):

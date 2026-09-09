@@ -1,0 +1,652 @@
+async function packages() {
+  const request = packageRequest();
+  try {
+    const d = await api(
+      "/api/catalog?term=" + encodeURIComponent($("#pkgSearch").value),
+      { signal: request.signal },
+    );
+    if (!request.current()) return;
+    $("#pkg").innerHTML = d.items
+      .map(
+        (x) =>
+          `<option value="${esc(x.folder)}">${esc(x.display_name)}${x.version ? " · " + esc(x.version) : ""}</option>`,
+      )
+      .join("");
+    await scripts();
+  } catch (e) {
+    if (e.name !== "AbortError" && request.current()) toast(e.message);
+  }
+}
+async function scripts() {
+  const request = scriptRequest(),
+    folder = $("#pkg").value,
+    action = $("#action").value,
+    control = $("#script");
+  control.innerHTML = "";
+  control.disabled = true;
+  try {
+    if (folder) {
+      const data = await api(
+        `/api/scripts?package=${encodeURIComponent(folder)}&action=${encodeURIComponent(action)}`,
+        { signal: request.signal },
+      );
+      if (
+        !request.current() ||
+        folder !== $("#pkg").value ||
+        action !== $("#action").value
+      )
+        return;
+      control.innerHTML = data.scripts
+        .map((x) => `<option>${esc(x)}</option>`)
+        .join("");
+    }
+    renderFav();
+  } catch (e) {
+    if (e.name !== "AbortError" && request.current()) toast(e.message);
+  } finally {
+    if (request.current()) control.disabled = false;
+  }
+}
+function packageFolder(pkg) {
+  return pkg;
+}
+async function preflight() {
+  if (!S.target) return;
+  const pc = S.target;
+  let d = await api("/api/preflight/" + pc);
+  if (S.target !== pc) return;
+  $("#preflight").innerHTML = `<div class=checks>${Object.entries(d)
+    .map(
+      ([k, v]) =>
+        `<span class="check ${v ? "ok" : ""}">${v ? "✓" : "✕"} ${esc(k)}</span>`,
+    )
+    .join("")}</div>`;
+}
+async function deploy(mode = "full") {
+  if (deploySubmitting) return;
+  if ($("#script").disabled || !$("#script").value)
+    return toast("Wait for an action script to load");
+  if (!S.target) return toast("Select a target");
+  let pkg = $("#pkg").value,
+    p = prefs();
+  p.recent = [pkg, ...p.recent.filter((x) => x !== pkg)].slice(0, 5);
+  save(p);
+  renderRecent();
+  deploySubmitting = true;
+  let d;
+  try {
+    d = await api("/api/deploy", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        computer: S.target,
+        folder: packageFolder(pkg),
+        script: $("#script").value,
+        action: $("#action").value,
+        fresh: $("#fresh").checked,
+        threads: +$("#threads").value,
+        mode,
+      }),
+    });
+  } finally {
+    deploySubmitting = false;
+  }
+  S.job = d.job;
+  poll(d.job);
+}
+function poll(id) {
+  return AtlasClient.watch(
+    "console-deployment",
+    "/api/job/" + id,
+    (data) => {
+      $("#log").textContent = data.events
+        .map(
+          (e) =>
+            `[${e.time}] ${e.message}${e.log ? "\n" + e.log.join("\n") : ""}`,
+        )
+        .join("\n");
+      if (AtlasClient.terminal.has(data.state)) toast(data.state);
+    },
+    { onError: (e) => toast("Monitoring: " + e.message) },
+  );
+}
+function renderFav() {
+  let p = prefs(),
+    pkg = $("#pkg").value;
+  $("#favBtn").textContent = p.favs.includes(pkg)
+    ? "★ Favourite"
+    : "☆ Favourite";
+}
+function toggleFav() {
+  let p = prefs(),
+    pkg = $("#pkg").value;
+  p.favs = p.favs.includes(pkg)
+    ? p.favs.filter((x) => x !== pkg)
+    : [...p.favs, pkg];
+  save(p);
+  renderFav();
+  renderRecent();
+}
+function renderRecent() {
+  let p = prefs(),
+    vals = [...p.favs, ...p.recent].filter((x, i, a) => a.indexOf(x) === i);
+  $("#recent").innerHTML = vals
+    .map(
+      (x) =>
+        `<button data-recent="${esc(x)}">${p.favs.includes(x) ? "★ " : ""}${esc(x)}</button>`,
+    )
+    .join("");
+  $$("[data-recent]").forEach(
+    (b) =>
+      (b.onclick = () => {
+        $("#pkg").value = b.dataset.recent;
+        scripts();
+      }),
+  );
+}
+async function admin(kind) {
+  let pc = $("#adminPc").value.trim();
+  if (!pc) return;
+  let u =
+    kind === "overview"
+      ? `/api/overview/${pc}`
+      : kind === "ping"
+        ? `/api/ping/${pc}`
+        : kind === "access"
+          ? `/api/access/${pc}`
+          : kind === "disk"
+            ? `/api/disk/${pc}`
+            : `/api/processes/${pc}?kind=${kind}`;
+  let d = await api(u);
+  if (kind === "cpu" || kind === "memory") {
+    S.processes = d;
+    renderProcesses();
+  } else
+    $("#adminOverview").innerHTML =
+      `<pre>${esc(JSON.stringify(d, null, 2))}</pre>`;
+}
+function renderProcesses() {
+  let q = $("#processFilter").value.toLowerCase(),
+    d = S.processes.filter((x) => JSON.stringify(x).toLowerCase().includes(q));
+  $("#adminOut").innerHTML = table(d);
+}
+function table(rows) {
+  if (!rows.length) return "";
+  return `<table><thead><tr>${Object.keys(rows[0])
+    .map((k) => `<th>${esc(k)}</th>`)
+    .join("")}</tr></thead><tbody>${rows
+    .map(
+      (r) =>
+        `<tr>${Object.values(r)
+          .map((v) => `<td>${esc(v)}</td>`)
+          .join("")}</tr>`,
+    )
+    .join("")}</tbody></table>`;
+}
+function bulkTargets() {
+  return [
+    ...new Set(
+      $("#bulkTargets")
+        .value.split(/[,;\s]+/)
+        .map((x) => x.trim().toUpperCase())
+        .filter(Boolean),
+    ),
+  ];
+}
+async function bulkPackages() {
+  const request = bulkPackageRequest();
+  try {
+    const d = await api(
+      "/api/catalog?term=" + encodeURIComponent($("#bulkSearch").value),
+      { signal: request.signal },
+    );
+    if (!request.current()) return;
+    $("#bulkPkg").innerHTML = d.items
+      .map(
+        (x) =>
+          `<option value="${esc(x.folder)}">${esc(x.display_name)}${x.version ? " · " + esc(x.version) : ""}</option>`,
+      )
+      .join("");
+    await bulkScripts();
+  } catch (e) {
+    if (e.name !== "AbortError" && request.current()) toast(e.message);
+  }
+}
+async function bulkScripts() {
+  const request = bulkScriptRequest(),
+    folder = $("#bulkPkg").value,
+    action = $("#bulkAction").value,
+    control = $("#bulkScript");
+  control.innerHTML = "";
+  control.disabled = true;
+  try {
+    if (folder) {
+      const d = await api(
+        `/api/scripts?package=${encodeURIComponent(folder)}&action=${encodeURIComponent(action)}`,
+        { signal: request.signal },
+      );
+      if (!request.current()) return;
+      control.innerHTML = d.scripts
+        .map((x) => `<option>${esc(x)}</option>`)
+        .join("");
+    }
+  } catch (e) {
+    if (e.name !== "AbortError" && request.current()) toast(e.message);
+  } finally {
+    if (request.current()) control.disabled = false;
+  }
+}
+async function startBulk() {
+  let pcs = bulkTargets();
+  if (!pcs.length) return toast("Enter targets");
+  let pkg = $("#bulkPkg").value,
+    d = await api("/api/bulk/deploy", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        computers: pcs,
+        folder: packageFolder(pkg),
+        script: $("#bulkScript").value,
+        action: $("#bulkAction").value,
+        fresh: $("#bulkFresh").checked,
+        threads: +$("#bulkThreads").value,
+        concurrency: +$("#concurrency").value,
+      }),
+    });
+  S.bulk = d.job;
+  bulkPoll(d.job);
+}
+function bulkPoll(id) {
+  return AtlasClient.watch(
+    "console-bulk",
+    "/api/bulk/job/" + id,
+    (data) => {
+      S.rows = data.results || [];
+      renderBulk(data);
+      if (AtlasClient.terminal.has(data.state)) toast("Bulk " + data.state);
+    },
+    { onError: (e) => toast("Monitoring: " + e.message) },
+  );
+}
+function renderBulk(j) {
+  let r = S.rows;
+  $("#bulkSummary").innerHTML =
+    `<div class=summary><div>Phase<b>${esc(j.phase)}</b></div><div>Total<b>${r.length}</b></div><div>Failed<b>${r.filter((x) => x.copy === "Failed" || x.completion === "Failed").length}</b></div><div>Complete<b>${r.filter((x) => String(x.completion).startsWith("Complete")).length}</b></div></div>`;
+  $("#bulkBody").innerHTML = r
+    .map(
+      (x) =>
+        `<tr><td><b>${esc(x.machine)}</b></td><td class="${x.copy === "Failed" ? "bad" : "good"}">${esc(x.copy)}</td><td>${esc(x.launch)}</td><td>${esc(x.pid)}</td><td>${esc(x.completion)}</td><td>${esc(x.exit_code)}</td><td>${esc(
+          String(x.details || "")
+            .split("\n")
+            .slice(-1)[0],
+        )}</td></tr>`,
+    )
+    .join("");
+}
+async function history() {
+  let d = await api("/api/history");
+  $("#historyBody").innerHTML = d
+    .map(
+      (x) =>
+        `<tr><td>${esc(x.started)}</td><td>${esc(x.target)}</td><td>${esc(x.package)}</td><td>${esc(x.action)}</td><td>${esc(x.mode)}</td><td>${esc(x.state)}</td><td>${esc(x.exit_code)}</td></tr>`,
+    )
+    .join("");
+}
+function exportCsv() {
+  if (!S.rows.length) return;
+  let k = [
+      "machine",
+      "copy",
+      "launch",
+      "pid",
+      "completion",
+      "exit_code",
+      "details",
+    ],
+    csv = [
+      k.join(","),
+      ...S.rows.map((r) =>
+        k
+          .map((x) => '"' + String(r[x] ?? "").replace(/"/g, '""') + '"')
+          .join(","),
+      ),
+    ].join("\n"),
+    a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv]));
+  a.download = "bulk.csv";
+  a.click();
+}
+async function openTargetTool(tool) {
+  if (!S.target) return toast("Select a target");
+  const d = await api(
+    `/api/open-tool/${encodeURIComponent(tool)}/${encodeURIComponent(S.target)}`,
+    { method: "POST" },
+  );
+  toast(`${tool} opened for ${d.computer}`);
+}
+async function cleanPackages() {
+  const context = AtlasClient.snapshot({ computer: S.target });
+  if (!context.computer) return toast("Select a target");
+  const info = await api(
+    "/api/package-folder/" + encodeURIComponent(context.computer),
+  );
+  if (S.target !== context.computer)
+    return toast(
+      "Target changed. Open cleanup again for the selected machine.",
+    );
+  if (!info.exists)
+    return toast("The package folder does not exist on " + context.computer);
+  if (
+    !confirm(
+      `Delete ALL contents of ${context.computer} C:\\Temp\\Packages?\n${info.folders} folders, ${info.files} files, ${(info.bytes / 1048576).toFixed(1)} MB`,
+    )
+  )
+    return;
+  const result = await api(
+    "/api/cleanup-packages/" + encodeURIComponent(context.computer),
+    { method: "POST" },
+  );
+  toast(
+    `${context.computer}: deleted ${result.deleted}; failed ${result.failed}`,
+  );
+}
+function currentPackagePayload(mode = "full") {
+  const pkg = document.querySelector("#pkg").value;
+  return {
+    computer: S.target,
+    folder: packageFolder(pkg),
+    script: document.querySelector("#script").value,
+    action: document.querySelector("#action").value,
+    fresh: document.querySelector("#fresh").checked,
+    threads: Number(document.querySelector("#threads").value),
+    mode,
+  };
+}
+async function loadFreshness() {
+  const d = await api("/api/database-freshness");
+  const el = document.querySelector("#dbFreshness");
+  if (!el) return;
+  el.innerHTML = `<b>${d.excel_newer ? "NEWER EXCEL AVAILABLE" : "DATABASE CURRENT"}</b><span>DB: ${esc(d.database_modified || "missing")}</span><span>Excel: ${esc(d.excel_modified || "missing")}</span>`;
+  el.classList.toggle("stale", d.excel_newer);
+}
+function refreshTargetHealth() {
+  const pc = S.target;
+  return pc
+    ? AtlasHealth.mount($("#healthLine"), pc, () => S.target === pc)
+    : Promise.resolve();
+}
+function renderQueue() {
+  document.querySelector("#queueCount").textContent = deploymentQueue.length;
+  document.querySelector("#queueItems").innerHTML = deploymentQueue.length
+    ? deploymentQueue
+        .map(
+          (x, i) =>
+            `<div class="queue-row"><b>${i + 1}. ${esc(x.computer)}</b><span>${esc(PathName(x.folder))} · ${esc(x.action)} · ${esc(x.state || "waiting")}</span><button data-remove-queue="${i}">Remove</button></div>`,
+        )
+        .join("")
+    : '<p class="empty">Queue is empty</p>';
+  document.querySelectorAll("[data-remove-queue]").forEach(
+    (b) =>
+      (b.onclick = () => {
+        if (activeQueueId)
+          return toast("Clear the saved queue before changing its items.");
+        deploymentQueue.splice(+b.dataset.removeQueue, 1);
+        renderQueue();
+      }),
+  );
+}
+function PathName(path) {
+  return (
+    String(path || "")
+      .split(/[\\/]/)
+      .filter(Boolean)
+      .pop() || ""
+  );
+}
+function addQueue() {
+  if (activeQueueId) return toast("Finish or clear the saved queue first");
+  if (!S.target) return toast("Select a target");
+  deploymentQueue.push({ ...currentPackagePayload("full"), state: "waiting" });
+  renderQueue();
+  toast("Added to queue");
+}
+async function startDeploymentQueue() {
+  if (queueRunning) return toast("Queue is already running");
+  if (!deploymentQueue.length) return toast("Queue is empty");
+  queueRunning = true;
+  try {
+    const d = activeQueueId
+      ? await api("/api/queue/" + activeQueueId + "/resume", { method: "POST" })
+      : await api("/api/queue", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ items: deploymentQueue }),
+        });
+    activeQueueId = d.queue;
+    pollQueue(activeQueueId);
+  } catch (e) {
+    queueRunning = false;
+    throw e;
+  }
+}
+function pollQueue(id) {
+  return AtlasClient.watch(
+    "console-queue",
+    "/api/queue/" + id,
+    (q) => {
+      deploymentQueue = q.items.map((x) => ({
+        ...x.payload,
+        computer: x.target,
+        folder: x.package,
+        action: x.action,
+        state: x.state,
+      }));
+      renderQueue();
+      if (q.state === "paused" || AtlasClient.terminal.has(q.state)) {
+        queueRunning = false;
+        if (q.state !== "paused") {
+          activeQueueId = null;
+          deploymentQueue = [];
+          renderQueue();
+        }
+        toast("Queue " + q.state);
+      }
+    },
+    {
+      done: (q) => q.state === "paused" || AtlasClient.terminal.has(q.state),
+      onError: (e) => toast("Queue monitoring: " + e.message),
+    },
+  );
+}
+async function clearDeploymentQueue() {
+  if (activeQueueId)
+    await api("/api/queue/" + activeQueueId + "/cancel", { method: "POST" });
+  if (queueRunning) return toast("Queue will stop after its current item.");
+  activeQueueId = null;
+  deploymentQueue = [];
+  renderQueue();
+}
+async function pauseDeploymentQueue() {
+  if (activeQueueId)
+    await api("/api/queue/" + activeQueueId + "/pause", { method: "POST" });
+}
+function terminalLines(events) {
+  return (
+    (events || [])
+      .map(
+        (event) =>
+          `[${event.time || "--:--:--"}] ${event.message || ""}${event.log ? "\n" + event.log.join("\n") : ""}`,
+      )
+      .join("\n") || "Waiting for terminal output..."
+  );
+}
+function deploymentCard(item) {
+  if (item.kind === "queue") {
+    const rows = (item.items || [])
+      .map(
+        (row) =>
+          `<div class="deployment-queue-item"><b>${esc(row.target || "Unknown target")}</b><span>${esc(row.package || "")} · ${esc(row.action || "")}</span><i class="${statusAccent(row.state)}">${esc(row.state || "waiting")}</i><details><summary>Terminal</summary><pre>${esc(terminalLines(row.events))}</pre></details></div>`,
+      )
+      .join("");
+    return `<article class="deployment-monitor-card"><header><b>Queue</b><span class="${statusAccent(item.state)}">${esc(item.state)}</span></header>${rows || '<p class="empty">Queue has no items</p>'}</article>`;
+  }
+  return `<article class="deployment-monitor-card"><header><b>Deployment ${esc(item.id.slice(0, 8))}</b><span class="${statusAccent(item.state)}">${esc(item.state)}</span></header><p>${esc(item.last_message || "")}</p><pre>${esc(terminalLines(item.events))}</pre></article>`;
+}
+function renderDeploymentMonitor(data) {
+  const list = document.querySelector("#deploymentsList");
+  const count =
+    data.count ??
+    (data.deployments || []).filter((x) =>
+      ["queued", "running", "launched", "monitoring", "paused"].includes(
+        x.state,
+      ),
+    ).length;
+  document.querySelector("#deploymentsCount").textContent = count;
+  document
+    .querySelector("#deploymentsToggle")
+    .classList.toggle("has-active", count > 0);
+  list.innerHTML = (data.deployments || []).length
+    ? (data.deployments || []).map(deploymentCard).join("")
+    : '<p class="empty">No ongoing deployments</p>';
+  list
+    .querySelectorAll("pre")
+    .forEach((pre) => (pre.scrollTop = pre.scrollHeight));
+}
+function refreshDeploymentMonitor(mode = deploymentMonitorMode) {
+  deploymentMonitorMode = mode;
+  deploymentMonitorTimer?.();
+  const visible = () => $("#deploymentsDrawer").classList.contains("open");
+  deploymentMonitorTimer = AtlasClient.watch(
+    "deployment-monitor",
+    mode === "recent" ? "/api/deployments/recent" : "/api/deployments/active",
+    (data) => {
+      renderDeploymentMonitor(data);
+      $("#deploymentsState").textContent =
+        mode === "recent" ? "Recent" : "Live";
+    },
+    {
+      done: () => !visible() || !$("#autoDeployments").checked,
+      onError: (e) => {
+        $("#deploymentsList").textContent = e.message;
+      },
+    },
+  );
+}
+function openDeploymentMonitor(mode = "active") {
+  document.querySelector("#deploymentsDrawer").classList.add("open");
+  refreshDeploymentMonitor(mode);
+}
+function closeDeploymentMonitor() {
+  $("#deploymentsDrawer").classList.remove("open");
+  deploymentMonitorTimer?.();
+  deploymentMonitorTimer = null;
+}
+function normaliseSoftwareName(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+function softwareRows() {
+  const q = normaliseSoftwareName(
+    document.querySelector("#softwareFilter").value,
+  );
+  return softwareState.currentSoftware.filter(
+    (x) =>
+      !q ||
+      normaliseSoftwareName(
+        [x.Name, x.Version, x.Publisher].join(" "),
+      ).includes(q),
+  );
+}
+function renderSoftware() {
+  return AtlasSoftware.render();
+}
+function loadSoftware(pc, force = false) {
+  return AtlasSoftware.load(pc, force);
+}
+function updatePackagePresence() {
+  const host = document.querySelector("#packagePresence");
+  if (!host) return;
+  const packageName = document.querySelector("#pkg")?.value;
+  if (!packageName || !S.target) {
+    host.innerHTML = "";
+    return;
+  }
+  const cached = softwareState.software.get(S.target);
+  if (!cached) {
+    host.innerHTML =
+      '<span class="status-neutral">Software status not collected</span><button id="checkPackagePresence">Check</button>';
+    document.querySelector("#checkPackagePresence").onclick = () =>
+      loadSoftware(S.target);
+    return;
+  }
+  const p = normaliseSoftwareName(packageName),
+    matches = (cached.software || []).filter((x) => {
+      const n = normaliseSoftwareName(x.Name);
+      return n && p && (n.includes(p) || p.includes(n));
+    });
+  host.innerHTML = matches.length
+    ? `<span class="status-ok">INSTALLED</span><b>${matches
+        .slice(0, 3)
+        .map((x) => esc(`${x.Name} ${x.Version || ""}`))
+        .join(" · ")}</b>`
+    : '<span class="status-warn">NOT FOUND IN REGISTRY INVENTORY</span>';
+}
+function softwareReport(rows = softwareRows()) {
+  const data = softwareState.software.get(softwareState.softwareTarget) || {};
+  return [
+    `Target: ${softwareState.softwareTarget}`,
+    `Collected: ${data.collected_at || ""}`,
+    `Method: ${data.method || "WMI StdRegProv Core"}`,
+    `Applications: ${rows.length}`,
+    "",
+    ...rows.map((x) =>
+      [x.Name, x.Version, x.Publisher].filter(Boolean).join(" | "),
+    ),
+  ].join("\n");
+}
+function exportSoftwareCsv() {
+  const rows = softwareRows(),
+    headers = ["Name", "Version", "Publisher"];
+  const csv = [
+    headers.join(","),
+    ...rows.map((row) =>
+      headers
+        .map((h) => '"' + String(row[h] || "").replace(/"/g, '""') + '"')
+        .join(","),
+    ),
+  ].join("\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+  a.download = `${softwareState.softwareTarget}_installed_software_core.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+async function refreshConsolePackage() {
+  const folder = document.querySelector("#pkg")?.value,
+    host = document.querySelector("#console-package-details"),
+    v = ++consoleCatalogueRequest;
+  if (!host) return;
+  host.textContent = "";
+  if (!folder) return;
+  try {
+    const d = await api(
+      "/api/catalog/details?folder=" + encodeURIComponent(folder),
+    );
+    if (
+      v !== consoleCatalogueRequest ||
+      folder !== document.querySelector("#pkg").value
+    )
+      return;
+    host.textContent = `${d.display_name || folder} · ${d.version || "Version not recorded"} · ${d.availability} · ${d.files_checked} files checked${d.complete ? "" : " · scan incomplete"}. External script dependencies are not checked.`;
+  } catch (e) {
+    if (v === consoleCatalogueRequest)
+      host.textContent = "Package inspection unavailable: " + e.message;
+  }
+}
+function refreshConsoleSummary() {
+  const host = document.querySelector("#console-deploy-summary");
+  if (host)
+    host.textContent = `${S.user?.full_name || S.user?.name || "No directory user"} → ${S.target || "Choose a machine"} → ${document.querySelector("#pkg")?.selectedOptions[0]?.textContent || "Choose a package"} → ${document.querySelector("#action")?.value || ""} → ${document.querySelector("#script")?.value || "Choose a script"}`;
+}

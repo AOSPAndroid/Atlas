@@ -13,9 +13,11 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from directory_lookup import exact_users, linked_machines, search_directory, prepare_views
+from desk_directory import desk_context,person_desks
 
 ROOT = Path(__file__).resolve().parent.parent
-DB = ROOT / 'office_atlas.db'
+from runtime_paths import database_path
+DB = database_path()
 ATLAS = ROOT / 'atlas'
 app = FastAPI(title='Atlas read-only viewer', docs_url=None, redoc_url=None, openapi_url=None)
 
@@ -37,7 +39,7 @@ async def read_only(request: Request, call_next):
     if request.method not in ('GET', 'HEAD'):
         return JSONResponse({'detail': 'This shared Atlas is read only. Changes and remote operations require the local admin version.'}, status_code=403)
     response = await call_next(request)
-    response.headers['Cache-Control'] = 'no-store'
+    response.headers['Cache-Control'] = 'no-store' if request.url.path.startswith('/api/') or request.url.path=='/' else 'public, max-age=0, must-revalidate' if request.url.path.startswith('/api/') or request.url.path=='/' else 'public, max-age=0, must-revalidate'
     response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['Content-Security-Policy'] = "frame-ancestors 'self'"
     return response
@@ -58,7 +60,7 @@ def capabilities():
 @app.get('/api/official/state')
 def state():
     with connect() as con:
-        return {'read_only': True, 'records': [json.loads(r[0]) for r in con.execute('select body from official_records order by id')],
+        return {'read_only': True, 'records': [dict(json.loads(r[0]),layout='official') for r in con.execute('select body from official_records order by id')],
                 'legacy': [json.loads(r[0]) for r in con.execute('select body from records order by id')],
                 'mappings': dict(con.execute('select legacy_id,official_id from official_seating_mappings'))}
 
@@ -78,8 +80,9 @@ def user(uid: str):
         if len(rows) != 1:
             raise HTTPException(409, 'Select a user from search results')
         person = dict(rows[0])
-        links = [r[0] for r in con.execute('select distinct o.id from desk_user_links l left join official_seating_mappings m on m.legacy_id=l.desk_id join official_records o on o.id=coalesce(m.official_id,l.desk_id) where l.user_key=?', (person['canonical_key'],))]
-        return {'user': person, 'machines': linked_machines(con, person['id']), 'desks': links}
+        desks=person_desks(con,person)
+        return {'user': person, 'machines': linked_machines(con, person['id']), 'desks':[d['id'] for d in desks], 'desk_matches':desks}
+
 
 
 @app.get('/api/desks/{desk_id}/context')
@@ -89,27 +92,22 @@ def context(desk_id: str):
         if not row:
             raise HTTPException(404, 'Desk not found')
         desk = json.loads(row[0])
-        link = con.execute('select user_key from desk_user_links where desk_id=?', (desk_id,)).fetchone()
-        candidates = []
-        if desk.get('occupancy') != 'vacant':
-            candidates = con.execute('select * from legacy_users where canonical_key=?', (link[0],)).fetchall() if link else exact_users(con, desk['name'])
-        person = dict(candidates[0]) if len(candidates) == 1 else None
-        machines = linked_machines(con, person['id']) if person else []
-        hostname = desk.get('hostname', '').strip()
-        if hostname and not any(m['name'].casefold() == hostname.casefold() for m in machines):
-            machine = con.execute('select * from legacy_machines where name_norm=?', (hostname.casefold(),)).fetchone()
-            machines.insert(0, dict(machine) if machine else {'name': hostname, 'match_type': 'Desk equipment'})
-        return {'desk': desk, 'user': person, 'candidates': [dict(r) for r in candidates], 'machines': machines,
-                'match_method': 'confirmed' if link and person else 'name-match' if person else 'unmatched'}
+        return desk_context(con, desk)
 
 
 @app.get('/')
 def home():
     html = (ATLAS / 'official-index.html').read_text(encoding='utf-8')
-    html = re.sub(r'<(?:script|link)\b[^>]*(?:src|href)="/assets/machine-health[^"]*"[^>]*>(?:</script>)?', '', html)
+    html = re.sub(r'<(?:script|link)\b[^>]*(?:src|href)="/assets/(?:machine-health|client)[^"]*"[^>]*>(?:</script>)?', '', html)
     # The mode is supplied by this server, never by a URL or browser preference.
     html = html.replace('<head>', '<head><meta name="atlas-mode" content="viewer"><link rel="stylesheet" href="/viewer.css">')
     return HTMLResponse(html)
+
+
+@app.get('/assets/{filename}')
+def shared_asset(filename:str):
+    if filename not in ('shared-ui.js','ui-tokens.css'):raise HTTPException(404,'Not available')
+    return FileResponse(ROOT/'frontend/assets'/filename)
 
 
 @app.get('/{filename}')

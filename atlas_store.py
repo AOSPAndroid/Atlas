@@ -2,7 +2,8 @@ import json,sqlite3,re,math
 from datetime import datetime,timezone
 from pathlib import Path
 ROOT=Path(__file__).resolve().parent/"atlas"
-DB=ROOT.parent/"office_atlas.db"
+from runtime_paths import database_path
+DB=database_path()
 
 class Conflict(ValueError):
     pass
@@ -20,10 +21,11 @@ def connect():
 def get_record(con, desk_id):
     row = con.execute('SELECT body FROM records WHERE id=?', (desk_id,)).fetchone()
     if not row and con.execute("select 1 from sqlite_master where name='official_records'").fetchone():row=con.execute('select body from official_records where id=?',(desk_id,)).fetchone()
-    return json.loads(row[0]) if row else None
+    if not row:return None
+    record=json.loads(row[0]);record.setdefault('layout', 'previous' if con.execute('select 1 from records where id=?',(desk_id,)).fetchone() else 'official');return record
 
 def all_records(con):
-    return [json.loads(row[0]) for row in con.execute('SELECT body FROM records ORDER BY id')]
+    return [dict(json.loads(row[0]),layout='previous') for row in con.execute('SELECT body FROM records ORDER BY id')]
 
 def check_revision(old, revision):
     if (old or {}).get('revision', 0) != revision:
@@ -56,15 +58,21 @@ def validate(item):
         if r['occupancy'] == 'assigned':
             raise ValueError('Assigned desks require a name')
         r['name'] = 'Vacant desk' if r['occupancy'] == 'vacant' else 'Unconfirmed desk'
+    if 'layout' in item:
+        if item['layout'] not in ('official','previous'):raise ValueError('Invalid layout')
+        r['layout']=item['layout']
     r['verified'] = item.get('verified') is True
     return r
 
 def save_record(con, record, old, action):
     record = validate(record)
+    prior_layout=(old or {}).get('layout')
+    if prior_layout and record.get('layout',prior_layout)!=prior_layout:raise ValueError('Use the seating mapping workflow to change layouts')
+    record['layout']=prior_layout or record.get('layout') or ('official' if re.fullmatch(r'[0-9]{2}[A-Z][0-9]{6}',record['id']) else 'previous')
     record['revision'] = (old or {}).get('revision', 0) + 1
     record['updatedAt'] = datetime.now(timezone.utc).isoformat()
     encoded = json.dumps(record, ensure_ascii=False)
-    table='official_records' if re.fullmatch(r'[0-9]{2}[A-Z][0-9]{6}',record['id']) else 'records'
+    table='official_records' if record['layout']=='official' else 'records'
     con.execute('INSERT OR REPLACE INTO '+table+'(id, body) VALUES (?, ?)', (record['id'], encoded))
     con.execute('INSERT INTO history(desk_id, at, action, before_json, after_json) VALUES (?, ?, ?, ?, ?)',
                 (record['id'], record['updatedAt'], action, json.dumps(old) if old else None, encoded))

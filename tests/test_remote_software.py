@@ -55,6 +55,8 @@ class RemoteSoftware(unittest.TestCase):
    jobs[j]['events'].append(dict(message=msg,**extra))
    if state:jobs[j]['state']=state
   w=SimpleNamespace(validate_pc=validate,target_lock=lambda pc:target,jobs=jobs,lock=lock,CONFIG={},history_create=lambda *a:hist.append(a),history_update=lambda *a,**k:None,emit=emit)
+  w.job_service=SimpleNamespace(inventory=threading.BoundedSemaphore(3),target_ready=lambda pc:None,unresolved=set())
+  w.start_job=lambda fn,*args:fn(*args)
   app=FastAPI()
   def token(r):
    if r.headers.get('x-atlas-token')!='test':raise HTTPException(403,'Token')

@@ -26,7 +26,7 @@ def layout_records(c, layout):
     if layout not in ('official', 'previous'):
         raise ValueError('Choose official or previous seating.')
     records, links = snapshot(c)
-    return {d:r for d,r in records.items() if r['kind']=='desk' and bool(re.fullmatch(r'[0-9]{2}[A-Z][0-9]{6}', d)) == (layout=='official')}, links
+    return {d:r for d,r in records.items() if r['kind']=='desk' and r.get('layout','previous') == layout}, links
 
 def stamp(c, layout):
     records, links = layout_records(c, layout)

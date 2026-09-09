@@ -1,0 +1,761 @@
+function toast(m) {
+  let x = document.createElement("div");
+  x.className = "toast";
+  x.textContent = m;
+  $("#toast").append(x);
+  setTimeout(() => x.remove(), 2500);
+}
+async function copy(v, n = "Value") {
+  if (!v) return toast(`${n} empty`);
+  await navigator.clipboard.writeText(String(v));
+  toast(`${n} copied`);
+}
+function page(id) {
+  $$(".page,nav button").forEach((x) => x.classList.remove("active"));
+  $("#" + id).classList.add("active");
+  $(`[data-page="${id}"]`).classList.add("active");
+  $("#pageTitle").textContent = $(`[data-page="${id}"] .nav-label`).textContent;
+  document.querySelectorAll("nav [data-page]").forEach((b) => {
+    if (b.dataset.page === id) b.setAttribute("aria-current", "page");
+    else b.removeAttribute("aria-current");
+  });
+  if (id === "history") history();
+}
+async function init() {
+  let h = await api("/api/health");
+  $("#identity").textContent = h.identity;
+  $("#health").innerHTML =
+    `Version ${h.version}<br>${h.database ? "●" : "○"} Database · ${h.users.toLocaleString()} users<br>${h.machines.toLocaleString()} machines<br>${h.repository ? "●" : "○"} Repository`;
+  await packages();
+  await bulkPackages();
+  renderRecent();
+  $("#search").focus();
+}
+function bind() {
+  $("#pkgSearch").oninput = () => {
+    clearTimeout(window.pt);
+    window.pt = setTimeout(packages, 250);
+  };
+  $("#pkg").onchange = scripts;
+  $("#action").onchange = scripts;
+  $("#deploy").onclick = () => deploy("full");
+  $("#copyOnly").onclick = () => deploy("copy");
+  $("#execOnly").onclick = () => deploy("execute");
+  $("#favBtn").onclick = toggleFav;
+  $("#bulkTargets").oninput = () =>
+    ($("#targetCount").textContent = `${bulkTargets().length} targets`);
+  $("#bulkSearch").oninput = () => {
+    clearTimeout(window.bt);
+    window.bt = setTimeout(bulkPackages, 250);
+  };
+  $("#bulkPkg").onchange = bulkScripts;
+  $("#bulkAction").onchange = bulkScripts;
+  $("#bulkStart").onclick = startBulk;
+  $("#copyFailed").onclick = () =>
+    copy(
+      S.rows
+        .filter((x) => x.copy === "Failed" || x.completion === "Failed")
+        .map((x) => x.machine)
+        .join("\n"),
+      "Failed machines",
+    );
+  $("#exportCsv").onclick = exportCsv;
+  $("#processFilter").oninput = renderProcesses;
+  $("#refreshHistory").onclick = history;
+  $("#killBtn").onclick = async () =>
+    toast(
+      "Terminated " +
+        (
+          await api("/api/kill", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              computer: $("#adminPc").value,
+              value: $("#kill").value,
+            }),
+          })
+        ).count,
+    );
+  $$("[data-preflight]").forEach((x) => (x.onclick = preflight));
+  $$("[data-copy-target]").forEach(
+    (x) => (x.onclick = () => copy(S.target, "Hostname")),
+  );
+  $$("[data-admin-target]").forEach((x) => (x.onclick = () => page("admin")));
+  ["overview", "ping", "access", "disk", "cpu", "memory"].forEach(
+    (k) =>
+      ($(`[data-${k}]`).onclick = () =>
+        admin(k).catch((x) => toast(x.message))),
+  );
+  $("[data-reboot]").onclick = async () => {
+    if (confirm("Reboot " + $("#adminPc").value + "?"))
+      toast(
+        "Return " +
+          (
+            await api("/api/reboot", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ computer: $("#adminPc").value }),
+            })
+          ).result,
+      );
+  };
+}
+function bindRemoteTools() {
+  document
+    .querySelectorAll("[data-tool]")
+    .forEach(
+      (b) =>
+        (b.onclick = () =>
+          openTargetTool(b.dataset.tool).catch((e) => toast(e.message))),
+    );
+  document.querySelector("#copySupport").onclick = () =>
+    copy(supportSummary(), "Support summary");
+  document.querySelector("#cleanupPackages").onclick = () =>
+    cleanPackages().catch((e) => toast(e.message));
+  renderRecentTargets();
+}
+function openPalette() {
+  return sharedPaletteReady
+    ?.then((p) => p.open())
+    .catch((e) => toast(e.message));
+}
+function closePalette() {
+  sharedPalette?.close();
+}
+function typing() {
+  const a = document.activeElement;
+  return a && ["INPUT", "TEXTAREA", "SELECT"].includes(a.tagName);
+}
+function bindQueueControls() {
+  loadFreshness();
+  renderQueue();
+  $("#queueToggle").onclick = () => $("#queueDrawer").classList.toggle("open");
+  $("#closeQueue").onclick = () => $("#queueDrawer").classList.remove("open");
+  $("#startQueue").onclick = () =>
+    startDeploymentQueue().catch((e) => toast(e.message));
+  $("#pauseQueue").onclick = () =>
+    pauseDeploymentQueue().catch((e) => toast(e.message));
+  $("#clearQueue").onclick = () =>
+    clearDeploymentQueue().catch((e) => toast(e.message));
+  document.addEventListener("click", () =>
+    $("#machineMenu").classList.add("hidden"),
+  );
+}
+function statusAccent(value) {
+  const text = String(value ?? "")
+    .trim()
+    .toLowerCase();
+  if (!text) return "status-neutral";
+  if (/failed|failure|error|not started|unavailable|offline/.test(text))
+    return "status-bad";
+  if (/warning|reboot|unknown|not written/.test(text)) return "status-warn";
+  if (
+    [
+      "ok",
+      "online",
+      "available",
+      "operational",
+      "complete",
+      "completed",
+      "success",
+      "successful",
+      "ready",
+      "started",
+      "running",
+      "current",
+      "true",
+      "0",
+    ].some(
+      (x) => text === x || text.startsWith(x + " ") || text.includes(" " + x),
+    )
+  )
+    return "status-ok";
+  if (
+    [
+      "warning",
+      "warn",
+      "pending",
+      "waiting",
+      "queued",
+      "checking",
+      "monitoring",
+      "paused",
+      "not written",
+      "completed with warning",
+      "unknown",
+    ].some((x) => text === x || text.includes(x))
+  )
+    return "status-warn";
+  if (
+    [
+      "no",
+      "offline",
+      "unavailable",
+      "failed",
+      "failure",
+      "error",
+      "not started",
+      "monitor failed",
+      "missing",
+      "false",
+    ].some((x) => text === x || text.startsWith(x + " ") || text.includes(x))
+  )
+    return "status-bad";
+  return "status-neutral";
+}
+function bindQoLActions() {
+  const menu = document.querySelector("#targetActions");
+  if (!menu) return;
+  menu.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-qol-action]");
+    if (!button) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const action = button.dataset.qolAction;
+    if (action === "copy-host") copy(S.target, "Hostname");
+    else if (action === "copy-summary")
+      copy(supportSummary(), "Support summary");
+    else if (action === "admin") page("admin");
+    else if (action === "queue") addQueue();
+    else if (action === "health") refreshTargetHealth();
+    else if (action === "cleanup") cleanPackages();
+  });
+}
+function bindDeploymentMonitor() {
+  $("#deploymentsToggle").onclick = () => openDeploymentMonitor("active");
+  $("#closeDeployments").onclick = closeDeploymentMonitor;
+  $("#refreshDeployments").onclick = () => refreshDeploymentMonitor("active");
+  $("#showRecentDeployments").onclick = () =>
+    refreshDeploymentMonitor("recent");
+  $("#autoDeployments").onchange = () =>
+    refreshDeploymentMonitor(deploymentMonitorMode);
+  refreshDeploymentMonitor("active");
+}
+import("/command-registry.js").then(({ COMMANDS }) => {
+  shortcutRegistry = [
+    { label: "Open command palette", keys: "Ctrl+K", run: openPalette },
+    { label: "Focus search", keys: "/", run: () => $("#search").focus() },
+    ...COMMANDS.filter((c) => c.shortcut).map((c) => ({
+      label: c.title,
+      keys: c.shortcut,
+      run: () => runSharedCommand(c.id),
+    })),
+  ];
+});
+function normaliseKeys(value) {
+  return String(value || "")
+    .replace(/\s+/g, "")
+    .toLowerCase();
+}
+function renderShortcutHelp() {
+  const host = document.querySelector("#shortcutHelpList");
+  if (!host) return;
+  host.innerHTML = shortcutRegistry
+    .map(
+      (item) =>
+        `<button data-shortcut-label="${esc(item.label)}"><span>${esc(item.label)}</span><kbd>${esc(item.keys)}</kbd></button>`,
+    )
+    .join("");
+  host.querySelectorAll("[data-shortcut-label]").forEach(
+    (button) =>
+      (button.onclick = () => {
+        const item = shortcutRegistry.find(
+          (x) => x.label === button.dataset.shortcutLabel,
+        );
+        closeShortcutHelp();
+        if (item) item.run();
+      }),
+  );
+}
+function openShortcutHelp() {
+  renderShortcutHelp();
+  document.querySelector("#shortcutHelp").classList.remove("hidden");
+}
+function closeShortcutHelp() {
+  document.querySelector("#shortcutHelp").classList.add("hidden");
+}
+function closeAllOverlays() {
+  closePalette();
+  closeShortcutHelp();
+  document.querySelector("#machineMenu")?.classList.add("hidden");
+  document.querySelector("#queueDrawer")?.classList.remove("open");
+  if (typeof closeDeploymentMonitor === "function") closeDeploymentMonitor();
+}
+function shortcutEventKey(event) {
+  const parts = [];
+  if (event.ctrlKey) parts.push("ctrl");
+  if (event.shiftKey) parts.push("shift");
+  if (event.altKey) parts.push("alt");
+  let key = event.key.toLowerCase();
+  if (key === " ") key = "space";
+  if (key === "?" && !event.ctrlKey && !event.altKey && !event.metaKey)
+    return "?";
+  parts.push(key);
+  return parts.join("+");
+}
+function bindPaletteShortcuts() {
+  document.querySelector("#closeShortcutHelp").onclick = closeShortcutHelp;
+  document.querySelector("#shortcutHelp").onclick = (event) => {
+    if (event.target.id === "shortcutHelp") closeShortcutHelp();
+  };
+  document.addEventListener(
+    "keydown",
+    (event) => {
+      if (
+        event
+          .composedPath()
+          .some((node) => node.classList?.contains("atlas-palette-mount"))
+      )
+        return;
+      if (event.key === "Escape") {
+        closeAllOverlays();
+        return;
+      }
+      const active = document.activeElement;
+      const isTyping =
+        active && ["INPUT", "TEXTAREA", "SELECT"].includes(active.tagName);
+      if (isTyping && normaliseKeys(shortcutEventKey(event)) !== "ctrl+k")
+        return;
+      const pressed = normaliseKeys(shortcutEventKey(event));
+      const item = shortcutRegistry.find(
+        (x) => normaliseKeys(x.keys) === pressed,
+      );
+      if (item) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        Promise.resolve(item.run()).catch((e) => toast(e.message));
+      }
+    },
+    true,
+  );
+}
+function renderNavigationIcons() {
+  document.querySelectorAll("nav [data-page]").forEach((button) => {
+    const pageName = button.dataset.page;
+    const label =
+      button.querySelector(".nav-label")?.textContent ||
+      button.title ||
+      pageName;
+    button.title = label;
+    button.setAttribute("aria-label", label);
+    button.innerHTML = `<span class="nav-icon">${navigationIcons[pageName] || ""}</span><span class="nav-label">${esc(label)}</span>`;
+  });
+}
+function formatUptime(seconds) {
+  if (seconds === null || seconds === undefined) return "—";
+  const d = Math.floor(seconds / 86400),
+    h = Math.floor((seconds % 86400) / 3600),
+    m = Math.floor((seconds % 3600) / 60);
+  return `${d}d ${String(h).padStart(2, "0")}h ${String(m).padStart(2, "0")}m`;
+}
+function makeSwitch(input) {
+  if (!input || input.dataset.switchReady) return;
+  input.dataset.switchReady = "1";
+  input.classList.add("switch-input");
+  const visual = document.createElement("span");
+  visual.className = "switch-visual";
+  visual.innerHTML = "<i></i><b></b>";
+  input.insertAdjacentElement("afterend", visual);
+  const update = () => {
+    visual.classList.toggle("on", input.checked);
+    visual.querySelector("b").textContent = input.checked ? "ON" : "OFF";
+    input.setAttribute("aria-checked", String(input.checked));
+  };
+  input.addEventListener("change", update);
+  update();
+}
+function applySwitches() {
+  document.querySelectorAll('input[type="checkbox"]').forEach(makeSwitch);
+}
+function bindSoftwareControls() {
+  renderNavigationIcons();
+  applySwitches();
+  $("#closeSoftware").onclick = () =>
+    $("#softwareDrawer").classList.remove("open");
+  $("#refreshSoftware").onclick = () =>
+    loadSoftware(softwareState.softwareTarget || S.target, true);
+  $("#copySoftware").onclick = () => copy(softwareReport(), "Software report");
+  $("#exportSoftware").onclick = exportSoftwareCsv;
+  $("#softwareFilter").oninput = renderSoftware;
+  $("#pkg").addEventListener("change", updatePackagePresence);
+}
+function bindConsolePolish() {
+  document
+    .querySelector("nav [data-page].active")
+    ?.setAttribute("aria-current", "page");
+  document
+    .querySelectorAll(".nav-icon")
+    .forEach((el) => el.setAttribute("aria-hidden", "true"));
+  const menus = [...document.querySelectorAll(".toolmenu")];
+  function closeMenus() {
+    menus.forEach((m) => {
+      m.classList.remove("menu-open");
+      m.querySelector(".toolmenu-btn").setAttribute("aria-expanded", "false");
+    });
+  }
+  menus.forEach((m) => {
+    const trigger = m.querySelector(".toolmenu-btn"),
+      content = m.querySelector(".toolmenu-content");
+    content.id = m.id + "-content";
+    trigger.setAttribute("aria-controls", content.id);
+    trigger.setAttribute("aria-expanded", "false");
+    trigger.addEventListener("click", () => {
+      const open = !m.classList.contains("menu-open");
+      closeMenus();
+      if (open) {
+        m.classList.add("menu-open");
+        trigger.setAttribute("aria-expanded", "true");
+      }
+    });
+    trigger.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        closeMenus();
+        m.classList.add("menu-open");
+        trigger.setAttribute("aria-expanded", "true");
+        content.querySelector("button")?.focus();
+      }
+    });
+    content.addEventListener("click", (e) => {
+      if (e.target.closest("button")) closeMenus();
+    });
+    m.addEventListener("focusout", () =>
+      queueMicrotask(() => {
+        if (!m.contains(document.activeElement)) {
+          m.classList.remove("menu-open");
+          trigger.setAttribute("aria-expanded", "false");
+        }
+      }),
+    );
+  });
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest(".toolmenu")) closeMenus();
+  });
+  const panels = [
+    ...document.querySelectorAll(
+      "#queueDrawer,#deploymentsDrawer,#softwareDrawer",
+    ),
+  ];
+  let active = null,
+    returnFocus = null;
+  const toggles = {
+    queueDrawer: "queueToggle",
+    deploymentsDrawer: "deploymentsToggle",
+  };
+  panels.forEach((p) => {
+    p.setAttribute("role", "dialog");
+    p.setAttribute("aria-label", p.querySelector("b").textContent);
+    p.setAttribute("tabindex", "-1");
+    const close = p.querySelector('[id^="close"]');
+    close.setAttribute(
+      "aria-label",
+      "Close " + p.getAttribute("aria-label").toLowerCase(),
+    );
+    close.title = close.getAttribute("aria-label");
+    const t = document.getElementById(toggles[p.id]);
+    if (t) {
+      t.setAttribute("aria-controls", p.id);
+      t.setAttribute("aria-expanded", "false");
+    }
+    p.inert = !p.classList.contains("open");
+  });
+  function closePanel(p) {
+    if (p.id === "deploymentsDrawer") closeDeploymentMonitor();
+    else p.classList.remove("open");
+  }
+  function syncPanels() {
+    const opening = panels.find(
+      (p) => p !== active && p.classList.contains("open"),
+    );
+    if (opening) {
+      if (!active) returnFocus = document.activeElement;
+      panels.filter((p) => p !== opening).forEach(closePanel);
+      active = opening;
+      opening.inert = false;
+      opening.querySelector('[id^="close"]').focus();
+    } else if (active && !active.classList.contains("open")) {
+      active = null;
+      if (returnFocus?.isConnected) returnFocus.focus();
+      returnFocus = null;
+    }
+    panels.forEach((p) => {
+      const open = p.classList.contains("open");
+      p.inert = !open;
+      p.setAttribute("aria-hidden", String(!open));
+      document
+        .getElementById(toggles[p.id])
+        ?.setAttribute("aria-expanded", String(open));
+    });
+  }
+  panels.forEach((p) =>
+    new MutationObserver(syncPanels).observe(p, {
+      attributes: true,
+      attributeFilter: ["class"],
+    }),
+  );
+  syncPanels();
+  const live = document.querySelector("#deploymentsToggle");
+  live.onclick = () => {
+    if (document.querySelector("#deploymentsDrawer").classList.contains("open"))
+      closeDeploymentMonitor();
+    else openDeploymentMonitor("active");
+  };
+  document.addEventListener(
+    "keydown",
+    (e) => {
+      if (e.key === "Escape") {
+        const m = menus.find((m) => m.classList.contains("menu-open"));
+        closeMenus();
+        m?.querySelector(".toolmenu-btn").focus();
+        panels.forEach(closePanel);
+      }
+    },
+    true,
+  );
+  document.querySelector("#toast").setAttribute("role", "status");
+  document.querySelector("#toast").setAttribute("aria-live", "polite");
+}
+function bindCommandDiscovery() {
+  document.querySelector("#openShortcuts").onclick = openShortcutHelp;
+  document
+    .querySelector("#closeShortcutHelp")
+    .setAttribute("aria-label", "Close keyboard shortcuts");
+}
+async function openPaletteTarget() {
+  const params = new URLSearchParams(location.search),
+    person = params.get("person"),
+    machine = params.get("machine");
+  if (!person && !machine) {
+    await runInitialSharedCommand(params);
+    return;
+  }
+  try {
+    if (person) {
+      if (!/^id:\d+$/.test(person)) throw Error("Invalid person link");
+      clearLookup();
+      await loadUser(person, ++lookupSequence);
+    } else {
+      document.querySelector("#search").value = "machine:" + machine;
+      await search();
+      if (S.machines.some((m) => m.name === machine))
+        setTarget(machine, "Selected from Atlas map");
+    }
+    await runInitialSharedCommand(params);
+  } catch (error) {
+    toast("Could not open palette result: " + error.message);
+  }
+}
+async function runInitialSharedCommand(params) {
+  const id = params.get("command");
+  if (!id) return;
+  const { COMMANDS } = await import("/command-registry.js");
+  if (!COMMANDS.some((c) => c.id === id)) return;
+  const url = new URL(location.href);
+  url.searchParams.delete("command");
+  window.history.replaceState(null, "", url);
+  await runSharedCommand(id);
+}
+async function runSharedCommand(id) {
+  const { MAP_COMMANDS, commandUrl } = await import("/command-registry.js");
+  if (MAP_COMMANDS.has(id)) {
+    location.assign(commandUrl(id, S.target));
+    return;
+  }
+  const focus = (selector, needsTarget = false) => {
+    page("workspace");
+    if (needsTarget && !S.target) {
+      toast("Select a machine first, then open this command again.");
+      document.querySelector("#search").focus();
+      return;
+    }
+    const control = document.querySelector(selector);
+    control?.scrollIntoView({ block: "center" });
+    if (control && !control.matches("button,input,select,textarea,a"))
+      control.tabIndex = -1;
+    control?.focus();
+  };
+  const toolMenu = (menuSelector, controlSelector) => {
+    if (!S.target) {
+      focus("#search", true);
+      return;
+    }
+    page("workspace");
+    const menu = document.querySelector(menuSelector);
+    if (!menu.classList.contains("menu-open"))
+      menu.querySelector(".toolmenu-btn").click();
+    menu.querySelector(controlSelector)?.focus();
+  };
+  const showReport = () => {
+    if (!S.target) {
+      focus("#search", true);
+      return;
+    }
+    const { body } = AtlasUI.dialog("Machine report");
+    const report = document.createElement("pre");
+    report.textContent = completeMachineReport();
+    const button = document.createElement("button");
+    button.textContent = "Copy report";
+    button.onclick = () => copy(report.textContent, "Machine report");
+    body.append(report, button);
+  };
+  const recover = async () => {
+    const { body } = AtlasUI.dialog("Operation recovery");
+    body.textContent = "Loading…";
+    try {
+      const data = await api("/api/operations/recovery");
+      body.textContent = data.targets.length
+        ? "Inspect the target and operation logs before acknowledging an interrupted operation."
+        : "No unresolved operations.";
+      for (const pc of data.targets) {
+        const row = document.createElement("p"),
+          label = document.createElement("label"),
+          input = document.createElement("input"),
+          button = document.createElement("button");
+        label.textContent = pc + " — type hostname after checking: ";
+        label.append(input);
+        button.textContent = "Acknowledge";
+        button.disabled = true;
+        input.oninput = () => (button.disabled = input.value !== pc);
+        button.onclick = async () => {
+          button.disabled = true;
+          try {
+            await api("/api/operations/recovery/" + encodeURIComponent(pc), {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ confirmation: input.value }),
+            });
+            row.remove();
+          } catch (e) {
+            toast(e.message);
+            button.disabled = false;
+          }
+        };
+        row.append(label, button);
+        body.append(row);
+      }
+    } catch (e) {
+      body.textContent = e.message;
+    }
+  };
+  const actions = {
+    recovery: recover,
+    workspace: () => page("workspace"),
+    admin: () => page("admin"),
+    bulk: () => page("bulk"),
+    history: () => page("history"),
+    active: () => openDeploymentMonitor("active"),
+    recent: () => openDeploymentMonitor("recent"),
+    queue: () => document.querySelector("#queueDrawer").classList.add("open"),
+    deploy: () => focus("#deploy"),
+    copy: () => focus("#copyOnly"),
+    "queue-add": () => toolMenu("#targetActions", '[data-qol-action="queue"]'),
+    msra: () => toolMenu("#targetTools", '[data-tool="msra"]'),
+    cshare: () => toolMenu("#targetTools", '[data-tool="cshare"]'),
+    health: () => focus("#healthLine", true),
+    cleanup: () => focus("#cleanupPackages", true),
+    summary: () => focus("#copySupport", true),
+    software: () => {
+      page("admin");
+      document.querySelector("#adminSoftware").focus();
+    },
+    report: showReport,
+    shortcuts: openShortcutHelp,
+  };
+  if (actions[id]) return actions[id]();
+}
+sharedPaletteReady = import("/command-palette.js").then(
+  ({ installCommandPalette }) => {
+    let records = [];
+    sharedPalette = installCommandPalette({
+      getRecords: () => records,
+      prepare: async () => {
+        records = await AtlasClient.deskIndex();
+      },
+      toast,
+      runCommand: runSharedCommand,
+      replaceTrigger: document.querySelector("#openCommands"),
+      onSelect: (id) =>
+        location.assign("/?" + new URLSearchParams({ desk: id })),
+      openPerson: async (id) => {
+        page("workspace");
+        clearLookup();
+        await loadUser(id, ++lookupSequence);
+      },
+      openMachine: async (machine) => {
+        page("workspace");
+        document.querySelector("#search").value = "machine:" + machine;
+        await search();
+        if (S.machines.some((m) => m.name === machine))
+          setTarget(machine, "Selected from Atlas search");
+      },
+    });
+    return sharedPalette;
+  },
+);
+document.addEventListener("DOMContentLoaded", () => {
+  (() => {
+    const searchInput = document.getElementById("search");
+    searchInput.disabled = false;
+    searchInput.readOnly = false;
+    searchInput.removeAttribute("disabled");
+    searchInput.removeAttribute("readonly");
+    searchInput.setAttribute("tabindex", "0");
+    searchInput.value = "";
+    searchInput.addEventListener("pointerdown", () => searchInput.focus());
+    searchInput.addEventListener("click", () => searchInput.focus());
+    searchInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        event.stopPropagation();
+        search().catch((error) => toast(error.message));
+      }
+    });
+    document
+      .querySelectorAll("nav button")
+      .forEach((button) =>
+        button.addEventListener("click", () => page(button.dataset.page)),
+      );
+    bind();
+    setTimeout(() => searchInput.focus(), 50);
+    init().catch((error) => toast(error.message));
+  })();
+  bindRemoteTools();
+  bindQueueControls();
+  bindDeploymentMonitor();
+  bindPaletteShortcuts();
+  bindSoftwareControls();
+  bindMasterDB();
+  (() => {
+    document.querySelector("#pkg").addEventListener("change", () => {
+      refreshConsolePackage();
+      refreshConsoleSummary();
+    });
+    document
+      .querySelector("#action")
+      .addEventListener("change", refreshConsoleSummary);
+    document
+      .querySelector("#script")
+      .addEventListener("change", refreshConsoleSummary);
+    new MutationObserver(() => {
+      refreshConsolePackage();
+      refreshConsoleSummary();
+    }).observe(document.querySelector("#pkg"), { childList: true });
+    new MutationObserver(refreshConsoleSummary).observe(
+      document.querySelector("#deployTarget"),
+      { childList: true },
+    );
+    new MutationObserver(refreshConsoleSummary).observe(
+      document.querySelector("#script"),
+      { childList: true },
+    );
+    refreshConsoleSummary();
+  })();
+  bindConsolePolish();
+  bindCommandDiscovery();
+  (() => queueMicrotask(openPaletteTarget))();
+  bindQoLActions();
+  $("#search").setAttribute(
+    "aria-label",
+    "Search users, email addresses or machines",
+  );
+});

@@ -47,7 +47,7 @@ class LauncherTests(unittest.TestCase):
         with patch.dict(os.environ,{'ATLAS_ADMIN_PORT':'8770','ATLAS_VIEWER_PORT':'8770'}):
             with self.assertRaises(ValueError):launcher.servers()
     def test_failed_viewer_rolls_back_only_new_admin(self):
-        with tempfile.TemporaryDirectory() as tmp,patch.object(launcher,'ROOT',Path(tmp)):
+        with tempfile.TemporaryDirectory() as tmp,patch.object(launcher,'ROOT',Path(tmp)),patch('runtime_paths.prepare_runtime_database'):
             child=Mock()
             with patch.object(launcher,'start_server',side_effect=[child,RuntimeError('port occupied')]):
                 self.assertEqual(launcher.run(False),1);child.terminate.assert_called_once()

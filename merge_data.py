@@ -17,7 +17,7 @@ def merge_directory(target,source):
    known={r[1] for r in dst.execute('pragma table_info('+table+')')}
    if not set(columns)<=known:raise ValueError('Incompatible directory schema')
    sql='insert into '+table+'('+','.join(columns)+') values ('+','.join('?' for _ in columns)+')'
-   dst.executemany(sql,[tuple(r) for r in src.execute('select * from '+table)])
+   dst.executemany(sql,(tuple(r) for r in src.execute('select * from '+table)))
   for k,v in src.execute('select key,value from metadata'):dst.execute('insert or replace into metadata values(?,?)',('directory.'+k,v))
   dst.commit()
  except:dst.rollback();raise

@@ -1,21 +1,15 @@
-// State/race regression checks in Node. This does not replace browser visual testing.
-const vm=require('node:vm'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
-const nodes=new Map();const node=()=>({value:'',innerHTML:'',textContent:'',classList:{add(){},remove(){},toggle(){}}});
-const context={document:{readyState:'loading',addEventListener(){},getElementById(id){return this.querySelector('#'+id)},querySelector(s){if(!nodes.has(s))nodes.set(s,node());return nodes.get(s)},querySelectorAll(){return []}},MutationObserver:class{observe(){}},localStorage:{getItem(){return null},setItem(){}},window:{},console,setTimeout,clearTimeout,setInterval,clearInterval,fetch:async()=>({ok:true,json:async()=>({})})};vm.createContext(context);
-vm.runInContext(fs.readFileSync(path.join(__dirname,'../frontend/assets/app.js'),'utf8'),context);
-vm.runInContext('renderUsers=()=>{};renderMachines=()=>{};renderKyc=()=>{};toast=()=>{};',context);
+const assert=require('node:assert/strict');const {fixture}=require('./ui_fixture.cjs');const sleep=()=>new Promise(r=>setImmediate(r));
 (async()=>{
- const pending=[];context.fetch=(url)=>new Promise(resolve=>pending.push({url,resolve}));
- const resolve=(i,data)=>pending[i].resolve({ok:true,json:async()=>data});
- nodes.get('#search')||context.document.querySelector('#search');nodes.get('#search').value='first';const first=vm.runInContext('search()',context);
- nodes.get('#search').value='second';const second=vm.runInContext('search()',context);
- resolve(1,{matched:false});await new Promise(r=>setImmediate(r));resolve(2,{users:[],machines:[{name:'SECOND'}]});await second;
- resolve(0,{matched:true,user_key:'id:1'});await first;
- assert.equal(vm.runInContext('S.machines[0].name',context),'SECOND');assert.equal(pending.length,3);
- vm.runInContext("S.target='OLD';S.user={id:1};",context);nodes.get('#search').value='missing';const missing=vm.runInContext('search()',context);
- assert.equal(vm.runInContext('S.target',context),'');assert.equal(vm.runInContext('S.user',context),null);
- resolve(3,{matched:false});await new Promise(r=>setImmediate(r));resolve(4,{users:[],machines:[]});await missing;
- assert.equal(vm.runInContext('S.machines.length',context),0);
- assert.equal(vm.runInContext("packageFolder('Example')",context),'Example');
- console.log('PASS: full script evaluation, stale search rejection, target clearing, empty results, portable package reference');
-})().catch(e=>{console.error(e);process.exitCode=1});
+ const pending=[],calls=[];let hold=false;
+ const f=await fixture({fetch:async(url,options={})=>{calls.push(String(url));const reply=data=>({ok:true,status:200,json:async()=>data});if(hold&&(/api\/master\/resolve|api\/package-folder|api\/scripts|api\/job\//.test(url)))return new Promise(resolve=>pending.push({url:String(url),resolve:data=>resolve(reply(data))}));if(url==='/api/health')return reply({identity:'FIXTURE',version:'test',users:0,machines:0});if(url.includes('/catalog'))return reply({items:[]});if(url.includes('/session'))return reply({token:'test'});if(url.includes('/palette/desks'))return {...reply({records:[]}),headers:{get:()=>null}};if(url.includes('/deployments/'))return reply({deployments:[]});return reply({users:[],machines:[],available:false})}});
+ await f.console();await sleep();await sleep();const {w,run}=f;hold=true;
+ // Old lookup must not replace a newer selection.
+ w.document.querySelector('#search').value='first';const first=run('search()');w.document.querySelector('#search').value='second';const second=run('search()');pending[1].resolve({matched:false});await second;pending[0].resolve({matched:true,user_key:'id:1'});await first;assert.equal(run('S.target'),'');
+ // Cleanup's preview is invalid after changing target.
+ run("S.target='PC-A'");let confirmations=0;w.confirm=()=>{confirmations++;return true};const clean=run('cleanPackages()');run("S.target='PC-B'");pending[2].resolve({exists:true,folders:3,files:7,bytes:1});await clean;assert.equal(confirmations,0);assert(!calls.some(url=>url.includes('/api/cleanup-packages/')));
+ // Script responses may resolve out of order; the newest package owns the control.
+ const pkg=w.document.querySelector('#pkg');pkg.innerHTML='<option>A</option><option>B</option>';pkg.value='A';const a=run('scripts()');pkg.value='B';const b=run('scripts()');pending[4].resolve({scripts:['B_i.ps1']});await b;pending[3].resolve({scripts:['A_i.ps1']});await a;assert.equal(w.document.querySelector('#script').value,'B_i.ps1');
+ // Replacing a monitor cancels its timer and cannot render an old response.
+ const timers=[];w.setTimeout=fn=>{timers.push(fn);return timers.length};run("poll('A');poll('B')");pending[5].resolve({state:'running',events:[{message:'OLD'}]});pending[6].resolve({state:'running',events:[{message:'NEW'}]});await sleep();await sleep();assert(w.document.querySelector('#log').textContent.includes('NEW'));assert.equal(timers.length,1);timers[0]();pending[7].resolve({state:'complete',events:[]});await sleep();
+ assert.equal(f.errors.length,0,f.errors.join('\n'));w.close();console.log('PASS: current console modules, stale lookup rejection, immutable cleanup target, ordered scripts, single job monitor');
+})().catch(error=>{console.error(error);process.exitCode=1});

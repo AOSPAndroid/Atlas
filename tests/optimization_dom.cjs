@@ -1,6 +1,6 @@
 const fs=require('fs'),vm=require('vm'),assert=require('assert/strict');
-const source=fs.readFileSync('frontend/assets/app.js','utf8');
-const block=source.slice(source.indexOf('function applyCompactWorkspace(){'),source.indexOf('const compactWorkspaceObserver='));
+const source=fs.readFileSync('frontend/assets/console-directory.js','utf8');
+const ast=require('acorn').parse(source,{ecmaVersion:'latest'});const fn=ast.body.find(n=>n.type==='FunctionDeclaration'&&n.id.name==='applyCompactWorkspace');const block=source.slice(fn.start,fn.end);
 let handlers=0;const details={dataset:{},hasAttribute:()=>true,addEventListener:()=>handlers++};
 const ctx={document:{body:{classList:{add(){}}},querySelector:()=>null,querySelectorAll:()=>[details]}};
 vm.createContext(ctx);vm.runInContext(block,ctx);for(let i=0;i<20;i++)ctx.applyCompactWorkspace();assert.equal(handlers,1);

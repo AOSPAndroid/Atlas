@@ -7,15 +7,18 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from types import SimpleNamespace
 import database_manager as dm
+from sqlite_fixture import connect
+from runtime_paths import database_path
 from fastapi.testclient import TestClient
 from http.server import ThreadingHTTPServer,BaseHTTPRequestHandler
 ROOT=Path(__file__).resolve().parents[1]
 with tempfile.TemporaryDirectory() as td:
  db=Path(td)/'office_atlas.db'
- with sqlite3.connect(ROOT/'office_atlas.db') as a,sqlite3.connect(db) as b:a.backup(b)
+ with connect(database_path()) as a,connect(db) as b:a.backup(b)
  app=FastAPI();w=SimpleNamespace(MASTER_DB=db,jobs={},queue_jobs={})
  def token(r):
   if r.headers.get('x-atlas-token')!='test':raise HTTPException(403,'token')
+ @app.get('/api/session')
  @app.get('/api/state')
  def state():return {'token':'test'}
  app.mount('/assets',StaticFiles(directory=ROOT/'frontend/assets'))

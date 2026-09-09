@@ -4,6 +4,7 @@ from pathlib import Path
 from datetime import datetime,timezone
 import xml.etree.ElementTree as ET
 from fastapi import Request,HTTPException
+from starlette.concurrency import run_in_threadpool
 from fastapi.responses import Response
 import atlas_store as store
 from Build_MasterDB_From_database040926 import workbook_parts,iter_rows
@@ -12,7 +13,7 @@ HEADERS=['Desk ID','Floor','Current name','Team','Account','Occupancy','Type','X
 NS='{http://schemas.openxmlformats.org/spreadsheetml/2006/main}'
 def snapshot(c):
  records={r['id']:r for r in store.all_records(c)}
- if c.execute("select 1 from sqlite_master where name='official_records'").fetchone():records.update({id:json.loads(b) for id,b in c.execute('select id,body from official_records')})
+ if c.execute("select 1 from sqlite_master where name='official_records'").fetchone():records.update({id:dict(json.loads(b),layout='official') for id,b in c.execute('select id,body from official_records')})
  links={r[0]:r[1] for r in c.execute('select desk_id,user_key from desk_user_links')}
  return records,links
 
@@ -37,7 +38,7 @@ def plan_moves(c,rows):
   if revision!=r['revision']:raise ValueError(id+' changed after export. Export again.')
   if str(row[2])!=r['name'] or str(row[3])!=r['team']:raise ValueError('Edit Move to desk only. Name or team changed at '+id)
  for src,dest in moves.items():
-  if bool(re.fullmatch(r'[0-9]{2}[A-Z][0-9]{6}',src))!=bool(re.fullmatch(r'[0-9]{2}[A-Z][0-9]{6}',dest)):raise ValueError('Use Carry over previous seating to map between layouts.')
+  if records[src].get('layout')!=records[dest].get('layout'):raise ValueError('Use Carry over previous seating to map between layouts.')
   if records[src]['occupancy']=='vacant' or records[src]['name'] in ('Unconfirmed desk','Vacant desk','Unassigned','Unnamed desk'):raise ValueError(src+' has no recorded occupant to move.')
   if records[dest]['occupancy']!='vacant' and dest not in moves:raise ValueError(dest+' is occupied or unconfirmed. Move its occupant out in this batch, or vacate it first in Atlas.')
  return {'moves':moves,'records':{id:records[id] for id in affected},'links':{id:links.get(id) for id in affected},'summary':[{'person':records[src]['name'],'from':src,'to':dest} for src,dest in moves.items()]}
@@ -67,7 +68,7 @@ def export_workbook(db,layout="previous"):
  # Populate the pre-authored Excel template using OpenXML; no extra Windows dependency.
  with sqlite3.connect(db,factory=ClosingConnection) as c:
   records,links=snapshot(c);users=dict(c.execute('select canonical_key,user_id from users'))
- records={id:r for id,r in records.items() if bool(re.fullmatch(r'[0-9]{2}[A-Z][0-9]{6}',id))==(layout=='official')}
+ records={id:r for id,r in records.items() if r.get('layout','previous')==layout}
  rows=[[r['id'],r['floor'],r['name'],r['team'],users.get(links.get(r['id']),''),r['occupancy'],r['kind'],r['x'],r['y'],r['angle'],r['revision'],''] for r in sorted(records.values(),key=lambda r:r['id'])]
  template=Path(__file__).parent/'desk_moves_template.xlsx';out=io.BytesIO()
  with zipfile.ZipFile(template) as z,zipfile.ZipFile(out,'w',zipfile.ZIP_DEFLATED) as target:
@@ -100,7 +101,7 @@ def register_desk_moves(app,wmi,check_token,busy):
   async for chunk in request.stream():
    raw.extend(chunk)
    if len(raw)>10*1024*1024:raise HTTPException(413,'Desk workbook exceeds 10 MB')
-  try:
+  def prepare():
    with tempfile.TemporaryDirectory() as d:
     path=Path(d)/'moves.xlsx';path.write_bytes(raw)
     with zipfile.ZipFile(path) as z:
@@ -112,6 +113,9 @@ def register_desk_moves(app,wmi,check_token,busy):
     rows=[r for _,r in it]
     if len(rows)>5000:raise ValueError('Too many desk rows')
     with sqlite3.connect(wmi.MASTER_DB,factory=ClosingConnection) as c:plan=plan_moves(c,rows)
+   return plan
+  try:
+   plan=await run_in_threadpool(prepare)
    staged.clear();id=uuid.uuid4().hex;staged[id]=(time.time(),plan)
    return {'id':id,'moves':plan['summary']}
   except (ValueError,KeyError,StopIteration,zipfile.BadZipFile,ET.ParseError) as e:raise HTTPException(400,str(e) or 'Invalid desk workbook')

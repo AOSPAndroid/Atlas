@@ -2,9 +2,13 @@
   "name": "office-atlas-ui-tests",
   "private": true,
   "scripts": {
-    "test:palette": "node --experimental-vm-modules tests/shared_palette_dom.cjs"
+    "test:palette": "node --experimental-vm-modules tests/shared_palette_dom.cjs",
+    "test": "py -3.12 -X utf8 tests/run_all.py",
+    "format:check": "prettier --check \"frontend/assets/*.js\" \"frontend/*.html\" atlas/official-app.js atlas/official-index.html atlas/operations.js atlas/viewer.js atlas/command-palette.js atlas/command-registry.js atlas/command-palette.css frontend/assets/atlas-theme.css frontend/assets/ui-tokens.css"
   },
   "devDependencies": {
-    "jsdom": "^29.1.1"
+    "acorn": "^8.18.0",
+    "jsdom": "^29.1.1",
+    "prettier": "^3.9.6"
   }
 }

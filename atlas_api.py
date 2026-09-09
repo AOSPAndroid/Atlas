@@ -3,13 +3,15 @@ import json,re,secrets,sqlite3,tempfile,threading,uuid,unicodedata
 from datetime import datetime,timezone
 from pathlib import Path
 from fastapi import HTTPException,Request
+from starlette.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse,Response,JSONResponse
 import atlas_store as store
 from merge_data import atlas_schema,import_atlas
+from desk_directory import name_key,resolve_person,desk_context as shared_context,person_desks
 TOKEN=secrets.token_urlsafe(32)
 
 def now():return datetime.now(timezone.utc).isoformat()
-def name_key(value):return ' '.join(sorted(re.findall(r'[^\W_]+',unicodedata.normalize('NFKC',str(value)).casefold())))
+
 
 def register_atlas(app):
  from backend import main as wmi
@@ -24,47 +26,11 @@ def register_atlas(app):
   if not r:raise HTTPException(404,'Desk not found')
   return r
 
- def resolution(c,r):
-  if r['occupancy']=='vacant':return [],'unassigned'
-  explicit=c.execute('select user_key from desk_user_links where desk_id=?',(r['id'],)).fetchone()
-  if explicit:
-   user=c.execute('select * from legacy_users where canonical_key=?',(explicit[0],)).fetchone()
-   return ([dict(user)] if user else []),'confirmed' if user else 'missing-linked-user'
-  k=name_key(r['name'])
-  if len(k.split())<2:return [],'unmatched'
-  # Cached by directory generation; rebuilt after a refresh instead of per desk click.
-  version=c.execute("select value from metadata where key='directory.created_at'").fetchone()
-  stamp=version[0] if version else c.execute("select value from metadata where key='created_at'").fetchone()[0]
-  if getattr(resolution,'stamp',None)!=stamp:
-   index={}
-   for row in c.execute('select * from legacy_users'):
-    index.setdefault(name_key(row['full_name']),[]).append(dict(row))
-   resolution.index=index;resolution.stamp=stamp
-  matches=resolution.index.get(k,[])
-  return matches,('unconfirmed-name-match' if r['occupancy']=='unconfirmed' else 'name-match') if len(matches)==1 else 'ambiguous' if matches else 'unmatched'
-
+ resolution=resolve_person
  def context(c,r):
-  candidates,method=resolution(c,r);user=candidates[0] if len(candidates)==1 else None
-  machines=wmi.linked_machines(c,user['id']) if user else []
-  for m in machines:m['link_source']='User directory'
-  host=r.get('hostname','').strip().upper()
-  if host and r['kind']=='desk':
-   try:wmi.validate_pc(host)
-   except HTTPException:host=''
-  if host:
-   existing=next((m for m in machines if m['name'].upper()==host),None)
-   if existing:existing['desk_equipment']=True
-   else:
-    row=c.execute('select * from legacy_machines where name_norm=?',(host.lower(),)).fetchone()
-    m=dict(row) if row else {'name':host,'operational_status':'Not in directory','model_id':'','serial_number':''}
-    m.update(link_source='Desk equipment record',match_type='Recorded at this desk',desk_equipment=True,assigned_relationship=0,logon_relationship=0);machines.insert(0,m)
-  for m in machines:
-   m['relationship_group']='Desk equipment' if m.get('desk_equipment') else 'Assigned to user' if m.get('assigned_relationship') else 'Last logged on (inventory)'
-   m['inventory_discovered_at']=m.get('last_discovered') or None
-   m['inventory_updated_at']=m.get('updated_on') or None
-  machines.sort(key=lambda m:({'Desk equipment':0,'Assigned to user':1,'Last logged on (inventory)':2}[m['relationship_group']],m['name']))
-  history=[dict(x) for x in c.execute('select d.*,x.desk_id from desk_deployments x join deployments d on d.id=x.job_id where x.desk_id=? order by d.started desc limit 20',(r['id'],))]
-  return {'desk':r,'user':user,'candidates':candidates,'match_method':method,'machines':machines,'deployments':history}
+  result=shared_context(c,r)
+  result['deployments']=[dict(x) for x in c.execute('select d.*,x.desk_id from desk_deployments x join deployments d on d.id=x.job_id where x.desk_id=? order by d.started desc limit 20',(r['id'],))]
+  return result
 
  @app.get('/api/ops/audit')
  def audit():
@@ -139,17 +105,22 @@ def register_atlas(app):
   with wmi.db() as c:
    person=c.execute('select * from legacy_users where id=?',(int(uid[3:]),)).fetchone()
    if not person:raise HTTPException(404,'Person not found')
-   mapped=[dict(row) for row in c.execute("select distinct o.id,o.body from desk_user_links l left join official_seating_mappings m on m.legacy_id=l.desk_id join official_records o on o.id=coalesce(m.official_id,l.desk_id) where l.user_key=?",(person['canonical_key'],))]
-   if mapped:return {'desks':[{'id':r['id'],'floor':json.loads(r['body'])['floor'],'match':'confirmed account link'} for r in mapped]}
-   # Name matches are navigation suggestions, never saved account links.
-   key=name_key(person['full_name'])
-   desks=[]
-   for row in c.execute('select body from official_records'):
-    r=json.loads(row[0])
-    if r.get('occupancy')!='vacant' and key and name_key(r['name'])==key:
-     linked=c.execute('select user_key from desk_user_links where desk_id=?',(r['id'],)).fetchone()
-     if not linked:desks.append({'id':r['id'],'floor':r['floor'],'match':'matching name; account not confirmed'})
-   return {'desks':desks}
+   return {'desks':person_desks(c,person)}
+
+ @app.get('/api/session')
+ def session():
+  return JSONResponse({'token':TOKEN},headers={'Cache-Control':'no-store'})
+
+ @app.get('/api/palette/desks')
+ def palette_desks(request:Request):
+  import hashlib
+  with wmi.db() as c:
+   records=[{key:r.get(key,'') for key in ('id','name','team','hostname','floor')} for (body,) in c.execute('select body from official_records order by id') for r in [json.loads(body)]]
+  encoded=json.dumps({'records':records},ensure_ascii=False,separators=(',',':')).encode()
+  etag='"'+hashlib.sha256(encoded).hexdigest()+'"'
+  headers={'ETag':etag,'Cache-Control':'private, no-cache'}
+  if request.headers.get('if-none-match')==etag:return Response(status_code=304,headers=headers)
+  return Response(encoded,media_type='application/json',headers=headers)
 
  @app.get('/api/state')
  def state():
@@ -179,7 +150,7 @@ def register_atlas(app):
    chunks.append(chunk)
   with tempfile.TemporaryDirectory() as tmp:
    path=Path(tmp)/'atlas.db';path.write_bytes(b''.join(chunks))
-   try:result=import_atlas(store.DB,path)
+   try:result=await run_in_threadpool(import_atlas,store.DB,path)
    except (ValueError,sqlite3.Error,KeyError,TypeError) as e:raise HTTPException(400,'Invalid Atlas backup: '+str(e))
   with store.connect() as c:result['records']=store.all_records(c)
   return result
@@ -292,7 +263,7 @@ def register_atlas(app):
     # Both deployment audit and desk association commit before the worker starts.
     c.execute('insert into deployments(id,started,operator,target,package,action,script,mode,state) values(?,?,?,?,?,?,?,?,?)',(job,now(),wmi.identity(),pc,Path(p.folder).name,p.action,p.script,p.mode,'queued'))
     c.execute('insert into desk_deployments values(?,?,?,?,?,?)',(job,desk_id,expected,pc,r['revision'],now()))
-   wmi.jobs[job]={'state':'queued','events':[]};threading.Thread(target=wmi.deploy_worker,args=(job,p),daemon=True).start()
+   wmi.jobs[job]={'state':'queued','target':pc,'events':[]};wmi.start_job(wmi.deploy_worker,job,p)
    return {'job':job,'desk_id':desk_id,'computer':pc}
   except store.Conflict as e:raise HTTPException(409,str(e))
   except (ValueError,TypeError) as e:raise HTTPException(400,str(e))
@@ -335,7 +306,7 @@ def register_atlas(app):
 
  @app.get('/{filename}')
  def atlas_asset(filename:str):
-  allowed={'command-registry.js','command-palette.js','command-palette.css','official-app.js','official-data.json','official.css','app.js','style.css','data.json','operations.js','operations.css'}|{'floor-'+str(n)+'.jpg' for n in range(2,8)}
+  allowed={'command-registry.js','command-palette.js','command-palette.css','official-app.js','official-data.json','official.css','style.css','data.json','operations.js','operations.css'}|{'floor-'+str(n)+'.jpg' for n in range(2,8)}
   allowed|={'official-floor-'+str(n)+ext for n in range(-1,9) for ext in ('.jpg','.pdf')}
   allowed|={'studio-floor-'+str(n)+'.svg' for n in range(-1,9)}
   if filename not in allowed:raise HTTPException(404,'Not found')

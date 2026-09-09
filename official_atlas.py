@@ -38,7 +38,7 @@ def register_official(app,wmi,check_token):
  @app.get('/api/official/state')
  def state():
   from atlas_api import TOKEN
-  with store.connect() as c:return {'token':TOKEN,'records':[json.loads(x[0]) for x in c.execute('select body from official_records order by id')],'legacy':[json.loads(x[0]) for x in c.execute('select body from records order by id')],'mappings':dict(c.execute('select legacy_id,official_id from official_seating_mappings'))}
+  with store.connect() as c:return {'token':TOKEN,'records':[dict(json.loads(x[0]),layout='official') for x in c.execute('select body from official_records order by id')],'legacy':[json.loads(x[0]) for x in c.execute('select body from records order by id')],'mappings':dict(c.execute('select legacy_id,official_id from official_seating_mappings'))}
  @app.post('/api/official/map-occupant')
  def map_occupant(body:dict,request:Request):
   check_token(request)

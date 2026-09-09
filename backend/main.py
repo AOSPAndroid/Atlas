@@ -17,7 +17,8 @@ FRONTEND=WEB
 ASSETS=WEB/'assets'
 LOGS=ROOT/'logs'
 DATA=ROOT/'data'
-MASTER_DB=ROOT/'office_atlas.db'
+from runtime_paths import database_path
+MASTER_DB=database_path()
 DB=MASTER_DB
 DAAS_DB=MASTER_DB
 HISTORY_DB=MASTER_DB
@@ -34,7 +35,11 @@ if not REPO.is_absolute(): REPO=ROOT/REPO
 REMOTE_ROOT=r'C:\Temp\Packages'; NW=0x08000000 if os.name=='nt' else 0
 logging.basicConfig(filename=LOGS/'application.log',level=logging.INFO,format='%(asctime)s %(levelname)s %(message)s')
 app=FastAPI(title='WMI Packager Web v2',docs_url='/api/docs',redoc_url=None)
-jobs:dict[str,dict[str,Any]]={}; lock=threading.Lock()
+from job_service import JobService, TERMINAL
+job_service=JobService(lambda:HISTORY_DB)
+jobs=job_service.jobs;lock=job_service.lock
+@app.on_event('startup')
+def recover_operations():job_service.recover()
 NAME_RE=re.compile(r'^[A-Za-z0-9_.-]{1,64}$')
 
 def norm(v):
@@ -61,6 +66,7 @@ def hist_db():
  c=sqlite3.connect(HISTORY_DB,timeout=20,factory=ClosingConnection);c.row_factory=sqlite3.Row
  c.execute('''create table if not exists deployments(id text primary key,started text,finished text,operator text,target text,package text,action text,script text,mode text,state text,robocopy_code text,pid text,exit_code text,details text)''');c.commit();return c
 def history_create(j,target,package,action,script,mode):
+ if j in jobs:jobs[j]['target']=target;job_service.save(j)
  with hist_db() as c:c.execute('insert into deployments(id,started,operator,target,package,action,script,mode,state) values(?,datetime("now","localtime"),?,?,?,?,?,?,?)',(j,identity(),target,package,action,script,mode,'queued'));c.commit()
 def history_update(j,**fields):
  if not fields:return
@@ -70,6 +76,7 @@ def emit(j,message,state=None,**extra):
  with lock:
   job=jobs[j];job['events'].append({'time':time.strftime('%H:%M:%S'),'message':message,**extra})
   if state:job['state']=state
+  job_service.save(j)
 
 def copy_pkg(src,dst,fresh=False,threads=8):
  if fresh and os.path.exists(dst):shutil.rmtree(dst)
@@ -133,7 +140,14 @@ class QueueItem(BaseModel):
 class QueueRequest(BaseModel):
  items:list[QueueItem]
 
-target_locks={}
+import weakref
+target_locks=weakref.WeakValueDictionary()
+def start_job(fn,j,*args):
+ try:
+  job_service.save(j);return job_service.submit(fn,j,*args)
+ except Exception as error:
+  emit(j,str(error),'failed');history_update(j,state='failed',details=str(error));raise
+
 def target_lock(pc):
  with lock:return target_locks.setdefault(pc,threading.Lock())
 
@@ -144,9 +158,13 @@ def outcome(ec):
  return 'failed','Installer failed or outcome unavailable: '+code
 
 def deploy_worker(j,p):
- acquired=False;guard=None
+ with job_service.execution:
+  return _deploy_worker(j,p)
+
+def _deploy_worker(j,p):
+ acquired=False;guard=None;launched=False
  try:
-  validate_deployment(p);pc=p.computer;pkg=Path(p.folder).name
+  validate_deployment(p);pc=p.computer;job_service.target_ready(pc);jobs[j]['target']=pc;pkg=Path(p.folder).name
   guard=target_lock(pc);acquired=guard.acquire(blocking=False)
   if not acquired:raise RuntimeError('Another deployment or cleanup is active on this target')
   remote=rf'{REMOTE_ROOT}\{pkg}\{p.script}'
@@ -157,13 +175,15 @@ def deploy_worker(j,p):
    emit(j,f'Copy complete. Robocopy: {rc}');history_update(j,robocopy_code=str(rc))
   if p.mode=='copy':
    emit(j,'Copy-only completed','complete');history_update(j,state='complete',finished=time.strftime('%Y-%m-%d %H:%M:%S'));return
-  pid,log,ex=launch(pc,remote,pkg);emit(j,f'Started PID {pid}',pid=pid);history_update(j,pid=str(pid))
+  pid,log,ex=launch(pc,remote,pkg);launched=True;emit(j,f'Started PID {pid}',pid=pid);history_update(j,pid=str(pid))
   ec,lines=monitor(pc,pid,log,ex);state,message=outcome(ec)
   emit(j,message,state,log=lines,exit_code=ec)
   history_update(j,state=state,exit_code=str(ec),finished=time.strftime('%Y-%m-%d %H:%M:%S'),details=message+'\n'+'\n'.join(lines[-20:]))
  except Exception as e:
-  emit(j,str(e),'failed')
-  try:history_update(j,state='failed',finished=time.strftime('%Y-%m-%d %H:%M:%S'),details=str(e))
+  state='unknown' if launched else 'failed'
+  if launched:job_service.unresolved.add(pc)
+  emit(j,str(e),state)
+  try:history_update(j,state=state,finished=time.strftime('%Y-%m-%d %H:%M:%S'),details=str(e))
   except Exception:logging.exception('Could not persist failed deployment')
   logging.exception('deployment failed')
  finally:
@@ -184,7 +204,8 @@ def bulk_worker(j,p):
   except Exception as exc:row.update(copy='Failed',launch='Not started',completion='Failed',details=str(exc));jobs[child]['state']='failed'
  try:
   with ThreadPoolExecutor(max_workers=p.concurrency) as pool:list(pool.map(work,rows))
- finally:jobs[j].update(state='complete',phase='complete')
+ finally:
+  jobs[j].update(state='complete',phase='complete');job_service.save(j)
 
 class ClosingConnection(sqlite3.Connection):
  def __exit__(self,*args):
@@ -279,23 +300,23 @@ def preflight(pc:str):
  return checks
 @app.post('/api/deploy')
 def deploy(p:Deploy):
- validate_deployment(p)
- j=uuid.uuid4().hex;jobs[j]={'state':'queued','events':[]};history_create(j,p.computer,Path(p.folder).name,p.action,p.script,p.mode);threading.Thread(target=deploy_worker,args=(j,p),daemon=True).start();return {'job':j}
+ validate_deployment(p);job_service.target_ready(p.computer)
+ j=uuid.uuid4().hex;jobs[j]={'state':'queued','events':[]};history_create(j,p.computer,Path(p.folder).name,p.action,p.script,p.mode);start_job(deploy_worker,j,p);return {'job':j}
 @app.get('/api/job/{j}')
 def job(j:str):
  if j not in jobs:raise HTTPException(404,'Job not found')
- return jobs[j]
+ return job_service.snapshot(jobs,j)
 @app.post('/api/bulk/deploy')
 def bulk_deploy(p:Bulk):
  targets=list(dict.fromkeys(validate_pc(x) for x in p.computers))
  for pc in targets:validate_deployment(Deploy(computer=pc,folder=p.folder,script=p.script,action=p.action,fresh=p.fresh,threads=p.threads))
  p.computers=targets
  j=uuid.uuid4().hex;jobs[j]={'state':'queued','phase':'queued','results':[],'events':[]}
- threading.Thread(target=bulk_worker,args=(j,p),daemon=True).start();return {'job':j}
+ start_job(bulk_worker,j,p);return {'job':j}
 @app.get('/api/bulk/job/{j}')
 def bulk_job(j:str):
  if j not in jobs:raise HTTPException(404,'Job not found')
- return jobs[j]
+ return job_service.snapshot(jobs,j)
 @app.get('/api/history')
 def history(limit:int=100):
  with hist_db() as c:return [dict(x) for x in c.execute('select * from deployments order by started desc limit ?', (max(1,min(limit,500)),))]
@@ -368,7 +389,7 @@ def package_folder_info(pc:str):
 
 @app.post('/api/cleanup-packages/{pc}')
 def cleanup_package_folder(pc:str):
-    pc=validate_pc(pc);guard=target_lock(pc)
+    pc=validate_pc(pc);job_service.target_ready(pc);guard=target_lock(pc)
     if not guard.acquire(blocking=False):raise HTTPException(409,"A deployment is active on this target")
     try:return _cleanup_package_folder(pc)
     finally:guard.release()
@@ -389,61 +410,111 @@ def _cleanup_package_folder(pc:str):
 
 
 
-queue_jobs={}
+queue_jobs=job_service.queues
 
 def _queue_worker(queue_id,items):
- q=queue_jobs[queue_id];q['state']='running'
+ q=queue_jobs[queue_id];q['state']='running';job_service.save(queue_id,queue=True)
  try:
   for index,item in enumerate(items):
-   if q.get('pause_requested'):q['state']='paused';return
-   row=q['items'][index];row['state']='running';child=uuid.uuid4().hex
-   jobs[child]={'state':'queued','events':[]};row['job']=child
+   row=q['items'][index]
+   if row['state'] in TERMINAL:continue
+   if q.get('cancel_requested'):
+    q['state']='cancelled';return
+   if q.get('pause_requested'):
+    q['state']='paused';return
+   row['state']='running';child=uuid.uuid4().hex
+   jobs[child]={'state':'queued','target':item.computer,'events':[]};row['job']=child;job_service.save(queue_id,queue=True)
    try:
     history_create(child,item.computer,Path(item.folder).name,item.action,item.script,item.mode)
     deploy_worker(child,item)
     row.update(state=jobs[child]['state'],events=jobs[child].get('events',[]))
    except Exception as exc:
     jobs[child]['state']='failed';row.update(state='failed',events=[{'message':str(exc)}])
-  q['state']='complete'
+   job_service.save(child);job_service.save(queue_id,queue=True)
+  q['state']='cancelled' if q.get('cancel_requested') else 'complete'
  except Exception as exc:q.update(state='failed',error=str(exc))
+ finally:
+  if q['state']=='cancelled':
+   for row in q['items']:
+    if row['state']=='waiting':row['state']='cancelled'
+  job_service.save(queue_id,queue=True)
 
 @app.post('/api/queue')
 def start_queue(request:QueueRequest):
-    if not request.items or len(request.items)>200:raise HTTPException(400,'Queue must contain 1 to 200 items')
-    for item in request.items:validate_deployment(item)
-    queue_id=uuid.uuid4().hex
-    queue_jobs[queue_id]={'id':queue_id,'state':'queued','pause_requested':False,'items':[{'target':x.computer,'package':Path(x.folder).name,'action':x.action,'mode':x.mode,'state':'waiting','events':[]} for x in request.items]}
-    threading.Thread(target=_queue_worker,args=(queue_id,request.items),daemon=True).start()
-    return {'queue':queue_id}
+ if not request.items or len(request.items)>200:raise HTTPException(400,'Queue must contain 1 to 200 items')
+ for item in request.items:
+  validate_deployment(item);job_service.target_ready(item.computer)
+ queue_id=uuid.uuid4().hex
+ queue_jobs[queue_id]={'id':queue_id,'state':'queued','pause_requested':False,'items':[{'target':x.computer,'package':Path(x.folder).name,'action':x.action,'mode':x.mode,'state':'waiting','events':[],'payload':x.model_dump()} for x in request.items]}
+ job_service.save(queue_id,queue=True)
+ try:job_service.submit(_queue_worker,queue_id,request.items)
+ except Exception:
+  queue_jobs[queue_id]['state']='cancelled';job_service.save(queue_id,queue=True);raise
+ return {'queue':queue_id}
 
 @app.get('/api/queue/{queue_id}')
-def get_queue(queue_id:str):
-    if queue_id not in queue_jobs:raise HTTPException(404,'Queue not found')
-    return queue_jobs[queue_id]
+def get_queue(queue_id:str):return job_service.snapshot(queue_jobs,queue_id)
 
 @app.post('/api/queue/{queue_id}/pause')
 def pause_queue(queue_id:str):
-    if queue_id not in queue_jobs:raise HTTPException(404,'Queue not found')
-    queue_jobs[queue_id]['pause_requested']=True
-    return {'pause_requested':True}
+ with lock:
+  q=queue_jobs.get(queue_id)
+  if not q:raise HTTPException(404,'Queue not found')
+  if q['state'] not in ('queued','running'):raise HTTPException(409,'Only a running queue can be paused')
+  q['pause_requested']=True;job_service.save(queue_id,queue=True)
+ return {'pause_requested':True}
+
+@app.post('/api/queue/{queue_id}/resume')
+def resume_queue(queue_id:str):
+ with lock:
+  q=queue_jobs.get(queue_id)
+  if not q:raise HTTPException(404,'Queue not found')
+  if q['state']!='paused':raise HTTPException(409,'Only a paused queue can be resumed')
+  items=[QueueItem(**row['payload']) for row in q['items']]
+  for item,row in zip(items,q['items']):
+   if row['state']=='waiting':validate_deployment(item);job_service.target_ready(item.computer)
+  q.update(state='queued',pause_requested=False);job_service.save(queue_id,queue=True)
+  try:job_service.submit(_queue_worker,queue_id,items)
+  except Exception:
+   q['state']='paused';job_service.save(queue_id,queue=True);raise
+ return {'queue':queue_id}
+
+@app.post('/api/queue/{queue_id}/cancel')
+def cancel_queue(queue_id:str):
+ with lock:
+  q=queue_jobs.get(queue_id)
+  if not q:raise HTTPException(404,'Queue not found')
+  q['cancel_requested']=True
+  if q['state']=='paused':
+   q['state']='cancelled'
+   for row in q['items']:
+    if row['state']=='waiting':row['state']='cancelled'
+  job_service.save(queue_id,queue=True)
+ return {'queue':queue_id,'state':q['state']}
+
+@app.get('/api/operations/recovery')
+def operation_recovery():return {'targets':sorted(job_service.unresolved)}
+
+@app.post('/api/operations/recovery/{pc}')
+def acknowledge_recovery(pc:str,body:dict):
+ pc=validate_pc(pc)
+ if body.get('confirmation')!=pc:raise HTTPException(400,'Type the exact hostname after inspecting the target')
+ with lock:
+  job_service.acknowledge(pc)
+  for key,data in list(jobs.items()):
+   if data.get('state') in ('unknown','interrupted'):
+    if data.get('target')==pc:data['recovery_acknowledged']=True
+    data.setdefault('acknowledged_targets',[]).append(pc);job_service.save(key)
+  for key,data in list(queue_jobs.items()):
+   if data.get('state')=='interrupted':
+    data.setdefault('acknowledged_targets',[]).append(pc);job_service.save(key,queue=True)
+ return {'acknowledged':pc}
 
 @app.get('/api/database-freshness')
 def database_freshness():
     excel=ROOT/'database040926.xlsx'
     db=DB
     return {'database_exists':db.exists(),'excel_exists':excel.exists(),'database_modified':datetime.fromtimestamp(db.stat().st_mtime).isoformat(sep=' ',timespec='seconds') if db.exists() else '', 'excel_modified':datetime.fromtimestamp(excel.stat().st_mtime).isoformat(sep=' ',timespec='seconds') if excel.exists() else '', 'excel_newer':bool(excel.exists() and db.exists() and excel.stat().st_mtime>db.stat().st_mtime), 'database_size':db.stat().st_size if db.exists() else 0}
-
-@app.get('/api/target-health/{pc}')
-def target_health(pc:str):
-    pc=validate_pc(pc)
-    result={'computer':pc,'ping':run(['ping.exe','-n','1','-w','1200',pc],False).returncode==0,'c_share':os.path.isdir(unc(pc)),'wmi':False,'free_gb':None,'logged_on':''}
-    try:
-        raw=ps(f"$o=Get-WmiObject -ComputerName {quote(pc)} Win32_OperatingSystem -EA Stop;$c=Get-WmiObject -ComputerName {quote(pc)} Win32_ComputerSystem -EA Stop;$d=Get-WmiObject -ComputerName {quote(pc)} Win32_LogicalDisk -Filter 'DeviceID=\"C:\"';[pscustomobject]@{{Wmi=$true;FreeGB=[math]::Round($d.FreeSpace/1GB,1);LoggedOn=$c.UserName}}|ConvertTo-Json -Compress")
-        data=json.loads(raw);result.update(wmi=bool(data.get('Wmi')),free_gb=data.get('FreeGB'),logged_on=data.get('LoggedOn') or '')
-    except Exception as exc:result['wmi_error']=str(exc)
-    return result
-
-
 
 @app.get('/api/daas/status')
 def daas_status():
@@ -510,7 +581,7 @@ def daas_machines_batch(request:DaaSMachineBatch):
 def active_deployments():
     active_states={'queued','running','launched','monitoring','paused'}
     deployments=[]
-    for job_id,job_data in list(jobs.items()):
+    for job_id,job_data in [(k,job_service.snapshot(jobs,k)) for k in list(jobs)]:
         state=job_data.get('state','unknown')
         if state not in active_states:continue
         events=job_data.get('events',[])
@@ -521,7 +592,7 @@ def active_deployments():
             'events':events[-200:],
             'last_message':events[-1].get('message','') if events else '',
         })
-    for queue_id,queue_data in list(queue_jobs.items()):
+    for queue_id,queue_data in [(k,job_service.snapshot(queue_jobs,k)) for k in list(queue_jobs)]:
         state=queue_data.get('state','unknown')
         if state not in active_states:continue
         items=[]
@@ -547,63 +618,6 @@ def recent_deployments():
             'last_message':events[-1].get('message','') if events else ''
         })
     return {'deployments':result}
-
-
-
-@app.get('/api/v28/health/{pc}')
-def v28_target_health(pc:str):
-    pc=validate_pc(pc)
-    result={'computer':pc,'ping':run(['ping.exe','-n','1','-w','1200',pc],False).returncode==0,'c_share':os.path.isdir(unc(pc)),'wmi':False,'free_gb':None,'logged_on':'','last_boot':'','uptime_seconds':None}
-    try:
-        raw=ps(f"$o=Get-WmiObject -ComputerName {quote(pc)} Win32_OperatingSystem -EA Stop;$c=Get-WmiObject -ComputerName {quote(pc)} Win32_ComputerSystem -EA Stop;$d=Get-WmiObject -ComputerName {quote(pc)} Win32_LogicalDisk -Filter 'DeviceID=\"C:\"';$b=$o.ConvertToDateTime($o.LastBootUpTime);[pscustomobject]@{{Wmi=$true;FreeGB=[math]::Round($d.FreeSpace/1GB,1);LoggedOn=$c.UserName;LastBoot=$b.ToString('yyyy-MM-dd HH:mm:ss');UptimeSeconds=[int]((Get-Date)-$b).TotalSeconds}}|ConvertTo-Json -Compress")
-        data=json.loads(raw);result.update(wmi=bool(data.get('Wmi')),free_gb=data.get('FreeGB'),logged_on=data.get('LoggedOn') or '',last_boot=data.get('LastBoot') or '',uptime_seconds=data.get('UptimeSeconds'))
-    except Exception as exc:result['wmi_error']=str(exc)
-    return result
-
-@app.get('/api/v28/software/{pc}')
-def v28_software_inventory(pc:str):
-    pc=validate_pc(pc)
-    # WMI StdRegProv. The WMI moniker and registry paths below deliberately use
-    # the exact single-backslash form that works in an interactive PowerShell test.
-    script="""$ErrorActionPreference='Stop'
-$computer=__PC__
-$hklm=[uint32]2147483650
-$provider=[wmiclass]("\\\\$computer\\root\\default:StdRegProv")
-$paths=@(
-  @{Path='SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall';Arch='x64'},
-  @{Path='SOFTWARE\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall';Arch='x86'}
-)
-$items=New-Object System.Collections.Generic.List[object]
-function Read-RegString([string]$subKey,[string]$valueName){
-  try{
-    $result=$provider.GetStringValue($hklm,$subKey,$valueName)
-    if($result.ReturnValue -eq 0){ return [string]$result.sValue }
-  }catch{}
-  return ''
-}
-foreach($source in $paths){
-  $enum=$provider.EnumKey($hklm,$source.Path)
-  if($enum.ReturnValue -ne 0 -or -not $enum.sNames){ continue }
-  foreach($subName in $enum.sNames){
-    $subKey=$source.Path+'\\'+$subName
-    $name=Read-RegString $subKey 'DisplayName'
-    if([string]::IsNullOrWhiteSpace($name)){ continue }
-    $items.Add([pscustomobject]@{
-      Name=$name
-      Version=Read-RegString $subKey 'DisplayVersion'
-      Publisher=Read-RegString $subKey 'Publisher'
-    })
-  }
-}
-@($items | Sort-Object Name,Version,Publisher -Unique) | ConvertTo-Json -Compress -Depth 3
-""".replace('__PC__',quote(pc))
-    try:
-        raw=ps(script,timeout=180)
-        data=json.loads(raw) if raw else []
-        if isinstance(data,dict):data=[data]
-        return {'computer':pc,'method':'WMI StdRegProv Core','collected_at':datetime.now().isoformat(sep=' ',timespec='seconds'),'count':len(data),'software':data}
-    except Exception as exc:
-        raise HTTPException(502,f'WMI software inventory failed: {exc}')
 
 
 

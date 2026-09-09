@@ -17,7 +17,10 @@ async function until(fn){for(let i=0;i<100;i++){if(fn())return;await sleep(30)}t
   if(modules.has(file))return modules.get(file);
   const promise=(async()=>{const mod=new vm.SourceTextModule(fs.readFileSync(file,'utf8'),{context,identifier:file});await mod.link(moduleFor);await mod.evaluate();return mod})();modules.set(file,promise);return promise;
  }
- vm.runInContext(fs.readFileSync(path.join(root,'frontend/assets/app.js'),'utf8'),context,{importModuleDynamically:moduleFor});
+ w.Headers=Headers;w.AbortController=AbortController;
+ for(const file of ['client.js','shared-ui.js'])vm.runInContext(fs.readFileSync(path.join(root,'frontend/assets',file),'utf8'),context);
+ vm.runInContext(require('./ui_fixture.cjs').consoleSource(),context,{importModuleDynamically:moduleFor});
+ vm.runInContext(fs.readFileSync(path.join(root,'frontend/assets/remote-software.js'),'utf8'),context);
  await until(()=>w.document.querySelector('#identity').textContent==='LOCAL UI TEST');
  await until(()=>w.document.querySelector('#pkg').value==='Example App');
  for(const page of ['admin','bulk','history','workspace']){w.document.querySelector(`[data-page="${page}"]`).click();assert(w.document.querySelector('#'+page).classList.contains('active'));assert(w.document.querySelector('#pageTitle').textContent.trim().length>0)}

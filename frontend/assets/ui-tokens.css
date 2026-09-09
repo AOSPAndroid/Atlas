@@ -1,0 +1,99 @@
+:root {
+  --atlas-accent: #0079a5;
+  --atlas-text: #173346;
+  --atlas-muted: #647887;
+  --atlas-line: #d4e1e8;
+  --atlas-radius: 12px;
+  --atlas-focus: #69b8da;
+  --atlas-surface: #fff;
+  --atlas-font: system-ui, sans-serif;
+}
+.atlas-person {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 14px;
+  background: var(--atlas-surface);
+  border: 1px solid var(--atlas-line);
+  border-radius: var(--atlas-radius);
+  padding: 16px;
+  color: var(--atlas-text);
+  font-family: var(--atlas-font);
+}
+.atlas-person h2 {
+  margin: 0 0 12px;
+  font-size: 18px;
+}
+.atlas-person .avatar {
+  display: grid;
+  place-items: center;
+  background: #e8f5fa;
+  border-radius: 10px;
+  width: 42px;
+  height: 42px;
+  color: var(--atlas-accent);
+}
+.atlas-person .facts,
+.atlas-person .detailgrid {
+  display: flex;
+  gap: 12px 20px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  color: var(--atlas-muted);
+}
+.atlas-person b {
+  display: block;
+  color: var(--atlas-text);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.atlas-person details {
+  margin-top: 12px;
+}
+.atlas-person summary {
+  cursor: pointer;
+  color: var(--atlas-accent);
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+.atlas-dialog {
+  width: min(760px, 94vw);
+  max-height: 85vh;
+  overflow: auto;
+  padding: 24px;
+  border: 1px solid var(--atlas-line);
+  border-radius: var(--atlas-radius);
+  color: var(--atlas-text);
+  background: var(--atlas-surface);
+  font: 14px/1.5 var(--atlas-font);
+}
+.atlas-dialog::backdrop {
+  background: #17334655;
+}
+.atlas-dialog > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.atlas-dialog pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.atlas-dialog button {
+  font: inherit;
+  border: 1px solid var(--atlas-line);
+  border-radius: 8px;
+  background: white;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+.atlas-dialog input {
+  font: inherit;
+  padding: 8px;
+  border: 1px solid var(--atlas-line);
+  border-radius: 8px;
+}
+.atlas-dialog :focus-visible {
+  outline: 3px solid var(--atlas-focus);
+  outline-offset: 2px;
+}

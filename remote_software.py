@@ -105,7 +105,7 @@ def verdict(result,kind,action='Uninstall'):
     return 'failed','Uninstaller returned '+ec+'. Inspect the operation log; vendor exit-code meanings can differ.'
 
 def register_remote_software(app,wmi,check_token):
-    scans={};plans={};unresolved={};mutex=threading.Lock()
+    scans={};plans={};mutex=threading.Lock()
     def prune():
         now=time.time()
         for pool in (scans,plans):
@@ -114,8 +114,10 @@ def register_remote_software(app,wmi,check_token):
     @app.post('/api/software-tools/inventory')
     def inventory(body:dict,request:Request):
         check_token(request);pc=wmi.validate_pc(body.get('computer',''))
+        if not wmi.job_service.inventory.acquire(blocking=False):raise HTTPException(429,'Three inventory scans are active; try again shortly.')
         try:data=remote_call(wmi,pc,include_cache=body.get('cache') is True,include_appx=body.get('appx') is True)
         except Exception as e:raise HTTPException(502,str(e))
+        finally:wmi.job_service.inventory.release()
         items=data.get('software') or []
         if isinstance(items,dict):items=[items]
         sid=data.get('operator_sid','');id=uuid.uuid4().hex
@@ -156,9 +158,10 @@ def register_remote_software(app,wmi,check_token):
             wmi.history_update(job,state=state,exit_code=str(data.get('exit_code')),finished=time.strftime('%Y-%m-%d %H:%M:%S'),details=details)
         except Exception as e:
             if isinstance(e,UnknownOutcome):
-                with mutex:unresolved[pc]=str(e)
-            wmi.emit(job,str(e),'failed')
-            wmi.history_update(job,state='failed',finished=time.strftime('%Y-%m-%d %H:%M:%S'),details=str(e))
+                wmi.job_service.unresolved.add(pc)
+            state='unknown' if isinstance(e,UnknownOutcome) else 'failed'
+            wmi.emit(job,str(e),state)
+            wmi.history_update(job,state=state,finished=time.strftime('%Y-%m-%d %H:%M:%S'),details=str(e))
         finally:guard.release()
     @app.post('/api/software-tools/uninstall')
     def uninstall(body:dict,request:Request):
@@ -167,15 +170,15 @@ def register_remote_software(app,wmi,check_token):
             prune();plan=copy.deepcopy(plans.get(body.get('plan')))
             if not plan or plan['scan'] not in scans:raise HTTPException(409,'Preview is stale or inventory was refreshed. Preview again.')
             if body.get('confirmation')!=plan['pc']:raise HTTPException(400,'Type the exact target hostname to confirm this action.')
-            if plan['pc'] in unresolved:raise HTTPException(409,'Previous outcome is unresolved: '+unresolved[plan['pc']])
+        wmi.job_service.target_ready(plan['pc'])
         guard=wmi.target_lock(plan['pc'])
         if not guard.acquire(blocking=False):raise HTTPException(409,'Another deployment or uninstall is active on this target.')
         job=uuid.uuid4().hex
         try:
             wmi.history_create(job,plan['pc'],plan['item']['Name'],plan['action'],plan['command'],'remote-uninstall')
-            wmi.jobs[job]={'state':'queued','events':[]}
+            wmi.jobs[job]={'state':'queued','target':plan['pc'],'events':[]}
             with mutex:plans.pop(body['plan'],None)
-            threading.Thread(target=worker,args=(job,plan,guard),daemon=True).start()
+            wmi.start_job(worker,job,plan,guard)
         except Exception:
             guard.release();raise
         return {'job':job,'computer':plan['pc']}
