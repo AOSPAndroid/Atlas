@@ -1,14 +1,9 @@
-OFFICE ATLAS 6.7 - shared read-only viewer
-See README.md for dual-server startup and network access.
-
-OFFICE ATLAS 6.6 - detailed maps
-See CHANGELOG-6.6.txt for map changes and upgrade instructions.
-
-OFFICE ATLAS 6.5 - conservative optimization
-See CHANGELOG-6.5.txt for changes, validation and upgrade instructions.
-
-VERSION 6.4: progressive machine health, specifications, relationship badges and script-name fix.
-See CHANGELOG-6.4.txt for upgrade instructions and limitations.
+ATLAS - DETAILED IT OPERATIONS AND IMPORT REFERENCE
+For current setup, startup, updates and supported features, read README.md first.
+Quick start: download the main branch ZIP, extract all files, install Python 3.12,
+run Install_Dependencies.bat, then run Start-Office-Atlas.bat.
+The versioned notes below describe when features were introduced. Historical
+startup, upgrade and rendering descriptions may have been superseded by README.md.
 
 V6.3 — SOFTWARE RIGHT-CLICK ACTIONS
 Open Installed software from Remote Admin or the existing machine menu.

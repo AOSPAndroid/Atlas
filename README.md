@@ -2,12 +2,23 @@
 
 Office maps, people, machines and IT administration. This repository is now a normal project tree: Python source, browser assets, floor plans, templates, tests and the existing database. No TXT-to-Python extraction is needed. Previous transfer packages remain in Git history.
 
-## Start on Windows
+## How to run (Windows)
 
-1. Clone this private repository or download and unzip it.
-2. Install Python 3.12. `Python_Settings.bat` detects it through `py -3.12`. To select another installed interpreter, set `WMI_PYTHON` to its full executable path.
-3. Run `Install_Dependencies.bat` once.
-4. Run **`Start-Office-Atlas.bat`**. It starts both servers and opens two browser tabs.
+### First-time setup
+
+1. On this GitHub repository, select the **main** branch, then **Code → Download ZIP**.
+2. Right-click the downloaded ZIP and choose **Extract All**. Open the extracted folder containing `Install_Dependencies.bat` and `Start-Office-Atlas.bat`. Keep all files and subfolders together and run the scripts from the extracted folder.
+3. Install **Python 3.12** if it is not already installed, including the Python launcher (`py`). `Python_Settings.bat` detects it through `py -3.12`. If your organisation provides Python elsewhere, set `WMI_PYTHON` to that interpreter's full executable path.
+4. Double-click **`Install_Dependencies.bat`**. Wait for **Dependencies installed** and press a key to close the window. This installs the Python packages listed in `requirements.txt` and needs access to your configured Python package index.
+5. Double-click **`Start-Office-Atlas.bat`**. It starts both the admin tool and the read-only viewer, then opens two browser tabs.
+
+**Normal startup: `Start-Office-Atlas.bat`.** Dependency installation is needed for the first setup, after changing Python, or when an update changes `requirements.txt`.
+
+Git and Node.js are not needed to run the downloaded application. The download includes the application, maps and initial directory database. Application installers used for deployment stay in your separate package repository; select its folder in admin **Settings** before deploying.
+
+If you already use Atlas, follow [Configuration and updates](#configuration-and-updates) to retain your live database and settings when updating.
+
+### Open and share Atlas
 
 | Interface | Address | Access |
 | --- | --- | --- |
@@ -16,9 +27,16 @@ Office maps, people, machines and IT administration. This repository is now a no
 
 Use the host computer's Wi-Fi/Ethernet IPv4 address in place of `YOUR-IP`. The launcher prints candidate addresses and saves them in `data/share-addresses.txt`. Share the address belonging to the network your colleagues use. The viewer requires only a browser, not Python or Windows elevation on their computers.
 
-**`Stop-Office-Atlas.bat` stops both servers.** Starting again reuses this folder's running servers. Occupied ports fail with an error rather than attaching to another installation. Closing a browser tab does not stop hosting.
+**`Stop-Office-Atlas.bat` stops both servers.** Finish active deployments before stopping. Starting again reuses this folder's running servers. Occupied ports fail with an error rather than attaching to another installation. Closing a browser tab does not stop hosting.
 
 To change ports, set `ATLAS_ADMIN_PORT` and `ATLAS_VIEWER_PORT` before launching; they must be different. Logs are in `logs/admin-startup.log` and `logs/viewer-startup.log`.
+
+### If startup fails
+
+- **Python 3.12 not found:** install Python 3.12 with the launcher, or configure `WMI_PYTHON` as described above.
+- **Dependency installation failed / Dependencies missing:** rerun `Install_Dependencies.bat` and check its error message; dependencies must be installed for the same Python that starts Atlas.
+- **Startup failed / port occupied:** check the startup log named in the error. If this folder has an unresponsive Atlas server, run `Stop-Office-Atlas.bat` before starting again. If another application uses the port, choose different Atlas ports.
+- **Browser tabs did not open:** try `http://127.0.0.1:8770` for admin or `http://127.0.0.1:8771` for the viewer after a successful startup.
 
 ## One command palette across Atlas, the IT console and the shared viewer
 
