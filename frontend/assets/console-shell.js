@@ -556,6 +556,8 @@ async function runInitialSharedCommand(params) {
   await runSharedCommand(id);
 }
 async function runSharedCommand(id) {
+  if (id === "animations")
+    return document.querySelector(".atlas-motion-toggle input").click();
   const { MAP_COMMANDS, commandUrl } = await import("/command-registry.js");
   if (MAP_COMMANDS.has(id)) {
     location.assign(commandUrl(id, S.target));
@@ -638,6 +640,7 @@ async function runSharedCommand(id) {
     }
   };
   const actions = {
+    lookup: () => focus("#search"),
     recovery: recover,
     workspace: () => page("workspace"),
     admin: () => page("admin"),

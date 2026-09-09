@@ -2310,21 +2310,41 @@ function renderPlan() {
 setFloor(2);
 setView(view);
 
-if (!readOnly) {
+{
   const { installCommandPalette } = await import("./command-palette.js");
-  const { commandUrl, MAP_COMMANDS } = await import("./command-registry.js");
+  const { commandUrl, MAP_COMMANDS, COMMANDS } =
+    await import("./command-registry.js");
+  const viewerHelp = () => {
+    const { body } = AtlasUI.dialog("Keyboard shortcuts");
+    body.innerHTML =
+      "<p><kbd>Ctrl+K</kbd> / <kbd>Cmd+K</kbd> — Search Atlas</p><p><kbd>/</kbd> — Focus map search</p><p><kbd>Enter</kbd> — Locate a search result</p><p><kbd>↑</kbd> <kbd>↓</kbd> — Navigate palette results</p><p><kbd>Esc</kbd> — Close a dialog</p><p>Use person:, machine:, desk: or &gt; to narrow palette results.</p>";
+  };
   const handlers = {
-    atlas: () => {},
+    atlas: () =>
+      document.querySelector("#viewport").scrollIntoView({ block: "nearest" }),
+    lookup: () =>
+      readOnly
+        ? operations.openLookup()
+        : location.assign(commandUrl("lookup")),
     catalogue: () => $("#ops-catalog").click(),
     settings: () => $("#ops-settings").click(),
     database: () => location.assign("/manage-database"),
     view: () => $("#three-d-toggle").click(),
     reset: () => $("#reset").click(),
     refresh: () => location.reload(),
+    export: () => $("#export").click(),
+    animations: () =>
+      document.querySelector(".atlas-motion-toggle input").click(),
+    ...(readOnly ? { shortcuts: viewerHelp } : {}),
   };
   const runCommand = (id) => {
-    if (handlers[id]) handlers[id]();
-    else
+    if (
+      readOnly &&
+      !COMMANDS.some((command) => command.id === id && command.viewer)
+    )
+      return;
+    if (handlers[id]) return handlers[id]();
+    if (!readOnly)
       location.assign(
         commandUrl(
           id,
@@ -2337,6 +2357,7 @@ if (!readOnly) {
       );
   };
   installCommandPalette({
+    readOnly,
     getRecords: () => records,
     onSelect: (id) => {
       $("#search").value = "";
@@ -2348,18 +2369,35 @@ if (!readOnly) {
     runCommand,
     triggerParent: document.querySelector(".header-right"),
     openPerson: (value) =>
-      location.assign("/installer?" + new URLSearchParams({ person: value })),
+      readOnly
+        ? operations.openPerson(value)
+        : location.assign(
+            "/installer?" + new URLSearchParams({ person: value }),
+          ),
     openMachine: (value) =>
-      location.assign("/installer?" + new URLSearchParams({ machine: value })),
+      readOnly
+        ? operations.openMachine(value)
+        : location.assign(
+            "/installer?" + new URLSearchParams({ machine: value }),
+          ),
   });
   const params = new URLSearchParams(location.search),
     desk = params.get("desk"),
     command = params.get("command");
   if (desk && records.some((r) => r.id === desk)) selectRecord(desk);
-  if (command && MAP_COMMANDS.has(command)) {
+  if (
+    command &&
+    (readOnly
+      ? COMMANDS.some((c) => c.id === command && c.viewer)
+      : MAP_COMMANDS.has(command))
+  ) {
     const url = new URL(location.href);
     url.searchParams.delete("command");
     history.replaceState(null, "", url);
     runCommand(command);
   }
+  if (readOnly && params.get("person"))
+    operations.openPerson(params.get("person"));
+  else if (readOnly && params.get("machine"))
+    operations.openMachine(params.get("machine"));
 }

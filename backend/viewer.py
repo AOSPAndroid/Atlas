@@ -13,7 +13,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from directory_lookup import exact_users, linked_machines, search_directory, prepare_views
-from desk_directory import desk_context,person_desks
+from desk_directory import desk_context,person_desks,machine_context
 
 ROOT = Path(__file__).resolve().parent.parent
 from runtime_paths import database_path
@@ -39,7 +39,7 @@ async def read_only(request: Request, call_next):
     if request.method not in ('GET', 'HEAD'):
         return JSONResponse({'detail': 'This shared Atlas is read only. Changes and remote operations require the local admin version.'}, status_code=403)
     response = await call_next(request)
-    response.headers['Cache-Control'] = 'no-store' if request.url.path.startswith('/api/') or request.url.path=='/' else 'public, max-age=0, must-revalidate' if request.url.path.startswith('/api/') or request.url.path=='/' else 'public, max-age=0, must-revalidate'
+    response.headers['Cache-Control'] = 'no-store' if request.url.path.startswith('/api/') or request.url.path=='/' else 'public, max-age=0, must-revalidate'
     response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['Content-Security-Policy'] = "frame-ancestors 'self'"
     return response
@@ -95,6 +95,28 @@ def context(desk_id: str):
         return desk_context(con, desk)
 
 
+@app.get('/api/palette/person/{uid}')
+def palette_person(uid: str):
+    if not uid.startswith('id:') or not uid[3:].isdigit():
+        raise HTTPException(400, 'Select a directory result')
+    with connect() as con:
+        person = con.execute('select * from legacy_users where id=?', (int(uid[3:]),)).fetchone()
+        if not person:
+            raise HTTPException(404, 'Person not found')
+        return {'desks': person_desks(con, person)}
+
+
+@app.get('/api/machine/{computer}')
+def machine(computer: str):
+    if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]{0,63}', computer) or '..' in computer:
+        raise HTTPException(400, 'Invalid computer name')
+    with connect() as con:
+        result = machine_context(con, computer)
+        if result is None:
+            raise HTTPException(404, 'Machine not found in directory')
+        return result
+
+
 @app.get('/')
 def home():
     html = (ATLAS / 'official-index.html').read_text(encoding='utf-8')
@@ -112,7 +134,7 @@ def shared_asset(filename:str):
 
 @app.get('/{filename}')
 def asset(filename: str):
-    allowed = {'official-app.js','camera-motion.js', 'official-data.json', 'official.css', 'style.css', 'operations.css', 'viewer.js', 'viewer.css'}
+    allowed = {'command-palette.js', 'command-palette.css', 'command-registry.js', 'official-app.js','camera-motion.js', 'official-data.json', 'official.css', 'style.css', 'operations.css', 'viewer.js', 'viewer.css'}
     if filename not in allowed and not re.fullmatch(r'(official-floor-(-1|[0-8])\.(jpg|pdf)|studio-floor-(-1|[0-8])\.svg)', filename):
         raise HTTPException(404, 'Not available in the shared viewer')
     return FileResponse(ATLAS / filename)

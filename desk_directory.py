@@ -76,3 +76,19 @@ def person_desks(c, person, suggestions=True):
     key = name_key(person['full_name'])
     linked = dict(c.execute('select desk_id,user_key from desk_user_links'))
     return [{'id':desk['id'],'floor':desk['floor'],'match':'matching name; account not confirmed'} for (body,) in c.execute('select body from official_records') for desk in [json.loads(body)] if desk.get('occupancy')!='vacant' and key and name_key(desk['name'])==key and desk['id'] not in linked]
+
+
+def machine_context(c, computer):
+    """Stored inventory and identity evidence only; never contacts a machine."""
+    machine = c.execute('select * from legacy_machines where name_norm=?', (computer.casefold().rstrip('.'),)).fetchone()
+    if machine is None:
+        return None
+    users = [dict(row) for row in c.execute("""select u.*,
+        max(a.relationship_type='assigned_to') as assigned_relationship,
+        max(a.relationship_type='last_logon_user') as logon_relationship
+        from assignments a join legacy_users u on u.id=a.user_id_ref
+        where a.machine_id=? group by u.id order by u.full_name,u.id""", (machine['id'],))]
+    desks = [{'id':r['id'], 'floor':r['floor'], 'match':'recorded at this desk'}
+             for (body,) in c.execute('select body from official_records')
+             for r in [json.loads(body)] if r.get('hostname','').casefold().rstrip('.') == machine['name'].casefold().rstrip('.')]
+    return {'machine':dict(machine), 'users':users, 'desks':desks}

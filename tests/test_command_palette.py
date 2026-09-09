@@ -21,9 +21,17 @@ class PaletteTests(unittest.TestCase):
    self.assertEqual(self.client.get(path).status_code,200)
   with TestClient(main.app,base_url='http://127.0.0.1',client=('192.0.2.10',12345)) as remote:
    self.assertEqual(remote.get('/api/palette/person/id:1').status_code,403)
- def test_viewer_does_not_expose_admin_palette(self):
+ def test_viewer_shares_palette_reads_without_admin_routes(self):
   with TestClient(viewer.app) as client:
-   for path in ('/command-palette.js','/command-palette.css','/command-registry.js','/api/palette/person/id:1'):
+   for path in ('/command-palette.js','/command-palette.css','/command-registry.js'):
+    self.assertEqual(client.get(path).status_code,200)
+   with main.db() as c:
+    person=c.execute('select id from legacy_users where canonical_key in (select user_key from desk_user_links where desk_id="04R024065")').fetchone()
+   path='/api/palette/person/id:'+str(person[0])
+   self.assertEqual(client.get(path).json(),self.client.get(path).json())
+   self.assertEqual(client.get('/api/palette/person/not-an-id').status_code,400)
+   self.assertEqual(client.get('/api/palette/person/id:999999999').status_code,404)
+   for path in ('/api/session','/operations.js','/installer','/api/preflight/PC1'):
     self.assertEqual(client.get(path).status_code,404)
 
 if __name__=='__main__':unittest.main()

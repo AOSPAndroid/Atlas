@@ -34,6 +34,16 @@ class ViewerTests(unittest.TestCase):
         for path in ['/api/preflight/PC','/api/overview/PC','/api/v28/software/PC','/api/access/PC','/api/backup','/api/package-script','/api/ops/settings','/installer','/manage-database','/office_atlas.db','/config.json','/api/docs','/openapi.json','/operations.js','/.git/config','/%2e%2e/config.json']:
             self.assertEqual(self.client.get(path).status_code,404,path)
         self.assertEqual(before,hashlib.sha256(self.db.read_bytes()).digest())
+    def test_machine_inspector_uses_stored_relationships_only(self):
+        before=hashlib.sha256(self.db.read_bytes()).digest()
+        with viewer.connect() as con:
+            row=con.execute("select m.machine_name from machines m where exists(select 1 from assignments a where a.machine_id=m.id) limit 1").fetchone()
+        response=self.client.get('/api/machine/'+row[0]);self.assertEqual(response.status_code,200)
+        data=response.json();self.assertEqual(data['machine']['name'],row[0]);self.assertTrue(data['users'])
+        self.assertIn('assigned_relationship',data['users'][0]);self.assertIn('logon_relationship',data['users'][0])
+        self.assertEqual(self.client.get('/api/machine/NO-SUCH-FIXTURE-MACHINE').status_code,404)
+        self.assertEqual(self.client.get('/api/machine/PC;BAD').status_code,400)
+        self.assertEqual(before,hashlib.sha256(self.db.read_bytes()).digest())
     def test_assets_and_untrusted_mode_override(self):
         home=self.client.get('/?mode=admin');self.assertIn('content="viewer"',home.text);self.assertNotIn('/assets/machine-health',home.text)
         for path in ['/viewer.js','/viewer.css','/official-app.js','/camera-motion.js','/official-data.json','/style.css','/operations.css','/official.css','/studio-floor-2.svg']:

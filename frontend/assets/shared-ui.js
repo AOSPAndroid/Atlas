@@ -105,7 +105,9 @@
     )}</div><div><h2>${esc(name)}</h2><div class="facts">${fields(facts)}</div><details class="details"><summary>Person details</summary><div class="detailgrid">${fields(details)}</div></details></div></div>`;
   }
   function dialog(title) {
-    const previous = document.activeElement,
+    const previous =
+        document.activeElement?.shadowRoot?.activeElement ||
+        document.activeElement,
       element = document.createElement("dialog");
     element.className = "atlas-dialog";
     element.setAttribute("aria-label", title);

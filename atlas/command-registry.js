@@ -27,8 +27,36 @@ const targeted = new Set([
   "software",
   "report",
 ]);
+const viewerCommands = new Set([
+  "atlas",
+  "lookup",
+  "view",
+  "reset",
+  "refresh",
+  "export",
+  "animations",
+  "shortcuts",
+]);
 // The single command catalogue used by the map and IT console.
 export const COMMANDS = [
+  [
+    "lookup",
+    "User & machine lookup",
+    "Find a colleague or stored machine record",
+    "directory person user computer lookup",
+  ],
+  [
+    "export",
+    "Export records",
+    "Download the map records",
+    "export download seating json",
+  ],
+  [
+    "animations",
+    "Toggle animations",
+    "Turn map and interface animations on or off",
+    "motion animation effects",
+  ],
   [
     "atlas",
     "Floor atlas",
@@ -166,7 +194,7 @@ export const COMMANDS = [
   [
     "shortcuts",
     "Keyboard shortcuts",
-    "View console keyboard shortcuts",
+    "View available keyboard shortcuts",
     "help shortcuts keyboard",
   ],
   [
@@ -184,6 +212,7 @@ export const COMMANDS = [
   shortcut: shortcuts[id] || "",
   requiresTarget: targeted.has(id),
   handler: id,
+  viewer: viewerCommands.has(id),
 }));
 export const MAP_COMMANDS = new Set([
   "atlas",
@@ -193,6 +222,8 @@ export const MAP_COMMANDS = new Set([
   "view",
   "reset",
   "refresh",
+  "export",
+  "animations",
 ]);
 export function commandUrl(id, target = "") {
   if (!COMMANDS.some((c) => c.id === id)) throw Error("Unknown Atlas command");

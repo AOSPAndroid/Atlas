@@ -24,6 +24,7 @@ export function installCommandPalette({
   prepare,
   triggerParent,
   replaceTrigger,
+  readOnly = false,
 }) {
   const mount = document.createElement("span");
   mount.className = "atlas-palette-mount";
@@ -56,7 +57,10 @@ export function installCommandPalette({
     previousFocus;
   const openConsole = (key, value) =>
     key === "person" ? openPerson(value) : openMachine(value);
-  const actions = COMMANDS.map((a) => ({ ...a, run: () => runCommand(a.id) }));
+  const actions = COMMANDS.filter((a) => !readOnly || a.viewer).map((a) => ({
+    ...a,
+    run: () => runCommand(a.id),
+  }));
   function invalidate() {
     generation++;
     clearTimeout(timer);
@@ -135,7 +139,7 @@ export function installCommandPalette({
             }))
             .concat({
               kind: "Person",
-              title: "Open person in IT console",
+              title: "Open person details",
               detail: row.title,
               run: () => openConsole("person", row.person),
             }),
