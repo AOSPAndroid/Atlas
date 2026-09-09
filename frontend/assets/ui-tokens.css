@@ -161,15 +161,61 @@ html[data-atlas-motion="reduce"] *::after {
   transition: none !important;
   scroll-behavior: auto !important;
 }
-.atlas-motion-select {
+.atlas-motion-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+  white-space: nowrap;
   font: 12px var(--atlas-font);
   color: var(--atlas-text);
   background: var(--atlas-surface);
   border: 1px solid var(--atlas-line);
   border-radius: var(--atlas-radius);
   padding: 9px 8px;
-  max-width: 150px;
+  min-height: 38px;
   cursor: pointer;
+}
+.atlas-motion-toggle input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+}
+.atlas-motion-track {
+  width: 36px;
+  height: 22px;
+  flex-shrink: 0;
+  border-radius: 20px;
+  position: relative;
+  background: #93a4af;
+  transition: background-color var(--atlas-motion-fast);
+}
+.atlas-motion-track::after {
+  content: "";
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  top: 2px;
+  left: 2px;
+  border-radius: 50%;
+  background: white;
+  transition: transform var(--atlas-motion-fast);
+}
+.atlas-motion-toggle input:checked + .atlas-motion-track {
+  background: var(--atlas-accent);
+}
+.atlas-motion-toggle input:checked + .atlas-motion-track::after {
+  transform: translateX(14px);
+}
+.atlas-motion-toggle input:focus-visible + .atlas-motion-track {
+  outline: 2px solid var(--atlas-accent);
+  outline-offset: 3px;
+}
+.atlas-motion-state {
+  min-width: 20px;
+  color: var(--atlas-muted);
 }
 .view-switch {
   display: flex;

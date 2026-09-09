@@ -47,9 +47,9 @@ const { fixture, root } = require("./ui_fixture.cjs");
     "System respects reduced motion",
   );
   w.AtlasUI.motion.install(w.document.body);
-  const motionControl = w.document.querySelector(".atlas-motion-select");
-  motionControl.value = "full";
-  motionControl.onchange();
+  const motionControl = w.document.querySelector(".atlas-motion-toggle input");
+  assert.equal(motionControl.checked, false);
+  motionControl.click();
   assert.equal(
     w.AtlasUI.motion.isReduced(),
     false,
@@ -178,11 +178,10 @@ const { fixture, root } = require("./ui_fixture.cjs");
 
   t.selectRecord(people[0].id);
   const reducedGoal = t.focusTarget(people[0]);
-  motionControl.value = "reduce";
-  motionControl.onchange();
+  motionControl.click();
   assert(
-    [...w.document.querySelectorAll(".atlas-motion-select")].every(
-      (el) => el.value === "reduce",
+    [...w.document.querySelectorAll(".atlas-motion-toggle input")].every(
+      (el) => !el.checked,
     ),
   );
   close(t.state(), reducedGoal);
@@ -196,9 +195,19 @@ const { fixture, root } = require("./ui_fixture.cjs");
   assert.equal(t.cameraMotion.active, false, "reduced motion is immediate");
   step(0);
   assert.equal(frames.size, 0);
-  motionControl.value = "system";
-  motionControl.onchange();
-  assert.equal(w.AtlasUI.motion.isReduced(), true, "System can be restored");
+  assert.equal(
+    w.localStorage.getItem("atlas-motion"),
+    "reduce",
+    "Off is remembered",
+  );
+  w.localStorage.setItem("atlas-motion", "full");
+  w.dispatchEvent(new w.StorageEvent("storage", { key: "atlas-motion" }));
+  assert(
+    [...w.document.querySelectorAll(".atlas-motion-toggle input")].every(
+      (el) => el.checked,
+    ),
+    "Switches follow changes in another tab",
+  );
   await new Promise(setImmediate);
   assert.equal(f.errors.length, 0, f.errors.join("\n"));
   w.close();

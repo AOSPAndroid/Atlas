@@ -13,8 +13,11 @@
     document.documentElement.dataset.atlasMotion = isReduced()
       ? "reduce"
       : "full";
-    document.querySelectorAll(".atlas-motion-select").forEach((el) => {
-      el.value = motionChoice;
+    document.querySelectorAll(".atlas-motion-toggle").forEach((el) => {
+      el.querySelector("input").checked = !isReduced();
+      el.querySelector(".atlas-motion-state").textContent = isReduced()
+        ? "Off"
+        : "On";
     });
     window.dispatchEvent(new Event("atlas-motion-change"));
   }
@@ -29,31 +32,33 @@
   });
   applyMotion();
   function motionControl(parent) {
-    if (!parent || parent.querySelector(".atlas-motion-select")) return;
-    const select = document.createElement("select");
-    select.className = "atlas-motion-select";
-    select.setAttribute("aria-label", "Animations");
-    select.title =
-      "Map and interface animations. System follows your accessibility preference.";
-    for (const [value, text] of [
-      ["system", "Motion: System"],
-      ["full", "Motion: On"],
-      ["reduce", "Motion: Off"],
-    ]) {
-      const option = document.createElement("option");
-      option.value = value;
-      option.textContent = text;
-      select.append(option);
-    }
-    select.value = motionChoice;
-    select.onchange = () => {
-      motionChoice = select.value;
+    if (!parent || parent.querySelector(".atlas-motion-toggle")) return;
+    const label = document.createElement("label");
+    label.className = "atlas-motion-toggle";
+    label.title = "Enable or disable map and interface animations.";
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.setAttribute("role", "switch");
+    input.setAttribute("aria-label", "Animations");
+    input.checked = !isReduced();
+    const track = document.createElement("span");
+    track.className = "atlas-motion-track";
+    track.setAttribute("aria-hidden", "true");
+    const text = document.createElement("span");
+    text.textContent = "Animations";
+    const state = document.createElement("span");
+    state.className = "atlas-motion-state";
+    state.setAttribute("aria-hidden", "true");
+    state.textContent = isReduced() ? "Off" : "On";
+    input.onchange = () => {
+      motionChoice = input.checked ? "full" : "reduce";
       try {
         localStorage.setItem(motionKey, motionChoice);
       } catch {}
       applyMotion();
     };
-    parent.append(select);
+    label.append(input, track, text, state);
+    parent.append(label);
   }
   const esc = (value) =>
     String(value ?? "").replace(
