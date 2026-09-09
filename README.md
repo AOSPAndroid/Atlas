@@ -1,18 +1,18 @@
 # Office Atlas + IT
 
-**[Download the latest complete Atlas package](Office-Atlas-Latest.txt)** · [Changelog](Office-Atlas-6.5-Changelog.txt) · [Demo](demo/) · [Old releases](old/)
+**[Download the latest complete Atlas package](Office-Atlas-Latest.txt)** · [Changelog](Office-Atlas-6.6-Changelog.txt) · [Demo](demo/) · [Old releases](old/)
 
-## Full IT application — version 6.5
+## Full IT application — version 6.6
 
 This is the complete Office Atlas toolbox. The previous filename, `Office-Atlas-IT-Software-Actions.txt`, referred to this same full package; it was not a separate software-only tool. References to that filename inside the 6.4 package and changelog still refer to this download.
 
-Version 6.5 fixes duplicate UI handlers, narrows UI observers, indexes exact directory searches, and restores progressive health in machine reports and the eight-day uptime warning. It retains machine specifications, Assigned / Last logged-on badges and the script-name fix.
+Version 6.6 adds detailed walls and 3D doors across all ten floors, name tags that follow camera movement, and map layer controls. It retains the 6.5 optimizations, machine specifications, user relationship badges and full editing and IT operations. Door angles illustrate the source plan; they are not live door states. Elevator area shading is annotated on Level 02.
 
-[Read the 6.5 changelog](Office-Atlas-6.5-Changelog.txt). The intermittent software-inventory issue is deferred.
+[Read the 6.6 changelog](Office-Atlas-6.6-Changelog.txt). The intermittent software-inventory issue is deferred.
 
 ## Download one file
 
-Download [Office-Atlas-Latest.txt](Office-Atlas-Latest.txt) using GitHub's raw-file download control. The complete file is **41,052,679 bytes**; no joining is required.
+Download [Office-Atlas-Latest.txt](Office-Atlas-Latest.txt) using GitHub's raw-file download control. The complete file is **43,080,806 bytes**; no joining is required.
 
 Enable filename extensions in Windows Explorer, rename the file to `Office-Atlas-Latest.py`, and run it with Python 3.12. Follow the extracted README and Python_Settings instructions to install dependencies and start the application. The extractor verifies the embedded files; it does not launch remote operations.
 
@@ -31,7 +31,7 @@ Python dependencies and external application installers are not embedded. Remote
 
 ## Integrity
 
-SHA-256: `6c494dfffb874de7c92c02d21cb3c21f7e9abf58c042ca5b98ce56cc3dd68ff9`
+SHA-256: `ff91711c3442bc15be39e4f4f9449d582f919bf13f1c843de11eac5ca2672675`
 
 This private bundle contains internal employee, machine and floor-plan data. Restrict repository access accordingly.
 
@@ -53,7 +53,7 @@ Validated extraction integrity, HTTP read-only boundaries, data pagination/relat
 
 ## Older full IT installations
 
-The script-name fix is included in version 6.5; a separate patch is not needed. [Atlas-Script-Names-Fix.txt](old/6.3/Atlas-Script-Names-Fix.txt) remains available for older full IT installations. The standalone demo is frozen and should not be patched.
+The script-name fix is included in version 6.6; a separate patch is not needed. [Atlas-Script-Names-Fix.txt](old/6.3/Atlas-Script-Names-Fix.txt) remains available for older full IT installations. The standalone demo is frozen and should not be patched.
 
 For upgrades, follow the changelog to preserve your database, Python path, repository configuration and any custom launcher settings. Live Windows hardware queries and full browser rendering remain to be validated in the target environment.
 
@@ -62,3 +62,5 @@ For upgrades, follow the changelog to preserve your database, Python path, repos
 Previous full IT releases are retained in [old](old/). Version [6.3](old/6.3/) includes its original package, README and script-name patch. Future releases should archive the outgoing version before replacing the current package.
 
 Version [6.4](old/6.4/) is also archived with its original package, changelog and README. The demo package is unchanged.
+
+Version [6.5](old/6.5/) is archived with its unchanged original package, changelog and README.

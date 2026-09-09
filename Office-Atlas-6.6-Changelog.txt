@@ -1,0 +1,25 @@
+OFFICE ATLAS 6.6 - Detailed maps across all floors
+
+- Detailed source-plan walls and partitions across all ten floors (-1 to 8).
+- Upright 3D door panels, frames and handles with floor-level swing arcs.
+- Walls, doors and elevator-highlight controls; no floating lift label.
+- Name tags follow desks during pan, zoom and rotation.
+- Bounded geometry caches; Level 02 opens by default.
+- Full editable application and existing IT operations retained.
+
+The map geometry is a visualization inferred from source-plan vectors. Door
+angles illustrate the plan and do not report live open/closed state.
+Elevator area shading is currently annotated on Level 02.
+
+UPGRADE
+Finish active jobs, back up the entire database and stop the old application.
+Extract this package into a new folder. Copy your full database backup over
+the seeded office_atlas.db and retain your Python_Settings/configuration.
+Keep the old installation until verified. No database migration is introduced.
+The standalone read-only demo remains unchanged.
+
+VALIDATION
+Embedded manifest and database integrity verified after extraction.
+All-floor geometry and JavaScript syntax checked. Official seating edit and
+conflict handling tested on a database copy. Existing backend code unchanged.
+Live Windows operations and browser rendering require target-machine validation.
