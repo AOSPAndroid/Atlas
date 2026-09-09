@@ -25,6 +25,14 @@ const assert=require('node:assert/strict');const {fixture}=require('./ui_fixture
  const healthCount=()=>calls.filter(url=>url.startsWith('/api/machine-health/PC-A/')).length;
  for(let i=0;i<2;i++){openMenu();const count=healthCount();menu.querySelector('[data-cmd="health"]').click();await sleep();await sleep();assert.equal(run('S.target'),'PC-A');assert.equal(healthCount()-count,8,'exactly one health pass, including after target change');assert(menu.classList.contains('hidden'))}
  for(const tool of ['rdp','compmgmt','eventvwr']){run("S.target='PC-B'");openMenu();const count=calls.length;menu.querySelector(`[data-cmd="${tool}"]`).click();await sleep();await sleep();assert.equal(run('S.target'),'PC-A');assert.deepEqual(calls.slice(count).filter(url=>url.startsWith('/api/open-tool/')),[`/api/open-tool/${tool}/PC-A`]);assert(menu.classList.contains('hidden'))}
+ // Deployment follows the target, retains form state and floats only in Workspace.
+ run('installDeploymentPanel()');const deployment=w.document.querySelector('#deploymentPanel'),deploymentToggle=w.document.querySelector('#deploymentToggle');
+ assert(deployment.hidden);assert(!deploymentToggle.hidden);const beforeExpand=calls.length;deploymentToggle.click();assert(!deployment.hidden);assert.equal(calls.length,beforeExpand);
+ w.document.querySelector('#pkgSearch').value='Retain this package filter';run("S.target='PC-B';syncDeploymentPanel()");assert(deploymentToggle.textContent.includes('PC-B'));assert.equal(w.document.querySelector('#pkgSearch').value,'Retain this package filter');
+ w.document.querySelector('#closeDeploymentPanel').click();assert(deployment.hidden);assert.equal(w.document.activeElement,deploymentToggle);
+ run("page('admin')");assert(deployment.hidden);assert(deploymentToggle.hidden);run("page('workspace')");assert(!deploymentToggle.hidden);
+ const matchMedia=w.matchMedia;w.matchMedia=()=>({matches:false});run('syncDeploymentPanel()');assert(!deployment.hidden);assert(deploymentToggle.hidden);run('clearLookup()');assert(deployment.hidden);assert(deploymentToggle.hidden);w.matchMedia=matchMedia;
+ run(`S.machines=${JSON.stringify([machine,{name:'PC-B'}])};renderMachines()`);
  const viewport={width:w.innerWidth,height:w.innerHeight};w.innerWidth=320;w.innerHeight=240;menu.getBoundingClientRect=()=>({width:304,height:224});openMenu();assert.equal(menu.style.left,'8px');assert.equal(menu.style.top,'8px');key('End');assert.equal(w.document.activeElement.dataset.cmd,'report');key('Escape');w.innerWidth=viewport.width;w.innerHeight=viewport.height;
  run('clearLookup()');hold=true;
  // Floating context follows scroll/selection without starting another health request.

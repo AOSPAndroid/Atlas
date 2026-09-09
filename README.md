@@ -57,6 +57,12 @@ The host must remain awake and network-reachable. Windows Firewall or your organ
 
 ## Machine details
 
+The console, map and shared viewer use the same Atlas header, blue eagle branding and sidebar dimensions. The console keeps its Workspace, Remote Admin, Bulk Deploy and History navigation below the header. Map import, export and database backup actions are grouped under **More**.
+
+Application deployment appears only after selecting a target. On larger screens its package selector stays beside the machine list as you scroll, with its own scroll area on short screens. On smaller screens, use the floating **Deployment · hostname** button to open or minimize the panel. The selected package and action remain in place when the panel is minimized; clearing the target hides it.
+
+**Package catalogue** opens the same dialog within the console or map, without navigating away. Browse packages, inspect scripts and edit display names or versions. Closing it returns to your current view and preserves the selected target and deployment form.
+
 In the IT console, scrolling past the full person card or live-health panel reveals a compact floating version above the machine list. The person card keeps name, account, email, team and office visible; health chips show the selected target's existing readings. Click either heading to return to the full panel. The cards disappear when their original panels return into view, the lookup is cleared, or you leave Workspace. Scrolling does not run additional health checks; refresh from the full health panel or the machine's right-click menu. Hover a health chip for the full reading and its check time.
 
 Right-click a linked machine to refresh health, open Remote Desktop, Computer Management or Event Viewer, or use the existing copy, remote assistance, file, deployment and inventory actions. Actions use the right-clicked machine. The menu stays within the screen and scrolls when needed; use the mouse wheel or arrow keys, Home/End to reach the first/last option, and Escape to close it. Remote tools use the host computer's current account and existing access permissions.
@@ -85,7 +91,7 @@ py -3.12 launcher.py stop
 
 `backend/main.py` hosts admin routes; `backend/viewer.py` hosts shared read routes; `directory_lookup.py` shares database-only lookup queries; `atlas/official-app.js` renders the common map; `atlas/viewer.js` provides read-only user and machine inspection.
 
-The test runner uses disposable database copies, starts isolated UI fixtures on ports 8892/8893, and runs 72 Python tests plus ten Node DOM suites. Remote operations are simulated. `npm run format:check` verifies formatting of the maintained browser sources.
+The test runner uses disposable database copies, starts isolated UI fixtures on ports 8892/8893, and runs 72 Python tests plus eleven Node DOM suites. Remote operations are simulated. `npm run format:check` verifies formatting of the maintained browser sources.
 
 ## Optimization changes
 

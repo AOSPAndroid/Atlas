@@ -20,6 +20,7 @@ function page(id) {
     else b.removeAttribute("aria-current");
   });
   if (id === "history") history();
+  syncDeploymentPanel();
 }
 async function init() {
   let h = await api("/api/health");
@@ -560,6 +561,7 @@ async function runInitialSharedCommand(params) {
 }
 async function runSharedCommand(id) {
   if (id === "animations") return AtlasUI.motion.toggle();
+  if (id === "catalogue") return openConsoleCatalogue();
   const { MAP_COMMANDS, commandUrl } = await import("/command-registry.js");
   if (MAP_COMMANDS.has(id)) {
     location.assign(commandUrl(id, S.target));
@@ -573,6 +575,7 @@ async function runSharedCommand(id) {
       return;
     }
     const control = document.querySelector(selector);
+    if (control?.closest("#deploymentPanel")) openDeploymentPanel();
     control?.scrollIntoView({ block: "center" });
     if (control && !control.matches("button,input,select,textarea,a"))
       control.tabIndex = -1;
@@ -651,8 +654,8 @@ async function runSharedCommand(id) {
     active: () => openDeploymentMonitor("active"),
     recent: () => openDeploymentMonitor("recent"),
     queue: () => document.querySelector("#queueDrawer").classList.add("open"),
-    deploy: () => focus("#deploy"),
-    copy: () => focus("#copyOnly"),
+    deploy: () => focus("#deploy", true),
+    copy: () => focus("#copyOnly", true),
     "queue-add": () => toolMenu("#targetActions", '[data-qol-action="queue"]'),
     msra: () => toolMenu("#targetTools", '[data-tool="msra"]'),
     cshare: () => toolMenu("#targetTools", '[data-tool="cshare"]'),
@@ -699,6 +702,9 @@ sharedPaletteReady = import("/command-palette.js").then(
 );
 document.addEventListener("DOMContentLoaded", () => {
   installSupportDock();
+  installDeploymentPanel();
+  $("#openCatalogue").onclick = () =>
+    openConsoleCatalogue().catch((e) => toast(e.message));
   (() => {
     const searchInput = document.getElementById("search");
     searchInput.disabled = false;

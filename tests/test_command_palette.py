@@ -17,7 +17,7 @@ class PaletteTests(unittest.TestCase):
   self.assertEqual(self.client.get('/api/palette/person/id:999999999').status_code,404)
   self.assertEqual(self.client.get('/api/palette/person/not-an-id').status_code,400)
  def test_admin_assets_and_remote_boundary(self):
-  for path in ('/command-palette.js','/command-palette.css','/command-registry.js'):
+  for path in ('/command-palette.js','/command-palette.css','/command-registry.js','/catalogue.js'):
    self.assertEqual(self.client.get(path).status_code,200)
   with TestClient(main.app,base_url='http://127.0.0.1',client=('192.0.2.10',12345)) as remote:
    self.assertEqual(remote.get('/api/palette/person/id:1').status_code,403)

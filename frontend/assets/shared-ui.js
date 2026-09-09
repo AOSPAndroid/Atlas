@@ -38,6 +38,41 @@
     } catch {}
     applyMotion();
   }
+  function installShell() {
+    const header = document.querySelector("body > .atlas-app-header");
+    if (!header) return;
+    const more = header.querySelector(".atlas-header-more");
+    if (more) {
+      document.addEventListener("click", (event) => {
+        if (!more.contains(event.target) || event.target.closest("button"))
+          more.open = false;
+      });
+      more.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          event.stopPropagation();
+          more.open = false;
+          more.querySelector("summary").focus();
+        }
+      });
+    }
+    const measure = () => {
+      const height = header.getBoundingClientRect().height;
+      if (height)
+        document.documentElement.style.setProperty(
+          "--atlas-header-height",
+          height + "px",
+        );
+      window.dispatchEvent(new Event("atlas-shell-resize"));
+    };
+    if (typeof ResizeObserver !== "undefined")
+      new ResizeObserver(measure).observe(header);
+    else window.addEventListener("resize", measure, { passive: true });
+    measure();
+  }
+  if (document.readyState === "loading")
+    document.addEventListener("DOMContentLoaded", installShell, { once: true });
+  else installShell();
   function motionControl(parent) {
     if (!parent || parent.querySelector(".atlas-motion-toggle")) return;
     const label = document.createElement("label");

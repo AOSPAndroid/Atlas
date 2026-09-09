@@ -4,6 +4,7 @@ function setTarget(pc, status = "") {
     .toUpperCase();
   if (!pc || pc === S.target) return;
   S.target = pc;
+  syncDeploymentPanel();
   $("#deployTarget").textContent = pc;
   $("#adminPc").value = pc;
   $("#barTarget").textContent = pc;
@@ -23,6 +24,7 @@ function clearLookup() {
   S.users = [];
   S.machines = [];
   S.target = "";
+  syncDeploymentPanel();
   daasState.user = null;
   daasUserKey = "";
   masterState.resolution = null;
@@ -162,7 +164,7 @@ function installSupportDock() {
     heading = dock.querySelector(".support-health-title"),
     metrics = dock.querySelector(".support-health-metrics");
   const back = (element) => {
-    element.style.scrollMarginTop = "16px";
+    element.style.scrollMarginTop = supportTop() + "px";
     element.scrollIntoView({
       block: "start",
       behavior: AtlasUI.motion.isReduced() ? "instant" : "smooth",
@@ -175,23 +177,31 @@ function installSupportDock() {
   let frame = 0,
     lastPerson = "",
     lastHealth = "";
+  const supportTop = () =>
+    Math.max(
+      0,
+      document.querySelector(".atlas-app-header")?.getBoundingClientRect()
+        .bottom || 0,
+    ) + 12;
   function update() {
     frame = 0;
-    const active = workspace.classList.contains("active");
+    const active = workspace.classList.contains("active"),
+      top = supportTop();
     const showPerson =
       active &&
       !!S.user &&
       !!user.firstElementChild &&
-      user.getBoundingClientRect().bottom <= 12;
+      user.getBoundingClientRect().bottom <= top;
     const showHealth =
       active &&
       !!S.target &&
       !health.classList.contains("hidden") &&
-      health.getBoundingClientRect().bottom <= 12;
+      health.getBoundingClientRect().bottom <= top;
     person.hidden = !showPerson;
     panel.hidden = !showHealth;
     dock.hidden = !showPerson && !showHealth;
     if (dock.hidden) return;
+    dock.style.top = top + "px";
     const bounds = column.getBoundingClientRect();
     dock.style.left = Math.max(8, bounds.left) + "px";
     dock.style.width = Math.min(bounds.width, window.innerWidth - 16) + "px";
@@ -222,6 +232,7 @@ function installSupportDock() {
   };
   window.addEventListener("scroll", schedule, { passive: true });
   window.addEventListener("resize", schedule, { passive: true });
+  window.addEventListener("atlas-shell-resize", schedule);
   const observer = new MutationObserver(schedule);
   for (const host of [user, health, $("#deployTarget")])
     observer.observe(host, {

@@ -60,7 +60,6 @@ export function createViewerOperations({ onSelect, toast }) {
   button.textContent = "User lookup";
   button.id = "viewer-lookup";
   document.querySelector(".header-right").prepend(button);
-  document.querySelector(".edition").textContent = "READ ONLY";
   document.querySelector(".empty-detail").innerHTML =
     '<span class="eyebrow">SHARED ATLAS</span><h2>Find a desk or colleague.</h2><p>Search people, machines and locations with Ctrl+K, or explore all ten floors.</p><small>Shared directory and inventory. Changes and elevated operations require the local admin version.</small>';
   function bindLinks(host) {

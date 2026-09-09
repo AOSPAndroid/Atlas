@@ -11,14 +11,21 @@
     <link rel="stylesheet" href="operations.css?v=1" />
     <link rel="stylesheet" href="official.css?v=66" />
     <link rel="stylesheet" href="/assets/machine-health.css" />
+    <link rel="stylesheet" href="/assets/atlas-shell.css" />
+    <link rel="stylesheet" href="/assets/catalogue.css" />
     <script src="/assets/machine-health.js"></script>
   </head>
   <body>
-    <header>
-      <a class="brand atlas-wordmark" href="./" aria-label="Atlas home"
-        >Atlas</a
+    <header class="atlas-app-header">
+      <a class="atlas-brand" href="./" aria-label="Atlas home"
+        ><img
+          src="/assets/barclays-eagle.svg"
+          alt=""
+          width="30"
+          height="32"
+        /><span>Atlas</span></a
       >
-      <div class="header-right">
+      <div class="header-right atlas-header-actions">
         <a class="atlas-return" href="/manage-database">Manage Database</a
         ><button id="ops-audit" hidden>Review previous mappings</button
         ><button id="ops-catalog">Package catalogue</button
@@ -30,13 +37,17 @@
           target="_blank"
           rel="noopener"
           >IT console ↗</a
-        ><button id="ops-import-atlas">Import previous seating .db</button
-        ><input id="ops-db-file" type="file" accept=".db,.sqlite" hidden /><span
-          class="edition"
-          >SEATING REGISTER</span
-        ><button id="export">Export records ↗</button
-        ><button id="import">Import records</button
-        ><input type="file" id="file" accept="application/json" hidden />
+        >
+        <details class="atlas-header-more">
+          <summary aria-label="More actions">More</summary>
+          <div id="atlasMoreActions" class="atlas-header-menu">
+            <button id="export">Export records ↗</button>
+            <button id="import">Import records</button>
+            <input type="file" id="file" accept="application/json" hidden />
+            <button id="ops-import-atlas">Import previous seating .db</button>
+            <input id="ops-db-file" type="file" accept=".db,.sqlite" hidden />
+          </div>
+        </details>
       </div>
     </header>
     <div class="workspace">
@@ -173,6 +184,6 @@
       </aside>
     </div>
     <div id="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="official-app.js?v=66"></script>
+    <script type="module" src="official-app.js?v=67"></script>
   </body>
 </html>

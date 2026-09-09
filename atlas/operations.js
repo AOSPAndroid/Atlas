@@ -1,3 +1,4 @@
+import { openCatalogue } from "./catalogue.js";
 const esc = (s) =>
   String(s ?? "").replace(
     /[&<>"']/g,
@@ -550,89 +551,12 @@ export function createOperations({
       body.textContent = e.message;
     }
   }
-  async function catalogue() {
-    const d = dialogShell("Package catalogue"),
-      body = d.querySelector(".ops-dialog-body");
-    body.innerHTML =
-      '<p class="ops-muted">Display names and versions are stored in the shared database. Package folders and scripts are unchanged.</p><label class="ops-label">Search applications<input id="catalog-search" placeholder="Name, version or folder"></label><p id="catalog-status"></p><div class="catalog-layout"><div id="catalog-list"></div><div id="catalog-detail"><p>Select a package to inspect scripts and local file availability.</p></div></div>';
-    let request = 0,
-      inspection = 0,
-      timer;
-    const list = async () => {
-      const v = ++request;
-      try {
-        const data = await api(
-          "/api/catalog?term=" +
-            encodeURIComponent(d.querySelector("#catalog-search").value),
-        );
-        if (!d.isConnected || v !== request) return;
-        d.querySelector("#catalog-status").textContent =
-          data.error ||
-          `${data.total} packages${data.truncated ? " · first 500 shown, refine search" : ""}`;
-        d.querySelector("#catalog-list").innerHTML = data.items
-          .map(
-            (p) =>
-              `<button data-catalog-folder="${esc(p.folder)}"><b>${esc(p.display_name)}</b><small>${esc(p.version || "Version not recorded")} · ${esc(p.folder)}</small></button>`,
-          )
-          .join("");
-        d.querySelectorAll("[data-catalog-folder]").forEach(
-          (b) => (b.onclick = () => inspect(b.dataset.catalogFolder)),
-        );
-      } catch (e) {
-        if (d.isConnected)
-          d.querySelector("#catalog-status").textContent = e.message;
-      }
-    };
-    const inspect = async (folder) => {
-      const v = ++inspection,
-        host = d.querySelector("#catalog-detail");
-      host.textContent = "Inspecting package file metadata…";
-      try {
-        const x = await api(
-          "/api/catalog/details?folder=" + encodeURIComponent(folder),
-        );
-        if (!d.isConnected || v !== inspection) return;
-        host.innerHTML = `<h3>${esc(x.display_name || folder)}</h3><p class="ops-muted">${esc(folder)}</p><p><b>${esc(x.availability)}</b> · ${x.files_checked} files checked</p><small>${esc(x.availability_note)}</small>${!x.complete ? '<p class="ops-error">Scan incomplete. Script lists may be partial.</p>' : ""}<p class="ops-muted">Checked ${esc(x.checked_at)}</p>${Object.entries(
-          x.scripts,
-        )
-          .map(
-            ([action, scripts]) =>
-              `<details open><summary>${action} (${scripts.length})</summary>${scripts.length ? `<ul>${scripts.map((s) => `<li><code>${esc(s)}</code></li>`).join("")}</ul>` : '<p class="ops-muted">No matching script found.</p>'}</details>`,
-          )
-          .join(
-            "",
-          )}<form id="catalog-edit"><label class="ops-label">Application name<input name="display_name" maxlength="160" required value="${esc(x.display_name || folder)}"></label><label class="ops-label">Version<input name="version" maxlength="80" value="${esc(x.version || "")}" placeholder="Leave blank if unknown"></label><button class="primary">Save catalogue details</button><p id="catalog-message"></p></form>`;
-        host.querySelector("form").onsubmit = async (e) => {
-          e.preventDefault();
-          const form = e.target;
-          try {
-            await api("/api/catalog/metadata", {
-              method: "POST",
-              body: JSON.stringify({
-                folder,
-                display_name: form.elements.display_name.value,
-                version: form.elements.version.value,
-                revision: x.revision,
-              }),
-            });
-            await list();
-            await inspect(folder);
-            if (current) loadPackages(generation);
-            toast("Catalogue details saved");
-          } catch (e) {
-            host.querySelector("#catalog-message").textContent = e.message;
-          }
-        };
-      } catch (e) {
-        if (d.isConnected && v === inspection) host.textContent = e.message;
-      }
-    };
-    d.querySelector("#catalog-search").oninput = () => {
-      clearTimeout(timer);
-      timer = setTimeout(list, 200);
-    };
-    list();
-  }
+  const catalogue = () =>
+    openCatalogue({
+      api,
+      toast,
+      onSave: () => (current ? loadPackages(generation) : undefined),
+    });
   async function settings() {
     try {
       const d = await api("/api/ops/settings");

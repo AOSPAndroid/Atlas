@@ -40,7 +40,7 @@ def main():
                         time.sleep(.1)
                 else:
                     raise RuntimeError(f'{script} startup timed out')
-            for script in ['shared_palette_dom', 'console_dom', 'installer_frontend_regression',
+            for script in ['shared_palette_dom', 'console_dom', 'installer_frontend_regression', 'catalogue_dom',
                            'remote_software_dom', 'machine_health_dom', 'optimization_dom',
                            'render_cache', 'map_motion', 'viewer_dom', 'seating_excel_dom']:
                 run('node', '--experimental-vm-modules', f'tests/{script}.cjs', env=env)
@@ -48,7 +48,7 @@ def main():
             for child in children:
                 child.terminate()
                 child.wait(timeout=10)
-    print('PASS: Python and all ten browser regression suites.')
+    print('PASS: Python and all eleven browser regression suites.')
 
 
 if __name__ == '__main__':

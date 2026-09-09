@@ -945,7 +945,7 @@ backup.onclick = () => {
   if (databaseReady) window.location.href = "/api/backup";
   else toast("Launch the Python app to back up its database");
 };
-if (!readOnly) document.querySelector(".header-right").append(backup);
+if (!readOnly) document.querySelector("#atlasMoreActions").append(backup);
 const refresh = document.createElement("button");
 refresh.textContent = "Refresh records";
 refresh.onclick = () => window.location.reload();

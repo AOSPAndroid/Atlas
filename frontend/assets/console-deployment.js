@@ -1,3 +1,64 @@
+let deploymentExpanded = false;
+function syncDeploymentPanel() {
+  const workspace = $("#workspace"),
+    panel = $("#deploymentPanel"),
+    toggle = $("#deploymentToggle");
+  if (!workspace || !panel || !toggle) return;
+  const available = !!S.target && workspace.classList.contains("active"),
+    compact = window.matchMedia("(max-width: 1279px)").matches;
+  if (!available) deploymentExpanded = false;
+  workspace.classList.toggle("has-target", !!S.target);
+  panel.hidden = !available || (compact && !deploymentExpanded);
+  toggle.hidden = !available || !compact;
+  toggle.textContent = "Deployment · " + S.target;
+  toggle.setAttribute("aria-expanded", String(!panel.hidden));
+}
+function openDeploymentPanel() {
+  if (!S.target) return toast("Select a target first");
+  deploymentExpanded = true;
+  syncDeploymentPanel();
+}
+function installDeploymentPanel() {
+  $("#deploymentToggle").onclick = () => {
+    deploymentExpanded = !deploymentExpanded;
+    syncDeploymentPanel();
+    if (deploymentExpanded) $("#pkgSearch").focus({ preventScroll: true });
+  };
+  $("#closeDeploymentPanel").onclick = () => {
+    deploymentExpanded = false;
+    syncDeploymentPanel();
+    $("#deploymentToggle").focus({ preventScroll: true });
+  };
+  $("#deploymentPanel").addEventListener("keydown", (event) => {
+    if (
+      event.key === "Escape" &&
+      window.matchMedia("(max-width: 1279px)").matches
+    ) {
+      event.stopPropagation();
+      $("#closeDeploymentPanel").click();
+    }
+  });
+  window.addEventListener("resize", syncDeploymentPanel, { passive: true });
+  syncDeploymentPanel();
+}
+async function openConsoleCatalogue() {
+  const { openCatalogue } = await import("/catalogue.js");
+  return openCatalogue({
+    api,
+    toast,
+    onSave: async (metadata) => {
+      for (const option of document.querySelectorAll(
+        "#pkg option, #bulkPkg option",
+      )) {
+        if (option.value === metadata.folder)
+          option.textContent =
+            metadata.display_name.trim() +
+            (metadata.version.trim() ? " · " + metadata.version.trim() : "");
+      }
+      await refreshConsolePackage();
+    },
+  });
+}
 async function packages() {
   const request = packageRequest();
   try {

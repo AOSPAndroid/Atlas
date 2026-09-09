@@ -4,7 +4,7 @@
   "scripts": {
     "test:palette": "node --experimental-vm-modules tests/shared_palette_dom.cjs",
     "test": "py -3.12 -X utf8 tests/run_all.py",
-    "format:check": "prettier --check \"frontend/assets/*.js\" \"frontend/*.html\" atlas/official-app.js atlas/camera-motion.js atlas/official.css atlas/official-index.html atlas/operations.js atlas/viewer.js atlas/viewer.css atlas/command-palette.js atlas/command-registry.js atlas/command-palette.css frontend/assets/atlas-theme.css frontend/assets/ui-tokens.css"
+    "format:check": "prettier --check \"frontend/assets/*.js\" \"frontend/*.html\" atlas/official-app.js atlas/camera-motion.js atlas/official.css atlas/official-index.html atlas/operations.js atlas/catalogue.js atlas/viewer.js atlas/viewer.css atlas/command-palette.js atlas/command-registry.js atlas/command-palette.css frontend/assets/atlas-theme.css frontend/assets/ui-tokens.css frontend/assets/atlas-shell.css frontend/assets/catalogue.css"
   },
   "devDependencies": {
     "acorn": "^8.18.0",

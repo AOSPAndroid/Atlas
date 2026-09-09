@@ -9,13 +9,29 @@
     <title>Atlas · IT Console</title>
     <link rel="stylesheet" href="/assets/atlas-theme.css" />
     <link rel="stylesheet" href="/assets/machine-health.css" />
+    <link rel="stylesheet" href="/assets/atlas-shell.css" />
+    <link rel="stylesheet" href="/assets/catalogue.css" />
     <script src="/assets/machine-health.js"></script>
   </head>
-  <body class="minimal-ui simple-dark-ui">
-    <aside>
-      <div class="brand">
-        <span class="brand-copy"><b>Atlas</b><small>IT CONSOLE</small></span>
+  <body class="minimal-ui simple-dark-ui atlas-console">
+    <header class="atlas-app-header">
+      <a class="atlas-brand" href="/" aria-label="Atlas home"
+        ><img
+          src="/assets/barclays-eagle.svg"
+          alt=""
+          width="30"
+          height="32"
+        /><span>Atlas</span></a
+      >
+      <div class="header-actions atlas-header-actions">
+        <a class="atlas-return" href="/manage-database">Manage Database</a>
+        <button id="openCommands">Commands <kbd>Ctrl K</kbd></button>
+        <button id="openShortcuts">Shortcuts <kbd>?</kbd></button>
+        <button id="openCatalogue">Package catalogue</button>
+        <a class="atlas-return" href="/">Floor map</a>
       </div>
+    </header>
+    <aside class="console-sidebar">
       <div>
         <p class="nav-section">Operations</p>
         <nav aria-label="IT console navigation">
@@ -35,6 +51,7 @@
         </nav>
       </div>
       <div class="sidebar-status">
+        <code id="identity"></code>
         <div id="health"></div>
         <div id="dbFreshness" class="db-freshness"></div>
         <div id="daasStatus" class="daas-status"></div>
@@ -42,31 +59,12 @@
       </div>
     </aside>
     <main>
-      <header>
+      <div class="console-page-heading">
         <div>
           <h1 id="pageTitle">Workspace</h1>
           <p>Europe-wide directory · Paris floor map</p>
         </div>
-        <div class="header-actions">
-          <a class="atlas-return" href="/manage-database">Manage Database</a
-          ><button id="openCommands">Commands <kbd>Ctrl K</kbd></button
-          ><button id="openShortcuts">Shortcuts <kbd>?</kbd></button
-          ><a
-            class="atlas-return"
-            href="/?catalog=1"
-            target="_blank"
-            rel="noopener"
-            >Package catalogue</a
-          ><a class="atlas-return" href="/">← Floor atlas</a
-          ><button
-            id="themeToggle"
-            class="icon-button"
-            title="Toggle light/dark theme"
-          >
-            ◐</button
-          ><code id="identity"></code>
-        </div>
-      </header>
+      </div>
       <div id="targetBar" class="targetbar hidden">
         <b id="barTarget"></b><span id="barState"></span
         ><button data-copy-target>Copy</button
@@ -134,7 +132,12 @@
             </p>
           </div>
         </div>
-        <div class="panel deployment-panel">
+        <div
+          id="deploymentPanel"
+          class="panel deployment-panel"
+          aria-label="Application deployment"
+          hidden
+        >
           <div class="head">
             <div>
               <small
@@ -142,7 +145,15 @@
               >
               <h2>Target: <span id="deployTarget">no target</span></h2>
             </div>
-            <button id="favBtn">☆ Favourite</button>
+            <div class="deployment-heading-actions">
+              <button id="favBtn">☆ Favourite</button
+              ><button
+                id="closeDeploymentPanel"
+                aria-label="Minimize deployment panel"
+              >
+                −
+              </button>
+            </div>
           </div>
           <p class="panel-description">
             Choose a package and its action script, then deploy to the selected
@@ -183,6 +194,15 @@
           <pre id="log">Ready.</pre>
         </div>
       </section>
+      <button
+        id="deploymentToggle"
+        class="deployment-toggle"
+        aria-controls="deploymentPanel"
+        aria-expanded="false"
+        hidden
+      >
+        Deployment
+      </button>
       <section id="admin" class="page">
         <div class="panel">
           <small>REMOTE ADMIN</small>
