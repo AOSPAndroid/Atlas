@@ -10,6 +10,7 @@ import tempfile
 from types import ModuleType
 import unittest
 from unittest.mock import patch
+import urllib.error
 
 from scripts import setup_assistant as installer
 
@@ -49,6 +50,9 @@ class AssistantSetup(unittest.TestCase):
             files.append({'path': name, 'size': len(content), 'sha256': sha256(content), 'assets': parts})
         self.manifest = {
             'schema': 1, 'id': 'atlas-qwen3-4b', 'name': 'Fixture model',
+            'upstream': 'onnx-community/Qwen3-4B-ONNX', 'revision': 'a'*40,
+            'license_source': {'upstream': 'Qwen/Qwen3-4B', 'revision': 'b'*40,
+                               'path': 'LICENSE', 'sha256': sha256(self.contents['LICENSE'])},
             'release_base': 'https://github.com/AOSPAndroid/BAtlas/releases/download/test-fixture',
             'runtime': 'onnxruntime-genai==0.15.2', 'files': files,
         }
@@ -71,8 +75,10 @@ class AssistantSetup(unittest.TestCase):
         self.manifest_path.write_text(json.dumps(self.manifest), encoding='utf-8')
 
     def run_setup(self, *arguments):
-        with patch.object(sys, 'argv', ['setup_assistant.py', *arguments]), redirect_stdout(io.StringIO()):
+        output = io.StringIO()
+        with patch.object(sys, 'argv', ['setup_assistant.py', *arguments]), redirect_stdout(output):
             installer.main()
+        return output.getvalue()
 
     def seed_marker(self):
         self.model.mkdir(exist_ok=True)
@@ -194,6 +200,99 @@ class AssistantSetup(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'pinned requirements'):
                 self.run_setup('--assets', str(self.assets))
         self.assertFalse(self.model.exists())
+        self.network.assert_not_called()
+
+    def test_private_release_404_falls_back_to_identical_pinned_whole_files(self):
+        self.cache.mkdir()
+        weight_entry = next(item for item in self.manifest['files'] if item['path'] == 'model.onnx.data')
+        for part in weight_entry['assets']:
+            cached = self.cache / part['name']
+            cached.write_bytes((self.assets / part['name']).read_bytes())
+            cached.with_suffix(cached.suffix+'.download').write_bytes(b'old partial download')
+        requests = []
+
+        def serve(request, **kwargs):
+            url = request.full_url
+            requests.append(url)
+            if url.startswith('https://github.com/'):
+                raise urllib.error.HTTPError(url, 404, 'Release requires access', {}, None)
+            entry = next(item for item in self.manifest['files'] if installer.upstream_url(self.manifest, item) == url)
+            response = io.BytesIO(self.contents[entry['path']])
+            response.status = 200
+            return response
+
+        with patch.object(installer.urllib.request, 'urlopen', side_effect=serve), patch.object(installer.time, 'sleep') as sleep:
+            output = self.run_setup()
+        self.assertEqual(sum(url.startswith('https://github.com/') for url in requests), 1)
+        self.assertEqual(len(requests), 1+len(self.contents))
+        self.assertIn('https://huggingface.co/Qwen/Qwen3-4B/resolve/'+'b'*40+'/LICENSE', requests)
+        self.assertIn('Release download requires access; using checksum-verified pinned upstream file', output)
+        sleep.assert_not_called()
+        for name, data in self.contents.items():
+            self.assertEqual((self.model / name).read_bytes(), data)
+        self.assertTrue((self.model / '.verified.json').is_file())
+        self.assertEqual(list(self.cache.iterdir()), [])
+
+    def test_access_errors_are_not_retried_and_corrupt_upstream_is_refused(self):
+        self.cache.mkdir()
+        entry = self.manifest['files'][0]
+        for code in (403, 404):
+            with self.subTest(code=code), patch.object(installer.urllib.request, 'urlopen',
+                    side_effect=urllib.error.HTTPError('https://github.com/fixture', code, 'Access denied', {}, None)) as request, \
+                    patch.object(installer.time, 'sleep') as sleep:
+                with self.assertRaises(urllib.error.HTTPError):
+                    installer.download('https://github.com/fixture', self.cache / entry['path'], entry)
+                self.assertEqual(request.call_count, 1)
+                sleep.assert_not_called()
+
+        calls = []
+
+        def corrupt(request, **kwargs):
+            calls.append(request.full_url)
+            if request.full_url.startswith('https://github.com/'):
+                raise urllib.error.HTTPError(request.full_url, 404, 'Access denied', {}, None)
+            response = io.BytesIO(b'x'*entry['size'])
+            response.status = 200
+            return response
+
+        self.seed_marker()
+        with patch.object(installer.urllib.request, 'urlopen', side_effect=corrupt), patch.object(installer.time, 'sleep'):
+            with self.assertRaisesRegex(ValueError, 'Checksum mismatch'):
+                self.run_setup()
+        self.assertEqual(sum(url.startswith('https://github.com/') for url in calls), 1)
+        self.assert_no_marker()
+        self.assertFalse((self.model / entry['path']).exists())
+        self.assertFalse((self.model / (entry['path']+'.installing')).exists())
+        self.assertFalse((self.model / (entry['path']+'.installing.download')).exists())
+
+    def test_transient_release_errors_do_not_use_upstream_fallback(self):
+        with patch.object(installer.urllib.request, 'urlopen', side_effect=urllib.error.HTTPError(
+                self.manifest['release_base'], 502, 'Temporary failure', {}, None)) as request, \
+                patch.object(installer.time, 'sleep'):
+            with self.assertRaises(urllib.error.HTTPError):
+                self.run_setup()
+        self.assertEqual(request.call_count, 3)
+        self.assertTrue(all(call.args[0].full_url.startswith('https://github.com/') for call in request.call_args_list))
+        self.assert_no_marker()
+
+    def test_upstream_fallback_sources_are_strictly_pinned_and_allowlisted(self):
+        cases = []
+        for field, value in [('upstream', 'other/model'), ('revision', 'main'),
+                             ('revision', '../'+('a'*40)), ('release_base', self.manifest['release_base']+'/../other')]:
+            manifest = copy.deepcopy(self.manifest)
+            manifest[field] = value
+            cases.append(manifest)
+        for field, value in [('upstream', 'other/license'), ('revision', 'main'),
+                             ('path', '../LICENSE'), ('sha256', '0'*64)]:
+            manifest = copy.deepcopy(self.manifest)
+            manifest['license_source'][field] = value
+            cases.append(manifest)
+        unknown = copy.deepcopy(self.manifest)
+        unknown['files'][0]['path'] = 'unlisted.onnx'
+        cases.append(unknown)
+        for manifest in cases:
+            with self.subTest(manifest=manifest), self.assertRaises(ValueError):
+                installer.validate_manifest(manifest)
         self.network.assert_not_called()
 
 

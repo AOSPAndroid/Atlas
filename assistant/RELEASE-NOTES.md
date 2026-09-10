@@ -6,6 +6,8 @@ The assistant explains existing information and offers IT troubleshooting guidan
 
 To install, download and extract the Atlas project, then run `Install_Atlas_Assistant.bat`. Setup installs the optional Python environment, downloads these model assets and verifies their SHA-256 checksums. Allow approximately **2.9 GB** for the model download, plus Python dependencies and temporary installation space. No cloud AI account or API key is required; answering questions works offline after setup.
 
+The Atlas repository can remain private. If GitHub release downloads require sign-in, setup retrieves the same files from their pinned public upstream revisions and verifies the same manifest checksums. You can also download the release assets through your signed-in browser and supply them locally. Setup does not read local GitHub credentials or change repository visibility.
+
 For an offline transfer, include all release assets and the required Python wheels in a `wheels` subfolder, then pass that folder to `Install_Atlas_Assistant.bat`. The model data is split into three parts to fit GitHub's per-file limit; the installer joins and verifies them automatically. GitHub's source-code ZIP contains the integration and installer; model weights are the separate assets attached to this release.
 
 The included `model-manifest.json` records every filename, size, checksum and upstream revision. The original model is licensed under **Apache 2.0**, with its complete license and Alibaba Cloud copyright notice included as `LICENSE`. License provenance is pinned separately because the ONNX export repository links to the original model but does not include its license file.

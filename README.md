@@ -212,14 +212,17 @@ One-time setup on **64-bit Windows with Python 3.12**:
 
 1. Download/extract the normal Atlas project and install its usual dependencies.
 2. Run **Install_Atlas_Assistant.bat**. This creates a separate `.venv-assistant`,
-   installs pinned CPU inference packages and downloads about **2.9 GB** from the
+   installs pinned CPU inference packages and downloads about **2.9 GB** using the
    [model release](https://github.com/AOSPAndroid/BAtlas/releases/tag/atlas-assistant-qwen3-4b-v1).
 3. Reopen Ask Atlas. The status should say the local model is ready.
 
 GitHub's source ZIP contains the integration and model manifest. Large weights
 are distributed as Release assets, with the main weight file split into three
 parts below GitHub's per-asset size limit. Setup verifies every part and each
-assembled file using SHA-256. No Git LFS or Hugging Face account is needed.
+assembled file using SHA-256. If the repository is private and GitHub requires
+sign-in, setup downloads the identical files from the pinned upstream model
+source and checks the same hashes. No Git LFS, GitHub token or Hugging Face
+account is needed for this fallback; repository visibility is unchanged.
 
 For an offline installation, copy all model release assets into a folder and
 put Windows/Python-compatible wheels for `requirements-assistant.txt` in its
