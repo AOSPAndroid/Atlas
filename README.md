@@ -1,6 +1,33 @@
 # Atlas 6.9.1
 
-Office maps, people, machines and IT administration. This repository is now a normal project tree: Python source, browser assets, floor plans, templates, tests and the existing database. No TXT-to-Python extraction is needed. Previous transfer packages remain in Git history.
+**One workspace to find people, locate equipment and get IT work done.**
+
+Atlas is a self-hosted Windows IT support and administration tool with a browser interface. It connects interactive office floor plans, directory users, machine inventory, application deployment and remote administration. Start with a colleague, a computer or a desk, then follow the links to the information and actions you need.
+
+The **map** helps you explore floors and seating in 2D or 3D. The **IT console** brings user lookup, linked machines, health checks and deployment into one workspace. Both share the same command palette, package catalogue and detail panels. A separate **read-only demo/viewer** lets colleagues browse maps and look up people and stored machine details from their own browsers.
+
+## What Atlas can do
+
+| Area | Capabilities |
+| --- | --- |
+| **Office maps** | Explore multiple floors in 2D and 3D, search desks and rooms, locate colleagues, and manage seating and directory links. |
+| **People and machines** | Search directory and inventory exports; inspect accounts, organisation details, assigned machines, last recorded users and original export fields. |
+| **Remote administration** | Check machine health and specifications, inspect software and resource usage, manage processes with confirmation, and open Windows support tools. Remote actions use the host account's existing permissions. |
+| **Application deployment** | Browse a package catalogue, select install/repair/uninstall scripts, deploy to individual targets or a bulk queue, and follow progress, logs and history. |
+| **Data management** | Preview and apply directory imports, review export-column coverage, maintain seating records, and back up or restore the database. |
+| **Shared viewer** | Host a separate read-only interface on the local network for maps, people lookup and stored inventory. Editing, deployment and elevated remote operations stay in the admin tool. |
+
+Atlas runs from Python source with FastAPI and SQLite; the interface uses HTML, CSS and JavaScript. The Windows launcher starts the local admin service and shared viewer together. Runtime records live in a persistent database, while deployment packages stay in your configured package repository.
+
+## Map previews
+
+These are screenshots of the Atlas renderer using **entirely fictional floors and sample desks**, with name tags disabled. They contain no real names, accounts, hostnames, IP addresses, seating assignments or office-plan geometry. The layouts illustrate the interface and are not the actual office floors.
+
+| 2D floor navigation | 3D floor exploration |
+| --- | --- |
+| ![Atlas 2D map with a fictional floor, sample desks and name tags disabled](docs/images/atlas-map-2d.jpg) | ![Atlas 3D map with a fictional floor, sample desks and name tags disabled](docs/images/atlas-map-3d.jpg) |
+
+[How the screenshots are produced](docs/images/README.md) · [How to run Atlas](#how-to-run-windows) · [Configuration and updates](#configuration-and-updates)
 
 ## How to run (Windows)
 
@@ -15,6 +42,8 @@ Office maps, people, machines and IT administration. This repository is now a no
 **Normal startup: `Start-Office-Atlas.bat`.** Dependency installation is needed for the first setup, after changing Python, or when an update changes `requirements.txt`.
 
 Git and Node.js are not needed to run the downloaded application. The download includes the application, maps and initial directory database. Application installers used for deployment stay in your separate package repository; select its folder in admin **Settings** before deploying.
+
+This is a normal project tree containing Python source, browser assets, floor plans, templates and tests. No TXT-to-Python extraction is needed.
 
 If you already use Atlas, follow [Configuration and updates](#configuration-and-updates) to retain your live database and settings when updating.
 
