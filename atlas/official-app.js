@@ -429,6 +429,7 @@ function search() {
 function setFloor(n, reset = true) {
   const changed = floor !== n;
   stopFocus();
+  cancelMapGesture();
   clearLocator();
   floor = n;
   const f = data.floors.find((x) => x.level === n);
@@ -780,6 +781,7 @@ $("#clear").onclick = () => {
 function setView(v, animate = false) {
   if (v !== "plan" && v !== "3d") v = "plan";
   stopFocus();
+  cancelMapGesture();
   if (v === "3d") init3d();
   if (v === "3d" && !glReady) {
     toast("3D unavailable on this device. Using the simple map.");
@@ -816,6 +818,7 @@ $("#three-d-toggle").onchange = (e) =>
   setView(e.target.checked ? "3d" : "plan", true);
 function resetCam(animate = true) {
   stopFocus();
+  cancelMapGesture();
   clearLocator();
   const goal = {
     yaw: view === "plan" ? 0 : -0.14,
@@ -969,6 +972,10 @@ const mapCursor = installMapCursor({
   viewport: $("#viewport"),
   canvases: [glCanvas, planCanvas],
 });
+let drag = null,
+  pinchDistance = 0,
+  draggedContext = false;
+const pointers = new Map();
 const ctx2d = planCanvas.getContext("2d");
 let gl = null,
   program,
@@ -1875,11 +1882,12 @@ function renderNames() {
       banner.append(actions);
     }
   }
-  $("#hint").textContent = hidden
-    ? `${hidden} more labels nearby · Zoom in to read them`
-    : view === "3d"
-      ? "Drag to orbit · Shift-drag to pan · Scroll to zoom"
-      : "Drag to pan · Scroll to zoom";
+  $("#hint").textContent =
+    view === "3d"
+      ? "Drag to move · Shift-drag to rotate / tilt · Scroll to zoom"
+      : hidden
+        ? `${hidden} more labels nearby · Zoom in to read them`
+        : "Drag to pan · Scroll to zoom";
   metrics.labelsMs = performance.now() - start;
 }
 
@@ -1889,12 +1897,23 @@ $("#map-labels").onclick = (e) => {
 };
 
 new ResizeObserver(() => draw()).observe($("#viewport"));
-let drag = null;
-const pointers = new Map();
-let pinchDistance = 0;
+function cancelMapGesture() {
+  drag = null;
+  pinchDistance = 0;
+  const captured = [...pointers.keys()];
+  pointers.clear();
+  for (const element of [glCanvas, planCanvas])
+    for (const pointerId of captured)
+      if (element.hasPointerCapture?.(pointerId))
+        element.releasePointerCapture(pointerId);
+  mapCursor.reset();
+}
 onMap("pointerdown", (e) => {
+  if (e.currentTarget !== canvas || e.button > 2 || pointers.size >= 2) return;
+  e.preventDefault();
   stopFocus();
   clearLocator();
+  draggedContext = false;
   mapCursor.set(canvas, placing ? "place" : "drag");
   canvas.setPointerCapture(e.pointerId);
   pointers.set(e.pointerId, [e.clientX, e.clientY]);
@@ -1904,18 +1923,26 @@ onMap("pointerdown", (e) => {
     drag = null;
     return;
   }
+  const rect = canvas.getBoundingClientRect(),
+    point = [e.clientX - rect.left, e.clientY - rect.top];
   drag = {
+    pointerId: e.pointerId,
     x: e.clientX,
     y: e.clientY,
+    point,
+    anchor: inversePoint(...point),
+    yaw: cam.yaw,
+    tilt: cam.tilt,
     moved: false,
-    shift: e.shiftKey,
+    orbit: view === "3d" && e.shiftKey && e.button === 0,
     button: e.button,
   };
 });
 onMap("pointermove", (e) => {
+  if (e.currentTarget !== canvas) return;
   if (pointers.has(e.pointerId))
     pointers.set(e.pointerId, [e.clientX, e.clientY]);
-  if (pointers.size === 2) {
+  if (pointers.size === 2 && pointers.has(e.pointerId)) {
     const p = [...pointers.values()],
       d = Math.hypot(p[0][0] - p[1][0], p[0][1] - p[1][1]);
     if (pinchDistance)
@@ -1924,25 +1951,28 @@ onMap("pointermove", (e) => {
     draw();
     return;
   }
-  if (drag) {
+  if (drag && drag.pointerId === e.pointerId) {
     const dx = e.clientX - drag.x,
       dy = e.clientY - drag.y;
-    if (Math.abs(dx) + Math.abs(dy) > 2) drag.moved = true;
-    if (view === "plan" || e.shiftKey || drag.button === 2) {
-      const rect = canvas.getBoundingClientRect(),
-        a = inversePoint(drag.x - rect.left, drag.y - rect.top),
-        b = inversePoint(e.clientX - rect.left, e.clientY - rect.top);
-      cam.cx += a[0] - b[0];
-      cam.cz += a[1] - b[1];
-    } else {
-      cam.yaw += dx * 0.006;
-      cam.tilt = Math.max(0.3, Math.min(1.48, cam.tilt + dy * 0.005));
+    if (Math.hypot(dx, dy) > 3) drag.moved = true;
+    if (!drag.moved) return;
+    if (drag.button === 2) draggedContext = true;
+    const rect = canvas.getBoundingClientRect();
+    if (drag.orbit) {
+      cam.yaw = drag.yaw + dx * 0.005;
+      cam.tilt = Math.max(0.3, Math.min(1.48, drag.tilt + dy * 0.004));
     }
-    drag.x = e.clientX;
-    drag.y = e.clientY;
+    // Move the grabbed floor point with the hand; rotation keeps that point
+    // at its original screen position instead of orbiting the map centre.
+    const point = drag.orbit
+      ? drag.point
+      : [e.clientX - rect.left, e.clientY - rect.top];
+    const current = inversePoint(...point);
+    cam.cx += drag.anchor[0] - current[0];
+    cam.cz += drag.anchor[1] - current[1];
     $("#hover").hidden = true;
     draw();
-  } else {
+  } else if (!pointers.size) {
     const r = hit(e),
       hover = $("#hover");
     hover.hidden = !r;
@@ -1958,10 +1988,14 @@ onMap("pointermove", (e) => {
   }
 });
 onMap("pointerup", async (e) => {
+  if (!pointers.has(e.pointerId)) return;
   pointers.delete(e.pointerId);
-  const clicked = drag && !drag.moved && drag.button === 0;
+  const clicked =
+    drag && !drag.moved && !drag.orbit && drag.button === 0 && e.button === 0;
   drag = null;
   pinchDistance = 0;
+  if (canvas.hasPointerCapture?.(e.pointerId))
+    canvas.releasePointerCapture(e.pointerId);
   mapCursor.set(canvas, placing ? "place" : hit(e) ? "hover" : "default");
   if (!clicked) return;
   if (placing) {
@@ -2000,14 +2034,15 @@ onMap("pointerup", async (e) => {
     if (r) selectRecord(r.id);
   }
 });
-onMap("pointercancel", (e) => {
-  pointers.delete(e.pointerId);
-  drag = null;
-  mapCursor.reset();
+onMap("pointercancel", cancelMapGesture);
+onMap("lostpointercapture", (e) => {
+  if (pointers.has(e.pointerId)) cancelMapGesture();
 });
+window.addEventListener("blur", cancelMapGesture);
 onMap("pointerleave", () => ($("#hover").hidden = true));
 onMap("contextmenu", (e) => {
   e.preventDefault();
+  if (draggedContext) return;
   const r = hit(e);
   if (r) deskMenu(e, r);
 });

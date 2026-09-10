@@ -139,6 +139,8 @@ The test runner uses disposable database copies, starts isolated UI fixtures on 
 
 ## Motion and map navigation
 
+Left-drag grabs and moves the map in both 2D and 3D, following the pointer at any zoom level. In 3D, hold **Shift** before dragging to rotate and tilt around the spot you grab. Scroll to zoom, or use the rotation and reset buttons. A simple click still selects a desk; right-click still opens its menu. Admin and demo share these controls.
+
 Search or select a person to glide to their desk with a brief location highlight. Longer moves pull back slightly before closing in, so the destination stays in context. Search groups are framed smoothly; zoom buttons, cursor-anchored wheel zoom, reset, and rotation share the same camera controller. Switching to 3D tilts the map into place, while floor changes fade in briefly.
 
 Palettes, dialogs, person cards, console pages, and drawers use the same short motion timings. Both the admin map and shared viewer receive the map effects. Dragging immediately cancels automatic movement; repeated searches replace the previous destination. The **Animations On/Off** switch is available beside the map view controls; use **Ctrl+K → Toggle animations** in the IT console. **Off** disables map movement and interface animations immediately; **On** enables them. Before you make a choice, Atlas follows your system reduced-motion preference. Your choice is saved for that browser and Atlas address; the viewer has its own preference. Changes apply immediately, including during a camera flight.
