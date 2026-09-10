@@ -1,8 +1,8 @@
 /* Bounded, read-only capture. Findings describe observations, not proven causes. */
 (() => {
   const duration = 60000,
-    interval = 4000,
-    maxSamples = 12;
+    interval = 10000,
+    maxSamples = 6;
   const number = (value) =>
     value == null || value === "" || !Number.isFinite(Number(value))
       ? null
@@ -79,41 +79,7 @@
       topCpu?.row,
     );
 
-    const excelGroups = new Map();
-    for (const sample of samples)
-      for (const row of sample.items || []) {
-        if (
-          !/^excel\.exe$/i.test(row.Process) ||
-          !row.CreatedAt ||
-          !known(row.BusiestThreadCPU) ||
-          !known(sample.summary?.cpu_percent)
-        )
-          continue;
-        const key = identity(row);
-        if (!excelGroups.has(key))
-          excelGroups.set(key, { row, eligible: [], hits: [] });
-        const group = excelGroups.get(key),
-          observation = { ...sample, thread: row };
-        group.eligible.push(observation);
-        if (row.BusiestThreadCPU >= 85 && sample.summary.cpu_percent < 70)
-          group.hits.push(observation);
-      }
-    const excel = [...excelGroups.values()]
-      .filter((g) => g.hits.length)
-      .sort((a, b) => b.hits.length - a.hits.length)[0];
-    if (excel)
-      add(
-        "excel",
-        "Excel has a busy CPU thread",
-        excel.eligible,
-        excel.hits,
-        `EXCEL.EXE (PID ${excel.row.PID}): its busiest thread reached ${fmt(Math.max(...excel.hits.map((s) => s.thread.BusiestThreadCPU)))} of one logical CPU while machine CPU stayed below 70% in these samples.`,
-        "A CPU bottleneck inside Excel is possible. Inspect threads, then distinguish workbook calculation, VBA and add-in work with a controlled reproduction or CPU trace. More RAM alone would not address this observation.",
-        95,
-        excel.row,
-      );
-
-    if (!excel) {
+    {
       const cores = cpu.filter((s) =>
         s.summary.cores?.some((core) => known(core.percent)),
       );
@@ -213,15 +179,34 @@
       ["Memory", count((s) => known(s.summary?.memory_percent))],
       ["Paging", count((s) => known(s.summary?.page_reads_sec))],
       ["Active disk latency", count((s) => known(diskDelay(s)))],
-      ["GPU", count((s) => known(s.summary?.gpu_percent))],
-      [
-        "Excel threads",
-        count((s) => s.items?.some((r) => known(r.BusiestThreadCPU))),
-      ],
     ];
   }
   const limits =
-    "Citrix session latency, file-share response, VDI host contention and exact Excel formulas/add-ins are not measured by this capture. No finding means the cause is not established.";
+    "Light capture measures CPU, memory and disk activity. GPU and individual CPU threads are checked only when you choose them. Citrix session latency, file-share response, VDI host contention and exact Excel formulas/add-ins are not measured. No finding means the cause is not established.";
+  function probePolicy(data) {
+    const s = data.summary || {},
+      elapsed = data.collection?.duration_ms || 0;
+    const wmiCpu = (data.items || [])
+      .filter((row) => /^wmiprvse\.exe$/i.test(row.Process) && known(row.CPU))
+      .reduce((sum, row) => sum + Number(row.CPU), 0);
+    if (
+      wmiCpu >= 5 ||
+      (s.logical_processors > 0 && wmiCpu * s.logical_processors >= 50)
+    )
+      return {
+        stop: "Stopped — WMI provider activity is elevated; pause checks to avoid adding load",
+      };
+    if (elapsed >= 10000)
+      return {
+        stop: "Stopped — collection is slow; pause checks before trying again",
+      };
+    return {
+      delay:
+        elapsed >= 5000 || s.cpu_percent >= 90 || s.memory_percent >= 95
+          ? 20000
+          : interval,
+    };
+  }
   let capture = null;
   function compact(data, elapsed) {
     const fields = [
@@ -232,14 +217,13 @@
       "GPU",
       "MemoryBytes",
       "MemoryPercent",
-      "BusiestThreadCPU",
-      "BusiestThreadId",
     ];
     return {
       elapsed,
       checked_at: data.checked_at,
       summary: data.summary || {},
       warnings: data.warnings || [],
+      collection: data.collection || {},
       items: (data.items || []).map((row) =>
         Object.fromEntries(fields.map((key) => [key, row[key]])),
       ),
@@ -272,7 +256,6 @@
       startedAt: new Date().toISOString(),
       samples: [],
       errors: [],
-      failures: 0,
     });
     run.deadlineTimer = setTimeout(() => {
       if (capture === run) stop("Capture complete");
@@ -301,7 +284,7 @@
       )
         throw Error("Invalid diagnostic sample; refresh and try again.");
       run.samples.push(compact(data, (performance.now() - run.started) / 1000));
-      run.failures = 0;
+      run.policy = probePolicy(data);
       processSnapshot = Object.freeze({
         computer: run.computer,
         kind: "cpu",
@@ -321,12 +304,11 @@
         },
       );
       renderProcesses();
+      if (run.policy.stop) return stop(run.policy.stop);
     } catch (error) {
       if (!current() || error.name === "AbortError") return;
       run.errors.push(error.message);
-      run.failures++;
-      if (run.failures >= 3)
-        return stop("Capture interrupted — repeated collection failures");
+      return stop("Stopped — collection failed; no automatic retries");
     }
     if (!current()) return;
     if (
@@ -336,23 +318,17 @@
       return stop("Capture complete");
     render();
     // Never overlap requests or keep polling after the bounded capture ends.
-    run.nextTimer = setTimeout(() => tick(run), interval);
+    run.nextTimer = setTimeout(() => tick(run), run.policy?.delay || interval);
   }
   function sampleRows(samples) {
     return samples.map((s) => {
-      const excel = (s.items || []).filter(
-        (r) => /^excel\.exe$/i.test(r.Process) && known(r.BusiestThreadCPU),
-      );
       return [
         `+${fmt(s.elapsed, "s")}`,
         fmt(s.summary.cpu_percent),
         fmt(s.summary.memory_percent),
         fmt(s.summary.page_reads_sec, "/s"),
         fmt(diskDelay(s), " ms"),
-        fmt(s.summary.gpu_percent),
-        excel.length
-          ? fmt(Math.max(...excel.map((r) => r.BusiestThreadCPU)))
-          : "Not measured",
+        fmt(s.collection?.duration_ms / 1000, "s"),
       ];
     });
   }
@@ -369,20 +345,20 @@
       ? "Reproduce the slowdown now"
       : findings[0]?.title || "Cause not established";
     $("#slowdownStatus").textContent =
-      `${computer} · ${active ? "Capturing for up to 60 seconds" : capture.reason} · ${samples.length} ${samples.length === 1 ? "sample" : "samples"}${samples.length ? ` · last received +${fmt(samples.at(-1).elapsed, "s")}` : ""}${errors.length ? ` · ${errors.length} failed requests` : ""}`;
+      `${computer} · ${active ? "Light capture · up to 60 seconds" : capture.reason} · ${samples.length} ${samples.length === 1 ? "sample" : "samples"}${samples.length ? ` · last received +${fmt(samples.at(-1).elapsed, "s")}` : ""}${active && capture.policy?.delay ? ` · resting ${capture.policy.delay / 1000}s between checks` : ""}${errors.length ? ` · ${errors.length} failed requests` : ""}`;
     $("#slowdownFindings").innerHTML =
       `<p class="muted">${active ? "Findings update as samples arrive. Repeated evidence is stronger than a brief spike." : "These are investigation leads from the measured samples. Several bottlenecks can coexist."}</p>
-      <div class="slowdown-cards">${findings.map((f, index) => `<article class="slowdown-finding ${f.repeated ? "repeated" : ""}"><div class="slowdown-label"><span>${esc(f.support)}</span><small>${esc(f.observations)}</small></div><h4>${esc(f.title)}</h4><p>${esc(f.evidence)}</p><p class="slowdown-next"><b>Next check</b> ${esc(f.next)}</p>${f.process?.CreatedAt ? `<button data-diagnosis-process="${index}">Inspect ${esc(f.process.Process)} threads</button>` : ""}</article>`).join("") || `<p class="slowdown-empty">${samples.length ? "No clear resource bottleneck in the available samples. If the slowdown happened during capture, check Citrix/session performance, file or data-source delays, then an Excel trace." : active ? "Waiting for the first sample. Atlas checks CPU, RAM, active disks, GPU and available Excel thread counters." : "No sample was completed. Check access to the machine and try again."}</p>`}</div>
+      <div class="slowdown-cards">${findings.map((f, index) => `<article class="slowdown-finding ${f.repeated ? "repeated" : ""}"><div class="slowdown-label"><span>${esc(f.support)}</span><small>${esc(f.observations)}</small></div><h4>${esc(f.title)}</h4><p>${esc(f.evidence)}</p><p class="slowdown-next"><b>Next check</b> ${esc(f.next)}</p>${f.process?.CreatedAt ? `<button data-diagnosis-process="${index}">Inspect ${esc(f.process.Process)} threads</button>` : ""}</article>`).join("") || `<p class="slowdown-empty">${samples.length ? "No clear resource bottleneck in the available samples. If the slowdown happened during capture, check Citrix/session performance, file or data-source delays, then an Excel trace." : active ? "Waiting for the first sample. Atlas checks CPU, RAM and active disks. GPU and individual threads stay on demand." : "No sample was completed. Check access to the machine and try again."}</p>`}</div>
       <p class="slowdown-limits">${esc(limits)}</p>
-      <details class="perf-details" ${expanded ? "open" : ""}><summary>Sample timeline & measurement coverage</summary><p class="muted">Samples are separate observations, not a continuous trace. Thresholds are investigation cues: CPU 85%, RAM 90%, paging reads 10/s with high RAM, active disk response 30 ms, GPU 90%, Excel thread 85% of one logical CPU, or one logical CPU at 90% with machine CPU below 70%. Repeated evidence needs at least three matching observations spanning eight seconds and 60% of measured samples.</p>
+      <details class="perf-details" ${expanded ? "open" : ""}><summary>Sample timeline & measurement coverage</summary><p class="muted">At most six samples, with at least 10 seconds of rest after each check (20 seconds if busy or responding slowly). Collection stops on failure, a slow response or elevated WMI provider CPU. Samples are separate observations, not a continuous trace. Thresholds are investigation cues: CPU 85%, RAM 90%, paging reads 10/s with high RAM, active disk response 30 ms, or one logical CPU at 90% with machine CPU below 70%. Repeated evidence needs at least three matching observations spanning eight seconds and 60% of measured samples.</p>
       <div class="perf-facts">${coverage(samples)
         .map(
           ([name, count]) =>
             `<span>${esc(name)} <b>${count}/${samples.length} samples</b></span>`,
         )
         .join("")}</div>
-      <p class="muted">Excel threads cover up to three instances with the largest working sets. Missing counters and inactive disks are not treated as zero. Process consumers are selected across CPU, memory, GPU and I/O; not every process is retained.</p>
-      <div class="tablewrap"><table><thead><tr>${["Received", "CPU", "RAM used", "Paging reads", "Disk response", "GPU", "Excel busiest thread"].map((h) => `<th>${h}</th>`).join("")}</tr></thead><tbody>${sampleRows(
+      <p class="muted">Missing counters and inactive disks are not treated as zero. Process consumers are selected across CPU, memory and I/O; not every process is retained. Thread counts do not require enumerating individual threads. Monitoring has a cost; this capture cannot guarantee zero impact.</p>
+      <div class="tablewrap"><table><thead><tr>${["Received", "CPU", "RAM used", "Paging reads", "Disk response", "Check duration"].map((h) => `<th>${h}</th>`).join("")}</tr></thead><tbody>${sampleRows(
         samples,
       )
         .map(
@@ -411,8 +387,8 @@
           .map(([name, count]) => `${name} ${count}/${capture.samples.length}`)
           .join(" · "),
       limits,
-      "Excel thread sampling covers up to three instances. Repeated evidence needs 3 observations spanning 8s and 60% of measured samples; these are investigation cues, not a proven cause.",
-      "\nReceived\tCPU\tRAM used\tPaging reads\tActive disk response\tGPU\tExcel busiest thread",
+      "Light capture: at most 6 samples with 10–20 seconds rest between checks. Repeated evidence needs 3 observations spanning 8s and 60% of measured samples; these are investigation cues, not a proven cause.",
+      "\nReceived\tCPU\tRAM used\tPaging reads\tActive disk response\tCheck duration",
       ...sampleRows(capture.samples).map((row) => row.join("\t")),
       ...new Set([
         ...capture.errors,
@@ -420,7 +396,14 @@
       ]),
     ].join("\n");
   }
-  window.AtlasDiagnostics = { start, stop, clear, analyze, report };
+  window.AtlasDiagnostics = {
+    start,
+    stop,
+    clear,
+    analyze,
+    report,
+    probePolicy,
+  };
   $("#diagnoseSlowness").onclick = start;
   $("#stopDiagnosis").onclick = () => stop();
   $("#copyDiagnosis").onclick = () => copy(report(), "Slowness findings");

@@ -4,8 +4,9 @@ $global:AtlasMode = 'normal'
 $global:AtlasCalls = @{}
 function Start-Sleep { param($Milliseconds) }
 function Get-WmiObject {
-    param($ComputerName, $Class, $Filter, $ErrorAction)
+    param($ComputerName, $Class, $Filter, $ErrorAction, $Property)
     if ($ComputerName -ne 'TESTPC') { throw 'Unexpected target' }
+    if ($global:AtlasMode -like 'excel*' -and (-not $Property -or $Property -contains '*' -or $Property -contains 'CommandLine')) { throw 'Light capture must request selected properties without command lines' }
     $global:AtlasCalls[$Class]++
     $sample = $global:AtlasCalls[$Class]
     if ($global:AtlasMode -eq 'partial' -and $Class -in @('Win32_PerfRawData_PerfOS_Processor', 'Win32_PerfFormattedData_GPUPerformanceCounters_GPUEngine', 'Win32_PerfFormattedData_PerfOS_Memory')) { throw 'Provider unavailable' }
@@ -69,10 +70,11 @@ if ($changed.ok -or $changed.error -notmatch 'changed') { throw 'Changed process
 $global:AtlasMode = 'partial'; $partial = Sample
 if (-not $partial.ok -or $null -ne $partial.summary.cpu_percent -or $null -ne $partial.summary.gpu_percent -or $null -ne $partial.summary.commit_percent -or $partial.summary.memory_percent -ne 87.5 -or -not $partial.warnings.Count) { throw 'Partial counters must not become zero or hide working metrics' }
 $global:AtlasMode = 'excel'; $diagnose = Sample diagnose
-if (-not $diagnose.ok -or $diagnose.items[0].BusiestThreadCPU -ne 80 -or $diagnose.items[0].BusiestThreadId -ne 100 -or $diagnose.items[0].MeasuredThreads -ne 2) { throw "Excel thread sampling failed: $($diagnose | ConvertTo-Json -Depth 6 -Compress)" }
-if ($global:AtlasCalls['Win32_PerfRawData_PerfProc_Thread'] -ne 2) { throw 'Excel threads need two bounded samples' }
+if (-not $diagnose.ok -or $diagnose.collection.profile -ne 'light' -or $diagnose.collection.query_count -ne 12 -or $diagnose.items[0].CPU -ne 25) { throw "Light capture failed: $($diagnose | ConvertTo-Json -Depth 6 -Compress)" }
+foreach ($class in @('Win32_PerfRawData_PerfProc_Thread', 'Win32_PerfFormattedData_GPUPerformanceCounters_GPUEngine', 'Win32_LogicalDisk')) {
+    if ($global:AtlasCalls[$class]) { throw "Light capture unexpectedly queried $class" }
+}
+if ($null -ne $diagnose.summary.gpu_percent -or $diagnose.summary.volumes.Count -ne 0) { throw 'Deferred counters must not be fabricated' }
 $global:AtlasMode = 'excel_identity'; $diagnose = Sample diagnose
-if (-not $diagnose.ok -or $null -ne $diagnose.items[0].BusiestThreadCPU -or $diagnose.items[0].MeasuredThreads -ne 0) { throw 'Reused Excel PID was attributed to old thread samples' }
-$global:AtlasMode = 'excel_missing'; $diagnose = Sample diagnose
-if (-not $diagnose.ok -or $null -ne $diagnose.items[0].BusiestThreadCPU -or -not $diagnose.warnings.Count -or $diagnose.items[0].MemoryPercent -ne 25) { throw 'Missing Excel threads must retain unknowns and other counters' }
+if (-not $diagnose.ok -or $null -ne $diagnose.items[0].CPU) { throw 'Reused Excel PID was attributed to old process samples' }
 Write-Output 'PASS: sampled CPU/thread rates, RAM capacity, GPU engine aggregation, disk latency, identity reuse and partial providers'
