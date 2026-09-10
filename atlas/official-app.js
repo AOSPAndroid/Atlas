@@ -2411,7 +2411,6 @@ setView(view);
   installCommandPalette({
     readOnly,
     getRecords: () => records,
-    getAssistantContext: () => ({ machine: operations.getTarget() || "" }),
     onSelect: (id) => {
       $("#search").value = "";
       $("#scope").value = "all";

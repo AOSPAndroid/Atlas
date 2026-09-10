@@ -16,6 +16,15 @@ class PaletteTests(unittest.TestCase):
  def test_bad_or_missing_person(self):
   self.assertEqual(self.client.get('/api/palette/person/id:999999999').status_code,404)
   self.assertEqual(self.client.get('/api/palette/person/not-an-id').status_code,400)
+ def test_removed_assistant_has_no_registered_or_accessible_routes(self):
+  for app in (main.app,viewer.app):
+   self.assertFalse(any(getattr(route,'path','').startswith('/api/assistant/') for route in app.routes))
+  self.assertEqual(self.client.get('/api/assistant/status').status_code,404)
+  self.assertEqual(self.client.post('/api/assistant/ask',json={'question':'Hello'}).status_code,404)
+  with TestClient(viewer.app) as client:
+   self.assertEqual(client.get('/api/assistant/status').status_code,404)
+   # The viewer rejects all POSTs before routing, including nonexistent paths.
+   self.assertEqual(client.post('/api/assistant/ask',json={'question':'Hello'}).status_code,403)
  def test_admin_assets_and_remote_boundary(self):
   for path in ('/command-palette.js','/command-palette.css','/command-registry.js','/catalogue.js'):
    self.assertEqual(self.client.get(path).status_code,200)

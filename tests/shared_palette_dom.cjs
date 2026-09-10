@@ -14,12 +14,12 @@ async function loadModule(file,context,cache=new Map()){
   w.HTMLElement.prototype.scrollIntoView=function(){};
   w.HTMLDialogElement.prototype.showModal=function(){this.open=true};
   w.HTMLDialogElement.prototype.close=function(){this.open=false;this.dispatchEvent(new w.Event('close'))};
-  const calls=[];let requests=[];
+  const calls=[],allRequests=[];let requests=[];
   const desk={id:'04R024065',floor:4,match:'confirmed account link'},secondDesk={...desk,id:'04R024066'};
   let personDesks=[desk];
   w.fetch=async(url)=>{
    requests.push(url);
-   if(url==='/api/assistant/status')return {ok:true,json:async()=>({available:true,model:'Fixture model'})};
+   allRequests.push(url);
    if(url.includes('/api/palette/person/'))return {ok:true,json:async()=>({desks:personDesks})};
    const term=new URL(url,w.location.href).searchParams.get('term');
    // Deliberately return an obsolete query last, even if its signal was aborted.
@@ -60,12 +60,26 @@ async function loadModule(file,context,cache=new Map()){
   await palette.open();key('ArrowDown');assert.equal(input.getAttribute('aria-activedescendant'),'atlas-command-1');
   let leaked=0;w.document.addEventListener('keydown',()=>leaked++);key('d');assert.equal(leaked,0,'palette typing must not reach console shortcuts');
   type('<script>');await sleep(220);assert.equal(options().length,0);assert(!palette.root.querySelector('script'));palette.close();
-  const askTrigger=palette.root.querySelector('#atlas-ask');assert.equal(askTrigger.textContent,'Ask Atlas');assert.equal(askTrigger.previousElementSibling.id,'atlas-commands','Ask remains beside Search in both hosts');requests=[];askTrigger.focus();askTrigger.click();await sleep(0);assert(palette.dialog.open);assert.equal(input.value,'');assert.equal(input.placeholder,'Ask any IT or Atlas question…');assert(!requests.some(url=>url==='/api/assistant/ask'));palette.close();assert.equal(palette.root.activeElement,askTrigger);
+  assert.equal(palette.root.querySelector('#atlas-ask, .palette-assistant'),null,'both hosts expose search only');
+  assert(!registry.namespace.COMMANDS.some(command=>command.id==='assistant'||/Ask Atlas/i.test(command.title)));
+  assert(!/Ask Atlas|offline assistant/i.test(palette.root.textContent),'no AI hints or hidden transcript remain');
+  const callsBefore=calls.length;
+  for(const query of ['Ask > Explain DNS','ask: Explain DNS','Why is Excel slow?','> assistant']){
+   trigger.focus();await palette.open();type(query);await sleep(220);
+   assert.equal(input.value,query,'former AI prefixes remain ordinary search text');
+   assert.equal(input.getAttribute('role'),'combobox');
+   assert.equal(input.placeholder,'Search people, machines, desks or actions…');
+   assert.equal(options().length,0,'questions do not create an AI result');
+   key('Enter');await sleep(0);assert.equal(calls.length,callsBefore,'unmatched questions perform no action');
+   assert(palette.dialog.open);palette.close();assert.equal(palette.root.activeElement,trigger);
+  }
+  assert(allRequests.every(url=>/^\/api\/(search\?|palette\/person\/)/.test(url)),'search only requests directory data; no AI or machine scans');
+  assert.throws(()=>registry.namespace.commandUrl('assistant'));
   assert.throws(()=>registry.namespace.commandUrl('reboot-now'));
   for(const command of registry.namespace.COMMANDS){const url=registry.namespace.commandUrl(command.id,'PC & 1');assert.equal(new URL(url,w.location.href).searchParams.get('machine'),'PC & 1');}
   w.close();
  }
- assert.deepEqual(results[0],results[1]);assert.equal(styles[0],styles[1]);await checkCombinedResults();console.log('PASS: identical commands/styles, keyboard selection, focus, identity-safe merged people/desks, fresh map resolution, console person routing, ambiguous/unlinked fallback, explicit desk navigation, stale response protection, shortcut isolation and URL allowlist.');
+ assert.deepEqual(results[0],results[1]);assert.equal(styles[0],styles[1]);await checkCombinedResults();console.log('PASS: identical search-only commands/styles, no AI UI or requests, keyboard selection, focus, identity-safe merged people/desks, fresh map resolution, console person routing, ambiguous/unlinked fallback, explicit desk navigation, stale response protection, shortcut isolation and URL allowlist.');
 })().catch(error=>{console.error(error);process.exitCode=1});
 
 async function checkCombinedResults() {
@@ -140,7 +154,7 @@ async function checkCombinedResults() {
   state.fail=true;rows=await search('Sam');assert.equal(rows.length,1);assert.equal(rows[0].querySelector('.palette-kind').textContent,'Desk');assert(palette.root.querySelector('#atlas-command-status').textContent.includes('Directory unavailable'));rows[0].click();await sleep(0);assert.deepEqual(outcomes(),[['desk','DESK-A']]);
   rows=await search('desk:DESK-A');assert.equal(rows.length,1);assert.equal(requests.length,0,'explicit desk lookup never contacts directory or assistant');key('Enter');await sleep(0);assert.deepEqual(outcomes(),[['desk','DESK-A']]);
   assert(!allRequests.some(url=>/\/api\/(assistant|machine-health|performance)\//.test(url)),'person/desk lookup never runs AI or WMI');
-  if(mode==='viewer')assert.equal(palette.root.querySelector('#atlas-ask'),null);
+  assert.equal(palette.root.querySelector('#atlas-ask, .palette-assistant'),null,mode+' has no AI controls');
   w.close();
  }
 }

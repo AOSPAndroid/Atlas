@@ -15,7 +15,6 @@ The **map** helps you explore floors and seating in 2D or 3D. The **IT console**
 | **Remote administration** | Check machine health and specifications, inspect software and resource usage, manage processes with confirmation, and open Windows support tools. Remote actions use the host account's existing permissions. |
 | **Application deployment** | Browse a package catalogue, select install/repair/uninstall scripts, deploy to individual targets or a bulk queue, and follow progress, logs and history. |
 | **Data management** | Preview and apply directory imports, review export-column coverage, maintain seating records, and back up or restore the database. |
-| **Ask Atlas** | Optional offline IT assistant for technical questions, troubleshooting and Atlas workflows, with selected records and existing scan reports available as context. |
 | **Shared viewer** | Host a separate read-only interface on the local network for maps, people lookup and stored inventory. Editing, deployment and elevated remote operations stay in the admin tool. |
 
 Atlas runs from Python source with FastAPI and SQLite; the interface uses HTML, CSS and JavaScript. The Windows launcher starts the local admin service and shared viewer together. Runtime records live in a persistent database, while deployment packages stay in your configured package repository.
@@ -74,7 +73,7 @@ To change ports, set `ATLAS_ADMIN_PORT` and `ATLAS_VIEWER_PORT` before launching
 
 Press **Ctrl+K** (or **Cmd+K** on a Mac browser), or click **Search Atlas** in either header. Search people, machines, desk codes, teams and admin views in one place. Use arrow keys and Enter to open a result, and Escape to close.
 
-Use `person:`, `machine:`, `desk:` or `>` to narrow results. In the IT console, person results open their details and linked machines in the Workspace, even when they have assigned desks; name searches prioritize directory people over desk matches. Explicit desk results open the map. From the map, people with a single mapped desk open there; multiple locations offer a choice. Unmapped people and machines open selected in the existing IT console. Name-only desk matches are identified as unconfirmed. Actions open the existing admin interface and keep its review/confirmation flow. Both admin views load the same component, isolated stylesheet and 29-command catalogue. Commands belonging to the other view navigate there; selected machines carry across where available. Deployment, file-access and remote-operation commands open their existing controls for review. The shared viewer uses the same component, styling, keyboard controls and animation setting, with eight read-only commands: lookup, map, 2D/3D, reset, refresh, export, animations and shortcut help. Its person and machine results stay inside the read-only viewer.
+Use `person:`, `machine:`, `desk:` or `>` to narrow results. In the IT console, person results open their details and linked machines in the Workspace, even when they have assigned desks; name searches prioritize directory people over desk matches. Explicit desk results open the map. From the map, people with a single mapped desk open there; multiple locations offer a choice. Unmapped people and machines open selected in the existing IT console. Name-only desk matches are identified as unconfirmed. Actions open the existing admin interface and keep its review/confirmation flow. Both admin views load the same component, isolated stylesheet and command catalogue. Commands belonging to the other view navigate there; selected machines carry across where available. Deployment, file-access and remote-operation commands open their existing controls for review. The shared viewer uses the same component, styling, keyboard controls and animation setting, with eight read-only commands: lookup, map, 2D/3D, reset, refresh, export, animations and shortcut help. Its person and machine results stay inside the read-only viewer.
 
 ## Shared viewer
 
@@ -157,7 +156,7 @@ py -3.12 launcher.py stop
 
 `backend/main.py` hosts admin routes; `backend/viewer.py` hosts shared read routes; `directory_lookup.py` shares database-only lookup queries; `atlas/official-app.js` renders the common map; `atlas/viewer.js` provides read-only user and machine inspection.
 
-The test runner uses disposable database copies, starts isolated UI fixtures on ports 8892/8893, and runs the Python regressions plus nineteen Node DOM suites. Remote operations are simulated. `npm run format:check` verifies formatting of the maintained browser sources.
+The test runner uses disposable database copies, starts isolated UI fixtures on ports 8892/8893, and runs the Python regressions plus eighteen Node DOM suites. Remote operations are simulated. `npm run format:check` verifies formatting of the maintained browser sources.
 
 ## Optimization changes
 
@@ -186,82 +185,6 @@ Machine, person and health cards fade and lift briefly when they first enter vie
 The map renderer, camera controller, animation switch, person cards, dialog styles and palette are shared source files across admin and viewer. Viewer commands are filtered through the common command catalogue; permissions continue to be enforced by the separate read-only server.
 
 Remote Admin shows up to 100 processes sorted by CPU, GPU or memory, with the full process count alongside. Right-click a row, press Shift+F10, or use its **•••** button to **Kill process**, copy its PID or copy its details. Killing a row confirms its name, PID and machine, rechecks the process creation time, reports Windows' result, and refreshes after success. Core Windows processes are blocked. The manual PID/name field also confirms before terminating; a name targets every matching instance. GPU usage reports the busiest engine per process and requires counters exposed by the remote graphics driver; unavailable counters produce an explicit message. These remote operations remain available only in the local admin version.
-
-
-## Optional offline assistant in the command palette
-
-Click **Ask Atlas** beside Search Atlas on the admin map or in the IT Console.
-You can also press **Ctrl+K**, type a question and choose **Ask Atlas about…** to
-send that question directly. Both use the same conversation within the palette,
-without leaving the page. Type or paste **Ask >** followed by a question to open
-Ask mode, for example `Ask > Explain DNS`. Spaces and letter case are flexible,
-and **ask:** remains supported. Submit with **Ask Atlas** or Enter; the prefix
-itself never sends a question. Example questions only fill the input.
-Opening the assistant, typing or selecting a machine never starts inference or
-a scan.
-
-Ask general IT questions without selecting a person, machine or report: for
-example, "What is the difference between DNS and DHCP?", "How do I troubleshoot
-access denied on a Windows share?" or "How do I deploy a package in Atlas?".
-Ask Atlas can explain Windows and networking concepts, errors, troubleshooting
-steps, commands and the tool's map, directory, deployment, remote administration
-and database workflows. It uses its general knowledge alongside relevant excerpts
-from the local Atlas guide; that guide does not limit which IT topics you can ask
-about. Follow-up questions stay in the same conversation.
-
-Selected records and reports are optional context. The assistant can look up a
-small number of stored users or machines. In the Console, **Include existing
-slowness results** attaches the report already on screen and collects no new
-readings. Expand **Source evidence** and **View supplied facts** to inspect the
-exact excerpts supplied. Answers are suggestions to check, not verified diagnoses;
-the offline model can be incomplete or outdated and cannot check live websites.
-
-**Manual scans only:** Ask Atlas cannot run WMI, start scans, execute commands,
-deploy, kill processes or change database records. For database updates it explains
-the existing **Manage database → Preview → Apply** workflow. Model output is plain
-text, never executable code. The read-only demo does not expose the assistant.
-
-One-time setup on **64-bit Windows with Python 3.12**:
-
-1. Download/extract the normal Atlas project and install its usual dependencies.
-2. Run **Install_Atlas_Assistant.bat**. This creates a separate `.venv-assistant`,
-   installs pinned CPU inference packages and downloads about **2.9 GB** using the
-   [model release](https://github.com/AOSPAndroid/BAtlas/releases/tag/atlas-assistant-qwen3-4b-v1).
-3. Reopen Ask Atlas. The status should say the local model is ready.
-
-GitHub's source ZIP contains the integration and model manifest. Large weights
-are distributed as Release assets, with the main weight file split into three
-parts below GitHub's per-asset size limit. Setup verifies every part and each
-assembled file using SHA-256. If the repository is private and GitHub requires
-sign-in, setup downloads the identical files from the pinned upstream model
-source and checks the same hashes. No Git LFS, GitHub token or Hugging Face
-account is needed for this fallback; repository visibility is unchanged.
-
-For an offline installation, copy all model release assets into a folder and
-put Windows/Python-compatible wheels for `requirements-assistant.txt` in its
-`wheels` subfolder. Run `Install_Atlas_Assistant.bat "C:\path\to\assets"`.
-Model files live in `models/atlas-qwen3-4b` and are ignored by Git. Rerunning
-setup verifies/reuses complete files and resumes interrupted asset downloads.
-Allow approximately 7 GB of free disk space during setup for the model and
-temporary download/assembly files, plus the Python environment.
-
-Inference runs locally through **ONNX Runtime GenAI's Python package**, without
-Ollama, llama.cpp, cloud APIs or an additional listening port. A worker starts only
-after Ask and exits after one answer, releasing model memory. Each Atlas server
-allows one answer at a time, four CPU threads, at most 4,096 total tokens and a
-120-second timeout. Closing the palette cancels the worker. No transcript is
-saved by Atlas; the short conversation lives only in the current browser page.
-This first package uses CPU inference so no GPU toolkit is required. Performance
-depends on the host; GPU acceleration is not enabled in this package.
-
-Model: **Qwen3 4B**, using ONNX Community's CPU int4 KLD export pinned to revision
-`98ddba15d05dede4435afb63f13280abcdbc2a48`. Upstream model/license provenance and
-file hashes are in `assistant/model-manifest.json`; the original Apache 2.0 terms
-are retained in `assistant/MODEL-LICENSE.txt` and the model release. The local
-reference guide is `assistant/it-guide.md`. The worker uses non-thinking mode
-and adapts one equivalent Jinja comparison in memory for tokenizer compatibility;
-the distributed model files remain unchanged. The assistant never downloads or
-updates itself at runtime.
 
 ## Troubleshooting performance in Remote Admin
 

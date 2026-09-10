@@ -643,7 +643,6 @@ async function runSharedCommand(id) {
     }
   };
   const actions = {
-    assistant: () => sharedPalette?.open("ask: "),
     lookup: () => focus("#search"),
     recovery: recover,
     workspace: () => page("workspace"),
@@ -682,17 +681,6 @@ sharedPaletteReady = import("/command-palette.js").then(
       runCommand: runSharedCommand,
       replaceTrigger: document.querySelector("#openCommands"),
       preferPersonDetails: true,
-      getAssistantContext: () => {
-        const machine = adminComputer() || S.target;
-        // A manually entered Remote Admin target may belong to someone else.
-        const user = !machine || machine === S.target ? S.user : null;
-        return {
-          machine,
-          user_key: user?.canonical_key || (user?.id ? "id:" + user.id : ""),
-          // Reading an existing report never starts a machine check.
-          scan_report: window.AtlasDiagnostics?.report() || "",
-        };
-      },
       onSelect: (id) =>
         location.assign("/?" + new URLSearchParams({ desk: id })),
       openPerson: async (id) => {
@@ -708,15 +696,6 @@ sharedPaletteReady = import("/command-palette.js").then(
           setTarget(machine, "Selected from Atlas search");
       },
     });
-    // Selection changes update the conversation without querying a machine.
-    const contextObserver = new MutationObserver(() =>
-      sharedPalette.refreshContext(),
-    );
-    for (const selector of ["#deployTarget", "#kyc"])
-      contextObserver.observe(document.querySelector(selector), {
-        childList: true,
-        subtree: true,
-      });
     return sharedPalette;
   },
 );
