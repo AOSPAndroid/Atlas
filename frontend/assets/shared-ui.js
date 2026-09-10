@@ -1,4 +1,4 @@
-/* Shared display primitives. This module performs no network or privileged actions. */
+/* Shared display primitives and on-demand, read-only export inspection. */
 (() => {
   const motionMedia = window.matchMedia("(prefers-reduced-motion: reduce)");
   const motionKey = "atlas-motion";
@@ -114,22 +114,28 @@
     const facts = [
       ["Account", user.user_name || user.user_id],
       ["Email", user.email],
-      ["Team", user.department || user.business_unit],
+      ["Department", user.department],
       ["Office", user.location],
       ["Job title", user.job_role || user.job_title],
       ["Manager", user.manager],
     ];
     const details = [
       ["Employee ID", user.employee_number || user.employee_id],
+      ["Business unit", user.business_unit],
       ["Organisation", user.organisational_unit || user.organisation],
       ["Worker type", user.job_type || user.worker_type],
       ["Start date", user.start_date],
       ["Last login", user.last_login],
-      ["Last login time", user.last_login_time],
+      ["Last login time", exportDate(user.last_login_time)],
     ];
     const fields = (rows) =>
       rows
-        .filter(([, value]) => value)
+        .filter(
+          ([, value]) =>
+            value !== null &&
+            value !== undefined &&
+            String(value).trim() !== "",
+        )
         .map(([key, value]) => `<span>${esc(key)}<b>${esc(value)}</b></span>`)
         .join("");
     return `<div class="card usercard atlas-person"><div class="avatar">${esc(
@@ -138,7 +144,25 @@
         .slice(0, 2)
         .map((s) => s[0])
         .join(""),
-    )}</div><div><h2>${esc(name)}</h2><div class="facts">${fields(facts)}</div><details class="details"><summary>Person details</summary><div class="detailgrid">${fields(details)}</div></details></div></div>`;
+    )}</div><div><h2>${esc(name)}</h2><div class="facts">${fields(facts)}</div><details class="details"><summary>Person details</summary><div class="detailgrid">${fields(details)}</div>${exportButton("user", user.canonical_key)}</details></div></div>`;
+  }
+  function exportDate(value) {
+    if (value === null || value === undefined || String(value).trim() === "")
+      return value;
+    if (!/^\d+(\.\d+)?$/.test(String(value))) return value;
+    const serial = Number(value);
+    if (serial > 2958465) return value;
+    const date = new Date(
+      Date.UTC(1899, 11, 30) + Math.round(serial * 86400) * 1000,
+    );
+    return serial < 1
+      ? date.toISOString().slice(11, 19)
+      : date.toISOString().slice(0, 19).replace("T", " ");
+  }
+  function exportButton(kind, key) {
+    return key
+      ? `<button type="button" class="atlas-export-button" data-export-kind="${esc(kind)}" data-export-key="${esc(key)}">All export fields</button>`
+      : "";
   }
   // Only fields actually supplied by the directory export. No live-state aliases.
   function machineSections(machine) {
@@ -194,7 +218,7 @@
             .join("")}</dl></section>`,
       )
       .join("");
-    return `<details class="atlas-machine-details"${open ? " open" : ""}><summary>Machine details</summary><div class="atlas-machine-inventory"><p>${machineNote}</p>${sections}</div></details>`;
+    return `<details class="atlas-machine-details"${open ? " open" : ""}><summary>Machine details</summary><div class="atlas-machine-inventory"><p>${machineNote}</p>${sections}${exportButton("machine", machine.machine_name_norm || String(machine.name || machine.machine_name || "").toLowerCase())}</div></details>`;
   }
   function machineReport(machine) {
     return [
@@ -238,6 +262,91 @@
     element.showModal();
     return { element, body };
   }
+  document.addEventListener(
+    "click",
+    async (event) => {
+      const button = event.target.closest?.("[data-export-kind]");
+      if (!button) return;
+      event.stopPropagation();
+      const { element, body } = dialog("All export fields"),
+        controller = new AbortController();
+      element.classList.add("atlas-export-dialog");
+      element.addEventListener("close", () => controller.abort(), {
+        once: true,
+      });
+      body.textContent = "Loading stored fields…";
+      try {
+        const query = new URLSearchParams({
+          kind: button.dataset.exportKind,
+          key: button.dataset.exportKey,
+        });
+        const response = await fetch("/api/directory/record?" + query, {
+          signal: controller.signal,
+          cache: "no-store",
+        });
+        const data = await response.json();
+        if (!response.ok)
+          throw Error(data.detail || "Export fields unavailable");
+        if (!element.open) return;
+        body.innerHTML = `<h3>${esc(data.name)}</h3><p>${esc(data.original_cells ? `${data.source} · ${data.sheet} · row ${data.row}` : "Stored directory fields. Refresh the directory export to retain original cells and any additional columns.")}</p>${data.restricted_columns ? "<p>Additional export columns are available in the admin version.</p>" : ""}<label>Find a field<input type="search" aria-label="Find an export field" placeholder="Name or value…"></label><p class="atlas-export-count" role="status"></p><div class="atlas-export-fields"></div><button type="button" class="atlas-export-copy">Copy all fields</button>`;
+        const valueOf = (field) => {
+          const value = field.stored_value ?? field.value;
+          return [
+            "start_date",
+            "last_login",
+            "last_login_time",
+            "updated_on",
+            "last_discovered",
+          ].includes(field.field)
+            ? exportDate(value)
+            : value;
+        };
+        const render = () => {
+          const q = body.querySelector("input").value.trim().toLowerCase();
+          const fields = data.fields.filter((f) =>
+            [f.header, f.label, f.value, valueOf(f)].some((v) =>
+              String(v ?? "")
+                .toLowerCase()
+                .includes(q),
+            ),
+          );
+          body.querySelector(".atlas-export-count").textContent =
+            `${fields.length} of ${data.fields.length} fields`;
+          body.querySelector(".atlas-export-fields").innerHTML = fields
+            .map((f) => {
+              const value = valueOf(f),
+                blank = value === null || value === undefined || value === "";
+              return `<article><b>${esc(f.label)}</b><small>${esc(f.header)}</small><div>${blank ? "Not supplied" : esc(value)}</div>${data.original_cells && String(value ?? "") !== String(f.value ?? "") ? `<small>Export value: ${esc(f.value)}</small>` : ""}</article>`;
+            })
+            .join("");
+        };
+        body.querySelector("input").oninput = render;
+        body.querySelector(".atlas-export-copy").onclick = async () => {
+          try {
+            const lines = [
+              data.name,
+              data.source,
+              ...data.fields.map(
+                (f) =>
+                  `${f.header}: ${valueOf(f) ?? ""}${data.original_cells && String(valueOf(f) ?? "") !== String(f.value ?? "") ? ` (export: ${f.value})` : ""}`,
+              ),
+            ];
+            await navigator.clipboard.writeText(lines.join("\n"));
+            body.querySelector(".atlas-export-count").textContent =
+              "All fields copied";
+          } catch {
+            body.querySelector(".atlas-export-count").textContent =
+              "Clipboard unavailable. Select and copy the fields.";
+          }
+        };
+        render();
+      } catch (error) {
+        if (element.open && error.name !== "AbortError")
+          body.textContent = error.message;
+      }
+    },
+    true,
+  );
   window.AtlasUI = {
     esc,
     person,

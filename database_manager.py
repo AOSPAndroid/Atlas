@@ -2,16 +2,20 @@
 import asyncio,json,sqlite3,tempfile,time,uuid,hashlib,zipfile,shutil
 from pathlib import Path
 from fastapi import Request,HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse,StreamingResponse
 from starlette.concurrency import run_in_threadpool
 from refresh_directory import prepare,apply_refresh,counts
 from atlas_store import ClosingConnection
+import directory_exports
 
 def fingerprint(path):
  with sqlite3.connect(path,factory=ClosingConnection) as c:
   h=hashlib.sha256()
   for t in ('users','machines','assignments','desk_user_links'):
    for row in c.execute('select * from '+t+' order by 1'):h.update(repr(row).encode())
+  if directory_exports.exists(c):
+   for t in directory_exports.TABLES:
+    for row in c.execute('select * from '+t+' order by 1,2'):h.update(repr(row).encode())
   return h.hexdigest()
 
 def compare(target,candidate):
@@ -29,6 +33,13 @@ def compare(target,candidate):
   result['missing_desk_accounts']=[{'desk':d,'account':k} for d,k in a.execute('select desk_id,user_key from desk_user_links') if k not in keys]
   result['warnings']=[f'{t}: more than 10% of existing records disappear.' for t in ('users','machines') if result[t]['removed']>result[t]['before']*.1]
   result['unlinked_machine_references']=b.execute("select count(*) from machines m where (trim(coalesce(assigned_to,''))<>'' or trim(coalesce(last_logon_user,''))<>'') and not exists(select 1 from assignments a where a.machine_id=m.id)").fetchone()[0]
+  result['coverage']=directory_exports.coverage(b)
+  old_columns={(s['sheet'],col['header']) for s in directory_exports.coverage(a)['sheets'] for col in s['columns']}
+  new_columns={(s['sheet'],col['header']) for s in result['coverage']['sheets'] for col in s['columns']}
+  missing=sorted(old_columns-new_columns)
+  if missing:result['warnings'].append('Columns absent from this snapshot: '+', '.join(s+'.'+col for s,col in missing))
+  if directory_exports.exists(a) and not result['coverage']['original_cells']:
+   result['warnings'].append('This older backup has no original export archive. Restoring it removes the current archive; stored directory fields remain.')
   return result
 
 def register_database_manager(app,wmi,check_token):
@@ -66,7 +77,32 @@ def register_database_manager(app,wmi,check_token):
  def status():
   with sqlite3.connect(wmi.MASTER_DB,factory=ClosingConnection) as c:
    c.row_factory=sqlite3.Row;history=[dict(r) for r in c.execute('select id,at,source,report from directory_import_history order by at desc limit 30')]
-  return {'counts':counts(wmi.MASTER_DB),'busy':busy(),'history':history}
+   coverage=directory_exports.coverage(c)
+  return {'counts':counts(wmi.MASTER_DB),'busy':busy(),'history':history,'coverage':coverage}
+ @app.get('/api/directory/record')
+ def export_record(kind:str,key:str):
+  with sqlite3.connect(wmi.MASTER_DB.resolve().as_uri()+'?mode=ro',uri=True,factory=ClosingConnection) as c:
+   c.row_factory=sqlite3.Row
+   try:result=directory_exports.record(c,kind,key)
+   except ValueError as e:raise HTTPException(400,str(e))
+  if result is None:raise HTTPException(404,'Directory record not found')
+  return result
+ @app.get('/api/database/export-archive')
+ def export_archive():
+  def lines():
+   with sqlite3.connect(wmi.MASTER_DB.resolve().as_uri()+'?mode=ro',uri=True,factory=ClosingConnection) as c:
+    c.execute('begin')
+    coverage=directory_exports.coverage(c)
+    yield json.dumps({'type':'coverage',**coverage},ensure_ascii=False)+'\n'
+    if coverage['original_cells']:
+     for sheet,number,key,cells in c.execute('select * from directory_export_rows order by sheet,row_number'):
+      yield json.dumps({'type':'row','sheet':sheet,'row':number,'key':key,'cells':json.loads(cells)},ensure_ascii=False)+'\n'
+    else:
+     c.row_factory=sqlite3.Row
+     for kind,table in (('user','users'),('machine','machines')):
+      for row in c.execute('select * from '+table+' order by id'):
+       yield json.dumps({'type':'stored_record','kind':kind,'fields':{column:row[column] for _,column,_ in directory_exports.FIELDS[kind]}},ensure_ascii=False)+'\n'
+  return StreamingResponse(lines(),media_type='application/x-ndjson',headers={'Content-Disposition':'attachment; filename="atlas-directory-export.ndjson"'})
  @app.post('/api/database/preview')
  async def preview(request:Request):
   check_token(request)
@@ -82,7 +118,10 @@ def register_database_manager(app,wmi,check_token):
     if sum(x.file_size for x in z.infolist())>512*1024*1024:raise ValueError('Expanded workbook exceeds 512 MB.')
    candidate=folder/'candidate.db'
    await run_in_threadpool(prepare,source,candidate)
-   return await run_in_threadpool(stage,folder,Path(unquote(request.headers.get('x-file-name','extract.xlsx'))).name[:200],candidate)
+   filename=Path(unquote(request.headers.get('x-file-name','extract.xlsx'))).name[:200]
+   with sqlite3.connect(candidate,factory=ClosingConnection) as c:
+    if directory_exports.exists(c):c.execute('update directory_export_sheets set source_file=?',(filename,))
+   return await run_in_threadpool(stage,folder,filename,candidate)
   except Exception as e:
    shutil.rmtree(folder,ignore_errors=True)
    if isinstance(e,HTTPException):raise

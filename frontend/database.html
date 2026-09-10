@@ -44,6 +44,29 @@
       #history button {
         margin: 8px 0;
       }
+      #coverage table,
+      #changes table {
+        width: 100%;
+        border-collapse: collapse;
+        text-align: left;
+      }
+      #coverage th,
+      #coverage td,
+      #changes th,
+      #changes td {
+        padding: 10px;
+        border-bottom: 1px solid var(--line);
+        vertical-align: top;
+      }
+      #coverage details,
+      #changes details {
+        margin: 12px 0;
+      }
+      #coverage summary,
+      #changes summary {
+        cursor: pointer;
+        font-weight: 600;
+      }
       input[type="file"] {
         width: 100%;
       }
@@ -119,6 +142,17 @@
           <b>current users and desks</b> below, change the existing rows, and
           upload that file.
         </p>
+      </section>
+      <section class="panel" id="directory-coverage">
+        <h2>Directory column coverage</h2>
+        <p>
+          Inspect every imported column, its populated records and where it is
+          used.
+        </p>
+        <div id="coverage">Loading column coverage…</div>
+        <a class="atlas-return" href="/api/database/export-archive"
+          >Download all directory fields (.ndjson)</a
+        >
       </section>
       <section class="panel" id="seating-panel">
         <h2>Users and desks · Excel sync</h2>

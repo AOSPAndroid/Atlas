@@ -1,4 +1,19 @@
 """Shared database-only directory queries for admin and viewer."""
+from directory_exports import field_map
+
+# Only these explicit column names ever enter SQL. Values remain parameters.
+SEARCH_FIELDS = {alias: (kind, column) for kind in ('user', 'machine')
+                 for alias, (column, _) in field_map(kind).items() if alias not in ('name', 'user_name', 'email')}
+SEARCH_FIELDS.update({
+ 'serial': ('machine', 'serial_number'), 'asset': ('machine', 'correlation_id'),
+ 'model': ('machine', 'model_id'), 'status': ('machine', 'operational_status'),
+ 'class': ('machine', 'sys_class_name'), 'source': ('machine', 'discovery_source'),
+ 'infrastructure': ('machine', 'infrastructure_itsi'), 'assigned': ('machine', 'assigned_to'),
+ 'last_user': ('machine', 'last_logon_user'), 'description': ('machine', 'short_description'),
+ 'team': ('user', 'department'), 'business': ('user', 'business_unit'),
+ 'organisation': ('user', 'organisational_unit'), 'office': ('user', 'location'),
+ 'title': ('user', 'job_role'), 'worker': ('user', 'job_type'),
+})
 
 def exact_users(c,value):
  q=' '.join(value.strip().split()).casefold();login=q.rsplit('\\',1)[-1]
@@ -9,12 +24,19 @@ def linked_machines(c,uid):
 
 def search_directory(c,term:str):
  text=' '.join(term.strip().split());prefix=''
+ if ':' in text and text.split(':',1)[0].lower() in SEARCH_FIELDS:
+  prefix,text=text.split(':',1);kind,column=SEARCH_FIELDS[prefix.lower()];value=text.strip().lower()
+  if not value:return {'users':[],'machines':[]}
+  like='%'+value.replace('\\','\\\\').replace('%','\\%').replace('_','\\_')+'%'
+  table='legacy_users' if kind=='user' else 'legacy_machines'
+  rows=c.execute('select * from '+table+' where lower("'+column+'") like ? escape \'\\\' order by name,id limit 100',(like,)).fetchall()
+  return {'users':[dict(r) for r in rows] if kind=='user' else [],'machines':[dict(r) for r in rows] if kind=='machine' else []}
  if ':' in text and text.split(':',1)[0].lower() in ('machine','user','email','name','brid'):
   prefix,text=text.split(':',1);prefix=prefix.lower();text=text.strip()
  if not text:return {'users':[],'machines':[]}
  q=text.casefold();login=q.rsplit('\\',1)[-1];like='%'+q.replace('\\','\\\\').replace('%','\\%').replace('_','\\_')+'%'
  users=[] if prefix=='machine' else exact_users(c,text)
- machines=[] if prefix in ('user','email','name','brid') else c.execute('select * from legacy_machines where name_norm=?',(q.rstrip('.'),)).fetchall()
+ machines=[] if prefix in ('user','email','name','brid') else c.execute('select * from legacy_machines where name_norm=? or lower(serial_number)=? or lower(correlation_id)=? order by name limit 100',(q.rstrip('.'),q,q)).fetchall()
  if not users and not machines:
   if prefix!='machine':users=c.execute("select * from legacy_users where user_name_norm like ? escape '\\' or name_norm like ? escape '\\' or email_norm like ? escape '\\' or lower(brid) like ? escape '\\' order by name,id limit 100",(like,like,like,like)).fetchall()
   if prefix not in ('user','email','name','brid'):machines=c.execute("select * from legacy_machines where name_norm like ? escape '\\' order by name limit 100",(like,)).fetchall()

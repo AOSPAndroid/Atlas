@@ -52,6 +52,8 @@
   }
   async function status() {
     const d = await api("/api/database/status");
+    if ($("coverage") && d.coverage)
+      $("coverage").innerHTML = coverage(d.coverage);
     $("message").textContent =
       `${d.counts.users.toLocaleString()} users · ${d.counts.machines.toLocaleString()} machines · ${d.counts.assignments.toLocaleString()} relationships${d.busy ? " — jobs active; imports are blocked." : ""}`;
     $("history").innerHTML = d.history.length
@@ -88,6 +90,11 @@
         return `<article><b>${esc(k)}</b><p>${x.before.toLocaleString()} → ${x.after.toLocaleString()}</p><p>+${x.added} added · −${x.removed} removed${x.changed !== undefined ? " · " + x.changed + " changed" : ""}</p></article>`;
       })
       .join("");
+    if (d.report.coverage)
+      $("changes").insertAdjacentHTML(
+        "beforeend",
+        `<article><h3>Incoming export columns</h3>${coverage(d.report.coverage)}</article>`,
+      );
     $("warnings").textContent = [
       ...d.report.warnings,
       `${d.report.unlinked_machine_references} machines have user references but no resolved relationship.`,
@@ -157,6 +164,17 @@
     });
   $("full").onchange = controls;
   $("confirm").oninput = controls;
+  function coverage(data) {
+    return (
+      `<p>${data.original_cells ? "Original export cells retained, including additional columns and sheets." : "This database predates original-cell retention. The stored directory columns are listed below; the next directory refresh will also retain original cells."}</p>` +
+      data.sheets
+        .map(
+          (sheet) =>
+            `<details><summary>${esc(sheet.sheet)} · ${sheet.columns.length} columns · ${sheet.rows.toLocaleString()} rows</summary><p>${esc(sheet.source)} · ${sheet.linked.toLocaleString()} rows linked to directory records</p><div style="overflow-x:auto"><table><thead><tr><th>Export column</th><th>Populated</th><th>Used in Atlas</th></tr></thead><tbody>${sheet.columns.map((col) => `<tr><td>${esc(col.header)}</td><td>${col.populated.toLocaleString()} / ${sheet.rows.toLocaleString()}</td><td>${esc(col.label)} · ${esc(col.use)}</td></tr>`).join("")}</tbody></table></div></details>`,
+        )
+        .join("")
+    );
+  }
   task(async () => {
     token = (await api("/api/session")).token;
     await status();

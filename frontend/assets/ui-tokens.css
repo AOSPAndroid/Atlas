@@ -275,3 +275,39 @@ html[data-atlas-motion="reduce"] *::after {
   flex-wrap: wrap;
   align-items: center;
 }
+:root {
+  --atlas-export-border: #d5e2ea;
+}
+.atlas-export-button {
+  margin-top: 12px;
+}
+.atlas-export-dialog .atlas-dialog-body > label {
+  display: block;
+}
+.atlas-export-dialog input {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+}
+.atlas-export-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+.atlas-export-fields article {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--atlas-export-border);
+  border-radius: 10px;
+}
+.atlas-export-fields small {
+  display: block;
+  color: #526575;
+  overflow-wrap: anywhere;
+}
+.atlas-export-fields article > div {
+  margin-top: 8px;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}

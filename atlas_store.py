@@ -88,6 +88,9 @@ def initialize():
         if con.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='users'").fetchone():
             con.execute('CREATE INDEX IF NOT EXISTS ix_users_email_lower ON users(lower(email))')
             con.execute('CREATE INDEX IF NOT EXISTS ix_users_employee_lower ON users(lower(employee_number))')
+        if con.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='machines'").fetchone():
+            con.execute('CREATE INDEX IF NOT EXISTS ix_machines_serial_lower ON machines(lower(serial_number))')
+            con.execute('CREATE INDEX IF NOT EXISTS ix_machines_correlation_lower ON machines(lower(correlation_id))')
         con.execute('BEGIN IMMEDIATE')
         if not con.execute("SELECT 1 FROM metadata WHERE key='atlas.seeded'").fetchone():
             for r in json.loads((ROOT / 'data.json').read_text(encoding='utf-8'))['records']:

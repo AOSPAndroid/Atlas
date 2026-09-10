@@ -44,7 +44,7 @@ export function installCommandPalette({
   dialog.className = "atlas-palette";
   dialog.setAttribute("aria-label", "Search Atlas");
   dialog.innerHTML =
-    '<div class="palette-input-row"><span aria-hidden="true">⌕</span><input id="atlas-command-input" placeholder="Search people, machines, desks or actions…" aria-label="Search people, machines, desks or actions" role="combobox" aria-autocomplete="list" aria-expanded="true" aria-controls="atlas-command-results" autocomplete="off"><button class="palette-close" aria-label="Close search">Esc</button></div><div id="atlas-command-status" role="status" aria-live="polite"></div><div id="atlas-command-results" role="listbox" aria-label="Atlas search results"></div><footer><span>↑ ↓ Navigate · Enter Open · Esc Close</span><span>Try person:, machine:, desk: or &gt; for actions</span></footer>';
+    '<div class="palette-input-row"><span aria-hidden="true">⌕</span><input id="atlas-command-input" placeholder="Search people, machines, desks or actions…" aria-label="Search people, machines, desks or actions" role="combobox" aria-autocomplete="list" aria-expanded="true" aria-controls="atlas-command-results" autocomplete="off"><button class="palette-close" aria-label="Close search">Esc</button></div><div id="atlas-command-status" role="status" aria-live="polite"></div><div id="atlas-command-results" role="listbox" aria-label="Atlas search results"></div><footer><span>↑ ↓ Navigate · Enter Open · Esc Close</span><span>Try person:, machine:, serial:, asset:, team:, location: or &gt; for actions</span></footer>';
   root.append(dialog);
   const input = dialog.querySelector("input"),
     list = dialog.querySelector("[role=listbox]"),

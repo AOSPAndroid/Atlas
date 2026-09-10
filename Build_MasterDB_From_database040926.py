@@ -48,7 +48,7 @@ def shared_strings(z,path_key=''):
     if cache is not None:cache[path_key]=out
     return out
 
-def iter_rows(path,target):
+def iter_rows(path,target,raw=False):
     with zipfile.ZipFile(path) as z:
         ss=shared_strings(z,str(path))
         with z.open(target) as f:
@@ -59,7 +59,7 @@ def iter_rows(path,target):
                     i=col_idx(c.attrib.get('r','A1'));k=c.attrib.get('t');v=c.find(NS+'v');val=''
                     if k=='inlineStr':val=''.join(t.text or '' for t in c.iter(NS+'t'))
                     elif v is not None and v.text is not None:val=ss[int(v.text)] if k=='s' else v.text
-                    cells[i]=clean(val)
+                    cells[i]=val if raw else clean(val)
                 if cells:
                     row=['']*(max(cells)+1)
                     for i,v in cells.items():row[i]=v
@@ -110,6 +110,9 @@ def build(src,out):
         it=iter_rows(src,parts['Users']);_,header=next(it);headers=[canonical_header(x) for x in header]
         aliases={'user_name':'user_id','name':'full_name','u_organisational_unit':'organisational_unit','u_business_unit':'business_unit','u_start_date':'start_date','title':'job_role','u_job_type':'job_type'}
         headers=[aliases.get(h,h) for h in headers]
+        from directory_exports import field_map, capture, MACHINE_FIELDS
+        known=[h for h in headers if h in {v[0] for v in field_map('user').values()}]
+        if len(known)!=len(set(known)):raise ValueError('Users: duplicate columns map to the same directory field')
         if not {'user_id','full_name','email'}.issubset(headers):raise ValueError('Users sheet is missing identity columns')
         user_count=0
         for _,row in it:
@@ -129,6 +132,11 @@ def build(src,out):
                 if clean(val):c.execute('insert or ignore into user_aliases(user_id_ref,alias_type,alias_value,alias_norm) values(?,?,?,?)',(ref,typ,val,norm(val)))
         # Machines
         it=iter_rows(src,parts['computers']);_,header=next(it);headers=[canonical_header(x) for x in header]
+        mapping=field_map('machine')
+        known=[mapping[h][0] for h in headers if h in mapping]
+        if len(known)!=len(set(known)):raise ValueError('computers: duplicate columns map to the same directory field')
+        aliases={column:source for source,column,_ in MACHINE_FIELDS}
+        headers=[aliases.get(h,h) for h in headers]
         machine_count=0
         for _,row in it:
             d=rowdict(headers,row);name=clean(d.get('name')).upper()
@@ -139,6 +147,7 @@ def build(src,out):
             machine_count+=1
             if machine_count%5000==0:c.commit()
         links=rebuild_links(c)
+        capture(c,src)
         print('Relationship matching:',links)
         c.executemany('insert into metadata(key,value) values(?,?)',[('schema_version','2'),('created_at',datetime.now().isoformat(sep=' ',timespec='seconds')),('source_file',src.name)])
         c.commit();check=c.execute('pragma integrity_check').fetchone()[0]

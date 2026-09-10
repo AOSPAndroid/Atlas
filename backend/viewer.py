@@ -14,6 +14,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from directory_lookup import exact_users, linked_machines, search_directory, prepare_views
 from desk_directory import desk_context,person_desks,machine_context
+import directory_exports
 
 ROOT = Path(__file__).resolve().parent.parent
 from runtime_paths import database_path
@@ -69,6 +70,18 @@ def state():
 def search(term: str):
     with connect() as con:
         return search_directory(con, term)
+
+
+@app.get('/api/directory/record')
+def export_record(kind: str, key: str):
+    with connect() as con:
+        try:
+            result = directory_exports.record(con, kind, key, include_unmapped=False)
+        except ValueError as error:
+            raise HTTPException(400, str(error))
+        if result is None:
+            raise HTTPException(404, 'Directory record not found')
+        return result
 
 
 @app.get('/api/user/{uid}')

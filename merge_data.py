@@ -19,6 +19,8 @@ def merge_directory(target,source):
    sql='insert into '+table+'('+','.join(columns)+') values ('+','.join('?' for _ in columns)+')'
    dst.executemany(sql,(tuple(r) for r in src.execute('select * from '+table)))
   for k,v in src.execute('select key,value from metadata'):dst.execute('insert or replace into metadata values(?,?)',('directory.'+k,v))
+  from directory_exports import copy_archive
+  copy_archive(src,dst)
   dst.commit()
  except:dst.rollback();raise
  finally:src.close();dst.close()
