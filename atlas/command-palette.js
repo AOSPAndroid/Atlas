@@ -13,6 +13,11 @@ const normalize = (s) =>
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .trim();
+const assistantPrefix = /^\s*ask\s*[:>]\s*/i;
+const stripAssistantPrefix = (value) =>
+  String(value ?? "")
+    .replace(assistantPrefix, "")
+    .trim();
 
 export function installCommandPalette({
   getRecords,
@@ -65,7 +70,7 @@ export function installCommandPalette({
   const searchPlaceholder = input.placeholder;
   const footer = dialog.querySelector("footer");
   if (!readOnly)
-    footer.lastElementChild.textContent += " · ask: for the offline assistant";
+    footer.lastElementChild.textContent += " · Ask > for the offline assistant";
   const searchHint = footer.innerHTML;
   const assistant = document.createElement("section");
   assistant.className = "palette-assistant";
@@ -320,7 +325,7 @@ export function installCommandPalette({
   async function askAssistant() {
     if (readOnly || !assistantMode || assistantPending) return;
     const current = syncAssistantContext(),
-      question = input.value.replace(/^\s*ask:\s*/i, "").trim();
+      question = stripAssistantPrefix(input.value);
     if (!question) {
       feedback.textContent =
         "Type an IT or Atlas question, then choose Ask Atlas.";
@@ -374,8 +379,7 @@ export function installCommandPalette({
       ].slice(-4);
       feedback.textContent =
         "Answer ready · No scans or database changes performed.";
-      if (input.value.replace(/^\s*ask:\s*/i, "").trim() === question)
-        input.value = "";
+      if (stripAssistantPrefix(input.value) === question) input.value = "";
     } catch (error) {
       if (request === assistantGeneration && error.name !== "AbortError")
         feedback.textContent = error.message;
@@ -549,8 +553,8 @@ export function installCommandPalette({
     invalidate();
     const request = generation,
       raw = input.value.trim();
-    if (/^ask:/i.test(raw)) {
-      input.value = raw.replace(/^ask:\s*/i, "");
+    if (assistantPrefix.test(raw)) {
+      input.value = stripAssistantPrefix(raw);
       showAssistant();
       return;
     }
@@ -713,8 +717,11 @@ export function installCommandPalette({
   if (!readOnly) assistantTrigger.onclick = () => open("ask: ");
   input.oninput = () => {
     assistantInputVersion++;
-    if (assistantMode) syncAssistantContext();
-    else search();
+    if (assistantMode) {
+      if (assistantPrefix.test(input.value))
+        input.value = stripAssistantPrefix(input.value);
+      syncAssistantContext();
+    } else search();
   };
   dialog.querySelector(".palette-close").onclick = close;
   dialog.addEventListener("close", () => {

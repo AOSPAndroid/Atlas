@@ -20,12 +20,21 @@ async function moduleFor(file, context, cache = new Map()) {
   await mod.evaluate();
   return mod;
 }
-async function fixture({ readOnly = false, transport = true } = {}) {
-  const dom = new JSDOM("<header></header>", {
-      url: "http://127.0.0.1:8770/",
-      runScripts: "outside-only",
-      pretendToBeVisual: true,
-    }),
+async function fixture({
+  readOnly = false,
+  transport = true,
+  host = "map",
+} = {}) {
+  const dom = new JSDOM(
+      host === "console"
+        ? '<header><button id="old">Commands</button></header>'
+        : "<header></header>",
+      {
+        url: "http://127.0.0.1:8770/",
+        runScripts: "outside-only",
+        pretendToBeVisual: true,
+      },
+    ),
     w = dom.window;
   w.HTMLElement.prototype.scrollIntoView = function () {};
   w.HTMLDialogElement.prototype.showModal = function () {
@@ -88,7 +97,12 @@ async function fixture({ readOnly = false, transport = true } = {}) {
     openPerson() {},
     openMachine() {},
     toast() {},
-    triggerParent: w.document.querySelector("header"),
+    ...(host === "console"
+      ? {
+          replaceTrigger: w.document.querySelector("#old"),
+          preferPersonDetails: true,
+        }
+      : { triggerParent: w.document.querySelector("header") }),
     readOnly,
     getAssistantContext: () => context,
   });
@@ -438,6 +452,98 @@ async function fixture({ readOnly = false, transport = true } = {}) {
     );
     f.w.close();
   }
+  // Both shared hosts accept Ask > and ask: without submitting on prefix input.
+  for (const host of ["map", "console"]) {
+    const alias = await fixture({ host });
+    let sent = 0;
+    for (const prefix of ["Ask >", "ask>", "  aSk   >  ", "ask:"]) {
+      await alias.palette.open();
+      assert(alias.$("footer").textContent.includes("Ask >"));
+      alias.query(prefix);
+      await settle();
+      assert.equal(
+        alias.$("#atlas-command-input").getAttribute("role"),
+        "textbox",
+      );
+      assert.equal(alias.$("#atlas-command-input").value, "");
+      assert.equal(
+        alias.pending.length,
+        sent,
+        host + " prefix opens without inference",
+      );
+      alias.enter();
+      await settle();
+      assert.equal(
+        alias.pending.length,
+        sent,
+        "an empty alias question is never sent",
+      );
+      assert(
+        alias
+          .$(".assistant-feedback")
+          .textContent.includes("Type an IT or Atlas question"),
+      );
+      alias.query(prefix + "Explain DNS");
+      assert.equal(alias.$("#atlas-command-input").value, "Explain DNS");
+      assert.equal(
+        alias.pending.length,
+        sent,
+        "pasting a prefixed question does not submit",
+      );
+      alias.enter();
+      alias.enter();
+      await settle();
+      assert.equal(
+        alias.pending.length,
+        sent + 1,
+        "Enter sends exactly one request",
+      );
+      assert.equal(
+        JSON.parse(alias.pending[sent].options.body).question,
+        "Explain DNS",
+      );
+      alias.answer(sent++);
+      await settle();
+      assert.equal(alias.$("#atlas-command-input").value, "");
+      alias.query(prefix + "Explain DHCP");
+      alias.$("[data-assistant-ask]").click();
+      await settle();
+      assert.equal(
+        JSON.parse(alias.pending[sent].options.body).question,
+        "Explain DHCP",
+        "follow-up prefixes are stripped consistently",
+      );
+      alias.answer(sent++);
+      await settle();
+      alias.palette.close();
+    }
+    await alias.palette.open();
+    for (const character of "AsK > Explain DNS")
+      alias.query(alias.$("#atlas-command-input").value + character);
+    await settle();
+    assert.equal(alias.$("#atlas-command-input").value.trim(), "Explain DNS");
+    assert.equal(
+      alias.pending.length,
+      sent,
+      "typing Ask > character by character never submits",
+    );
+    alias.enter();
+    await settle();
+    assert.equal(alias.pending.length, sent + 1);
+    assert.equal(
+      JSON.parse(alias.pending[sent].options.body).question,
+      "Explain DNS",
+    );
+    alias.answer(sent);
+    await settle();
+    assert(
+      !alias.calls.some((call) =>
+        /\/api\/(machine-health|performance)\//.test(call.url),
+      ),
+      "aliases never start machine scans",
+    );
+    alias.w.close();
+  }
   // A question row is an explicit submit; typing alone only searches saved data.
   const natural = await fixture();
   await natural.palette.open();
@@ -614,11 +720,19 @@ async function fixture({ readOnly = false, transport = true } = {}) {
   assert(!demo.$("[role=listbox]").textContent.includes("Ask Atlas"));
   assert.equal(demo.$(".palette-assistant"), null);
   assert.equal(demo.$("#atlas-ask"), null, "the public demo has no Ask button");
-  demo.query("ask: Explain");
-  demo.enter();
-  await settle();
-  assert.equal(demo.calls.length, 0, "demo cannot contact assistant or scans");
-  assert(demo.$("#atlas-command-status").textContent.includes("admin version"));
+  for (const prefix of ["Ask > ", "ask>", "  aSk   > ", "ask: "]) {
+    demo.query(prefix + "Explain DNS");
+    demo.enter();
+    await settle();
+    assert.equal(
+      demo.calls.length,
+      0,
+      "demo cannot contact assistant or scans",
+    );
+    assert(
+      demo.$("#atlas-command-status").textContent.includes("admin version"),
+    );
+  }
   demo.w.close();
   console.log(
     "PASS: explicit assistant button/Enter, no automatic inference or scans, authenticated shared/fallback transport, text-only answers and evidence, bounded history, stale-target isolation, cancellation, missing-model/error handling and demo exclusion.",

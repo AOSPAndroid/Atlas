@@ -193,8 +193,10 @@ Remote Admin shows up to 100 processes sorted by CPU, GPU or memory, with the fu
 Click **Ask Atlas** beside Search Atlas on the admin map or in the IT Console.
 You can also press **Ctrl+K**, type a question and choose **Ask Atlas about…** to
 send that question directly. Both use the same conversation within the palette,
-without leaving the page. In Ask mode, submit with **Ask Atlas** or Enter; the
-**ask:** prefix also opens this mode. Example questions only fill the input.
+without leaving the page. Type or paste **Ask >** followed by a question to open
+Ask mode, for example `Ask > Explain DNS`. Spaces and letter case are flexible,
+and **ask:** remains supported. Submit with **Ask Atlas** or Enter; the prefix
+itself never sends a question. Example questions only fill the input.
 Opening the assistant, typing or selecting a machine never starts inference or
 a scan.
 
