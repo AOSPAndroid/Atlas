@@ -61,14 +61,19 @@ def main():
     generator.append_tokens(tokens)
     stream = tokenizer.create_stream()
     pieces = []
+    last_token = None
     while not generator.is_done():
         generator.generate_next_token()
-        pieces.append(stream.decode(generator.get_next_tokens()[0]))
+        last_token = int(generator.get_next_tokens()[0])
+        pieces.append(stream.decode(last_token))
     answer = re.sub(r'<think>.*?</think>', '', ''.join(pieces), flags=re.S)
     if '<think>' in answer:
         raise ValueError('The model did not finish a user-facing answer.')
     answer = re.sub(r'<\|[^>]*\|>', '', answer).strip()
-    print(json.dumps({'answer': answer, 'input_tokens': len(tokens), 'output_tokens': len(pieces)}, ensure_ascii=False))
+    eos = json.loads((directory / 'genai_config.json').read_text(encoding='utf-8'))['model']['eos_token_id']
+    eos = eos if isinstance(eos, list) else [eos]
+    print(json.dumps({'answer': answer, 'input_tokens': len(tokens), 'output_tokens': len(pieces),
+                     'truncated': len(pieces) >= OUTPUT and last_token not in eos}, ensure_ascii=False))
     return 0
 
 

@@ -183,6 +183,15 @@ class AssistantGeneration(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(process.terminated)
         self.assert_slot_released()
 
+    async def test_incomplete_answer_is_labelled_without_automatic_continuation(self):
+        process = Process('{"answer":"First troubleshooting step.","truncated":true}')
+        with patch.object(runtime.subprocess, 'Popen', return_value=process) as spawn:
+            answer = await runtime.generate(self.messages, Request())
+        self.assertTrue(answer.startswith('First troubleshooting step.'))
+        self.assertIn('This answer is incomplete.', answer)
+        spawn.assert_called_once()
+        self.assert_slot_released()
+
     async def test_worker_errors_and_invalid_protocol_return_controlled_errors(self):
         examples = [
             ('{"kind":"context","error":"Question too large."}', 2, 422),

@@ -40,13 +40,18 @@ async function fixture({ readOnly = false, transport = true } = {}) {
   const calls = [],
     pending = [];
   let context = {},
-    available = true;
+    available = true,
+    directory = { users: [], machines: [] },
+    pauseStatus = false;
+  const waitingStatus = [];
   w.fetch = async (url, options = {}) => {
     calls.push({ url, options });
     if (url === "/api/session")
       return { ok: true, json: async () => ({ token: "fixture-token" }) };
-    if (url === "/api/assistant/status")
-      return {
+    if (url.startsWith("/api/search?"))
+      return { ok: true, json: async () => directory };
+    if (url === "/api/assistant/status") {
+      const result = {
         ok: true,
         json: async () => ({
           available,
@@ -55,6 +60,10 @@ async function fixture({ readOnly = false, transport = true } = {}) {
           setup: "Run Install_Atlas_Assistant.bat.",
         }),
       };
+      return pauseStatus
+        ? new Promise((resolve) => waitingStatus.push(() => resolve(result)))
+        : result;
+    }
     if (url === "/api/assistant/ask")
       return new Promise((resolve) => pending.push({ resolve, options }));
     throw Error("Unexpected endpoint: " + url);
@@ -113,6 +122,16 @@ async function fixture({ readOnly = false, transport = true } = {}) {
     },
     available(value) {
       available = value;
+    },
+    directory(value) {
+      directory = value;
+    },
+    pauseStatus(value) {
+      pauseStatus = value;
+    },
+    resolveStatus() {
+      assert.equal(waitingStatus.length, 1);
+      waitingStatus.shift()();
     },
     answer(
       index,
@@ -173,6 +192,25 @@ async function fixture({ readOnly = false, transport = true } = {}) {
       "choosing Ask Atlas must not run inference",
     );
     assert(f.$(".assistant-policy").textContent.includes("Manual scans only"));
+    assert(f.$(".assistant-policy").textContent.includes("how to use Atlas"));
+    assert(
+      f
+        .$(".assistant-context")
+        .textContent.includes("No machine or scan is required"),
+    );
+    assert.equal(
+      f.$("#atlas-command-input").placeholder,
+      "Ask any IT or Atlas question…",
+    );
+    const beforeExample = f.calls.length;
+    f.$("[data-assistant-example]").click();
+    assert.equal(f.$("#atlas-command-input").value, "Explain DNS");
+    assert.equal(f.pending.length, 0, "example chips fill without sending");
+    assert.equal(
+      f.calls.length,
+      beforeExample,
+      "example chips make no request",
+    );
     f.context({
       machine: "PC-1",
       user_key: "id:1",
@@ -226,6 +264,15 @@ async function fixture({ readOnly = false, transport = true } = {}) {
     });
     await settle();
     assert.equal(f.$(".assistant-transcript").children.length, 2);
+    assert(
+      f.$(".assistant-examples").hidden,
+      "example chips disappear once conversation begins",
+    );
+    assert.equal(
+      f.$("#atlas-command-input").value,
+      "",
+      "the next question does not require an ask: prefix",
+    );
     assert(f.$(".assistant-transcript").textContent.includes("<img src=x"));
     assert.equal(f.$(".assistant-transcript img"), null);
     assert.equal(f.$(".assistant-transcript script"), null);
@@ -331,6 +378,10 @@ async function fixture({ readOnly = false, transport = true } = {}) {
     assert(f.$(".assistant-feedback").textContent.includes("page's memory"));
     f.$("[data-assistant-back]").click();
     assert(!f.$("[role=listbox]").hidden);
+    assert.equal(
+      f.$("#atlas-command-input").placeholder,
+      "Search people, machines, desks or actions…",
+    );
     assert.equal(f.$("#atlas-command-input").getAttribute("role"), "combobox");
     assert.equal(
       f.$("#atlas-command-input").getAttribute("aria-controls"),
@@ -387,6 +438,80 @@ async function fixture({ readOnly = false, transport = true } = {}) {
     );
     f.w.close();
   }
+  // A question row is an explicit submit; typing alone only searches saved data.
+  const natural = await fixture();
+  await natural.palette.open();
+  natural.query("Why is Excel slow?");
+  await new Promise((resolve) => setTimeout(resolve, 220));
+  assert.equal(natural.pending.length, 0);
+  assert(
+    !natural.calls.some((call) => call.url.startsWith("/api/assistant/")),
+    "natural-language search never loads the assistant automatically",
+  );
+  const questionOption = natural.$("[role=option]");
+  assert(
+    questionOption.textContent.includes("Ask Atlas about “Why is Excel slow?”"),
+  );
+  natural.enter();
+  await settle();
+  assert.equal(
+    natural.pending.length,
+    1,
+    "choosing the question sends it once without a second confirmation",
+  );
+  assert.equal(
+    JSON.parse(natural.pending[0].options.body).question,
+    "Why is Excel slow?",
+  );
+  assert.equal(natural.$("#atlas-command-input").value, "Why is Excel slow?");
+  natural.answer(0);
+  await settle();
+  natural.palette.close();
+  natural.directory({
+    users: [{ id: 1, full_name: "Who Example", user_name: "who" }],
+    machines: [{ name: "PC-WHO" }],
+  });
+  await natural.palette.open("Who Example");
+  await new Promise((resolve) => setTimeout(resolve, 220));
+  const kinds = [...natural.palette.root.querySelectorAll(".palette-kind")].map(
+    (node) => node.textContent,
+  );
+  assert.deepEqual(
+    kinds,
+    ["Person", "Machine", "Ask Atlas"],
+    "question suggestions never outrank directory results",
+  );
+  natural.palette.close();
+  natural.w.close();
+  for (const cancelBy of ["edit", "close", "selection", "clear", "example"]) {
+    const guard = await fixture();
+    guard.pauseStatus(true);
+    await guard.palette.open("How do I deploy a package?");
+    await new Promise((resolve) => setTimeout(resolve, 220));
+    guard.enter();
+    await settle();
+    if (cancelBy === "edit") guard.query("Explain DNS");
+    if (cancelBy === "close") guard.palette.close();
+    if (cancelBy === "selection") {
+      guard.context({ machine: "PC-NEW" });
+      guard.palette.refreshContext();
+    }
+    if (cancelBy === "clear") guard.$("[data-assistant-clear]").click();
+    if (cancelBy === "example") guard.$("[data-assistant-example]").click();
+    guard.resolveStatus();
+    await settle();
+    assert.equal(
+      guard.pending.length,
+      0,
+      cancelBy + " cancels the question while availability is loading",
+    );
+    assert(
+      !guard.calls.some((call) =>
+        /\/api\/(machine-health|performance)\//.test(call.url),
+      ),
+    );
+    guard.w.close();
+  }
   // Exercise the real Console callback, including its independent Remote Admin field.
   const consoleCalls = [],
     consoleQuestions = [];
@@ -426,6 +551,24 @@ async function fixture({ readOnly = false, transport = true } = {}) {
   await consoleUi.console();
   await consoleUi.run("sharedPaletteReady");
   await settle();
+  assert.equal(
+    consoleUi.run("sharedPalette.root.querySelector('#atlas-ask').textContent"),
+    "Ask Atlas",
+  );
+  consoleUi.run("sharedPalette.root.querySelector('#atlas-ask').click()");
+  await settle();
+  assert.equal(
+    consoleQuestions.length,
+    0,
+    "the visible Console Ask button opens without sending",
+  );
+  assert.equal(
+    consoleUi.run(
+      "sharedPalette.root.querySelector('#atlas-command-input').value",
+    ),
+    "",
+  );
+  consoleUi.run("sharedPalette.close()");
   consoleUi.run(
     "S.user={id:17,canonical_key:'uid:fixture-alice',name:'Alice Fixture'};setTarget('PC-A')",
   );
@@ -470,6 +613,7 @@ async function fixture({ readOnly = false, transport = true } = {}) {
   await demo.palette.open();
   assert(!demo.$("[role=listbox]").textContent.includes("Ask Atlas"));
   assert.equal(demo.$(".palette-assistant"), null);
+  assert.equal(demo.$("#atlas-ask"), null, "the public demo has no Ask button");
   demo.query("ask: Explain");
   demo.enter();
   await settle();

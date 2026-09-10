@@ -144,6 +144,26 @@ class AssistantTests(unittest.TestCase):
         self.assertNotIn('Example Person', injection)
         self.assertIn('no matching saved directory record', note)
 
+    def test_lowercase_and_unicode_names_resolve_with_explicit_or_bare_queries(self):
+        c = sqlite3.connect(self.db)
+        try:
+            c.executemany('insert into users(canonical_key,user_id,user_id_norm,full_name,full_name_norm) values(?,?,?,?,?)', [
+                ('uid:u3', 'u3', 'u3', 'Élodie Martin', 'élodie martin'),
+                ('uid:u4', 'u4', 'u4', "Anne-Marie O'Neil", "anne-marie o'neil"),
+            ])
+            c.commit()
+        finally:
+            c.close()
+        cases = [('example person', 'Example Person'), ('who is example person', 'Example Person'),
+                 ('who is other person', 'Other Person'), ('find other person', 'Other Person'),
+                 ('LOOK UP other person', 'Other Person'), ('élodie martin', 'Élodie Martin'),
+                 ("find anne-marie o'neil", "Anne-Marie O'Neil")]
+        for question, expected in cases:
+            with self.subTest(question=question):
+                evidence, _, note = assistant.context(self.db, assistant.Question(question=question))
+                self.assertIn(expected, json.dumps(evidence, ensure_ascii=False))
+                self.assertNotIn('No saved record', note)
+
     def test_model_output_and_question_sql_are_never_executed(self):
         before = self.db.read_bytes()
         malicious = "DROP TABLE users; UPDATE machines SET model_id='invented';"
@@ -267,13 +287,120 @@ Keep the configured SharePoint-synchronised repository path.
         evidence = [{'source': 'S1', 'label': 'Machine TEST', 'data': '{"model": "Example"}'},
                     {'source': 'S2', 'label': 'Copied report', 'data': 'Line one\nLine two'}]
         prompt = assistant.messages(body, evidence, 'Saved evidence only.')
-        self.assertLess(len(assistant.SYSTEM), 1200)
-        self.assertIn('low overall CPU does not show whole-machine CPU pressure', assistant.SYSTEM)
-        self.assertIn('Citrix measurements leave those causes unknown', assistant.SYSTEM)
+        self.assertLess(len(assistant.SYSTEM), 1500)
         self.assertNotIn('[S1]', prompt[0]['content'])
         self.assertIn('[S1] Machine TEST\n  {"model": "Example"}', prompt[-1]['content'])
         self.assertIn('[S2] Copied report\n  Line one\n  Line two', prompt[-1]['content'])
         self.assertIn('Saved evidence only.', prompt[-1]['content'])
+
+    def test_general_dns_answer_needs_no_selection_report_or_database(self):
+        assistant.GUIDE.write_text('## Slowness and Excel\n\nHigh total CPU can indicate contention.\n', encoding='utf-8')
+        self.runtime.generate.return_value = 'DNS resolves names to addresses. Use Resolve-DnsName to inspect a lookup; compare the configured DNS server and the expected record.'
+        with patch.object(assistant.sqlite3, 'connect', side_effect=AssertionError('General IT questions must not open the directory')), \
+                patch.object(assistant, 'search_directory', side_effect=AssertionError('Not an identity lookup')):
+            response = self.ask({'question': 'Explain DNS resolution and how to troubleshoot a failed lookup.'})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['sources'], [])
+        self.assertEqual(response.json()['context_note'], '')
+        sent = self.runtime.generate.call_args.args[0]
+        self.assertIn('Use your general IT knowledge without requiring', sent[0]['content'])
+        self.assertIn('You may explain Windows or PowerShell commands', sent[0]['content'])
+        self.assertIn('You cannot run scans, commands, deployments or database changes', sent[0]['content'])
+        self.assertIn('no live web access', sent[0]['content'])
+        self.assertNotIn(assistant.CPU_RULE, sent[0]['content'])
+        self.assertNotIn('High total CPU', sent[-1]['content'])
+        self.assertNotIn('No person or machine', sent[-1]['content'])
+
+    def test_generic_technical_words_do_not_become_directory_selectors(self):
+        for question in ('What does DNS do?', 'Explain IPv6 and TLS1.3.',
+                         'How do database indexes work?', 'How do I use Copy only in Atlas?',
+                         'Why is a machine slow?', 'What is Windows11?', 'Remote Admin',
+                         'windows troubleshooting', 'what is dns', 'find DNS records',
+                         'memory usage', 'password reset', 'copy only'):
+            with self.subTest(question=question), patch.object(assistant.sqlite3, 'connect') as connect:
+                evidence, _, note = assistant.context(self.db, assistant.Question(question=question))
+                connect.assert_not_called()
+                self.assertEqual(note, '')
+        self.assertIn('TESTPC123', assistant._terms('Explain TESTPC123'))
+        self.assertIn('Example Person', assistant._terms('What machines does Example Person have?'))
+
+    def test_generic_computer_responses_do_not_request_directory_records(self):
+        for question in (
+            'A Windows share says Access denied, but the computer answers ping. What should I check?',
+            'The computer responds to ping, but file access fails. What should I check?',
+            'My machine has a slow connection. What should I check?',
+            'The computer runs Windows. How do I check its DNS settings?',
+            'computer answers ping',
+        ):
+            with self.subTest(question=question), patch.object(assistant.sqlite3, 'connect') as connect:
+                _, _, note = assistant.context(self.db.with_name('missing.db'), assistant.Question(question=question))
+                connect.assert_not_called()
+                self.assertEqual(note, '')
+        self.assertIn('TESTPC123', assistant._terms('The computer TESTPC123 answers ping.'))
+
+    def test_share_and_wmi_access_denied_retrieve_the_matching_workflow_first(self):
+        assistant.GUIDE.write_text('''## WMI, access denied and RPC connectivity
+
+WMI exposes Windows information; a computer can return access denied when the account lacks permissions.
+
+## SMB shares, C$ and access denied
+
+SMB provides Windows file access. Share permissions control access; ping alone cannot establish access.
+''', encoding='utf-8')
+        cases = (
+            ('A Windows share says Access denied, but the computer answers ping. What should I check?', '## SMB shares'),
+            ('WMI says Access denied. What permission should I check?', '## WMI'),
+        )
+        for question, heading in cases:
+            with self.subTest(question=question):
+                self.assertTrue(assistant._guide_excerpt(question).startswith(heading))
+
+    def test_atlas_procedures_retrieve_workflow_guide_without_database_actions(self):
+        assistant.GUIDE.write_text('''## Packages and deployment
+
+Atlas Copy only transfers the selected package without executing it. Choose the target, package and action in the IT Console.
+
+## Database updates
+
+Use Manage database to preview an export, review the changes and then Apply explicitly.
+''', encoding='utf-8')
+        before = self.db.read_bytes()
+        for question, marker in [('How do I use Copy only in Atlas?', 'transfers the selected package'),
+                                 ('How do I import a new export into Atlas?', 'review the changes')]:
+            with self.subTest(question=question), patch.object(assistant.sqlite3, 'connect') as connect:
+                evidence, sources, note = assistant.context(self.db, assistant.Question(question=question))
+                self.assertIn(marker, json.dumps(evidence))
+                self.assertTrue(sources)
+                self.assertEqual(note, '')
+                connect.assert_not_called()
+        self.assertEqual(self.db.read_bytes(), before)
+
+    def test_followup_uses_one_user_topic_not_assistant_generated_retrieval(self):
+        assistant.GUIDE.write_text('''## DNS resolution
+
+DNS troubleshooting starts with the queried name and configured DNS server.
+
+## Packages and deployment
+
+Packages are transferred from the selected package repository.
+''', encoding='utf-8')
+        body = assistant.Question(question='What should I check next?', history=[
+            assistant.Turn(role='user', content='How do I troubleshoot DNS resolution?'),
+            assistant.Turn(role='assistant', content='Packages deployment selected package repository.')])
+        with patch.object(assistant.sqlite3, 'connect') as connect:
+            evidence, _, note = assistant.context(self.db, body)
+            connect.assert_not_called()
+        self.assertIn('configured DNS server', json.dumps(evidence))
+        self.assertNotIn('Packages and deployment', json.dumps(evidence))
+        self.assertEqual(note, '')
+
+    def test_cpu_grounding_rule_is_preserved_only_when_relevant(self):
+        for body in (assistant.Question(question='Explain these CPU readings'),
+                     assistant.Question(question='Explain this', scan_report='Saved CPU readings.'),
+                     assistant.Question(question='What should I check next?', history=[assistant.Turn(role='user', content='Why is Excel slow?')])):
+            prompt = assistant.messages(body, [], '')
+            self.assertIn(assistant.CPU_RULE, prompt[0]['content'])
+        self.assertNotIn(assistant.CPU_RULE, assistant.messages(assistant.Question(question='How do I deploy a package?'), [], '')[0]['content'])
 
     def test_invalid_input_rejected_without_model_execution(self):
         for body in ({'question': ' '}, {'question': 'x'*1601}, {'question': 'ok', 'machine': '..\\bad'},

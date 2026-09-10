@@ -35,13 +35,24 @@ export function installCommandPalette({
   const root = mount.attachShadow({ mode: "open" });
   const sheet = document.createElement("link");
   sheet.rel = "stylesheet";
-  sheet.href = "/command-palette.css?v=72";
+  sheet.href = "/command-palette.css?v=73";
   root.append(sheet);
   const trigger = document.createElement("button");
   trigger.id = "atlas-commands";
   trigger.innerHTML = "Search Atlas <kbd>Ctrl K</kbd>";
   trigger.setAttribute("aria-label", "Search Atlas commands (Ctrl+K)");
   root.append(trigger);
+  const assistantTrigger = document.createElement("button");
+  if (!readOnly) {
+    assistantTrigger.id = "atlas-ask";
+    assistantTrigger.type = "button";
+    assistantTrigger.textContent = "Ask Atlas";
+    assistantTrigger.setAttribute(
+      "aria-label",
+      "Ask Atlas about IT or using Atlas",
+    );
+    root.append(assistantTrigger);
+  }
   const dialog = document.createElement("dialog");
   dialog.className = "atlas-palette";
   dialog.setAttribute("aria-label", "Search Atlas");
@@ -51,6 +62,7 @@ export function installCommandPalette({
   const input = dialog.querySelector("input"),
     list = dialog.querySelector("[role=listbox]"),
     status = dialog.querySelector("[role=status]");
+  const searchPlaceholder = input.placeholder;
   const footer = dialog.querySelector("footer");
   if (!readOnly)
     footer.lastElementChild.textContent += " · ask: for the offline assistant";
@@ -61,12 +73,13 @@ export function installCommandPalette({
   if (!readOnly) {
     assistant.setAttribute("aria-label", "Offline Atlas assistant");
     assistant.innerHTML =
-      '<div class="assistant-heading"><strong>Ask Atlas</strong><span>Local · Offline</span></div><p id="atlas-assistant-policy" class="assistant-policy">Manual scans only. The assistant explains stored records and results you already collected. It cannot start scans or change the database.</p><p class="assistant-model" role="status" aria-live="polite"></p><p class="assistant-context"></p><label class="assistant-include"><input type="checkbox"> Include existing slowness results</label><div class="assistant-transcript" role="log" aria-label="Conversation" aria-live="polite" aria-relevant="additions" tabindex="0"></div><p class="assistant-feedback" role="status" aria-live="polite"></p><div class="assistant-controls"><button type="button" data-assistant-back>Back to search</button><button type="button" data-assistant-clear>Clear conversation</button><button type="button" data-assistant-ask>Ask Atlas</button></div>';
+      '<div class="assistant-heading"><strong>Ask Atlas</strong><span>Local · Offline</span></div><p id="atlas-assistant-policy" class="assistant-policy">Ask about IT, troubleshooting or how to use Atlas. Saved records and scan results are optional context. Manual scans only: the assistant cannot start scans, run actions or change the database.</p><p class="assistant-model" role="status" aria-live="polite"></p><p class="assistant-context"></p><div class="assistant-examples" role="group" aria-label="Example questions"><button type="button" data-assistant-example>Explain DNS</button><button type="button" data-assistant-example>How do I deploy a package?</button><button type="button" data-assistant-example>Troubleshoot a Windows share</button></div><label class="assistant-include"><input type="checkbox"> Include existing slowness results</label><div class="assistant-transcript" role="log" aria-label="Conversation" aria-live="polite" aria-relevant="additions" tabindex="0"></div><p class="assistant-feedback" role="status" aria-live="polite"></p><div class="assistant-controls"><button type="button" data-assistant-back>Back to search</button><button type="button" data-assistant-clear>Clear conversation</button><button type="button" data-assistant-ask>Ask Atlas</button></div>';
     footer.before(assistant);
   }
   const assistantModel = assistant.querySelector(".assistant-model"),
     assistantContext = assistant.querySelector(".assistant-context"),
     transcript = assistant.querySelector(".assistant-transcript"),
+    examples = assistant.querySelector(".assistant-examples"),
     feedback = assistant.querySelector(".assistant-feedback"),
     includeScan = assistant.querySelector('input[type="checkbox"]'),
     askButton = assistant.querySelector("[data-assistant-ask]");
@@ -74,6 +87,8 @@ export function installCommandPalette({
     assistantStatus = null,
     assistantController,
     assistantGeneration = 0,
+    assistantInputVersion = 0,
+    assistantReady = Promise.resolve(),
     assistantPending = false,
     conversation = [],
     contextKey = "",
@@ -123,6 +138,7 @@ export function installCommandPalette({
       if (assistantPending) cancelAssistant();
       conversation = [];
       transcript.replaceChildren();
+      examples.hidden = false;
       includeScan.checked = false;
       feedback.textContent =
         "Selection changed. Conversation and scan selection cleared.";
@@ -133,7 +149,7 @@ export function installCommandPalette({
       ? `Selected machine: ${current.machine}${current.user_key ? " · selected user included" : ""} · stored data only`
       : current.user_key
         ? "Selected user · stored data only"
-        : "Ask an IT question or name a record to look up in the database.";
+        : "No machine or scan is required. You can also ask about a saved user or machine.";
     assistant.querySelector(".assistant-include").hidden = !current.scan_report;
     if (!current.scan_report) includeScan.checked = false;
     updateAskButton();
@@ -219,10 +235,11 @@ export function installCommandPalette({
     input.removeAttribute("aria-controls");
     input.setAttribute("aria-describedby", "atlas-assistant-policy");
     input.setAttribute("aria-label", "Ask the offline Atlas assistant");
+    input.placeholder = "Ask any IT or Atlas question…";
     footer.textContent =
       "Enter or Ask Atlas sends your question · Esc cancels and closes · Answers can be incomplete; check the evidence.";
     syncAssistantContext();
-    if (entering) checkAssistant();
+    if (entering) assistantReady = checkAssistant();
   }
   function hideAssistant() {
     if (assistantMode) cancelAssistant();
@@ -237,6 +254,7 @@ export function installCommandPalette({
     input.setAttribute("aria-autocomplete", "list");
     input.setAttribute("aria-controls", "atlas-command-results");
     input.removeAttribute("aria-describedby");
+    input.placeholder = searchPlaceholder;
     input.setAttribute(
       "aria-label",
       "Search people, machines, desks or actions",
@@ -294,6 +312,7 @@ export function installCommandPalette({
       message.append(note);
     }
     transcript.append(message);
+    examples.hidden = true;
     while (transcript.children.length > 8)
       transcript.firstElementChild.remove();
     transcript.scrollTop = transcript.scrollHeight;
@@ -301,9 +320,10 @@ export function installCommandPalette({
   async function askAssistant() {
     if (readOnly || !assistantMode || assistantPending) return;
     const current = syncAssistantContext(),
-      question = input.value.replace(/^ask:\s*/i, "").trim();
+      question = input.value.replace(/^\s*ask:\s*/i, "").trim();
     if (!question) {
-      feedback.textContent = "Type your question after ask:.";
+      feedback.textContent =
+        "Type an IT or Atlas question, then choose Ask Atlas.";
       input.focus();
       return;
     }
@@ -354,8 +374,8 @@ export function installCommandPalette({
       ].slice(-4);
       feedback.textContent =
         "Answer ready · No scans or database changes performed.";
-      if (input.value.replace(/^ask:\s*/i, "").trim() === question)
-        input.value = "ask: ";
+      if (input.value.replace(/^\s*ask:\s*/i, "").trim() === question)
+        input.value = "";
     } catch (error) {
       if (request === assistantGeneration && error.name !== "AbortError")
         feedback.textContent = error.message;
@@ -374,13 +394,21 @@ export function installCommandPalette({
       input.focus();
     };
     assistant.querySelector("[data-assistant-clear]").onclick = () => {
+      assistantInputVersion++;
       if (assistantPending) cancelAssistant();
       conversation = [];
       transcript.replaceChildren();
+      examples.hidden = false;
       includeScan.checked = false;
       feedback.textContent =
         "Conversation cleared. It is kept only in this page's memory.";
     };
+    for (const button of assistant.querySelectorAll("[data-assistant-example]"))
+      button.onclick = () => {
+        assistantInputVersion++;
+        input.value = button.textContent;
+        input.focus();
+      };
     document.addEventListener("input", () => {
       if (dialog.open && assistantMode) syncAssistantContext();
     });
@@ -426,10 +454,28 @@ export function installCommandPalette({
   async function choose(index) {
     const row = rows[index];
     if (!row) return;
-    if (row.id === "assistant") {
-      input.value = "ask: ";
+    if (row.id === "assistant" || row.id === "assistant-question") {
+      assistantInputVersion++;
+      input.value = "ask: " + (row.question || "");
       search();
       input.focus();
+      if (row.question) {
+        // Choosing this question is the explicit submit action. Editing, closing
+        // or changing the selection while availability loads cancels that intent.
+        const request = assistantGeneration,
+          inputVersion = assistantInputVersion,
+          selectedKey = keyFor(readContext());
+        await assistantReady;
+        if (
+          dialog.open &&
+          assistantMode &&
+          request === assistantGeneration &&
+          inputVersion === assistantInputVersion &&
+          selectedKey === keyFor(readContext()) &&
+          input.value.trim() === row.question
+        )
+          await askAssistant();
+      }
       return;
     }
     if (row.person) {
@@ -504,6 +550,7 @@ export function installCommandPalette({
     const request = generation,
       raw = input.value.trim();
     if (/^ask:/i.test(raw)) {
+      input.value = raw.replace(/^ask:\s*/i, "");
       showAssistant();
       return;
     }
@@ -517,6 +564,31 @@ export function installCommandPalette({
         : raw;
     const q = normalize(term),
       words = q.split(/\s+/).filter(Boolean);
+    const question =
+      !readOnly &&
+      !kind &&
+      !/^[\w-]+:/.test(raw) &&
+      raw.length >= 3 &&
+      raw.length <= 1600 &&
+      (/\?$/.test(raw) ||
+        /^(how|why|what|when|where|which|who|can|could|should|would|is|are|does|do|help|explain|tell|troubleshoot|diagnose)\b.+\S/i.test(
+          raw,
+        ) ||
+        (words.length >= 2 &&
+          /\b(excel|outlook|windows|citrix|vpn|network|dns|cpu|memory|ram|disk|printer|powershell|atlas|deployment)\b/i.test(
+            raw,
+          )))
+        ? [
+            {
+              id: "assistant-question",
+              kind: "Ask Atlas",
+              title: `Ask Atlas about “${raw.length > 120 ? raw.slice(0, 120) + "…" : raw}”`,
+              detail:
+                "Send this question to the offline IT assistant. No scans or actions are run.",
+              question: raw,
+            },
+          ]
+        : [];
     const matches = (text) => words.every((w) => normalize(text).includes(w));
     const local = [];
     if (!kind || kind === "action")
@@ -589,21 +661,22 @@ export function installCommandPalette({
         }));
         render(
           preferPersonDetails
-            ? [...people, ...machines, ...local]
-            : [...local, ...people, ...machines],
+            ? [...people, ...machines, ...local, ...question]
+            : [...local, ...people, ...machines, ...question],
           data.users.length > 10 || data.machines.length > 10
             ? "Showing the first directory matches. Refine your search for more."
             : "",
         );
       } catch (e) {
         if (e.name !== "AbortError" && request === generation && dialog.open)
-          render(local, e.message);
+          render([...local, ...question], e.message);
       }
     }, 180);
   }
   async function open(query = "", sourceDialog = null) {
     if (dialog.open) {
       if (typeof query === "string" && query) {
+        assistantInputVersion++;
         input.value = query;
         search();
       }
@@ -621,13 +694,14 @@ export function installCommandPalette({
       document.activeElement?.shadowRoot?.activeElement ||
       document.activeElement;
     dialog.showModal();
+    assistantInputVersion++;
     input.value = typeof query === "string" ? query : "";
     search();
     input.focus();
     if (prepare) {
       try {
         await prepare();
-        if (dialog.open) search();
+        if (dialog.open && !assistantMode) search();
       } catch {
         if (dialog.open)
           status.textContent =
@@ -636,7 +710,12 @@ export function installCommandPalette({
     }
   }
   trigger.onclick = open;
-  input.oninput = search;
+  if (!readOnly) assistantTrigger.onclick = () => open("ask: ");
+  input.oninput = () => {
+    assistantInputVersion++;
+    if (assistantMode) syncAssistantContext();
+    else search();
+  };
   dialog.querySelector(".palette-close").onclick = close;
   dialog.addEventListener("close", () => {
     invalidate();

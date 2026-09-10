@@ -3,6 +3,12 @@
   font-family: system-ui, sans-serif;
   color-scheme: light;
   cursor: default;
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-width: 100%;
+  min-width: 0;
 }
 * {
   box-sizing: border-box;
@@ -28,6 +34,24 @@
   border-radius: 5px;
   padding: 2px 5px;
   background: #f5f8fa;
+}
+#atlas-ask {
+  border: 1px solid #b9dce8;
+  border-radius: 9px;
+  padding: 10px 12px;
+  background: #edf8fc;
+  font: 600 13px system-ui;
+  color: #006d8e;
+  cursor: pointer;
+  white-space: nowrap;
+}
+#atlas-ask:hover {
+  background: #dff3fa;
+}
+#atlas-ask:focus-visible,
+#atlas-commands:focus-visible {
+  outline: 2px solid #00aeef;
+  outline-offset: 2px;
 }
 .atlas-palette {
   font: 14px system-ui;
@@ -243,6 +267,28 @@
 }
 .assistant-include input {
   accent-color: #007fa7;
+}
+.assistant-examples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0;
+}
+.assistant-examples button {
+  border: 1px solid #dbe6ed;
+  border-radius: 8px;
+  padding: 6px 9px;
+  background: #f7fafc;
+  color: #385469;
+  font: 11px system-ui;
+  cursor: pointer;
+}
+.assistant-examples button:hover {
+  background: #edf8fc;
+}
+.assistant-examples button:focus-visible {
+  outline: 2px solid #00aeef;
+  outline-offset: 2px;
 }
 .assistant-transcript {
   max-height: 32dvh;

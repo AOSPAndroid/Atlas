@@ -95,7 +95,10 @@ async def generate(messages, request):
         answer = result.get('answer')
         if not isinstance(answer, str) or not answer.strip():
             raise HTTPException(503, 'The model returned no answer. Try a shorter question.')
-        return answer.strip()[:20000]
+        answer = answer.strip()[:20000]
+        if result.get('truncated') is True:
+            answer += '\n\nThis answer is incomplete. Ask a narrower question for the remaining steps.'
+        return answer
     except (OSError, ValueError, TypeError):
         raise HTTPException(503, 'The local assistant process failed. Re-run the optional assistant setup and try again.') from None
     finally:

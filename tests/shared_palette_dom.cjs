@@ -19,6 +19,7 @@ async function loadModule(file,context,cache=new Map()){
   let personDesks=[desk];
   w.fetch=async(url)=>{
    requests.push(url);
+   if(url==='/api/assistant/status')return {ok:true,json:async()=>({available:true,model:'Fixture model'})};
    if(url.includes('/api/palette/person/'))return {ok:true,json:async()=>({desks:personDesks})};
    const term=new URL(url,w.location.href).searchParams.get('term');
    // Deliberately return an obsolete query last, even if its signal was aborted.
@@ -59,6 +60,7 @@ async function loadModule(file,context,cache=new Map()){
   await palette.open();key('ArrowDown');assert.equal(input.getAttribute('aria-activedescendant'),'atlas-command-1');
   let leaked=0;w.document.addEventListener('keydown',()=>leaked++);key('d');assert.equal(leaked,0,'palette typing must not reach console shortcuts');
   type('<script>');await sleep(220);assert.equal(options().length,0);assert(!palette.root.querySelector('script'));palette.close();
+  const askTrigger=palette.root.querySelector('#atlas-ask');assert.equal(askTrigger.textContent,'Ask Atlas');assert.equal(askTrigger.previousElementSibling.id,'atlas-commands','Ask remains beside Search in both hosts');requests=[];askTrigger.focus();askTrigger.click();await sleep(0);assert(palette.dialog.open);assert.equal(input.value,'');assert.equal(input.placeholder,'Ask any IT or Atlas question…');assert(!requests.some(url=>url==='/api/assistant/ask'));palette.close();assert.equal(palette.root.activeElement,askTrigger);
   assert.throws(()=>registry.namespace.commandUrl('reboot-now'));
   for(const command of registry.namespace.COMMANDS){const url=registry.namespace.commandUrl(command.id,'PC & 1');assert.equal(new URL(url,w.location.href).searchParams.get('machine'),'PC & 1');}
   w.close();

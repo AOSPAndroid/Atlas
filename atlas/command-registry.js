@@ -42,7 +42,7 @@ export const COMMANDS = [
   [
     "assistant",
     "Ask Atlas",
-    "Ask the offline IT assistant about stored data or existing scan results",
+    "Ask about IT, troubleshooting, technology or how to use Atlas",
     "ai assistant offline help explain troubleshoot ask",
   ],
   [

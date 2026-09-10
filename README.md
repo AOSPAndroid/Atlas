@@ -15,6 +15,7 @@ The **map** helps you explore floors and seating in 2D or 3D. The **IT console**
 | **Remote administration** | Check machine health and specifications, inspect software and resource usage, manage processes with confirmation, and open Windows support tools. Remote actions use the host account's existing permissions. |
 | **Application deployment** | Browse a package catalogue, select install/repair/uninstall scripts, deploy to individual targets or a bulk queue, and follow progress, logs and history. |
 | **Data management** | Preview and apply directory imports, review export-column coverage, maintain seating records, and back up or restore the database. |
+| **Ask Atlas** | Optional offline IT assistant for technical questions, troubleshooting and Atlas workflows, with selected records and existing scan reports available as context. |
 | **Shared viewer** | Host a separate read-only interface on the local network for maps, people lookup and stored inventory. Editing, deployment and elevated remote operations stay in the admin tool. |
 
 Atlas runs from Python source with FastAPI and SQLite; the interface uses HTML, CSS and JavaScript. The Windows launcher starts the local admin service and shared viewer together. Runtime records live in a persistent database, while deployment packages stay in your configured package repository.
@@ -187,21 +188,31 @@ The map renderer, camera controller, animation switch, person cards, dialog styl
 Remote Admin shows up to 100 processes sorted by CPU, GPU or memory, with the full process count alongside. Right-click a row, press Shift+F10, or use its **•••** button to **Kill process**, copy its PID or copy its details. Killing a row confirms its name, PID and machine, rechecks the process creation time, reports Windows' result, and refreshes after success. Core Windows processes are blocked. The manual PID/name field also confirms before terminating; a name targets every matching instance. GPU usage reports the busiest engine per process and requires counters exposed by the remote graphics driver; unavailable counters produce an explicit message. These remote operations remain available only in the local admin version.
 
 
-## Troubleshooting performance in Remote Admin
+## Optional offline assistant in the command palette
 
-### Optional offline assistant in the command palette
+Click **Ask Atlas** beside Search Atlas on the admin map or in the IT Console.
+You can also press **Ctrl+K**, type a question and choose **Ask Atlas about…** to
+send that question directly. Both use the same conversation within the palette,
+without leaving the page. In Ask mode, submit with **Ask Atlas** or Enter; the
+**ask:** prefix also opens this mode. Example questions only fill the input.
+Opening the assistant, typing or selecting a machine never starts inference or
+a scan.
 
-Press **Ctrl+K** and choose **Ask Atlas**, or type **ask:** followed by a question.
-The same assistant is available on the admin map and in the IT Console. Type a
-question and click **Ask Atlas** (or press Enter) to generate an answer. Opening
-the palette, typing or selecting a machine never starts inference or a scan.
+Ask general IT questions without selecting a person, machine or report: for
+example, "What is the difference between DNS and DHCP?", "How do I troubleshoot
+access denied on a Windows share?" or "How do I deploy a package in Atlas?".
+Ask Atlas can explain Windows and networking concepts, errors, troubleshooting
+steps, commands and the tool's map, directory, deployment, remote administration
+and database workflows. It uses its general knowledge alongside relevant excerpts
+from the local Atlas guide; that guide does not limit which IT topics you can ask
+about. Follow-up questions stay in the same conversation.
 
-The assistant can explain IT troubleshooting steps, look up a small number of
-stored user/machine records and explain directory import/column coverage. In the
-Console, **Include existing slowness results** attaches the report already on
-screen; it does not collect new readings. Expand **Source evidence** to see which
-stored records, copied report and local IT guide were supplied. Model answers are
-draft explanations, not verified diagnoses. Unknown measurements remain unknown.
+Selected records and reports are optional context. The assistant can look up a
+small number of stored users or machines. In the Console, **Include existing
+slowness results** attaches the report already on screen and collects no new
+readings. Expand **Source evidence** and **View supplied facts** to inspect the
+exact excerpts supplied. Answers are suggestions to check, not verified diagnoses;
+the offline model can be incomplete or outdated and cannot check live websites.
 
 **Manual scans only:** Ask Atlas cannot run WMI, start scans, execute commands,
 deploy, kill processes or change database records. For database updates it explains
@@ -249,6 +260,8 @@ reference guide is `assistant/it-guide.md`. The worker uses non-thinking mode
 and adapts one equivalent Jinja comparison in memory for tokenizer compatibility;
 the distributed model files remain unchanged. The assistant never downloads or
 updates itself at runtime.
+
+## Troubleshooting performance in Remote Admin
 
 ### Manual performance capture
 
