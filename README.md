@@ -123,7 +123,7 @@ py -3.12 launcher.py stop
 
 `backend/main.py` hosts admin routes; `backend/viewer.py` hosts shared read routes; `directory_lookup.py` shares database-only lookup queries; `atlas/official-app.js` renders the common map; `atlas/viewer.js` provides read-only user and machine inspection.
 
-The test runner uses disposable database copies, starts isolated UI fixtures on ports 8892/8893, and runs 82 Python tests plus thirteen Node DOM suites. Remote operations are simulated. `npm run format:check` verifies formatting of the maintained browser sources.
+The test runner uses disposable database copies, starts isolated UI fixtures on ports 8892/8893, and runs 82 Python tests plus fourteen Node DOM suites. Remote operations are simulated. `npm run format:check` verifies formatting of the maintained browser sources.
 
 ## Optimization changes
 
@@ -146,3 +146,5 @@ Palettes, dialogs, person cards, console pages, and drawers use the same short m
 No frontend runtime library was added. Camera movement shares the existing render loop and stops when settled. Cached geometry is reused throughout animations. Regression checks cover rapid selection, manual interruption, cursor anchoring, reduced motion, and rendering after the animation ends.
 
 The map renderer, camera controller, animation switch, person cards, dialog styles and palette are shared source files across admin and viewer. Viewer commands are filtered through the common command catalogue; permissions continue to be enforced by the separate read-only server.
+
+The map uses Barclays-blue native cursors with a dark outline and a white outer edge. Hovering a desk changes to a hand, dragging uses a closed hand, and placement uses a crosshair. Brief hover and click rings respect the Animations setting; the coloured cursor remains when animations are off. The implementation has no pointer-following loop or continuous animation, keeping it light for Citrix. The admin and demo maps share the same cursors.

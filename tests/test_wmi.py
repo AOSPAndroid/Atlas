@@ -68,7 +68,7 @@ class Regression(unittest.TestCase):
   self.assertEqual(self.client.post('/api/deploy',headers={'Origin':'https://other.example'},json={}).status_code,403)
   self.assertEqual(self.client.get('/api/history',headers={'Host':'other.example'}).status_code,403)
  def test_browser_revalidates_pages_and_scripts(self):
-  for path in ['/installer','/','/assets/console-directory.js','/assets/shared-ui.js','/assets/ui-tokens.css','/command-palette.js']:
+  for path in ['/installer','/','/assets/console-directory.js','/assets/shared-ui.js','/assets/ui-tokens.css','/command-palette.js','/map-cursor.js']:
    with self.subTest(path=path):
     response=self.client.get(path);self.assertEqual(response.status_code,200)
     self.assertEqual(response.headers.get('cache-control'),'no-cache')

@@ -1,4 +1,5 @@
 import { createCameraMotion } from "./camera-motion.js";
+import { installMapCursor } from "./map-cursor.js";
 const readOnly =
   document.querySelector('meta[name="atlas-mode"]')?.content === "viewer";
 const { createOperations } = readOnly
@@ -791,6 +792,8 @@ function setView(v, animate = false) {
   const changed = view !== v;
   view = v;
   canvas = v === "plan" ? planCanvas : glCanvas;
+  mapCursor.reset();
+  mapCursor.set(canvas, placing ? "place" : "default");
   applyNameVisibility();
   $("#source").hidden = true;
   glCanvas.hidden = v !== "3d";
@@ -856,6 +859,7 @@ $("#rotate").onclick = () => {
 $("#add").onclick = () => {
   if (!databaseReady) return toast("Launch the Python app to add desks");
   placing = placing ? false : "new";
+  mapCursor.set(canvas, placing ? "place" : "default");
   $("#add").textContent = placing ? "Cancel placement" : "＋ Add location";
   if (placing) {
     setView("plan");
@@ -865,6 +869,7 @@ $("#add").onclick = () => {
 window.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     placing = false;
+    mapCursor.reset();
     $("#detail").style.visibility = "";
     $("#add").textContent = "＋ Add location";
   }
@@ -960,6 +965,11 @@ planCanvas.setAttribute(
 );
 glCanvas.after(planCanvas);
 let canvas = planCanvas;
+const mapCursor = installMapCursor({
+  viewport: $("#viewport"),
+  canvases: [glCanvas, planCanvas],
+  reduced: () => motionPreference.matches,
+});
 const ctx2d = planCanvas.getContext("2d");
 let gl = null,
   program,
@@ -1886,6 +1896,7 @@ let pinchDistance = 0;
 onMap("pointerdown", (e) => {
   stopFocus();
   clearLocator();
+  mapCursor.set(canvas, placing ? "place" : "drag");
   canvas.setPointerCapture(e.pointerId);
   pointers.set(e.pointerId, [e.clientX, e.clientY]);
   if (pointers.size === 2) {
@@ -1944,7 +1955,7 @@ onMap("pointermove", (e) => {
         Math.min(e.clientX - rect.left + 12, rect.width - 210) + "px";
       hover.style.top = e.clientY - rect.top - 35 + "px";
     }
-    canvas.style.cursor = placing ? "crosshair" : r ? "pointer" : "grab";
+    mapCursor.set(canvas, placing ? "place" : r ? "hover" : "default", e);
   }
 });
 onMap("pointerup", async (e) => {
@@ -1952,6 +1963,7 @@ onMap("pointerup", async (e) => {
   const clicked = drag && !drag.moved && drag.button === 0;
   drag = null;
   pinchDistance = 0;
+  mapCursor.set(canvas, placing ? "place" : hit(e) ? "hover" : "default");
   if (!clicked) return;
   if (placing) {
     const rect = canvas.getBoundingClientRect(),
@@ -1979,6 +1991,7 @@ onMap("pointerup", async (e) => {
           };
     if (await saveRecord(next)) {
       placing = false;
+      mapCursor.set(canvas, "hover");
       $("#add").textContent = "＋ Add location";
       $("#detail").style.visibility = "";
       selectRecord(next.id);
@@ -1991,6 +2004,7 @@ onMap("pointerup", async (e) => {
 onMap("pointercancel", (e) => {
   pointers.delete(e.pointerId);
   drag = null;
+  mapCursor.reset();
 });
 onMap("pointerleave", () => ($("#hover").hidden = true));
 onMap("contextmenu", (e) => {

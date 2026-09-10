@@ -130,9 +130,11 @@ const { fixture, root } = require("./ui_fixture.cjs");
     new w.MouseEvent("pointerdown", { clientX: 400, clientY: 250, button: 0 }),
   );
   assert.equal(t.cameraMotion.active, false);
+  assert.equal(t.currentCanvas().dataset.mapCursor, "drag");
   step(900);
   close(t.state(), interrupted);
   t.currentCanvas().dispatchEvent(new w.MouseEvent("pointerup", { button: 2 }));
+  assert.notEqual(t.currentCanvas().dataset.mapCursor, "drag");
 
   t.selectRecord(people[0].id);
   t.setFloor(4);
@@ -169,6 +171,8 @@ const { fixture, root } = require("./ui_fixture.cjs");
   );
 
   t.setView("3d", true);
+  assert.equal(t.currentCanvas().dataset.mapCursor, "default");
+  assert(t.currentCanvas().style.cursor.includes("data:image/svg+xml"));
   step(480);
   const uploadCount = uploads;
   w.document.querySelector("#rotate").click();
