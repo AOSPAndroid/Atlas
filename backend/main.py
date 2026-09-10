@@ -30,8 +30,8 @@ DATA.mkdir(parents=True,exist_ok=True)
 # V308_BOOTSTRAP_END
 
 CONFIG=json.loads((ROOT/'config.json').read_text(encoding='utf-8')) if (ROOT/'config.json').exists() else {}
-REPO=Path(os.environ.get('WMI_PACKAGE_REPO') or CONFIG.get('package_repository') or str(Path.home()/'OneDrive - Barclays Bank PLC'/'Shortcuts'/'EPP_PACKAGE_REPO_BetaPackages - BetaPackages'))
-if not REPO.is_absolute(): REPO=ROOT/REPO
+from package_paths import package_repository
+REPO=package_repository(CONFIG,ROOT)
 REMOTE_ROOT=r'C:\Temp\Packages'; NW=0x08000000 if os.name=='nt' else 0
 logging.basicConfig(filename=LOGS/'application.log',level=logging.INFO,format='%(asctime)s %(levelname)s %(message)s')
 app=FastAPI(title='WMI Packager Web v2',docs_url='/api/docs',redoc_url=None)

@@ -41,7 +41,7 @@ These are screenshots of the Atlas renderer using **entirely fictional floors an
 
 **Normal startup: `Start-Office-Atlas.bat`.** Dependency installation is needed for the first setup, after changing Python, or when an update changes `requirements.txt`.
 
-Git and Node.js are not needed to run the downloaded application. The download includes the application, maps and initial directory database. Application installers used for deployment stay in your separate package repository; select its folder in admin **Settings** before deploying.
+Git and Node.js are not needed to run the downloaded application. The download includes the application, maps and initial directory database. Application installers used for deployment stay in your separate package repository. Atlas automatically looks for the synced **EPP_PACKAGE_REPO_BetaPackages - BetaPackages** SharePoint folder in business OneDrive; no repository setting is needed when that folder is available. Sync the SharePoint shortcut through OneDrive before deploying.
 
 This is a normal project tree containing Python source, browser assets, floor plans, templates and tests. No TXT-to-Python extraction is needed.
 
@@ -134,7 +134,9 @@ The demo shares the person/machine inspector, date display and field searches. I
 
 ## Configuration and updates
 
-Set the package repository in the admin Settings dialog, or copy `config.example.json` to `config.json` and edit it. `WMI_PACKAGE_REPO` overrides that value. Local configuration, logs, process records and SQLite journal files are ignored by Git.
+The default package repository is the synced **EPP_PACKAGE_REPO_BetaPackages - BetaPackages** SharePoint folder, inside **Shortcuts** or directly inside business OneDrive. Atlas checks `OneDriveCommercial`, the current account's registered business OneDrive folders, and the standard business OneDrive location. When running under a separate admin account, it can use the exact package folder from a loaded Windows profile if only one accessible match exists. It does not guess between multiple users' package folders.
+
+Leave `package_repository` blank in `config.json` (as in `config.example.json`), or omit `config.json`, to use automatic detection. An explicit repository saved through admin **Settings** takes precedence; `WMI_PACKAGE_REPO` overrides both. These defaults do not sign in to SharePoint or create its OneDrive shortcut. Local configuration, logs, process records and SQLite journal files are ignored by Git.
 
 The database and floor plans were already part of this private repository's embedded package and are now ordinary files. Keep the repository private. The launcher copies the distributed `office_atlas.db` seed into ignored `data/office_atlas.db` once, preserving existing records with SQLite backup. Subsequent launches keep that runtime database. Stop both servers and back up `data/office_atlas.db` before updating; preserve the `data` directory and `config.json` when moving to a fresh checkout. Set `ATLAS_DB_PATH` to use another existing Atlas database. Direct backend development uses the runtime database if present, otherwise the root seed. Use the admin database manager for supported directory refreshes.
 
