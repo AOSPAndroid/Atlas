@@ -205,32 +205,6 @@ function renderRecent() {
       }),
   );
 }
-async function admin(kind) {
-  let pc = $("#adminPc").value.trim();
-  if (!pc) return;
-  let u =
-    kind === "overview"
-      ? `/api/overview/${pc}`
-      : kind === "ping"
-        ? `/api/ping/${pc}`
-        : kind === "access"
-          ? `/api/access/${pc}`
-          : kind === "disk"
-            ? `/api/disk/${pc}`
-            : `/api/processes/${pc}?kind=${kind}`;
-  let d = await api(u);
-  if (kind === "cpu" || kind === "memory") {
-    S.processes = d;
-    renderProcesses();
-  } else
-    $("#adminOverview").innerHTML =
-      `<pre>${esc(JSON.stringify(d, null, 2))}</pre>`;
-}
-function renderProcesses() {
-  let q = $("#processFilter").value.toLowerCase(),
-    d = S.processes.filter((x) => JSON.stringify(x).toLowerCase().includes(q));
-  $("#adminOut").innerHTML = table(d);
-}
 function table(rows) {
   if (!rows.length) return "";
   return `<table><thead><tr>${Object.keys(rows[0])

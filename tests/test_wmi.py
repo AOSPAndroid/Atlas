@@ -98,6 +98,22 @@ class Regression(unittest.TestCase):
  def test_wmi_error_not_process_exit(self):
   with patch.object(app,'ps',side_effect=RuntimeError('WMI unreachable')):
    with self.assertRaises(RuntimeError):app.wmi_running('TESTPC',123)
+ def test_remote_process_routes_validate_and_report_windows_outcomes(self):
+  item={'PID':42,'Process':'sample.exe','CreatedAt':'20260910100000.000000+000','CanTerminate':True,'GPU':40}
+  with patch.object(app,'ps',return_value=json.dumps({'ok':True,'items':[item]})) as remote:
+   response=self.client.get('/api/processes/TESTPC?kind=gpu');self.assertEqual(response.status_code,200);self.assertEqual(response.json(),[item])
+   self.assertIn("-Kind 'gpu'",remote.call_args.args[0]);remote.reset_mock()
+   self.assertEqual(self.client.get('/api/processes/TESTPC?kind=invalid').status_code,400);remote.assert_not_called()
+  payload={'computer':'TESTPC','value':'42','created':item['CreatedAt'],'name':item['Process']}
+  outcome={'ok':True,'count':0,'failed':1,'results':[{'PID':42,'Process':'sample.exe','state':'failed','message':'Access denied'}]}
+  with patch.object(app,'ps',return_value=json.dumps(outcome)):
+   response=self.client.post('/api/kill',json=payload);self.assertEqual(response.status_code,200);self.assertEqual(response.json()['count'],0);self.assertEqual(response.json()['failed'],1)
+  with patch.object(app,'ps',side_effect=RuntimeError('WMI unreachable')):
+   self.assertEqual(self.client.get('/api/processes/TESTPC?kind=cpu').status_code,502)
+  with patch.object(app,'ps') as remote:
+   self.assertEqual(self.client.post('/api/kill',json=dict(payload,value='4')).status_code,400)
+   self.assertEqual(self.client.post('/api/kill',headers={'Origin':'https://other.example'},json=payload).status_code,403)
+   remote.assert_not_called()
  def test_unique_encoded_remote_commands(self):
   commands=[]
   with patch.object(app,'wmi_create',side_effect=lambda pc,cmd:commands.append(cmd) or 12):

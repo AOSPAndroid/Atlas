@@ -123,7 +123,7 @@ py -3.12 launcher.py stop
 
 `backend/main.py` hosts admin routes; `backend/viewer.py` hosts shared read routes; `directory_lookup.py` shares database-only lookup queries; `atlas/official-app.js` renders the common map; `atlas/viewer.js` provides read-only user and machine inspection.
 
-The test runner uses disposable database copies, starts isolated UI fixtures on ports 8892/8893, and runs 82 Python tests plus fourteen Node DOM suites. Remote operations are simulated. `npm run format:check` verifies formatting of the maintained browser sources.
+The test runner uses disposable database copies, starts isolated UI fixtures on ports 8892/8893, and runs the Python regressions plus fifteen Node DOM suites. Remote operations are simulated. `npm run format:check` verifies formatting of the maintained browser sources.
 
 ## Optimization changes
 
@@ -148,3 +148,5 @@ No frontend runtime library was added. Camera movement shares the existing rende
 The map renderer, camera controller, animation switch, person cards, dialog styles and palette are shared source files across admin and viewer. Viewer commands are filtered through the common command catalogue; permissions continue to be enforced by the separate read-only server.
 
 Atlas uses one shared cursor set with white fills and Barclays-blue outlines across the map, IT console, database manager, dialogs and shared command palette. A crisp pixel arrow, pointing hand, text caret, disabled indicator and map drag/placement cursors preserve each control’s purpose. Subtle click rings appear across the app, including inside dialogs, and respect the Animations setting. Text entry and touch do not trigger decorative click effects. The coloured cursors remain when animations are off. There is no pointer-following loop, continuous animation or layout measurement on pointer movement. Admin and demo load the same cursor implementation.
+
+Remote Admin lists the top 30 processes by CPU, GPU or memory. Right-click a row, press Shift+F10, or use its **•••** button to **Kill process**, copy its PID or copy its details. Killing a row confirms its name, PID and machine, rechecks the process creation time, reports Windows' result, and refreshes after success. Core Windows processes are blocked. The manual PID/name field also confirms before terminating; a name targets every matching instance. GPU usage reports the busiest engine per process and requires counters exposed by the remote graphics driver; unavailable counters produce an explicit message. These remote operations remain available only in the local admin version.

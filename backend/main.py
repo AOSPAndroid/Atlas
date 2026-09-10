@@ -131,7 +131,7 @@ def monitor(pc,pid,log,ex):
 
 class Deploy(BaseModel):computer:str;folder:str;script:str;action:Literal['Install','Uninstall','Repair']='Install';fresh:bool=False;threads:int=Field(8,ge=1,le=128);mode:Literal['full','copy','execute']='full'
 class Bulk(BaseModel):computers:list[str]=Field(min_length=1,max_length=200);folder:str;script:str;action:Literal['Install','Uninstall','Repair']='Install';fresh:bool=False;threads:int=Field(8,ge=1,le=128);concurrency:int=Field(5,ge=1,le=10)
-class Kill(BaseModel):computer:str;value:str
+class Kill(BaseModel):computer:str;value:str;created:str|None=None;name:str|None=None
 class Machine(BaseModel):computer:str
 class DaaSMachineBatch(BaseModel):
  computers:list[str]
@@ -336,12 +336,12 @@ def disk(pc:str):
  out=ps(f"Get-WmiObject -ComputerName {quote(validate_pc(pc))} Win32_LogicalDisk -Filter 'DriveType=3'|select DeviceID,@{{n='FreeGB';e={{[math]::Round($_.FreeSpace/1GB,1)}}}},@{{n='SizeGB';e={{[math]::Round($_.Size/1GB,1)}}}}|ConvertTo-Json -Compress");d=json.loads(out) if out else [];return d if isinstance(d,list) else [d]
 @app.get('/api/processes/{pc}')
 def processes(pc:str,kind:str='cpu'):
- pc=validate_pc(pc);s=f"Get-WmiObject -ComputerName {quote(pc)} Win32_PerfFormattedData_PerfProc_Process|?{{$_.IDProcess-gt 0}}|sort PercentProcessorTime -Descending|select -First 30 @{{n='PID';e={{$_.IDProcess}}}},@{{n='Process';e={{$_.Name}}}},@{{n='CPU';e={{$_.PercentProcessorTime}}}},@{{n='MemoryMB';e={{[math]::Round($_.WorkingSetPrivate/1MB,1)}}}}|ConvertTo-Json -Compress" if kind=='cpu' else f"Get-WmiObject -ComputerName {quote(pc)} Win32_Process|sort WorkingSetSize -Descending|select -First 30 @{{n='PID';e={{$_.ProcessId}}}},@{{n='Process';e={{$_.Name}}}},@{{n='MemoryMB';e={{[math]::Round($_.WorkingSetSize/1MB,1)}}}},CommandLine|ConvertTo-Json -Compress";out=ps(s);d=json.loads(out) if out else [];return d if isinstance(d,list) else [d]
+ import remote_processes,sys
+ return remote_processes.list_processes(sys.modules[__name__],pc,kind)
 @app.post('/api/kill')
 def kill(p:Kill):
- pc=validate_pc(p.computer);v=p.value.strip()
- if not re.fullmatch(r'[A-Za-z0-9_.-]+',v):raise HTTPException(400,'Invalid PID or executable name')
- flt=f'ProcessId={v}' if v.isdigit() else "Name='"+(v if v.lower().endswith('.exe') else v+'.exe')+"'";return {'count':ps(f'$p=@(Get-WmiObject -ComputerName {quote(pc)} Win32_Process -Filter {quote(flt)});foreach($x in $p){{[void]$x.Terminate()}};$p.Count')}
+ import remote_processes,sys
+ return remote_processes.terminate(sys.modules[__name__],p)
 @app.post('/api/reboot')
 def reboot(p:Machine):return {'result':ps(f'$o=Get-WmiObject -ComputerName {quote(validate_pc(p.computer))} Win32_OperatingSystem -EnableAllPrivileges;$o.Reboot().ReturnValue')}
 

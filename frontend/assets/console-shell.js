@@ -61,28 +61,14 @@ function bind() {
       "Failed machines",
     );
   $("#exportCsv").onclick = exportCsv;
-  $("#processFilter").oninput = renderProcesses;
+  bindProcessControls();
   $("#refreshHistory").onclick = history;
-  $("#killBtn").onclick = async () =>
-    toast(
-      "Terminated " +
-        (
-          await api("/api/kill", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              computer: $("#adminPc").value,
-              value: $("#kill").value,
-            }),
-          })
-        ).count,
-    );
   $$("[data-preflight]").forEach((x) => (x.onclick = preflight));
   $$("[data-copy-target]").forEach(
     (x) => (x.onclick = () => copy(S.target, "Hostname")),
   );
   $$("[data-admin-target]").forEach((x) => (x.onclick = () => page("admin")));
-  ["overview", "ping", "access", "disk", "cpu", "memory"].forEach(
+  ["overview", "ping", "access", "disk", "cpu", "gpu", "memory"].forEach(
     (k) =>
       ($(`[data-${k}]`).onclick = () =>
         admin(k).catch((x) => toast(x.message))),

@@ -31,7 +31,7 @@ class ViewerTests(unittest.TestCase):
         paths=['/api/save','/api/move','/api/vacate','/api/deploy','/api/kill','/api/reboot','/api/ops/settings','/api/database/apply/x','/api/open-tool/cmd/PC','/api/official/map-occupant']
         for method in ('POST','PUT','PATCH','DELETE'):
             for path in paths:self.assertEqual(self.client.request(method,path,json={}).status_code,403,(method,path))
-        for path in ['/api/preflight/PC','/api/overview/PC','/api/v28/software/PC','/api/access/PC','/api/backup','/api/package-script','/api/ops/settings','/installer','/manage-database','/office_atlas.db','/config.json','/api/docs','/openapi.json','/operations.js','/.git/config','/%2e%2e/config.json']:
+        for path in ['/api/processes/PC?kind=gpu','/assets/console-processes.js','/api/preflight/PC','/api/overview/PC','/api/v28/software/PC','/api/access/PC','/api/backup','/api/package-script','/api/ops/settings','/installer','/manage-database','/office_atlas.db','/config.json','/api/docs','/openapi.json','/operations.js','/.git/config','/%2e%2e/config.json']:
             self.assertEqual(self.client.get(path).status_code,404,path)
         self.assertEqual(before,hashlib.sha256(self.db.read_bytes()).digest())
     def test_machine_inspector_uses_stored_relationships_only(self):

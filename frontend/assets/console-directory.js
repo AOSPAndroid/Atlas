@@ -7,6 +7,7 @@ function setTarget(pc, status = "") {
   syncDeploymentPanel();
   $("#deployTarget").textContent = pc;
   $("#adminPc").value = pc;
+  invalidateProcesses();
   $("#barTarget").textContent = pc;
   $("#barState").textContent = status;
   $("#targetBar").classList.remove("hidden");
@@ -31,6 +32,7 @@ function clearLookup() {
   $("#machines").innerHTML = "";
   $("#deployTarget").textContent = "Select a machine";
   $("#adminPc").value = "";
+  invalidateProcesses();
   $("#targetBar").classList.add("hidden");
   $("#healthLine").classList.add("hidden");
   $("#preflight").innerHTML = "";

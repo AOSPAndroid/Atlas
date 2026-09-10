@@ -1004,6 +1004,49 @@ tbody tr:hover {
   border-radius: 10px;
   box-shadow: 0 12px 32px #17334625;
 }
+.process-table tbody tr:hover,
+.process-table tbody tr:focus-within {
+  background: #edf8fc;
+}
+.process-table tbody tr:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+#adminOut {
+  overflow-x: auto;
+}
+#processKillDialog {
+  width: min(460px, calc(100vw - 32px));
+  padding: 24px;
+  color: var(--text);
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: 0 20px 70px #17334630;
+}
+#processKillDialog::backdrop {
+  background: #17334666;
+}
+#processKillDialog h2 {
+  margin: 0 0 16px;
+}
+#processKillQuestion {
+  overflow-wrap: anywhere;
+  line-height: 1.6;
+}
+#processKillWarning {
+  color: var(--muted);
+  font-size: 13px;
+}
+#processKillDialog .row {
+  justify-content: flex-end;
+  margin-top: 24px;
+}
+#processStatus {
+  color: var(--muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
 .context-menu button {
   text-align: left;
   border: 0;

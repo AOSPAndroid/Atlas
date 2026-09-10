@@ -213,11 +213,24 @@
             ><button id="adminSoftware">Installed software</button
             ><button data-ping>Ping</button><button data-access>C$</button
             ><button data-disk>Disk</button><button data-cpu>CPU</button
-            ><button data-memory>Memory</button
+            ><button data-gpu>GPU</button><button data-memory>Memory</button
             ><button class="danger" data-reboot>Reboot</button>
           </div>
           <div id="adminOverview"></div>
-          <input id="processFilter" placeholder="Filter process table" />
+          <div class="row">
+            <input
+              id="processFilter"
+              placeholder="Filter by process, PID or session"
+              aria-label="Filter processes"
+            />
+            <button id="refreshProcesses" disabled>Refresh processes</button>
+          </div>
+          <p id="processStatus" role="status">
+            Choose CPU, GPU or Memory to load processes.
+          </p>
+          <p class="muted">
+            Right-click a process or use its ••• button for actions.
+          </p>
           <div id="adminOut"></div>
           <div class="row">
             <input id="kill" placeholder="PID or process" /><button
@@ -365,6 +378,20 @@
       </div>
     </div>
     <div id="machineMenu" class="context-menu hidden"></div>
+    <div id="processMenu" class="context-menu hidden" role="menu"></div>
+    <dialog
+      id="processKillDialog"
+      aria-labelledby="processKillTitle"
+      aria-describedby="processKillQuestion processKillWarning"
+    >
+      <h2 id="processKillTitle">Kill process?</h2>
+      <p id="processKillQuestion"></p>
+      <p id="processKillWarning">Unsaved work in this process may be lost.</p>
+      <div class="row">
+        <button id="cancelProcessKill" autofocus>Cancel</button>
+        <button id="confirmProcessKill" class="danger">Kill process</button>
+      </div>
+    </dialog>
     <aside id="softwareDrawer" class="software-drawer">
       <div class="software-head">
         <div>
@@ -469,6 +496,7 @@
     <script src="/assets/app.js"></script>
     <script src="/assets/console-directory.js"></script>
     <script src="/assets/console-deployment.js"></script>
+    <script src="/assets/console-processes.js"></script>
     <script src="/assets/console-shell.js"></script>
     <script src="/assets/remote-software.js"></script>
   </body>
