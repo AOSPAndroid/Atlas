@@ -50,7 +50,7 @@ async def read_only(request: Request, call_next):
 def health():
     with connect() as con:
         con.execute('select body from official_records limit 1').fetchone()
-    return {'application': 'Office Atlas', 'mode': 'viewer', 'version': '6.9', 'read_only': True, 'instance_id': os.environ.get('ATLAS_INSTANCE_ID')}
+    return {'application': 'Office Atlas', 'mode': 'viewer', 'version': '6.9.1', 'read_only': True, 'instance_id': os.environ.get('ATLAS_INSTANCE_ID')}
 
 
 @app.get('/api/capabilities')

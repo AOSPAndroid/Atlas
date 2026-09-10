@@ -1,4 +1,4 @@
-# Atlas 6.9
+# Atlas 6.9.1
 
 Office maps, people, machines and IT administration. This repository is now a normal project tree: Python source, browser assets, floor plans, templates, tests and the existing database. No TXT-to-Python extraction is needed. Previous transfer packages remain in Git history.
 
