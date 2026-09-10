@@ -257,8 +257,14 @@ def health():
 
 
 @app.get('/api/search')
-def search(term:str):
- with db() as c:return search_directory(c,term)
+def search(term:str,palette:bool=False):
+ with db() as c:
+  if palette:c.execute('begin')
+  result=search_directory(c,term)
+  if palette:
+   from desk_directory import palette_search
+   return palette_search(c,result)
+  return result
 @app.get('/api/user/{uid}')
 def user(uid:str):
  with db() as c:

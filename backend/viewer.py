@@ -13,7 +13,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from directory_lookup import exact_users, linked_machines, search_directory, prepare_views
-from desk_directory import desk_context,person_desks,machine_context
+from desk_directory import desk_context,person_desks,machine_context,palette_search
 import directory_exports
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -67,9 +67,12 @@ def state():
 
 
 @app.get('/api/search')
-def search(term: str):
+def search(term: str, palette: bool = False):
     with connect() as con:
-        return search_directory(con, term)
+        if palette:
+            con.execute('begin')
+        result = search_directory(con, term)
+        return palette_search(con, result) if palette else result
 
 
 @app.get('/api/directory/record')

@@ -452,7 +452,7 @@ export function installCommandPalette({
       message ||
       (!rows.length
         ? "No matches. Try a name, account, hostname or desk number."
-        : `${rows.length} results`);
+        : `${rows.length} ${rows.length === 1 ? "result" : "results"}`);
     setActive(0);
   }
   async function choose(index) {
@@ -609,6 +609,7 @@ export function installCommandPalette({
           .slice(0, 12)
           .map((r) => ({
             kind: "Desk",
+            deskId: r.id,
             title: r.name === "Unconfirmed desk" ? r.id : r.name,
             detail: `${r.id} · Floor ${r.floor} · ${r.team}`,
             run: () => onSelect(r.id),
@@ -638,7 +639,8 @@ export function installCommandPalette({
               ? "machine:"
               : "") + term;
         const response = await fetch(
-          "/api/search?" + new URLSearchParams({ term: query }),
+          "/api/search?" +
+            new URLSearchParams({ term: query, palette: "true" }),
           { signal: controller.signal },
         );
         if (!response.ok)
@@ -647,14 +649,67 @@ export function installCommandPalette({
           );
         const data = await response.json();
         if (request !== generation || !dialog.open) return;
-        const people = data.users.slice(0, 10).map((u) => ({
-          kind: "Person",
-          title: u.full_name || u.name,
-          detail: [u.user_name, u.email, u.location]
-            .filter(Boolean)
-            .join(" · "),
-          person: "id:" + u.id,
-        }));
+        const people = data.users.slice(0, 10).map((u) => {
+          const mappedDesks = Array.isArray(u.palette_desks)
+            ? u.palette_desks.filter(
+                (desk) => desk && typeof desk.id === "string",
+              )
+            : [];
+          const locations = mappedDesks
+            .slice(0, 3)
+            .map((desk) => `${desk.id} · Floor ${desk.floor ?? "?"}`)
+            .join("; ");
+          const action = preferPersonDetails
+            ? "Open person details"
+            : mappedDesks.length
+              ? "Locate on map"
+              : Array.isArray(u.palette_desks)
+                ? "Open person details"
+                : "Find mapped location or open details";
+          return {
+            kind: "Person",
+            title: u.full_name || u.name,
+            detail: [
+              action,
+              locations,
+              mappedDesks.length > 3
+                ? `+${mappedDesks.length - 3} more mapped desks`
+                : "",
+              u.user_name,
+              u.email,
+              u.location,
+              [
+                ...new Set(
+                  mappedDesks.map((desk) => desk.match).filter(Boolean),
+                ),
+              ].join("; "),
+            ]
+              .filter(Boolean)
+              .join(" · "),
+            person: "id:" + u.id,
+            mappedDesks,
+          };
+        });
+        // Only server-confirmed identity/provenance can combine a desk with a
+        // person. Equal display names never merge directory accounts here.
+        const peopleByDesk = new Map();
+        for (const person of people)
+          for (const desk of person.mappedDesks) {
+            const owners = peopleByDesk.get(desk.id) || [];
+            owners.push(person);
+            peopleByDesk.set(desk.id, owners);
+          }
+        const placedPeople = new Set();
+        const combinedLocal = local.flatMap((row) => {
+          const owners = peopleByDesk.get(row.deskId);
+          if (!owners) return [row];
+          if (preferPersonDetails) return [];
+          return owners.filter((person) => {
+            if (placedPeople.has(person.person)) return false;
+            placedPeople.add(person.person);
+            return true;
+          });
+        });
         const machines = data.machines.slice(0, 10).map((m) => ({
           kind: "Machine",
           title: m.name,
@@ -665,8 +720,13 @@ export function installCommandPalette({
         }));
         render(
           preferPersonDetails
-            ? [...people, ...machines, ...local, ...question]
-            : [...local, ...people, ...machines, ...question],
+            ? [...people, ...machines, ...combinedLocal, ...question]
+            : [
+                ...combinedLocal,
+                ...people.filter((person) => !placedPeople.has(person.person)),
+                ...machines,
+                ...question,
+              ],
           data.users.length > 10 || data.machines.length > 10
             ? "Showing the first directory matches. Refine your search for more."
             : "",

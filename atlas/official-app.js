@@ -489,6 +489,7 @@ function selectRecord(id) {
   placing = false;
   $("#add").textContent = "＋ Add location";
   renderDetail();
+  $("#detail").scrollTop = 0;
   search();
   focusPerson(r);
 }

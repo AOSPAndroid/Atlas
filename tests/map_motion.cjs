@@ -116,7 +116,7 @@ const { fixture, root } = require("./ui_fixture.cjs");
         get: () => value,
       });
     const t = await f.map(`
-    export {selectRecord, setFloor, setView, focusTarget, cameraMotion, inversePoint, projected, world};
+    export {selectRecord, renderDetail, setFloor, setView, focusTarget, cameraMotion, inversePoint, projected, world};
     export function state(){return {...cam}}
     export function currentCanvas(){return canvas}
     export function setCamera(value){cam = {...cam, ...value}; draw()}
@@ -133,6 +133,21 @@ const { fixture, root } = require("./ui_fixture.cjs");
     assert(people.length > 1);
     const initial = t.state();
     t.selectRecord(people[0].id);
+    const inspector = w.document.querySelector("#detail");
+    inspector.scrollTop = 320;
+    t.renderDetail();
+    assert.equal(
+      inspector.scrollTop,
+      320,
+      "rerendering an existing inspector preserves its reading position",
+    );
+    t.selectRecord(people[0].id);
+    assert.equal(
+      inspector.scrollTop,
+      0,
+      "reselecting the current desk reveals its inspector heading",
+    );
+    assert(inspector.classList.contains("open"));
     close(t.state(), initial);
     assert(t.cameraMotion.active);
     step(360);
@@ -140,7 +155,13 @@ const { fixture, root } = require("./ui_fixture.cjs");
     assert.equal(frames.size, 1, "only one render callback owns camera motion");
     // A newer selection continues from the current position and owns the endpoint.
     const middle = t.state();
+    inspector.scrollTop = 320;
     t.selectRecord(people[1].id);
+    assert.equal(
+      inspector.scrollTop,
+      0,
+      "selecting another desk reveals its inspector heading",
+    );
     close(t.state(), middle);
     const goal = t.focusTarget(people[1]);
     step(720);

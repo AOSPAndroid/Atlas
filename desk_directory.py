@@ -67,15 +67,59 @@ def desk_context(c, desk):
     return {'desk':desk,'user':person,'candidates':candidates,'match_method':method,'machines':machines}
 
 
-def person_desks(c, person, suggestions=True):
-    rows = c.execute('select distinct o.id,o.body from desk_user_links l left join official_seating_mappings m on m.legacy_id=l.desk_id join official_records o on o.id=coalesce(m.official_id,l.desk_id) where l.user_key=?', (person['canonical_key'],)).fetchall()
-    if rows:
-        return [{'id':row[0],'floor':json.loads(row[1])['floor'],'match':'confirmed account link'} for row in rows]
+def people_desks(c, people, suggestions=True):
+    """Resolve a batch against one directory snapshot without per-person queries.
+
+    Names are suggestions only when unique across the full directory. Any direct
+    or mapped legacy account link prevents name inference for that desk.
+    """
+    result = {person['canonical_key']: [] for person in people}
+    if not result:
+        return result
+    desks = {row[0]: json.loads(row[1]) for row in c.execute('select id,body from official_records order by id')}
+    links = {}
+    for desk_id, user_key in c.execute('''select coalesce(m.official_id,l.desk_id),l.user_key
+        from desk_user_links l left join official_seating_mappings m on m.legacy_id=l.desk_id'''):
+        links.setdefault(desk_id, set()).add(user_key)
+    for desk_id, accounts in links.items():
+        # Conflicting explicit links must be reviewed rather than merged.
+        if desk_id in desks and len(accounts) == 1:
+            account = next(iter(accounts))
+            if account in result:
+                result[account].append({'id': desk_id, 'floor': desks[desk_id]['floor'], 'match': 'confirmed account link'})
     if not suggestions:
-        return []
-    key = name_key(person['full_name'])
-    linked = dict(c.execute('select desk_id,user_key from desk_user_links'))
-    return [{'id':desk['id'],'floor':desk['floor'],'match':'matching name; account not confirmed'} for (body,) in c.execute('select body from official_records') for desk in [json.loads(body)] if desk.get('occupancy')!='vacant' and key and name_key(desk['name'])==key and desk['id'] not in linked]
+        return result
+    pending = {person['canonical_key']: name_key(person['full_name']) for person in people
+               if not result[person['canonical_key']]}
+    counts = {key: 0 for key in pending.values() if key}
+    if not counts:
+        return result
+    for (full_name,) in c.execute('select full_name from users'):
+        key = name_key(full_name)
+        if key in counts:
+            counts[key] += 1
+    named_desks = {}
+    for desk_id, desk in desks.items():
+        if desk_id not in links and desk.get('occupancy') != 'vacant':
+            key = name_key(desk.get('name', ''))
+            named_desks.setdefault(key, []).append({'id': desk_id, 'floor': desk['floor'], 'match': 'matching name; account not confirmed'})
+    for account, key in pending.items():
+        if counts.get(key) == 1:
+            result[account] = named_desks.get(key, [])
+    return result
+
+
+def person_desks(c, person, suggestions=True):
+    return people_desks(c, [person], suggestions)[person['canonical_key']]
+
+
+def palette_search(c, result):
+    """Add optional desk evidence to displayed people, leaving search data intact."""
+    people = result['users'][:10]
+    matches = people_desks(c, people)
+    users = [dict(person, palette_desks=matches[person['canonical_key']]) if index < 10 else dict(person)
+             for index, person in enumerate(result['users'])]
+    return {**result, 'users': users}
 
 
 def machine_context(c, computer):
