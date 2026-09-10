@@ -25,8 +25,6 @@ function clearLookup() {
   S.machines = [];
   S.target = "";
   syncDeploymentPanel();
-  daasState.user = null;
-  daasUserKey = "";
   masterState.resolution = null;
   $("#kyc").innerHTML = "";
   $("#users").innerHTML = "";
@@ -90,7 +88,6 @@ async function loadUser(id, sequence) {
   S.machines = d.machines;
   $("#users").innerHTML = "";
   renderKyc();
-  loadDaaSUser();
   renderMachines();
 }
 function renderKyc() {
@@ -111,6 +108,7 @@ function renderKyc() {
     bar.append(button);
   }
   host.append(bar);
+  injectDomainAccount();
   applyCompactWorkspace();
 }
 function renderMachines() {
@@ -398,86 +396,6 @@ function bindMachineContext() {
           machineContext(e, Number(card.dataset.machine))),
     );
 }
-function daasValue(value) {
-  return value === null || value === undefined || String(value).trim() === ""
-    ? "—"
-    : String(value);
-}
-function daasClass(value) {
-  const text = String(value || "").toLowerCase();
-  if (/online|registered|provisioned|complete|yes/.test(text))
-    return "status-ok";
-  if (/offline|unreachable|unregistered|remove|failed|no$/.test(text))
-    return "status-bad";
-  if (/unknown|maintenance|not in cloud|not provisioned/.test(text))
-    return "status-warn";
-  return "status-neutral";
-}
-function daasField(label, value, status = false) {
-  return `<span><em>${esc(label)}</em><b class="${status ? daasClass(value) : ""}">${esc(daasValue(value))}</b></span>`;
-}
-function loadDaaSStatus() {}
-function loadDaaSUser() {
-  if (!S.user) return;
-  const u = S.user;
-  daasState.user = {
-    matched: true,
-    users: [
-      {
-        ...u,
-        brid: u.employee_number,
-        team: u.department,
-        organisation_unit: u.organisational_unit,
-        employee_job_description: u.job_role,
-      },
-    ],
-    devices: S.machines,
-  };
-  renderDaaSUser();
-  mergeUserDetailPanels();
-  injectDomainAccount();
-}
-function renderDaaSUser() {
-  const host = document.querySelector("#kyc .usercard>div:last-child");
-  const old = document.querySelector("#daasUserDetails");
-  if (old) old.remove();
-  const d = daasState.user;
-  if (!host || !d || !d.matched) return;
-  const u = d.users[0] || {};
-  const block = document.createElement("details");
-  block.id = "daasUserDetails";
-  block.className = "details daas-details";
-  block.innerHTML = `<summary>DaaS user details <i>${d.devices.length} device${d.devices.length === 1 ? "" : "s"}</i></summary><div class="daas-grid">${daasField("BRID", u.brid)}${daasField("DaaS login", u.login_id)}${daasField("Team", u.team)}${daasField("Persona", u.persona)}${daasField("Organisation unit", u.organisation_unit)}${daasField("Corporate grade", u.corporate_grade)}${daasField("Job description", u.employee_job_description)}${daasField("BA2", u.ba2)}${daasField("BA3", u.ba3)}${daasField("BA4", u.ba4)}${daasField("BA5", u.ba5)}${daasField("BA6", u.ba6)}${daasField("Leaver", u.leaver, true)}${daasField("Out of office", u.out_of_office, true)}</div><div class="daas-device-list">${d.devices.map((x) => `<button data-daas-device="${esc(x.machine_name)}"><b>${esc(x.machine_name)}</b><span class="${daasClass(x.device_online)}">${esc(daasValue(x.device_online))}</span><span>${esc(daasValue(x.data_centre))}</span></button>`).join("")}</div>`;
-  host.appendChild(block);
-  block.querySelectorAll("[data-daas-device]").forEach(
-    (b) =>
-      (b.onclick = (e) => {
-        e.preventDefault();
-        setTarget(b.dataset.daasDevice, "DaaS device");
-      }),
-  );
-}
-function mergeUserDetailPanels() {
-  const directory = document.querySelector(
-    "#kyc details.details:not(.daas-details)",
-  );
-  const daas = document.querySelector("#daasUserDetails");
-  if (!directory || !daas || directory.dataset.mergedDaas) return;
-  const daasGrid = daas.querySelector(".daas-grid"),
-    deviceList = daas.querySelector(".daas-device-list");
-  if (daasGrid) {
-    const section = document.createElement("div");
-    section.className = "combined-detail-section";
-    section.innerHTML = "<h4>DAAS</h4>";
-    section.appendChild(daasGrid);
-    if (deviceList) section.appendChild(deviceList);
-    directory.appendChild(section);
-    directory.querySelector("summary").childNodes[0].textContent =
-      "User details ";
-    directory.dataset.mergedDaas = "1";
-    daas.remove();
-  }
-}
 function completeMachineReport() {
   const m = S.machines.find((x) => x.name === S.target) || {},
     u = S.user || {},
@@ -497,16 +415,15 @@ function completeMachineReport() {
     ...AtlasHealth.report($("#healthLine"), S.target),
   ].join("\n");
 }
-function domainAccountFromDaaS() {
-  const login =
-    daasState?.user?.users?.[0]?.login_id || S.user?.user_name || "";
+function domainAccount() {
+  const login = S.user?.login_id || S.user?.user_name || S.user?.user_id || "";
   if (!login) return "";
   return login.includes("\\") ? login : `INTRANET\\${login}`;
 }
 function injectDomainAccount() {
   const card = document.querySelector("#kyc .usercard");
   if (!card || card.querySelector(".domain-account-fact")) return;
-  const login = domainAccountFromDaaS();
+  const login = domainAccount();
   if (!login) return;
   const facts = card.querySelector(".facts");
   if (facts) {

@@ -58,6 +58,64 @@
   font-size: 12px;
   margin-bottom: 8px;
 }
+.atlas-person .atlas-person-details > summary {
+  padding: 12px 0 8px;
+  border-top: 1px solid var(--atlas-line);
+  font-weight: 600;
+}
+.atlas-person-detail-sections {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr));
+  gap: 12px;
+}
+.atlas-person-detail-sections > section {
+  min-width: 0;
+  padding: 12px;
+  background: #f5f9fc;
+  border: 1px solid var(--atlas-line);
+  border-radius: 10px;
+}
+.atlas-person-detail-sections h3 {
+  font-size: 12px;
+  margin: 0 0 12px;
+}
+.atlas-person-detail-sections dl {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+}
+.atlas-person-detail-sections dt {
+  color: var(--atlas-muted);
+  font-size: 11px;
+  margin: 0;
+}
+.atlas-person-detail-sections dd {
+  font-size: 12px;
+  color: var(--atlas-text);
+  margin: 3px 0 0;
+  overflow-wrap: anywhere;
+}
+.atlas-person-source {
+  color: var(--atlas-muted);
+  font-size: 11px;
+  margin: 12px 0 0;
+}
+.atlas-person-related {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.atlas-person-related button {
+  padding: 7px 10px;
+  min-height: 32px;
+  border: 1px solid var(--atlas-line);
+  border-radius: 9px;
+  background: var(--atlas-surface);
+  color: var(--atlas-accent);
+  font: 500 12px/1.4 var(--atlas-font);
+  cursor: pointer;
+}
 .atlas-machine-details {
   margin-top: 12px;
   min-width: 0;

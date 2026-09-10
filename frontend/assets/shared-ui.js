@@ -119,32 +119,82 @@
       ["Job title", user.job_role || user.job_title],
       ["Manager", user.manager],
     ];
-    const details = [
-      ["Employee ID", user.employee_number || user.employee_id],
-      ["Business unit", user.business_unit],
-      ["Organisation", user.organisational_unit || user.organisation],
-      ["Worker type", user.job_type || user.worker_type],
-      ["Start date", user.start_date],
-      ["Last login", user.last_login],
-      ["Last login time", exportDate(user.last_login_time)],
-    ];
+    const supplied = (value) =>
+      value !== null && value !== undefined && String(value).trim() !== "";
+    const account = user.user_name || user.user_id || "",
+      employee = user.employee_number || user.employee_id,
+      loginTime = exportDate(user.last_login_time),
+      loginDate = exportDate(user.last_login),
+      lastLogin = loginTime || loginDate;
+    const sections = [
+      [
+        "Organisation",
+        [
+          ["Business unit", user.business_unit],
+          ["Organisation unit", user.organisational_unit || user.organisation],
+          ["Worker type", user.job_type || user.worker_type],
+          [
+            "Start date",
+            String(exportDate(user.start_date) || "").replace(/ 00:00:00$/, ""),
+          ],
+        ],
+      ],
+      [
+        "Account activity",
+        [
+          [
+            "Employee ID",
+            String(employee || "").toLowerCase() !==
+            String(account).toLowerCase()
+              ? employee
+              : "",
+          ],
+          ["Last recorded login", lastLogin || "Not supplied"],
+          [
+            "Login date in export",
+            loginTime &&
+            loginDate &&
+            !String(loginTime).startsWith(String(loginDate).slice(0, 10))
+              ? loginDate
+              : "",
+          ],
+        ],
+      ],
+    ]
+      .map(([title, rows]) => [
+        title,
+        rows.filter(([, value]) => supplied(value)),
+      ])
+      .filter(([, rows]) => rows.length);
     const fields = (rows) =>
       rows
-        .filter(
-          ([, value]) =>
-            value !== null &&
-            value !== undefined &&
-            String(value).trim() !== "",
-        )
+        .filter(([, value]) => supplied(value))
         .map(([key, value]) => `<span>${esc(key)}<b>${esc(value)}</b></span>`)
         .join("");
+    const grouped = sections
+      .map(
+        ([title, rows]) =>
+          `<section><h3>${esc(title)}</h3><dl>${rows.map(([label, value]) => `<div><dt>${esc(label)}</dt><dd>${esc(value)}</dd></div>`).join("")}</dl>${title === "Account activity" ? '<p class="atlas-person-source">From the directory export, not a live sign-in check.</p>' : ""}</section>`,
+      )
+      .join("");
+    const related = [
+      ["Find manager", "user", user.manager],
+      ["Same department", "department", user.department],
+      ["Same office", "location", user.location],
+    ]
+      .filter(([, , value]) => supplied(value))
+      .map(
+        ([label, prefix, value]) =>
+          `<button type="button" data-person-search="${esc(prefix + ":" + value)}" title="${esc(value)}">${esc(label)}</button>`,
+      )
+      .join("");
     return `<div class="card usercard atlas-person"><div class="avatar">${esc(
       name
         .split(/\s+/)
         .slice(0, 2)
         .map((s) => s[0])
         .join(""),
-    )}</div><div><h2>${esc(name)}</h2><div class="facts">${fields(facts)}</div><details class="details"><summary>Person details</summary><div class="detailgrid">${fields(details)}</div>${exportButton("user", user.canonical_key)}</details></div></div>`;
+    )}</div><div><h2>${esc(name)}</h2><div class="facts">${fields(facts)}</div><details class="details atlas-person-details"><summary>User details</summary><div class="atlas-person-detail-sections">${grouped}</div>${related ? `<div class="atlas-person-related" role="group" aria-label="Related people">${related}</div>` : ""}${exportButton("user", user.canonical_key)}</details></div></div>`;
   }
   function exportDate(value) {
     if (value === null || value === undefined || String(value).trim() === "")
@@ -265,6 +315,17 @@
   document.addEventListener(
     "click",
     async (event) => {
+      const related = event.target.closest?.("[data-person-search]");
+      if (related) {
+        event.stopPropagation();
+        related.dispatchEvent(
+          new CustomEvent("atlas-directory-search", {
+            bubbles: true,
+            detail: { query: related.dataset.personSearch },
+          }),
+        );
+        return;
+      }
       const button = event.target.closest?.("[data-export-kind]");
       if (!button) return;
       event.stopPropagation();

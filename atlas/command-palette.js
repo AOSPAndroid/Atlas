@@ -250,18 +250,27 @@ export function installCommandPalette({
       }
     }, 180);
   }
-  async function open() {
+  async function open(query = "", sourceDialog = null) {
     if (dialog.open) {
+      if (typeof query === "string" && query) {
+        input.value = query;
+        search();
+      }
       input.focus();
       return;
     }
     // Do not interrupt an existing edit/confirmation dialog.
-    if (document.querySelector("dialog[open]")) return;
+    if (
+      [...document.querySelectorAll("dialog[open]")].some(
+        (existing) => existing !== sourceDialog,
+      )
+    )
+      return;
     previousFocus =
       document.activeElement?.shadowRoot?.activeElement ||
       document.activeElement;
     dialog.showModal();
-    input.value = "";
+    input.value = typeof query === "string" ? query : "";
     search();
     input.focus();
     if (prepare) {
@@ -315,6 +324,12 @@ export function installCommandPalette({
       e.preventDefault();
       open();
     }
+  });
+  window.addEventListener("atlas-directory-search", (event) => {
+    const person = event.target.closest?.(".atlas-person"),
+      query = event.detail?.query;
+    if (!person || typeof query !== "string" || !query.trim()) return;
+    open(query, person.closest(".viewer-lookup-dialog"));
   });
   return { open, close, dialog, root };
 }
