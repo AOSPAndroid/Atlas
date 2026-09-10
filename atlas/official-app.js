@@ -2206,7 +2206,7 @@ function finishFrame(start) {
           Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))
         ].toFixed(1)
       : "—";
-  output.textContent = `Atlas 6.9 · studio map · ${view === "plan" ? "Canvas 2D" : "Simple WebGL"}\nDraw + labels: ${metrics.renderMs.toFixed(1)} ms\nLabel layout: ${metrics.labelsMs.toFixed(1)} ms\nMovement frame interval p95: ${p95} ms\nBuffer: ${canvas.width} × ${canvas.height}\n${moving ? "Moving · names follow desks" : "Idle"}\nFrame interval includes event scheduling.\nRemote-display latency is not measured.`;
+  output.textContent = `Atlas 6.9.2 · studio map · ${view === "plan" ? "Canvas 2D" : "Simple WebGL"}\nDraw + labels: ${metrics.renderMs.toFixed(1)} ms\nLabel layout: ${metrics.labelsMs.toFixed(1)} ms\nMovement frame interval p95: ${p95} ms\nBuffer: ${canvas.width} × ${canvas.height}\n${moving ? "Moving · names follow desks" : "Idle"}\nFrame interval includes event scheduling.\nRemote-display latency is not measured.`;
 }
 
 function planBackground() {

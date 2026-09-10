@@ -252,7 +252,7 @@ def health():
  u=m=0
  if DB.exists():
   with source_db() as c:u=c.execute('select count(*) from users').fetchone()[0];m=c.execute('select count(*) from machines').fetchone()[0]
- return {'identity':identity(),'users':u,'machines':m,'database':DB.exists(),'repository':REPO.is_dir(),'application':'Office Atlas','mode':'admin','version':'6.9.1','instance_id':os.environ.get('ATLAS_INSTANCE_ID'),'instance_root':str(ROOT)}
+ return {'identity':identity(),'users':u,'machines':m,'database':DB.exists(),'repository':REPO.is_dir(),'application':'Office Atlas','mode':'admin','version':'6.9.2','instance_id':os.environ.get('ATLAS_INSTANCE_ID'),'instance_root':str(ROOT)}
 
 
 

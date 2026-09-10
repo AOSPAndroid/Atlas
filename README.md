@@ -1,4 +1,4 @@
-# Atlas 6.9.1
+# Atlas 6.9.2
 
 **One workspace to find people, locate equipment and get IT work done.**
 

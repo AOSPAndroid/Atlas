@@ -1,4 +1,4 @@
-ATLAS - DETAILED IT OPERATIONS AND IMPORT REFERENCE
+ATLAS 6.9.2 - DETAILED IT OPERATIONS AND IMPORT REFERENCE
 For current setup, startup, updates and supported features, read README.md first.
 Quick start: download the main branch ZIP, extract all files, install Python 3.12,
 run Install_Dependencies.bat, then run Start-Office-Atlas.bat.
