@@ -295,6 +295,8 @@ def register_atlas(app):
  register_official(app,wmi,check_token)
  from remote_software import register_remote_software
  register_remote_software(app,wmi,check_token)
+ from atlas_assistant import register_assistant
+ register_assistant(app,wmi,check_token)
 
  @app.get('/legacy-atlas')
  def previous_atlas():

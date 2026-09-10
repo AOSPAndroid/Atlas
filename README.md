@@ -156,7 +156,7 @@ py -3.12 launcher.py stop
 
 `backend/main.py` hosts admin routes; `backend/viewer.py` hosts shared read routes; `directory_lookup.py` shares database-only lookup queries; `atlas/official-app.js` renders the common map; `atlas/viewer.js` provides read-only user and machine inspection.
 
-The test runner uses disposable database copies, starts isolated UI fixtures on ports 8892/8893, and runs the Python regressions plus sixteen Node DOM suites. Remote operations are simulated. `npm run format:check` verifies formatting of the maintained browser sources.
+The test runner uses disposable database copies, starts isolated UI fixtures on ports 8892/8893, and runs the Python regressions plus nineteen Node DOM suites. Remote operations are simulated. `npm run format:check` verifies formatting of the maintained browser sources.
 
 ## Optimization changes
 
@@ -188,6 +188,66 @@ Remote Admin shows up to 100 processes sorted by CPU, GPU or memory, with the fu
 
 
 ## Troubleshooting performance in Remote Admin
+
+### Optional offline assistant in the command palette
+
+Press **Ctrl+K** and choose **Ask Atlas**, or type **ask:** followed by a question.
+The same assistant is available on the admin map and in the IT Console. Type a
+question and click **Ask Atlas** (or press Enter) to generate an answer. Opening
+the palette, typing or selecting a machine never starts inference or a scan.
+
+The assistant can explain IT troubleshooting steps, look up a small number of
+stored user/machine records and explain directory import/column coverage. In the
+Console, **Include existing slowness results** attaches the report already on
+screen; it does not collect new readings. Expand **Source evidence** to see which
+stored records, copied report and local IT guide were supplied. Model answers are
+draft explanations, not verified diagnoses. Unknown measurements remain unknown.
+
+**Manual scans only:** Ask Atlas cannot run WMI, start scans, execute commands,
+deploy, kill processes or change database records. For database updates it explains
+the existing **Manage database → Preview → Apply** workflow. Model output is plain
+text, never executable code. The read-only demo does not expose the assistant.
+
+One-time setup on **64-bit Windows with Python 3.12**:
+
+1. Download/extract the normal Atlas project and install its usual dependencies.
+2. Run **Install_Atlas_Assistant.bat**. This creates a separate `.venv-assistant`,
+   installs pinned CPU inference packages and downloads about **2.9 GB** from the
+   [model release](https://github.com/AOSPAndroid/BAtlas/releases/tag/atlas-assistant-qwen3-4b-v1).
+3. Reopen Ask Atlas. The status should say the local model is ready.
+
+GitHub's source ZIP contains the integration and model manifest. Large weights
+are distributed as Release assets, with the main weight file split into three
+parts below GitHub's per-asset size limit. Setup verifies every part and each
+assembled file using SHA-256. No Git LFS or Hugging Face account is needed.
+
+For an offline installation, copy all model release assets into a folder and
+put Windows/Python-compatible wheels for `requirements-assistant.txt` in its
+`wheels` subfolder. Run `Install_Atlas_Assistant.bat "C:\path\to\assets"`.
+Model files live in `models/atlas-qwen3-4b` and are ignored by Git. Rerunning
+setup verifies/reuses complete files and resumes interrupted asset downloads.
+Allow approximately 7 GB of free disk space during setup for the model and
+temporary download/assembly files, plus the Python environment.
+
+Inference runs locally through **ONNX Runtime GenAI's Python package**, without
+Ollama, llama.cpp, cloud APIs or an additional listening port. A worker starts only
+after Ask and exits after one answer, releasing model memory. Each Atlas server
+allows one answer at a time, four CPU threads, at most 4,096 total tokens and a
+120-second timeout. Closing the palette cancels the worker. No transcript is
+saved by Atlas; the short conversation lives only in the current browser page.
+This first package uses CPU inference so no GPU toolkit is required. Performance
+depends on the host; GPU acceleration is not enabled in this package.
+
+Model: **Qwen3 4B**, using ONNX Community's CPU int4 KLD export pinned to revision
+`98ddba15d05dede4435afb63f13280abcdbc2a48`. Upstream model/license provenance and
+file hashes are in `assistant/model-manifest.json`; the original Apache 2.0 terms
+are retained in `assistant/MODEL-LICENSE.txt` and the model release. The local
+reference guide is `assistant/it-guide.md`. The worker uses non-thinking mode
+and adapts one equivalent Jinja comparison in memory for tokenizer compatibility;
+the distributed model files remain unchanged. The assistant never downloads or
+updates itself at runtime.
+
+### Manual performance capture
 
 Click **Scan for slowness** while the user reproduces the problem. Opening Remote Admin, selecting a machine or waiting on the page never starts a scan. Each click starts a light capture: at most six samples over 60 seconds, with at least 10 seconds of rest after each completed check. It highlights busy CPU consumers, individual logical-processor saturation, memory pressure with paging activity, elevated disk response during I/O and commit headroom. Each finding includes measured evidence and a next check. Repeated evidence requires at least three matching observations spanning eight seconds and 60% of the available samples; brief spikes and limited evidence remain labelled separately. These thresholds guide investigation and do not establish a root cause.
 

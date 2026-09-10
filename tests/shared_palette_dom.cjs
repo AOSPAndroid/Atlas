@@ -8,7 +8,7 @@ async function loadModule(file,context,cache=new Map()){
  await mod.link(spec=>loadModule(path.resolve(path.dirname(file),spec),context,cache));await mod.evaluate();return mod;
 }
 (async()=>{
- const results=[];
+ const results=[],styles=[];
  for(const mode of ['map','console']){
   const dom=new JSDOM('<header><button id="old">Commands</button></header>',{url:'http://127.0.0.1:8770/',runScripts:'outside-only',pretendToBeVisual:true}),w=dom.window;
   w.HTMLElement.prototype.scrollIntoView=function(){};
@@ -31,7 +31,7 @@ async function loadModule(file,context,cache=new Map()){
   const palette=namespace.installCommandPalette({getRecords:()=>records,onSelect:id=>calls.push(['desk',id]),toast:s=>calls.push(['toast',s]),runCommand:id=>calls.push(['command',id]),openPerson:id=>calls.push(['person',id]),openMachine:id=>calls.push(['machine',id]),...(mode==='map'?{triggerParent:w.document.querySelector('header')}:{replaceTrigger:w.document.querySelector('#old'),preferPersonDetails:true,prepare:async()=>{}})});
   const input=palette.root.querySelector('input'),options=()=>[...palette.root.querySelectorAll('[role=option]')],type=s=>{input.value=s;input.dispatchEvent(new w.Event('input',{bubbles:true,composed:true}))},key=k=>input.dispatchEvent(new w.KeyboardEvent('keydown',{key:k,bubbles:true,composed:true}));
   const trigger=palette.root.querySelector('button');trigger.focus();await palette.open();
-  results.push(options().map(o=>o.textContent));assert.equal(options().length,registry.namespace.COMMANDS.length);assert.equal(palette.root.querySelector('link').getAttribute('href'),'/command-palette.css?v=71');
+  results.push(options().map(o=>o.textContent));assert.equal(options().length,registry.namespace.COMMANDS.length);styles.push(palette.root.querySelector('link').getAttribute('href'));assert.match(styles.at(-1),/^\/command-palette\.css\?v=\d+$/);
   type('> history');assert.equal(options().length,1);key('Enter');await sleep(0);assert.deepEqual(calls.pop(),['command','history']);assert(!palette.dialog.open);assert.equal(palette.root.activeElement,trigger);
   await palette.open();type('desk:04R024065');key('Enter');await sleep(0);assert.deepEqual(calls.pop(),['desk','04R024065']);
   for(const desks of [[desk],[desk,secondDesk],[]]){
@@ -63,5 +63,5 @@ async function loadModule(file,context,cache=new Map()){
   for(const command of registry.namespace.COMMANDS){const url=registry.namespace.commandUrl(command.id,'PC & 1');assert.equal(new URL(url,w.location.href).searchParams.get('machine'),'PC & 1');}
   w.close();
  }
- assert.deepEqual(results[0],results[1]);console.log('PASS: identical commands/styles, keyboard selection, focus, context-aware person routing with zero/one/multiple desks, name-search priority, explicit desk navigation, stale response protection, shortcut isolation and URL allowlist.');
+ assert.deepEqual(results[0],results[1]);assert.equal(styles[0],styles[1]);console.log('PASS: identical commands/styles, keyboard selection, focus, context-aware person routing with zero/one/multiple desks, name-search priority, explicit desk navigation, stale response protection, shortcut isolation and URL allowlist.');
 })().catch(error=>{console.error(error);process.exitCode=1});

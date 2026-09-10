@@ -7,6 +7,9 @@
 * {
   box-sizing: border-box;
 }
+[hidden] {
+  display: none !important;
+}
 #atlas-commands {
   border: 1px solid #d5e0e7;
   border-radius: 9px;
@@ -29,7 +32,11 @@
 .atlas-palette {
   font: 14px system-ui;
   box-sizing: border-box;
+  position: fixed;
+  inset: 0 12px auto;
   width: min(700px, calc(100vw - 24px));
+  min-width: 0;
+  max-width: calc(100vw - 24px);
   max-height: 80dvh;
   margin: 9vh auto auto;
   padding: 0;
@@ -169,6 +176,160 @@
   border-top: 1px solid #e0e8ee;
   font: 11px system-ui;
   color: #647c8b;
+}
+.palette-assistant {
+  padding: 18px 20px;
+  max-height: calc(80dvh - 180px);
+  overflow: auto;
+}
+.atlas-palette.assistant-open[open] {
+  display: flex;
+  flex-direction: column;
+}
+.assistant-open .palette-input-row,
+.assistant-open footer {
+  min-width: 0;
+  max-width: 100%;
+  flex-shrink: 0;
+}
+.assistant-open .palette-assistant {
+  min-height: 0;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.assistant-heading,
+.assistant-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.assistant-heading {
+  justify-content: space-between;
+}
+.assistant-heading strong {
+  font-size: 17px;
+}
+.assistant-heading span {
+  font-size: 11px;
+  padding: 5px 9px;
+  color: #006d8e;
+  border: 1px solid #b9dfeb;
+  border-radius: 20px;
+  background: #edf8fc;
+}
+.assistant-policy,
+.assistant-model,
+.assistant-context,
+.assistant-feedback,
+.assistant-include {
+  font-size: 12px;
+  line-height: 1.55;
+  color: #587184;
+}
+.assistant-policy {
+  margin: 12px 0;
+}
+.assistant-model {
+  color: #006d8e;
+}
+.assistant-include {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 12px 0;
+  cursor: pointer;
+}
+.assistant-include input {
+  accent-color: #007fa7;
+}
+.assistant-transcript {
+  max-height: 32dvh;
+  overflow: auto;
+  scrollbar-gutter: stable;
+}
+.assistant-message {
+  border: 1px solid #dbe6ed;
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin: 10px 0;
+  background: #f7fafc;
+}
+.assistant-message > strong {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #24768f;
+}
+.assistant-message p {
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 8px 0 0;
+}
+.assistant-message small,
+.assistant-message details {
+  display: block;
+  font-size: 11px;
+  color: #587184;
+  margin-top: 10px;
+}
+.assistant-message summary {
+  cursor: pointer;
+}
+.assistant-source-excerpt {
+  max-height: 12rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding: 10px;
+  margin: 8px 0;
+  border: 1px solid #dbe6ed;
+  border-radius: 8px;
+  background: #fff;
+  font:
+    12px/1.6 ui-monospace,
+    monospace;
+  color: #385469;
+}
+.assistant-user {
+  background: #eff8fc;
+  border-color: #c3e1ed;
+}
+.assistant-controls {
+  position: sticky;
+  bottom: -18px;
+  padding: 12px 0;
+  background: #fff;
+  box-shadow: 0 -8px 12px #ffffffed;
+}
+.assistant-controls button {
+  font: 12px system-ui;
+  border-radius: 8px;
+  border: 1px solid #cbdbe5;
+  padding: 9px 12px;
+  color: #385469;
+  background: #fff;
+  cursor: pointer;
+}
+.assistant-controls [data-assistant-ask] {
+  margin-left: auto;
+  color: #fff;
+  background: #007fa7;
+  border-color: #007fa7;
+  font-weight: 600;
+}
+.assistant-controls button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+.assistant-controls button:focus-visible,
+.assistant-transcript:focus-visible,
+.assistant-source-excerpt:focus-visible {
+  outline: 2px solid #00aeef;
+  outline-offset: 2px;
 }
 @media (max-width: 500px) {
   .palette-input-row {

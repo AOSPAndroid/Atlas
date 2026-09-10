@@ -1,0 +1,166 @@
+name: Publish offline assistant model
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - assistant/model-manifest.json
+      - assistant/MODEL-LICENSE.txt
+      - assistant/RELEASE-NOTES.md
+      - scripts/build_assistant_release.py
+      - .github/workflows/publish-assistant-model.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-atlas-assistant-model
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.repository == 'AOSPAndroid/BAtlas' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    steps:
+      - name: Check out the reviewed model manifest
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12"
+
+      - name: Rebuild assets from the pinned model and original license
+        run: python scripts/build_assistant_release.py
+
+      - name: Require the reviewed manifest and license to match
+        run: git diff --exit-code -- assistant/model-manifest.json assistant/MODEL-LICENSE.txt
+
+      - name: Upload a draft, verify every asset, then publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          import re
+          import subprocess
+
+          root = Path.cwd()
+          repository = os.environ['GITHUB_REPOSITORY']
+          manifest_path = root / 'assistant' / 'model-manifest.json'
+          manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
+          tag = manifest['release_tag']
+          if not re.fullmatch(r'[A-Za-z0-9_.-]+', tag):
+              raise SystemExit('Invalid release tag in the reviewed manifest.')
+          if not re.fullmatch(r'[A-Za-z0-9_.-]+', manifest['id']):
+              raise SystemExit('Invalid model identifier in the reviewed manifest.')
+          expected_base = f'https://github.com/{repository}/releases/download/{tag}'
+          if manifest['release_base'] != expected_base:
+              raise SystemExit('Manifest release destination does not match this repository.')
+          candidates = [path.parent for path in root.glob('data/assistant-release*/model-manifest.json')
+                        if path.read_bytes() == manifest_path.read_bytes()]
+          if len(candidates) != 1:
+              raise SystemExit('Expected one rebuilt asset directory matching the reviewed manifest.')
+          assets_dir = candidates[0]
+          notes = root / 'assistant' / 'RELEASE-NOTES.md'
+          title = 'Atlas offline assistant · ' + manifest['name']
+
+          def digest(path):
+              with path.open('rb') as source:
+                  return hashlib.file_digest(source, 'sha256').hexdigest()
+
+          expected = {}
+          for entry in manifest['files']:
+              for asset in entry['assets']:
+                  name = asset['name']
+                  if not re.fullmatch(r'[A-Za-z0-9_.-]+', name) or name in ('.', '..') or name in expected:
+                      raise SystemExit('Invalid or duplicated release asset name.')
+                  expected[name] = {'size': asset['size'], 'sha256': asset['sha256']}
+          expected['model-manifest.json'] = {
+              'size': manifest_path.stat().st_size, 'sha256': digest(manifest_path)}
+          if {path.name for path in assets_dir.iterdir()} != set(expected):
+              raise SystemExit('The rebuilt directory contains missing or unexpected assets.')
+          for name, metadata in expected.items():
+              path = assets_dir / name
+              if not path.is_file() or path.stat().st_size != metadata['size'] or digest(path) != metadata['sha256']:
+                  raise SystemExit(f'Rebuilt asset failed verification: {name}')
+              if metadata['size'] >= 2 * 1024 ** 3:
+                  raise SystemExit(f'Asset exceeds the GitHub release limit: {name}')
+
+          def gh(*arguments):
+              return subprocess.run(['gh', *arguments], check=True, text=True,
+                                    stdout=subprocess.PIPE).stdout
+
+          # A successful list distinguishes a missing release from auth/API errors.
+          pages = json.loads(gh('api', '--paginate', '--slurp',
+                                f'repos/{repository}/releases?per_page=100'))
+          matches = [release for page in pages for release in page if release['tag_name'] == tag]
+          if len(matches) > 1:
+              raise SystemExit('Multiple releases have the requested tag; refusing to modify them.')
+          release = matches[0] if matches else None
+          if release is not None and not release['draft']:
+              print(f'{tag} is already published; leaving it unchanged.')
+              raise SystemExit(0)
+          if release is None:
+              gh('release', 'create', tag, '--repo', repository, '--draft', '--latest=false',
+                 '--target', os.environ['GITHUB_SHA'], '--title', title,
+                 '--notes-file', str(notes))
+              release = json.loads(gh('api', f'repos/{repository}/releases/tags/{tag}'))
+          release_id = release['id']
+
+          def require_draft():
+              current = json.loads(gh('api', f'repos/{repository}/releases/{release_id}'))
+              if not current['draft'] or current['tag_name'] != tag:
+                  raise SystemExit('Release is no longer the expected draft; no further changes made.')
+              return current
+
+          def remote_assets():
+              pages = json.loads(gh('api', '--paginate', '--slurp',
+                                    f'repos/{repository}/releases/{release_id}/assets?per_page=100'))
+              items = [asset for page in pages for asset in page]
+              if len(items) != len({asset['name'] for asset in items}):
+                  raise SystemExit('Duplicate remote asset names; draft was not published.')
+              return {asset['name']: asset for asset in items}
+
+          require_draft()
+          if set(remote_assets()) - set(expected):
+              raise SystemExit('Draft contains unexpected assets; leaving them untouched and refusing publication.')
+          # Replacing an interrupted upload is permitted only while it is a draft.
+          for name in expected:
+              require_draft()
+              print(f'Uploading verified asset: {name}', flush=True)
+              gh('release', 'upload', tag, str(assets_dir / name), '--repo', repository, '--clobber')
+
+          require_draft()
+          uploaded = remote_assets()
+          if set(uploaded) != set(expected):
+              raise SystemExit('Uploaded asset names do not match the manifest; draft was not published.')
+          for name, metadata in expected.items():
+              asset = uploaded[name]
+              if asset.get('state') != 'uploaded' or asset['size'] != metadata['size']:
+                  raise SystemExit(f'Uploaded asset is incomplete: {name}')
+              remote_digest = asset.get('digest')
+              if remote_digest and remote_digest != 'sha256:' + metadata['sha256']:
+                  raise SystemExit(f'GitHub checksum differs for {name}; draft was not published.')
+              if not remote_digest:
+                  print(f'GitHub supplied no digest for {name}; local SHA-256 and uploaded size verified.')
+
+          require_draft()
+          gh('release', 'edit', tag, '--repo', repository, '--draft=false', '--latest=false',
+             '--title', title, '--notes-file', str(notes))
+          published = json.loads(gh('api', f'repos/{repository}/releases/{release_id}'))
+          if published['draft'] or published['tag_name'] != tag:
+              raise SystemExit('GitHub did not confirm publication of the expected release.')
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as summary:
+              summary.write(f"Published [{tag}]({published['html_url']}) after verifying {len(expected)} assets.\n")
+          PY

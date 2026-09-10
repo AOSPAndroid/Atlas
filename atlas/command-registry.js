@@ -40,6 +40,12 @@ const viewerCommands = new Set([
 // The single command catalogue used by the map and IT console.
 export const COMMANDS = [
   [
+    "assistant",
+    "Ask Atlas",
+    "Ask the offline IT assistant about stored data or existing scan results",
+    "ai assistant offline help explain troubleshoot ask",
+  ],
+  [
     "lookup",
     "User & machine lookup",
     "Find a colleague or stored machine record",
