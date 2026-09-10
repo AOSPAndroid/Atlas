@@ -54,7 +54,7 @@ const { fixture, root } = require("./ui_fixture.cjs");
     assert(
       svg.includes("#00aeef") &&
         svg.includes('fill="white"') &&
-        svg.includes('stroke="#00aeef" stroke-width="3"'),
+        svg.includes('shape-rendering="crispEdges"'),
     );
   }
   for (let i = 0; i < 100; i++) cursor.set(canvas, "default", event);

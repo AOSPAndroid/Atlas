@@ -3,10 +3,12 @@
   if (window.AtlasCursor) return;
   const shapes = {
     default: [
-      "M6.4 4.9C5.1 3.9 4.2 4.5 4.3 6.1L5.4 24.7C5.5 26.9 6.4 27.4 8 25.9L10.9 23.2Q12.1 22.1 12.9 23.5L16 29C16.8 30.5 17.5 30.7 19 29.9L20.1 29.3C21.9 28.3 22.1 27.6 21.1 25.9L18.2 21Q17.3 19.5 19.1 19.4L23.1 19.1C25.5 18.9 25.7 17.9 23.8 16.5Z",
-      5,
+      "M4 2H6V4H8V6H10V8H12V10H14V12H16V14H18V16H20V18H22V20H24V22H26V24H28V28H16V30H14V32H12V34H10V36H4Z",
       4,
+      2,
       "default",
+      false,
+      "M6 6H8V8H10V10H12V12H14V14H16V16H18V18H20V20H22V22H24V24H26V26H16V28H14V30H12V32H10V34H6Z",
     ],
     hover: [
       "M10.5 16V5.8a2 2 0 0 1 4 0v7.1c.5-.7 1.1-1 1.8-1 1.1 0 2 .8 2 1.9v.5c.5-.6 1.1-.9 1.8-.9 1.2 0 2 .9 2 2v.5c.4-.4 1-.7 1.6-.7 1.1 0 1.9.9 1.9 2v4.1c0 4.4-2.7 7.7-6.8 7.7h-2.2c-2.6 0-4.4-1.3-6-3.7L6.3 19a2 2 0 0 1 2.9-2.6l1.3 1.2Z",
@@ -36,14 +38,21 @@
     ],
   };
   const styles = Object.fromEntries(
-    Object.entries(shapes).map(([state, [path, x, y, fallback, line]]) => {
-      const fill = line ? "none" : "white";
-      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="34" viewBox="0 0 32 34"><g stroke-linecap="round" stroke-linejoin="round"><path d="${path}" fill="${fill}" stroke="#00aeef" stroke-width="${line ? 4.6 : 3}"/>${line ? `<path d="${path}" fill="none" stroke="white" stroke-width="1.6"/>` : ""}</g></svg>`;
-      return [
-        state,
-        `url("data:image/svg+xml,${encodeURIComponent(svg)}") ${x} ${y}, ${fallback}`,
-      ];
-    }),
+    Object.entries(shapes).map(
+      ([state, [path, x, y, fallback, line, pixels]]) => {
+        const fill = line ? "none" : "white";
+        // Integer-aligned filled steps keep the pixel arrow crisp at native size.
+        const height = pixels ? 38 : 34;
+        const artwork = pixels
+          ? `<g shape-rendering="crispEdges"><path d="${path}" fill="#00aeef"/><path d="${pixels}" fill="white"/></g>`
+          : `<g stroke-linecap="round" stroke-linejoin="round"><path d="${path}" fill="${fill}" stroke="#00aeef" stroke-width="${line ? 4.6 : 3}"/>${line ? `<path d="${path}" fill="none" stroke="white" stroke-width="1.6"/>` : ""}</g>`;
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="${height}" viewBox="0 0 32 ${height}">${artwork}</svg>`;
+        return [
+          state,
+          `url("data:image/svg+xml,${encodeURIComponent(svg)}") ${x} ${y}, ${fallback}`,
+        ];
+      },
+    ),
   );
   for (const [state, value] of Object.entries(styles))
     document.documentElement.style.setProperty(
