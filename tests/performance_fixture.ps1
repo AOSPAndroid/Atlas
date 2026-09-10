@@ -1,0 +1,70 @@
+# Every provider and the sampling delay is simulated; no machine is queried.
+$ErrorActionPreference = 'Stop'
+$global:AtlasMode = 'normal'
+$global:AtlasCalls = @{}
+function Start-Sleep { param($Milliseconds) }
+function Get-WmiObject {
+    param($ComputerName, $Class, $Filter, $ErrorAction)
+    if ($ComputerName -ne 'TESTPC') { throw 'Unexpected target' }
+    $global:AtlasCalls[$Class]++
+    $sample = $global:AtlasCalls[$Class]
+    if ($global:AtlasMode -eq 'partial' -and $Class -in @('Win32_PerfRawData_PerfOS_Processor', 'Win32_PerfFormattedData_GPUPerformanceCounters_GPUEngine', 'Win32_PerfFormattedData_PerfOS_Memory')) { throw 'Provider unavailable' }
+    switch ($Class) {
+        'Win32_ComputerSystem' { return [pscustomobject]@{NumberOfLogicalProcessors = 4} }
+        'Win32_Process' {
+            return [pscustomobject]@{ProcessId = 42; Name = $(if ($global:AtlasMode -eq 'identity' -and $sample -gt 1) { 'replacement.exe' } else { 'sample.exe' }); CreationDate = '20260910100000.000000+000'; WorkingSetSize = 4GB; ThreadCount = 650; HandleCount = 321; SessionId = 2; CommandLine = 'sample.exe -test'}
+        }
+        'Win32_OperatingSystem' { return [pscustomobject]@{TotalVisibleMemorySize = 16777216; FreePhysicalMemory = 2097152; Caption = 'Test Windows'} }
+        'Win32_PerfRawData_PerfProc_Process' {
+            return [pscustomobject]@{IDProcess = 42; ElapsedTime = 123; Timestamp_Sys100NS = (100000000 + $sample * 10000000); Timestamp_PerfTime = (100000000 + $sample * 10000000); Frequency_PerfTime = 10000000; PercentProcessorTime = ($sample * 10000000); IODataBytesPersec = ($sample * 1MB); PageFaultsPersec = ($sample * 7); PrivateBytes = 5GB}
+        }
+        'Win32_PerfRawData_PerfOS_Processor' {
+            foreach ($name in @('_Total', '0', '1', '2', '3')) {
+                [pscustomobject]@{Name = $name; Timestamp_Sys100NS = (100000000 + $sample * 10000000); PercentProcessorTime = ($sample * 1000000)}
+            }
+            return
+        }
+        'Win32_PerfRawData_PerfDisk_PhysicalDisk' { return [pscustomobject]@{Name = '0 C:'; Timestamp_PerfTime = (100000000 + $sample * 10000000); Frequency_PerfTime = 10000000; AvgDisksecPerRead = ($sample * 3000000); AvgDisksecPerRead_Base = ($sample * 10); AvgDisksecPerWrite = ($sample * 2000000); AvgDisksecPerWrite_Base = ($sample * 10); CurrentDiskQueueLength = 2; DiskReadBytesPersec = ($sample * 2MB); DiskWriteBytesPersec = ($sample * 1MB)} }
+        'Win32_LogicalDisk' { return [pscustomobject]@{DeviceID = 'C:'; Size = 100GB; FreeSpace = 5GB} }
+        'Win32_PerfFormattedData_PerfOS_Memory' { return [pscustomobject]@{CommittedBytes = 18GB; CommitLimit = 20GB; PageReadsPersec = 50} }
+        'Win32_PerfFormattedData_PerfOS_System' { return [pscustomobject]@{ProcessorQueueLength = 8; ContextSwitchesPersec = 1234; Threads = 800} }
+        'Win32_PerfFormattedData_GPUPerformanceCounters_GPUEngine' {
+            return @(
+                [pscustomobject]@{Name = 'pid_42_luid_a_phys_0_eng_0_engtype_3D'; UtilizationPercentage = 45}
+                [pscustomobject]@{Name = 'pid_99_luid_a_phys_0_eng_0_engtype_3D'; UtilizationPercentage = 35}
+                [pscustomobject]@{Name = 'pid_42_luid_a_phys_0_eng_1_engtype_Copy'; UtilizationPercentage = 25}
+            )
+        }
+        'Win32_PerfRawData_PerfProc_Thread' {
+            if ($Filter -ne 'IDProcess=42') { throw 'Thread query not scoped to process' }
+            return @(
+                [pscustomobject]@{IDProcess = 42; IDThread = 100; ElapsedTime = 123; Timestamp_Sys100NS = (100000000 + $sample * 10000000); Timestamp_PerfTime = (100000000 + $sample * 10000000); Frequency_PerfTime = 10000000; PercentProcessorTime = ($sample * 8000000); ContextSwitchesPersec = ($sample * 120); ThreadState = 2; ThreadWaitReason = 6; PriorityCurrent = 8}
+                [pscustomobject]@{IDProcess = 42; IDThread = 101; ElapsedTime = $(if ($global:AtlasMode -eq 'reuse') { $sample } else { 125 }); Timestamp_Sys100NS = (100000000 + $sample * 10000000); Timestamp_PerfTime = (100000000 + $sample * 10000000); Frequency_PerfTime = 10000000; PercentProcessorTime = 1000000; ContextSwitchesPersec = 5; ThreadState = 5; ThreadWaitReason = 6; PriorityCurrent = 8}
+            )
+        }
+        default { throw "Unexpected class $Class" }
+    }
+}
+function Sample($Kind = 'cpu') {
+    $global:AtlasCalls = @{}
+    (& (Join-Path $PSScriptRoot '../scripts/performance.ps1') -Computer TESTPC -Kind $Kind -ProcessId 42 -ExpectedCreated '20260910100000.000000+000' -ExpectedName 'sample.exe') | ConvertFrom-Json
+}
+$data = Sample
+if (-not $data.ok) { throw $data.error }
+if ($data.items[0].CPU -ne 25 -or $data.summary.cpu_percent -ne 90) { throw 'CPU normalization or inverse counter wrong' }
+if ($data.items[0].MemoryPercent -ne 25 -or $data.summary.memory_percent -ne 87.5 -or $data.summary.total_memory_bytes -ne 16GB) { throw "RAM denominator wrong: $($data | ConvertTo-Json -Depth 6 -Compress)" }
+if ($data.items[0].GPU -ne 45 -or $data.summary.gpu_percent -ne 80) { throw 'GPU engine aggregation wrong' }
+if ($data.items[0].IOBytesPerSec -ne 1MB -or $data.items[0].PageFaultsPerSec -ne 7) { throw 'Process rates wrong' }
+if ($data.summary.disks[0].read_ms -ne 30 -or $data.summary.disks[0].write_ms -ne 20) { throw 'Disk latency must use sample and base differences' }
+if ($data.summary.volumes[0].free_percent -ne 5 -or $data.summary.commit_percent -ne 90) { throw 'Pressure totals wrong' }
+$threads = Sample threads
+if (-not $threads.ok) { throw $threads.error }
+if ($threads.items[0].CoreCPU -ne 80 -or $threads.items[0].CPU -ne 20 -or $threads.items[0].ContextSwitches -ne 120) { throw 'Thread rates wrong' }
+if ($null -ne $threads.items[0].WaitReason -or $threads.items[1].WaitReason -ne 'User request') { throw 'Wait reason displayed for non-waiting thread' }
+$global:AtlasMode = 'reuse'; $reused = Sample threads
+if ($null -ne ($reused.items | Where-Object TID -eq 101).CoreCPU) { throw 'Reused thread ID has a fabricated CPU rate' }
+$global:AtlasMode = 'identity'; $changed = Sample threads
+if ($changed.ok -or $changed.error -notmatch 'changed') { throw 'Changed process identity was accepted' }
+$global:AtlasMode = 'partial'; $partial = Sample
+if (-not $partial.ok -or $null -ne $partial.summary.cpu_percent -or $null -ne $partial.summary.gpu_percent -or $null -ne $partial.summary.commit_percent -or $partial.summary.memory_percent -ne 87.5 -or -not $partial.warnings.Count) { throw 'Partial counters must not become zero or hide working metrics' }
+Write-Output 'PASS: sampled CPU/thread rates, RAM capacity, GPU engine aggregation, disk latency, identity reuse and partial providers'

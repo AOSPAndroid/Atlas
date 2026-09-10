@@ -7,7 +7,7 @@ const {fixture, root} = require('./ui_fixture.cjs');
   const response = data => ({ok:true,json:async()=>data});
   const f = await fixture({fetch:async (url, options={}) => {
     if(url === '/api/session') return response({token:'test'});
-    if(url.startsWith('/api/processes/')) return new Promise(resolve=>lists.push({url,resolve:data=>resolve(response(data))}));
+    if(url.startsWith('/api/performance/')) return new Promise(resolve=>lists.push({url,resolve:data=>resolve(response(data))}));
     if(url === '/api/kill') return new Promise(resolve=>kills.push({payload:JSON.parse(options.body),resolve:data=>resolve(response(data))}));
     throw Error('Unexpected request '+url);
   }});

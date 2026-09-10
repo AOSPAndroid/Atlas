@@ -67,6 +67,19 @@ class Regression(unittest.TestCase):
  def test_local_origin_boundaries(self):
   self.assertEqual(self.client.post('/api/deploy',headers={'Origin':'https://other.example'},json={}).status_code,403)
   self.assertEqual(self.client.get('/api/history',headers={'Host':'other.example'}).status_code,403)
+ def test_performance_routes_and_validation(self):
+  sample={'ok':True,'items':[],'summary':{'memory_percent':50}}
+  with patch.object(app,'run',return_value=type('Result',(),{'stdout':json.dumps(sample)})()) as remote:
+   response=self.client.get('/api/performance/TESTPC?kind=memory')
+   self.assertEqual(response.status_code,200);self.assertEqual(response.json()['summary']['memory_percent'],50)
+   response=self.client.get('/api/performance/TESTPC/threads/42',params={'created':'20260910100000.000000+000','name':'example.exe'})
+   self.assertEqual(response.status_code,200);self.assertIn('-ProcessId',remote.call_args.args[0])
+   remote.reset_mock()
+   self.assertEqual(self.client.get('/api/performance/PC;BAD').status_code,400)
+   self.assertEqual(self.client.get('/api/performance/TESTPC?kind=other').status_code,400)
+   self.assertEqual(self.client.get('/api/performance/TESTPC/threads/42',params={'created':'bad','name':'example.exe'}).status_code,400)
+   self.assertEqual(self.client.get('/api/performance/TESTPC',headers={'Origin':'https://other.example'}).status_code,403)
+   remote.assert_not_called()
  def test_browser_revalidates_pages_and_scripts(self):
   for path in ['/installer','/','/assets/console-directory.js','/assets/shared-ui.js','/assets/ui-tokens.css','/command-palette.js','/map-cursor.js']:
    with self.subTest(path=path):

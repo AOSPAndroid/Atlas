@@ -276,11 +276,21 @@
         Deployment
       </button>
       <section id="admin" class="page">
-        <div class="panel">
-          <small>REMOTE ADMIN</small>
-          <div class="row">
+        <div class="panel performance-panel">
+          <div class="performance-heading">
+            <div>
+              <small>REMOTE ADMIN</small>
+              <h2>What is slowing this machine down?</h2>
+              <p class="muted">
+                Take a performance snapshot, find the busiest process, then
+                inspect its threads.
+              </p>
+            </div>
+            <span class="pill">On-demand diagnostics</span>
+          </div>
+          <div class="row admin-tools">
             <input id="adminPc" placeholder="Computer" /><button data-overview>
-              Overview</button
+              Performance overview</button
             ><button id="adminSoftware">Installed software</button
             ><button data-ping>Ping</button><button data-access>C$</button
             ><button data-disk>Disk</button><button data-cpu>CPU</button
@@ -295,21 +305,28 @@
               aria-label="Filter processes"
             />
             <button id="refreshProcesses" disabled>Refresh processes</button>
+            <button id="copyPerformance" disabled>
+              Copy diagnostic report
+            </button>
           </div>
           <p id="processStatus" role="status">
             Choose CPU, GPU or Memory to load processes.
           </p>
           <p class="muted">
-            Right-click a process or use its ••• button for actions.
+            Right-click a process for actions, or click its thread count to
+            inspect CPU usage.
           </p>
           <div id="adminOut"></div>
-          <div class="row">
-            <input id="kill" placeholder="PID or process" /><button
-              id="killBtn"
-            >
-              Terminate
-            </button>
-          </div>
+          <details class="manual-termination">
+            <summary>Terminate by PID or name</summary>
+            <div class="row">
+              <input id="kill" placeholder="PID or process" /><button
+                id="killBtn"
+              >
+                Terminate
+              </button>
+            </div>
+          </details>
         </div>
       </section>
       <section id="bulk" class="page">
@@ -450,6 +467,27 @@
     </div>
     <div id="machineMenu" class="context-menu hidden"></div>
     <div id="processMenu" class="context-menu hidden" role="menu"></div>
+    <dialog id="threadDialog" aria-labelledby="threadTitle">
+      <div class="performance-heading">
+        <div>
+          <small>CPU THREAD INSPECTOR</small>
+          <h2 id="threadTitle">Process threads</h2>
+        </div>
+        <button id="closeThreads" aria-label="Close thread inspector">
+          Close
+        </button>
+      </div>
+      <p id="threadStatus" role="status"></p>
+      <p class="muted">
+        One busy thread can saturate one logical processor while total CPU stays
+        low. Waiting threads are normal; a wait reason alone does not identify
+        the cause of latency.
+      </p>
+      <div class="row">
+        <button id="refreshThreads">Refresh thread sample</button>
+      </div>
+      <div id="threadBody" class="tablewrap"></div>
+    </dialog>
     <dialog
       id="processKillDialog"
       aria-labelledby="processKillTitle"

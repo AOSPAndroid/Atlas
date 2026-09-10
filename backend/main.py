@@ -338,6 +338,14 @@ def disk(pc:str):
 def processes(pc:str,kind:str='cpu'):
  import remote_processes,sys
  return remote_processes.list_processes(sys.modules[__name__],pc,kind)
+@app.get('/api/performance/{pc}/threads/{pid}')
+def performance_threads(pc:str,pid:int,created:str,name:str):
+ import performance,sys
+ return performance.collect(sys.modules[__name__],pc,'threads',pid=pid,created=created,name=name)
+@app.get('/api/performance/{pc}')
+def performance_snapshot(pc:str,kind:str='cpu'):
+ import performance,sys
+ return performance.collect(sys.modules[__name__],pc,kind)
 @app.post('/api/kill')
 def kill(p:Kill):
  import remote_processes,sys
