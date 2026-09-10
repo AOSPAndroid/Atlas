@@ -108,11 +108,18 @@
           "'": "&#39;",
         })[c],
     );
+  function domainAccount(user) {
+    const login = String(
+      user?.login_id || user?.user_name || user?.user_id || "",
+    ).trim();
+    return !login ? "" : login.includes("\\") ? login : `INTRANET\\${login}`;
+  }
   function person(user) {
     const name =
       user.full_name || user.name || user.user_name || "Unknown person";
     const facts = [
       ["Account", user.user_name || user.user_id],
+      ["Domain account", domainAccount(user)],
       ["Email", user.email],
       ["Department", user.department],
       ["Office", user.location],
@@ -169,7 +176,10 @@
     const fields = (rows) =>
       rows
         .filter(([, value]) => supplied(value))
-        .map(([key, value]) => `<span>${esc(key)}<b>${esc(value)}</b></span>`)
+        .map(
+          ([key, value]) =>
+            `<span${key === "Domain account" ? ' class="domain-account-fact"' : ""}>${esc(key)}<b>${esc(value)}</b></span>`,
+        )
         .join("");
     const grouped = sections
       .map(
@@ -411,6 +421,7 @@
   window.AtlasUI = {
     esc,
     person,
+    domainAccount,
     machineDetails,
     machineReport,
     dialog,

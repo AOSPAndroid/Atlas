@@ -40,6 +40,21 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
     palette.querySelector('.palette-close').click();assert.equal(doc.activeElement,button);
   }
   assert(!calls.some(url=>/preflight|overview|open-tool|api\/deploy\b/.test(url)));
+  // G export IDs and corrected Windows logins stay distinct in display and copy.
+  const domainUser={...user,user_name:'G00123456',login_id:'x00123456'};
+  f.run('S.user='+JSON.stringify(domainUser)+';renderKyc()');
+  assert.equal(doc.querySelectorAll('#kyc .domain-account-fact').length,1);
+  assert.equal(doc.querySelector('#kyc .domain-account-fact b').textContent,'INTRANET\\x00123456');
+  const copied=[];Object.defineProperty(w.navigator,'clipboard',{value:{writeText:async text=>copied.push(text)},configurable:true});
+  const copyButton=label=>[...doc.querySelectorAll('#kyc .copybar button')].find(b=>b.textContent===label);
+  copyButton('Copy domain account').click();await sleep(0);assert.equal(copied.at(-1),'INTRANET\\x00123456');
+  copyButton('Copy account').click();await sleep(0);assert.equal(copied.at(-1),'G00123456');
+  assert(f.run('supportSummary()').includes('Domain account: INTRANET\\x00123456'));
+  assert(f.run('completeMachineReport()').includes('Domain account: INTRANET\\x00123456'));
+  const shared=w.document.createElement('div');shared.innerHTML=w.AtlasUI.person(domainUser);
+  assert.equal(shared.querySelector('.domain-account-fact b').textContent,'INTRANET\\x00123456');
+  assert.equal(w.AtlasUI.domainAccount({login_id:'OTHER\\someone'}),'OTHER\\someone');
+  assert.equal(w.AtlasUI.domainAccount({}),'');
   // Read-only lookup may host the palette; an edit dialog must still block it.
   const readOnly=w.AtlasUI.dialog('User & machine lookup');readOnly.element.classList.add('viewer-lookup-dialog');readOnly.body.innerHTML=w.AtlasUI.person(user);
   const manager=readOnly.body.querySelector('[data-person-search]');manager.click();await sleep(0);

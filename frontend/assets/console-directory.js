@@ -98,6 +98,7 @@ function renderKyc() {
   bar.className = "copybar";
   for (const [label, value] of [
     ["Copy account", u.user_name],
+    ["Copy domain account", AtlasUI.domainAccount(u)],
     ["Copy email", u.email],
     ["Copy name", u.full_name || u.name],
     ["Copy summary", supportSummary()],
@@ -108,7 +109,6 @@ function renderKyc() {
     bar.append(button);
   }
   host.append(bar);
-  injectDomainAccount();
   applyCompactWorkspace();
 }
 function renderMachines() {
@@ -278,6 +278,7 @@ function supportSummary() {
     `Timestamp: ${new Date().toLocaleString("en-GB")}`,
     `User: ${u.name || ""}`,
     `Username: ${u.user_name || ""}`,
+    `Domain account: ${AtlasUI.domainAccount(u)}`,
     `Email: ${u.email || ""}`,
     `Location: ${u.location || ""}`,
     `Manager: ${u.manager || ""}`,
@@ -406,6 +407,7 @@ function completeMachineReport() {
     "Target: " + S.target,
     "User: " + (u.name || ""),
     "Account: " + (u.user_name || ""),
+    "Domain account: " + AtlasUI.domainAccount(u),
     "Email: " + (u.email || ""),
     AtlasUI.machineReport({ ...m, name: S.target }),
     "Software inventory: " +
@@ -414,31 +416,6 @@ function completeMachineReport() {
         : "not collected"),
     ...AtlasHealth.report($("#healthLine"), S.target),
   ].join("\n");
-}
-function domainAccount() {
-  const login = S.user?.login_id || S.user?.user_name || S.user?.user_id || "";
-  if (!login) return "";
-  return login.includes("\\") ? login : `INTRANET\\${login}`;
-}
-function injectDomainAccount() {
-  const card = document.querySelector("#kyc .usercard");
-  if (!card || card.querySelector(".domain-account-fact")) return;
-  const login = domainAccount();
-  if (!login) return;
-  const facts = card.querySelector(".facts");
-  if (facts) {
-    const span = document.createElement("span");
-    span.className = "domain-account-fact";
-    span.innerHTML = `Domain account<b>${esc(login)}</b>`;
-    facts.appendChild(span);
-  }
-  const bar = card.querySelector(".copybar");
-  if (bar) {
-    const b = document.createElement("button");
-    b.textContent = "Copy domain account";
-    b.onclick = () => copy(login, "Domain account");
-    bar.appendChild(b);
-  }
 }
 async function loadMasterStatus() {
   try {

@@ -1,5 +1,14 @@
 """Shared database-only directory queries for admin and viewer."""
 from directory_exports import field_map
+import re
+
+
+def windows_login(value):
+    """The confirmed login convention is G-number export ID -> X-number login."""
+    domain, separator, account = str(value or '').strip().rpartition('\\')
+    if re.fullmatch(r'g[0-9]+', account, re.IGNORECASE):
+        account = 'x' + account[1:]
+    return domain + separator + account
 
 # Only these explicit column names ever enter SQL. Values remain parameters.
 SEARCH_FIELDS = {alias: (kind, column) for kind in ('user', 'machine')
@@ -17,7 +26,11 @@ SEARCH_FIELDS.update({
 
 def exact_users(c,value):
  q=' '.join(value.strip().split()).casefold();login=q.rsplit('\\',1)[-1]
- return c.execute("select distinct u.* from legacy_users u where u.user_name_norm=? or lower(u.email)=? or lower(u.brid)=? or u.name_norm=? or u.id in (select user_id_ref from user_aliases where alias_norm=?) order by u.name,u.id limit 100",(login,q,q,q,q)).fetchall()
+ # Resolve Windows X-number logins without rewriting the original export ID.
+ # Keep both matches if an export contains separate G and X records.
+ exported_login = re.sub(r'^x(?=[0-9]+$)', 'g', login)
+ exported_domain = q[:-len(login)] + exported_login if login else q
+ return c.execute("select distinct u.* from legacy_users u where u.user_name_norm in (?,?,?,?) or lower(u.email)=? or lower(u.brid)=? or u.name_norm=? or u.id in (select user_id_ref from user_aliases where alias_norm in (?,?)) order by u.name,u.id limit 100",(login,q,exported_login,exported_domain,q,q,q,q,login)).fetchall()
 
 def linked_machines(c,uid):
  return [dict(r) for r in c.execute("""select m.*,max(a.relationship_type='assigned_to') as assigned_relationship,max(a.relationship_type='last_logon_user') as logon_relationship,case when count(distinct a.relationship_type)>1 then 'Assigned + last logged on (inventory)' when max(a.relationship_type)='assigned_to' then 'Assigned' else 'Last logged on (inventory)' end as match_type from assignments a join legacy_machines m on m.id=a.machine_id where a.user_id_ref=? group by m.id order by case when lower(m.operational_status)='operational' then 0 else 1 end,m.last_discovered desc,m.name""",(uid,))]
@@ -44,4 +57,5 @@ def search_directory(c,term:str):
 
 
 def prepare_views(c):
-    c.executescript("\n create temp view legacy_users as select *,user_id as user_name,user_id_norm as user_name_norm,user_id as login_id,user_id_norm as login_norm,full_name as name,full_name_norm as name_norm,employee_number as employee_id,employee_number as brid,job_role as job_title,job_type as worker_type,organisational_unit as organisation,'' as active,'' as country from main.users;\n create temp view legacy_machines as select *,machine_name as name,machine_name_norm as name_norm,last_logon_user as u_last_logon_user,assigned_to as assigned_user,last_logon_user as last_logged_on_user,last_logon_user as most_frequent_user,infrastructure_itsi as u_infrastructure_itsi,sys_class_name as class,short_description as description,updated_on as updated,'' as operating_system,'' as asset_tag,'' as support_group from main.machines;\n ")
+    c.create_function('atlas_windows_login', 1, windows_login, deterministic=True)
+    c.executescript("\n create temp view legacy_users as select *,user_id as user_name,user_id_norm as user_name_norm,atlas_windows_login(user_id) as login_id,lower(atlas_windows_login(user_id)) as login_norm,full_name as name,full_name_norm as name_norm,employee_number as employee_id,employee_number as brid,job_role as job_title,job_type as worker_type,organisational_unit as organisation,'' as active,'' as country from main.users;\n create temp view legacy_machines as select *,machine_name as name,machine_name_norm as name_norm,last_logon_user as u_last_logon_user,assigned_to as assigned_user,last_logon_user as last_logged_on_user,last_logon_user as most_frequent_user,infrastructure_itsi as u_infrastructure_itsi,sys_class_name as class,short_description as description,updated_on as updated,'' as operating_system,'' as asset_tag,'' as support_group from main.machines;\n ")
