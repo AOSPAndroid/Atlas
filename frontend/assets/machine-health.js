@@ -105,7 +105,7 @@
   function render(host, pc, isCurrent, scanning) {
     host.classList.remove("hidden");
     host.classList.add("atlas-health");
-    host.innerHTML = `<div class="atlas-health-heading"><b>${esc(pc)} · Machine health</b><button type="button" data-health-refresh ${scanning ? "disabled" : ""}>${scanning ? "Checking…" : "Scan health"}</button></div>${scanning ? "" : "<p>Health checks start only when you click Scan health.</p>"}<div class="atlas-health-grid">${Object.entries(
+    host.innerHTML = `<div class="atlas-health-heading"><b>${esc(pc)} · Machine health</b><button type="button" data-health-refresh ${scanning ? "disabled" : ""}>${scanning ? "Checking…" : "Scan health"}</button></div><p>Manual scans only. Click Scan health or Refresh health to collect readings. No automatic refresh.</p><div class="atlas-health-grid">${Object.entries(
       labels,
     )
       .map(

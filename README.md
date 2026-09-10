@@ -94,7 +94,7 @@ Application deployment appears beneath **History** in the left sidebar after sel
 
 **Package catalogue** opens the same dialog within the console or map, without navigating away. Browse packages, inspect scripts and edit display names or versions. Closing it returns to your current view and preserves the selected target and deployment form.
 
-Selecting a machine in the map or IT console shows **Scan health** with **Not scanned** readings. Health checks run only when you click that button or explicitly choose **Refresh health**. Opening machine specifications also waits for **Scan health**; selecting a target never starts a health scan.
+**Manual scans only.** Selecting a machine in the map or IT console shows **Scan health** with **Not scanned** readings. Health checks run only when you click that button or explicitly choose **Refresh health**. Opening machine specifications also waits for **Scan health**; selecting a target never starts a health scan. Viewing existing results never starts another scan or automatic refresh.
 
 In the IT console, scrolling past the full person card or machine-health panel reveals a compact floating version above the machine list. The person card keeps name, account, email, team and office visible; health chips show the selected target's existing readings. Click either heading to return to the full panel. The cards disappear when their original panels return into view, the lookup is cleared, or you leave Workspace. Scrolling does not run additional health checks; refresh from the full health panel or the machine's right-click menu. Hover a health chip for the full reading and its check time.
 
