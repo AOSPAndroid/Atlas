@@ -61,7 +61,7 @@ The host must remain awake and network-reachable. Windows Firewall or your organ
 
 The console, map and shared viewer use the same Atlas header, blue eagle branding and sidebar dimensions. The console keeps its Workspace, Remote Admin, Bulk Deploy and History navigation below the header. Map import, export and database backup actions are grouped under **More**.
 
-Application deployment appears only after selecting a target. On larger screens its package selector stays beside the machine list as you scroll, with its own scroll area on short screens. On smaller screens, use the floating **Deployment · hostname** button to open or minimize the panel. The selected package and action remain in place when the panel is minimized; clearing the target hides it.
+Application deployment appears beneath **History** in the left sidebar after selecting a target in Workspace, giving the directory and machines the full remaining width. Open the package selector to search or choose a favourite/recent package; Escape restores the previous selection. **Install / Repair / Uninstall** choose the action. **Advanced** contains threads, fresh copy, alternative execution modes and package checks. The sidebar scrolls on shorter screens; on phones, use the floating **Deployment · hostname** button. Selection is retained when minimized, and clearing the target hides the panel. A job's compact status and expandable log appear only for its original target; failures open the log automatically.
 
 **Package catalogue** opens the same dialog within the console or map, without navigating away. Browse packages, inspect scripts and edit display names or versions. Closing it returns to your current view and preserves the selected target and deployment form.
 
@@ -123,7 +123,7 @@ py -3.12 launcher.py stop
 
 `backend/main.py` hosts admin routes; `backend/viewer.py` hosts shared read routes; `directory_lookup.py` shares database-only lookup queries; `atlas/official-app.js` renders the common map; `atlas/viewer.js` provides read-only user and machine inspection.
 
-The test runner uses disposable database copies, starts isolated UI fixtures on ports 8892/8893, and runs the Python regressions plus fourteen Node DOM suites. Remote operations are simulated. `npm run format:check` verifies formatting of the maintained browser sources.
+The test runner uses disposable database copies, starts isolated UI fixtures on ports 8892/8893, and runs the Python regressions plus sixteen Node DOM suites. Remote operations are simulated. `npm run format:check` verifies formatting of the maintained browser sources.
 
 ## Optimization changes
 
@@ -146,6 +146,8 @@ Search or select a person to glide to their desk with a brief location highlight
 Palettes, dialogs, person cards, console pages, and drawers use the same short motion timings. Both the admin map and shared viewer receive the map effects. Dragging immediately cancels automatic movement; repeated searches replace the previous destination. The **Animations On/Off** switch is available beside the map view controls; use **Ctrl+K → Toggle animations** in the IT console. **Off** disables map movement and interface animations immediately; **On** enables them. Before you make a choice, Atlas follows your system reduced-motion preference. Your choice is saved for that browser and Atlas address; the viewer has its own preference. Changes apply immediately, including during a camera flight.
 
 No frontend runtime library was added. Camera movement shares the existing render loop and stops when settled. Cached geometry is reused throughout animations. Regression checks cover rapid selection, manual interruption, cursor anchoring, reduced motion, and rendering after the animation ends.
+
+Machine, person and health cards fade and lift briefly when they first enter view while scrolling. The floating support summary has the same short entrance. Effects share the existing Animations preference across the interface, stop immediately when disabled, and never hide content while waiting to enter view. Scroll reveals use one visibility observer, limit simultaneous effects, and add no scroll animation loop. The shared card effects also apply to the admin map and demo inspectors.
 
 The map renderer, camera controller, animation switch, person cards, dialog styles and palette are shared source files across admin and viewer. Viewer commands are filtered through the common command catalogue; permissions continue to be enforced by the separate read-only server.
 

@@ -197,10 +197,12 @@ function installSupportDock() {
       !!S.target &&
       !health.classList.contains("hidden") &&
       health.getBoundingClientRect().bottom <= top;
+    const entering = dock.hidden && (showPerson || showHealth);
     person.hidden = !showPerson;
     panel.hidden = !showHealth;
     dock.hidden = !showPerson && !showHealth;
     if (dock.hidden) return;
+    if (entering) AtlasUI.motion.reveal(dock);
     dock.style.top = top + "px";
     const bounds = column.getBoundingClientRect();
     dock.style.left = Math.max(8, bounds.left) + "px";

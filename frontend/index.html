@@ -50,19 +50,156 @@
           </button>
         </nav>
       </div>
-      <div class="sidebar-status">
-        <code id="identity"></code>
-        <div id="health"></div>
-        <div id="dbFreshness" class="db-freshness"></div>
-        <div id="daasStatus" class="daas-status"></div>
-        <div id="masterDbStatus" class="masterdb-status"></div>
+      <div class="console-sidebar-content">
+        <section
+          id="deploymentPanel"
+          class="deployment-panel"
+          aria-label="Application deployment"
+          hidden
+        >
+          <div class="head">
+            <div>
+              <small>DEPLOY TO</small>
+              <h2 id="deployTarget">Select a machine</h2>
+            </div>
+            <button
+              id="closeDeploymentPanel"
+              aria-label="Minimize deployment panel"
+            >
+              −
+            </button>
+          </div>
+          <div class="deployment-package-heading">
+            <span>Package</span
+            ><button
+              id="favBtn"
+              aria-label="Favourite selected package"
+              title="Favourite selected package"
+            >
+              ☆
+            </button>
+          </div>
+          <details id="packagePicker" class="package-picker">
+            <summary id="packagePickerButton">
+              <span id="packageSelection">Choose a package</span
+              ><span aria-hidden="true">⌄</span>
+            </summary>
+            <div class="package-picker-body">
+              <input
+                id="pkgSearch"
+                type="search"
+                placeholder="Find a package…"
+                aria-label="Search packages"
+                autocomplete="off"
+              />
+              <div
+                class="recent"
+                id="recent"
+                aria-label="Favourite and recent packages"
+              ></div>
+              <select id="pkg" size="5" aria-label="Package results"></select>
+              <p id="packageSearchStatus" class="muted" role="status"></p>
+              <button id="choosePackage" type="button">
+                Use selected package
+              </button>
+            </div>
+          </details>
+          <div
+            class="deployment-action-switch"
+            role="group"
+            aria-label="Deployment action"
+          >
+            <button
+              type="button"
+              data-deploy-action="Install"
+              aria-pressed="true"
+            >
+              Install
+            </button>
+            <button
+              type="button"
+              data-deploy-action="Repair"
+              aria-pressed="false"
+            >
+              Repair
+            </button>
+            <button
+              type="button"
+              data-deploy-action="Uninstall"
+              aria-pressed="false"
+            >
+              Uninstall
+            </button>
+          </div>
+          <select id="action" aria-label="Action" hidden>
+            <option>Install</option>
+            <option>Uninstall</option>
+            <option>Repair</option>
+          </select>
+          <label class="deployment-script"
+            >Script<select id="script"></select
+          ></label>
+          <details class="deployment-advanced">
+            <summary>Advanced</summary>
+            <div class="deployment-options">
+              <label
+                ><input type="checkbox" role="switch" id="fresh" /> Fresh
+                copy</label
+              >
+              <label
+                >Threads<input
+                  class="num"
+                  id="threads"
+                  type="number"
+                  min="1"
+                  max="32"
+                  value="8"
+              /></label>
+            </div>
+            <div class="deployment-alternatives">
+              <button id="copyOnly">Copy only</button
+              ><button id="execOnly">Execute existing</button>
+            </div>
+            <div id="console-package-details" class="package-presence"></div>
+            <div id="packagePresence" class="package-presence"></div>
+            <div id="preflight"></div>
+          </details>
+          <button class="primary" id="deploy">Copy &amp; execute</button>
+          <div
+            id="console-deploy-summary"
+            class="deployment-summary"
+            role="status"
+          ></div>
+          <section
+            id="deploymentProgress"
+            class="deployment-progress"
+            aria-label="Deployment progress"
+            hidden
+          >
+            <div class="deployment-progress-heading">
+              <b id="deploymentState"></b><span id="deploymentJobTarget"></span>
+            </div>
+            <p id="deploymentMessage" role="status"></p>
+            <details id="deploymentLog">
+              <summary>View log</summary>
+              <pre id="log"></pre>
+            </details>
+          </section>
+        </section>
+        <details class="sidebar-status">
+          <summary>Connection &amp; data</summary>
+          <code id="identity"></code>
+          <div id="health"></div>
+          <div id="dbFreshness" class="db-freshness"></div>
+          <div id="daasStatus" class="daas-status"></div>
+          <div id="masterDbStatus" class="masterdb-status"></div>
+        </details>
       </div>
     </aside>
     <main>
       <div class="console-page-heading">
         <div>
           <h1 id="pageTitle">Workspace</h1>
-          <p>Europe-wide directory · Paris floor map</p>
         </div>
       </div>
       <div id="targetBar" class="targetbar hidden">
@@ -103,8 +240,7 @@
       <section id="workspace" class="page active">
         <div class="lookup-column">
           <div class="lookup-heading">
-            <h2><span class="step-number">1</span>Directory &amp; machines</h2>
-            <small>LOOKUP</small>
+            <h2>Directory &amp; machines</h2>
           </div>
           <div id="healthLine" class="healthline hidden"></div>
           <div class="searchbox">
@@ -117,9 +253,6 @@
               placeholder="Search username, email, name or machine"
             /><kbd>Enter</kbd>
           </div>
-          <p class="search-help">
-            Search by name, login, email or hostname. Press Enter to look up.
-          </p>
           <div id="recentTargets" class="recent-targets"></div>
           <div id="users"></div>
           <div id="kyc"></div>
@@ -131,67 +264,6 @@
               hostname directly.
             </p>
           </div>
-        </div>
-        <div
-          id="deploymentPanel"
-          class="panel deployment-panel"
-          aria-label="Application deployment"
-          hidden
-        >
-          <div class="head">
-            <div>
-              <small
-                ><span class="step-number">2</span>APPLICATION DEPLOYMENT</small
-              >
-              <h2>Target: <span id="deployTarget">no target</span></h2>
-            </div>
-            <div class="deployment-heading-actions">
-              <button id="favBtn">☆ Favourite</button
-              ><button
-                id="closeDeploymentPanel"
-                aria-label="Minimize deployment panel"
-              >
-                −
-              </button>
-            </div>
-          </div>
-          <p class="panel-description">
-            Choose a package and its action script, then deploy to the selected
-            machine.
-          </p>
-          <div class="recent" id="recent"></div>
-          <div class="grid">
-            <label>Package search<input id="pkgSearch" /></label
-            ><label>Package<select id="pkg"></select></label
-            ><label
-              >Action<select id="action">
-                <option>Install</option>
-                <option>Uninstall</option>
-                <option>Repair</option>
-              </select></label
-            ><label>Action script<select id="script"></select></label>
-          </div>
-          <div class="row">
-            <label
-              ><input type="checkbox" role="switch" id="fresh" /> Fresh
-              copy</label
-            ><label
-              >Threads<input
-                class="num"
-                id="threads"
-                type="number"
-                min="1"
-                max="32"
-                value="8" /></label
-            ><button id="copyOnly">Copy only</button
-            ><button id="execOnly">Execute existing</button
-            ><button class="primary" id="deploy">Copy &amp; execute</button>
-          </div>
-          <div id="console-package-details" class="package-presence"></div>
-          <div id="console-deploy-summary" class="package-presence"></div>
-          <div id="packagePresence" class="package-presence"></div>
-          <div id="preflight"></div>
-          <pre id="log">Ready.</pre>
         </div>
       </section>
       <button

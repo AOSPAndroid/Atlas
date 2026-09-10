@@ -38,6 +38,97 @@
     } catch {}
     applyMotion();
   }
+  const activeReveals = new Map();
+  function reveal(element) {
+    activeReveals.get(element)?.cancel();
+    if (isReduced() || !element?.animate || document.hidden) return;
+    const animation = element.animate(
+      [
+        { opacity: 0.45, transform: "translateY(8px)" },
+        { opacity: 1, transform: "translateY(0)" },
+      ],
+      { duration: 220, easing: "cubic-bezier(0.22, 1, 0.36, 1)" },
+    );
+    activeReveals.set(element, animation);
+    const clear = () => {
+      if (activeReveals.get(element) === animation)
+        activeReveals.delete(element);
+    };
+    animation.onfinish = clear;
+    animation.oncancel = clear;
+  }
+  const clearReveals = () => {
+    for (const animation of activeReveals.values()) animation.cancel();
+    activeReveals.clear();
+  };
+  window.addEventListener("atlas-motion-change", () => {
+    if (isReduced()) clearReveals();
+  });
+  window.addEventListener("pagehide", clearReveals);
+  function installScrollReveals() {
+    if (typeof IntersectionObserver === "undefined") return;
+    const selector =
+      ".machine, .ops-machine, .viewer-machine, .atlas-person, .atlas-health-item, .deployment-monitor-card";
+    const seen = new WeakSet(),
+      observed = new Set();
+    const observer = new IntersectionObserver(
+      (entries) => {
+        let animated = 0;
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          observer.unobserve(entry.target);
+          observed.delete(entry.target);
+          seen.add(entry.target);
+          // Limit simultaneous effects when a long result list first appears.
+          if (animated++ < 6) reveal(entry.target);
+        }
+      },
+      { threshold: 0.08 },
+    );
+    const scan = (node, removed = false) => {
+      if (node.nodeType !== 1) return;
+      const elements = [
+        ...(node.matches(selector) ? [node] : []),
+        ...node.querySelectorAll(selector),
+      ];
+      for (const element of elements) {
+        if (removed) {
+          observer.unobserve(element);
+          observed.delete(element);
+          activeReveals.get(element)?.cancel();
+        } else if (!seen.has(element) && !observed.has(element)) {
+          observed.add(element);
+          observer.observe(element);
+        }
+      }
+    };
+    const changes = new MutationObserver((records) => {
+      for (const record of records) {
+        record.removedNodes.forEach((node) => scan(node, true));
+        record.addedNodes.forEach((node) => scan(node));
+      }
+    });
+    const stop = () => {
+      observer.disconnect();
+      changes.disconnect();
+      observed.clear();
+    };
+    const sync = () => {
+      stop();
+      if (isReduced()) return;
+      scan(document.body);
+      changes.observe(document.body, { childList: true, subtree: true });
+    };
+    window.addEventListener("atlas-motion-change", sync);
+    window.addEventListener("pagehide", stop);
+    window.addEventListener("pageshow", sync);
+    sync();
+  }
+  if (document.readyState === "loading")
+    document.addEventListener("DOMContentLoaded", installScrollReveals, {
+      once: true,
+    });
+  else installScrollReveals();
   function installShell() {
     const header = document.querySelector("body > .atlas-app-header");
     if (!header) return;
@@ -427,6 +518,7 @@
     dialog,
     motion: {
       isReduced,
+      reveal,
       install: motionControl,
       toggle: () => setMotion(isReduced()),
     },

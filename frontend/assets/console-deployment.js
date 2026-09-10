@@ -1,17 +1,26 @@
 let deploymentExpanded = false;
+let packageChoice = null,
+  packageBusy = false,
+  currentDeployment = null;
+const packageLabels = new Map();
 function syncDeploymentPanel() {
   const workspace = $("#workspace"),
     panel = $("#deploymentPanel"),
     toggle = $("#deploymentToggle");
   if (!workspace || !panel || !toggle) return;
   const available = !!S.target && workspace.classList.contains("active"),
-    compact = window.matchMedia("(max-width: 1279px)").matches;
+    compact = window.matchMedia("(max-width: 760px)").matches;
   if (!available) deploymentExpanded = false;
+  const wasHidden = panel.hidden;
   workspace.classList.toggle("has-target", !!S.target);
   panel.hidden = !available || (compact && !deploymentExpanded);
   toggle.hidden = !available || !compact;
   toggle.textContent = "Deployment · " + S.target;
   toggle.setAttribute("aria-expanded", String(!panel.hidden));
+  if (!panel.hidden && wasHidden) AtlasUI.motion.reveal(panel);
+  if (!available && packageChoice) cancelPackageChoice();
+  syncDeploymentProgress();
+  refreshConsoleSummary();
 }
 function openDeploymentPanel() {
   if (!S.target) return toast("Select a target first");
@@ -19,10 +28,13 @@ function openDeploymentPanel() {
   syncDeploymentPanel();
 }
 function installDeploymentPanel() {
+  if ($("#deploymentPanel").dataset.installed) return;
+  $("#deploymentPanel").dataset.installed = "true";
   $("#deploymentToggle").onclick = () => {
     deploymentExpanded = !deploymentExpanded;
     syncDeploymentPanel();
-    if (deploymentExpanded) $("#pkgSearch").focus({ preventScroll: true });
+    if (deploymentExpanded)
+      $("#packagePickerButton").focus({ preventScroll: true });
   };
   $("#closeDeploymentPanel").onclick = () => {
     deploymentExpanded = false;
@@ -32,14 +44,87 @@ function installDeploymentPanel() {
   $("#deploymentPanel").addEventListener("keydown", (event) => {
     if (
       event.key === "Escape" &&
-      window.matchMedia("(max-width: 1279px)").matches
+      window.matchMedia("(max-width: 760px)").matches
     ) {
       event.stopPropagation();
       $("#closeDeploymentPanel").click();
     }
   });
   window.addEventListener("resize", syncDeploymentPanel, { passive: true });
+  installPackagePicker();
   syncDeploymentPanel();
+}
+function updatePackageSelection() {
+  const option = $("#pkg").selectedOptions[0];
+  $("#packageSelection").textContent =
+    option?.textContent || "Choose a package";
+  $("#packagePickerButton").title = option?.textContent || "Search packages";
+  refreshConsoleSummary();
+}
+function commitPackageChoice() {
+  clearTimeout(window.pt);
+  packageRequest();
+  packageBusy = false;
+  packageChoice = null;
+  $("#packagePicker").open = false;
+  $("#pkg").disabled = false;
+  updatePackageSelection();
+}
+function cancelPackageChoice() {
+  if (!packageChoice) return;
+  const previous = packageChoice;
+  commitPackageChoice();
+  $("#pkg").innerHTML = previous.options;
+  $("#pkg").value = previous.folder;
+  $("#pkgSearch").value = previous.search;
+  $("#pkg").dispatchEvent(new Event("change", { bubbles: true }));
+}
+function installPackagePicker() {
+  const picker = $("#packagePicker"),
+    select = $("#pkg");
+  picker.addEventListener("toggle", () => {
+    if (picker.open && !packageChoice) {
+      packageChoice = {
+        folder: select.value,
+        options: select.innerHTML,
+        search: $("#pkgSearch").value,
+      };
+      $("#pkgSearch").focus({ preventScroll: true });
+      if (!select.options.length && !packageBusy) packages();
+    } else if (!picker.open && packageChoice) cancelPackageChoice();
+    refreshConsoleSummary();
+  });
+  const choose = () => {
+    if (packageBusy || !select.value) return;
+    commitPackageChoice();
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+    $("#packagePickerButton").focus({ preventScroll: true });
+  };
+  $("#choosePackage").onclick = choose;
+  select.ondblclick = choose;
+  picker.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && picker.open) {
+      event.preventDefault();
+      event.stopPropagation();
+      cancelPackageChoice();
+      $("#packagePickerButton").focus({ preventScroll: true });
+    } else if (event.key === "Enter" && event.target.matches("input, select")) {
+      event.preventDefault();
+      choose();
+    } else if (event.key === "ArrowDown" && event.target === $("#pkgSearch")) {
+      event.preventDefault();
+      select.focus();
+    }
+  });
+  document.addEventListener("pointerdown", (event) => {
+    if (picker.open && !picker.contains(event.target)) cancelPackageChoice();
+  });
+  document.querySelectorAll("[data-deploy-action]").forEach((button) => {
+    button.onclick = () => {
+      $("#action").value = button.dataset.deployAction;
+      $("#action").dispatchEvent(new Event("change", { bubbles: true }));
+    };
+  });
 }
 async function openConsoleCatalogue() {
   const { openCatalogue } = await import("/catalogue.js");
@@ -47,35 +132,70 @@ async function openConsoleCatalogue() {
     api,
     toast,
     onSave: async (metadata) => {
+      const label =
+        (metadata.display_name.trim() || metadata.folder) +
+        (metadata.version.trim() ? " · " + metadata.version.trim() : "");
+      packageLabels.set(metadata.folder, label);
       for (const option of document.querySelectorAll(
         "#pkg option, #bulkPkg option",
       )) {
-        if (option.value === metadata.folder)
-          option.textContent =
-            metadata.display_name.trim() +
-            (metadata.version.trim() ? " · " + metadata.version.trim() : "");
+        if (option.value === metadata.folder) option.textContent = label;
       }
+      renderRecent();
+      updatePackageSelection();
       await refreshConsolePackage();
     },
   });
 }
 async function packages() {
   const request = packageRequest();
+  packageBusy = true;
+  $("#pkg").disabled = true;
+  $("#packageSearchStatus").textContent = "Searching…";
+  refreshConsoleSummary();
   try {
     const d = await api(
       "/api/catalog?term=" + encodeURIComponent($("#pkgSearch").value),
       { signal: request.signal },
     );
     if (!request.current()) return;
+    const previous = $("#pkg").value;
+    for (const item of d.items)
+      packageLabels.set(
+        item.folder,
+        item.display_name + (item.version ? " · " + item.version : ""),
+      );
     $("#pkg").innerHTML = d.items
       .map(
         (x) =>
           `<option value="${esc(x.folder)}">${esc(x.display_name)}${x.version ? " · " + esc(x.version) : ""}</option>`,
       )
       .join("");
+    $("#pkg").value = d.items.some((item) => item.folder === previous)
+      ? previous
+      : d.items[0]?.folder || "";
+    $("#packageSearchStatus").textContent =
+      d.available === false
+        ? d.error || "Package repository unavailable. Check Settings."
+        : d.truncated
+          ? `Showing ${d.items.length} of ${d.total} packages. Refine your search.`
+          : d.items.length
+            ? `${d.items.length} packages`
+            : "No matching packages";
+    if (!packageChoice) updatePackageSelection();
     await scripts();
   } catch (e) {
-    if (e.name !== "AbortError" && request.current()) toast(e.message);
+    if (e.name !== "AbortError" && request.current()) {
+      $("#packageSearchStatus").textContent =
+        "Packages unavailable: " + e.message;
+      toast(e.message);
+    }
+  } finally {
+    if (request.current()) {
+      packageBusy = false;
+      $("#pkg").disabled = false;
+      refreshConsoleSummary();
+    }
   }
 }
 async function scripts() {
@@ -85,6 +205,7 @@ async function scripts() {
     control = $("#script");
   control.innerHTML = "";
   control.disabled = true;
+  refreshConsoleSummary();
   try {
     if (folder) {
       const data = await api(
@@ -105,7 +226,10 @@ async function scripts() {
   } catch (e) {
     if (e.name !== "AbortError" && request.current()) toast(e.message);
   } finally {
-    if (request.current()) control.disabled = false;
+    if (request.current()) {
+      control.disabled = false;
+      refreshConsoleSummary();
+    }
   }
 }
 function packageFolder(pkg) {
@@ -125,22 +249,26 @@ async function preflight() {
 }
 async function deploy(mode = "full") {
   if (deploySubmitting) return;
+  if (packageBusy || $("#packagePicker").open)
+    return toast("Choose a package first");
   if ($("#script").disabled || !$("#script").value)
     return toast("Wait for an action script to load");
   if (!S.target) return toast("Select a target");
+  const target = S.target;
   let pkg = $("#pkg").value,
     p = prefs();
   p.recent = [pkg, ...p.recent.filter((x) => x !== pkg)].slice(0, 5);
   save(p);
   renderRecent();
   deploySubmitting = true;
+  refreshConsoleSummary();
   let d;
   try {
     d = await api("/api/deploy", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        computer: S.target,
+        computer: target,
         folder: packageFolder(pkg),
         script: $("#script").value,
         action: $("#action").value,
@@ -149,17 +277,40 @@ async function deploy(mode = "full") {
         mode,
       }),
     });
+  } catch (error) {
+    toast(error.message);
+    return;
   } finally {
     deploySubmitting = false;
+    refreshConsoleSummary();
   }
   S.job = d.job;
-  poll(d.job);
+  poll(d.job, target);
 }
-function poll(id) {
+function syncDeploymentProgress() {
+  const host = $("#deploymentProgress");
+  if (host)
+    host.hidden = !currentDeployment || currentDeployment.target !== S.target;
+}
+function poll(id, target = S.target) {
+  currentDeployment = { id, target };
+  $("#deploymentJobTarget").textContent = target;
+  $("#deploymentState").textContent = "Starting";
+  $("#deploymentMessage").textContent = "Waiting for the first update…";
+  $("#deploymentLog").open = false;
+  $("#log").textContent = "";
+  syncDeploymentProgress();
   return AtlasClient.watch(
     "console-deployment",
     "/api/job/" + id,
     (data) => {
+      const failure = ["failed", "interrupted", "unknown"].includes(data.state);
+      $("#deploymentState").textContent = String(
+        data.state || "running",
+      ).replace(/^./, (letter) => letter.toUpperCase());
+      $("#deploymentState").className = statusAccent(data.state);
+      $("#deploymentMessage").textContent = data.events.at(-1)?.message || "";
+      if (failure) $("#deploymentLog").open = true;
       $("#log").textContent = data.events
         .map(
           (e) =>
@@ -168,15 +319,22 @@ function poll(id) {
         .join("\n");
       if (AtlasClient.terminal.has(data.state)) toast(data.state);
     },
-    { onError: (e) => toast("Monitoring: " + e.message) },
+    {
+      onError: (e) => {
+        $("#deploymentState").textContent = "Updates unavailable";
+        $("#deploymentMessage").textContent = e.message;
+        $("#deploymentLog").open = true;
+      },
+    },
   );
 }
 function renderFav() {
   let p = prefs(),
     pkg = $("#pkg").value;
-  $("#favBtn").textContent = p.favs.includes(pkg)
-    ? "★ Favourite"
-    : "☆ Favourite";
+  const favourite = p.favs.includes(pkg);
+  $("#favBtn").textContent = favourite ? "★" : "☆";
+  $("#favBtn").setAttribute("aria-pressed", String(favourite));
+  $("#favBtn").disabled = !pkg || packageBusy || $("#packagePicker").open;
 }
 function toggleFav() {
   let p = prefs(),
@@ -194,14 +352,26 @@ function renderRecent() {
   $("#recent").innerHTML = vals
     .map(
       (x) =>
-        `<button data-recent="${esc(x)}">${p.favs.includes(x) ? "★ " : ""}${esc(x)}</button>`,
+        `<button data-recent="${esc(x)}">${p.favs.includes(x) ? "★ " : "↶ "}${esc(packageLabels.get(x) || x)}</button>`,
     )
     .join("");
   $$("[data-recent]").forEach(
     (b) =>
       (b.onclick = () => {
+        if (
+          ![...$("#pkg").options].some(
+            (option) => option.value === b.dataset.recent,
+          )
+        )
+          $("#pkg").add(
+            new Option(
+              packageLabels.get(b.dataset.recent) || b.dataset.recent,
+              b.dataset.recent,
+            ),
+          );
         $("#pkg").value = b.dataset.recent;
-        scripts();
+        commitPackageChoice();
+        $("#pkg").dispatchEvent(new Event("change", { bubbles: true }));
       }),
   );
 }
@@ -682,6 +852,36 @@ async function refreshConsolePackage() {
 }
 function refreshConsoleSummary() {
   const host = document.querySelector("#console-deploy-summary");
+  const choosing = $("#packagePicker").open,
+    script = $("#script"),
+    unavailable =
+      !S.target ||
+      packageBusy ||
+      choosing ||
+      !$("#pkg").value ||
+      script.disabled ||
+      !script.value ||
+      deploySubmitting;
+  for (const button of [$("#deploy"), $("#copyOnly"), $("#execOnly")])
+    button.disabled = unavailable;
+  $("#choosePackage").disabled = packageBusy || !$("#pkg").value;
+  $("#deploy").textContent = deploySubmitting ? "Starting…" : "Copy & execute";
+  for (const button of document.querySelectorAll("[data-deploy-action]"))
+    button.setAttribute(
+      "aria-pressed",
+      String(button.dataset.deployAction === $("#action").value),
+    );
   if (host)
-    host.textContent = `${S.user?.full_name || S.user?.name || "No directory user"} → ${S.target || "Choose a machine"} → ${document.querySelector("#pkg")?.selectedOptions[0]?.textContent || "Choose a package"} → ${document.querySelector("#action")?.value || ""} → ${document.querySelector("#script")?.value || "Choose a script"}`;
+    host.textContent = packageBusy
+      ? "Loading packages…"
+      : choosing
+        ? "Choose a package to continue."
+        : !$("#pkg").value
+          ? "Choose a package."
+          : script.disabled
+            ? "Loading scripts…"
+            : !script.value
+              ? "No script for this action."
+              : "";
+  renderFav();
 }

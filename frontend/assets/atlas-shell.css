@@ -120,8 +120,34 @@ body.atlas-console > .console-sidebar {
   position: sticky;
   top: var(--atlas-header-height);
   height: calc(100dvh - var(--atlas-header-height));
-  padding: 28px 22px 22px;
-  gap: 24px;
+  padding: 18px 16px 12px;
+  gap: 16px;
+  overflow: hidden;
+}
+.console-sidebar > div:first-child {
+  flex: 0 0 auto;
+}
+.console-sidebar nav {
+  gap: 4px;
+}
+.console-sidebar nav button {
+  min-height: 38px;
+}
+.console-sidebar-content {
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  padding: 2px;
+  flex: 1;
+}
+.console-sidebar .sidebar-status {
+  margin-top: 16px;
+  padding: 8px 0 0;
+}
+.sidebar-status > summary {
+  color: var(--atlas-muted);
+  font-size: 11px;
 }
 .console-sidebar .nav-section {
   margin-top: 0;
@@ -129,10 +155,10 @@ body.atlas-console > .console-sidebar {
 body.atlas-console > main {
   max-width: none;
   margin: 0;
-  padding: 28px 26px 12px;
+  padding: 20px 24px 80px;
 }
 .console-page-heading {
-  margin-bottom: 26px;
+  margin-bottom: 18px;
 }
 .console-page-heading h1 {
   font: 700 24px/1.3 var(--atlas-font);
@@ -147,20 +173,169 @@ body.atlas-console > main {
 .atlas-console #workspace.active {
   grid-template-columns: minmax(0, 1fr);
 }
-.atlas-console #workspace.active.has-target {
-  grid-template-columns: minmax(0, 1fr) minmax(340px, 400px);
-}
 .atlas-console .deployment-panel {
-  position: sticky;
-  top: calc(var(--atlas-header-height) + 12px);
-  max-height: calc(100dvh - var(--atlas-header-height) - 24px);
-  overflow: auto;
-  overscroll-behavior: contain;
+  position: static;
+  padding: 14px 10px 12px;
+  background: #f5faff;
+  border: 1px solid #cee2ed;
+  border-radius: 12px;
   margin: 0;
 }
-.deployment-heading-actions {
+.deployment-panel .head h2 {
+  margin: 4px 0 12px;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.deployment-panel small {
+  font-size: 9px;
+  letter-spacing: 1px;
+}
+.deployment-panel :is(input, select, button) {
+  min-height: 32px;
+  font-size: 11px;
+  padding: 6px 8px;
+}
+.deployment-package-heading {
   display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--atlas-muted);
+}
+.deployment-panel #favBtn {
+  border: 0;
+  background: transparent;
+  font-size: 19px;
+  padding: 0 4px;
+  min-height: 26px;
+}
+.package-picker > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 8px;
+  min-height: 36px;
+  padding: 8px;
+  border: 1px solid var(--atlas-line);
+  border-radius: 8px;
+  background: white;
+  color: var(--atlas-text);
+  font-size: 12px;
+  list-style: none;
+}
+.package-picker > summary::-webkit-details-marker {
+  display: none;
+}
+#packageSelection {
+  overflow-wrap: anywhere;
+}
+.package-picker-body {
+  display: grid;
+  gap: 8px;
+  padding: 10px 0;
+}
+.package-picker-body :is(input, select, button) {
+  width: 100%;
+}
+.package-picker #pkg {
+  min-height: 110px;
+  padding: 4px;
+}
+.package-picker option {
+  padding: 5px 4px;
+}
+.package-picker #recent {
+  display: grid;
+  gap: 4px;
+  max-height: 120px;
+  overflow: auto;
+}
+.package-picker #recent:empty,
+.deployment-summary:empty {
+  display: none;
+}
+.package-picker #recent button {
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+#packageSearchStatus {
+  margin: 0;
+  font-size: 11px;
+}
+.deployment-action-switch {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 2px;
+  padding: 3px;
+  background: #e7eff5;
+  border-radius: 9px;
+  margin: 12px 0;
+}
+.deployment-action-switch button {
+  background: transparent;
+  border-color: transparent;
+  padding: 5px 2px;
+}
+.deployment-action-switch button[aria-pressed="true"] {
+  background: white;
+  color: #006f9b;
+  border-color: #c8dce7;
+}
+.deployment-script select {
+  width: 100%;
+}
+.deployment-advanced {
+  margin: 8px 0;
+}
+.deployment-options,
+.deployment-alternatives {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 10px 0;
+  flex-wrap: wrap;
+}
+.deployment-options .num {
+  width: 52px;
+}
+.deployment-panel #deploy {
+  width: 100%;
+  min-width: 0;
+  min-height: 36px;
+}
+.deployment-summary {
+  font-size: 11px;
+  color: var(--atlas-muted);
+  margin-top: 8px;
+}
+.deployment-panel .package-presence {
+  margin: 10px 0;
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+.deployment-progress {
+  border-top: 1px solid var(--atlas-line);
+  margin-top: 12px;
+  padding-top: 10px;
+  font-size: 11px;
+}
+.deployment-progress-heading {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  justify-content: space-between;
+}
+#deploymentMessage {
+  margin: 6px 0 0;
+  overflow-wrap: anywhere;
+}
+.deployment-panel #log {
+  min-height: 0;
+  max-height: 180px;
+  margin: 4px 0 0;
+  padding: 8px;
+  font-size: 10px;
 }
 #closeDeploymentPanel,
 .deployment-toggle {
@@ -188,12 +363,9 @@ body.atlas-console > main {
     grid-template-columns: var(--atlas-sidebar-width) minmax(320px, 1fr);
   }
 }
-@media (max-width: 1279px) {
+@media (max-width: 760px) {
   body.atlas-console > main {
     padding-bottom: 90px;
-  }
-  .atlas-console #workspace.active.has-target {
-    grid-template-columns: minmax(0, 1fr);
   }
   .atlas-console .deployment-panel {
     position: fixed;
@@ -203,6 +375,9 @@ body.atlas-console > main {
     bottom: 140px;
     width: min(440px, calc(100% - 32px));
     max-height: calc(100dvh - var(--atlas-header-height) - 164px);
+    overflow: auto;
+    overscroll-behavior: contain;
+    padding: 18px;
     box-shadow: 0 12px 40px #17334626;
   }
   #closeDeploymentPanel {
@@ -252,6 +427,13 @@ body.atlas-console > main {
     position: static;
     height: auto;
     padding: 12px 16px;
+    overflow: visible;
+  }
+  .console-sidebar-content {
+    overflow: visible;
+  }
+  .console-sidebar .sidebar-status {
+    margin-top: 0;
   }
   body.atlas-console > main {
     padding: 24px 16px 90px;

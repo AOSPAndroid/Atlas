@@ -37,7 +37,10 @@ function bind() {
     clearTimeout(window.pt);
     window.pt = setTimeout(packages, 250);
   };
-  $("#pkg").onchange = scripts;
+  $("#pkg").onchange = () => {
+    if (!$("#packagePicker").open) commitPackageChoice();
+    scripts();
+  };
   $("#action").onchange = scripts;
   $("#deploy").onclick = () => deploy("full");
   $("#copyOnly").onclick = () => deploy("copy");
@@ -562,6 +565,13 @@ async function runSharedCommand(id) {
     }
     const control = document.querySelector(selector);
     if (control?.closest("#deploymentPanel")) openDeploymentPanel();
+    if (control?.closest("#packagePicker")) $("#packagePicker").open = true;
+    for (
+      let parent = control?.parentElement;
+      parent;
+      parent = parent.parentElement
+    )
+      if (parent.matches("details")) parent.open = true;
     control?.scrollIntoView({ block: "center" });
     if (control && !control.matches("button,input,select,textarea,a"))
       control.tabIndex = -1;

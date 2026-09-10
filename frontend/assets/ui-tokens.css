@@ -247,7 +247,6 @@ dialog[open]::backdrop {
   animation: atlas-backdrop-enter var(--atlas-motion-fast) ease-out;
 }
 .page.active,
-.atlas-person,
 #detail.open > .record-head,
 #toast > .toast {
   animation: atlas-reveal var(--atlas-motion-enter) var(--atlas-ease);

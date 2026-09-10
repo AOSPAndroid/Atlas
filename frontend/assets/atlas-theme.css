@@ -284,7 +284,7 @@ small,
 }
 #workspace.active {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(360px, 0.85fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 24px;
   align-items: start;
 }
@@ -321,12 +321,6 @@ small,
   padding: 20px;
   margin: 14px 0;
   box-shadow: 0 3px 12px #17334604;
-}
-.deployment-panel {
-  margin: 0;
-  position: sticky;
-  top: 20px;
-  border-top: 3px solid var(--accent);
 }
 .head {
   display: flex;
@@ -662,13 +656,6 @@ summary {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
 }
-.deployment-panel .grid label:nth-child(2),
-.deployment-panel .grid label:nth-child(4) {
-  grid-column: 1/-1;
-}
-.deployment-panel .grid label:nth-child(1) {
-  grid-column: 1/-1;
-}
 .row,
 .actions {
   display: flex;
@@ -706,17 +693,6 @@ label:has(input[type="checkbox"]) {
 .danger-item {
   color: var(--red);
   border-color: #e9c7ca;
-}
-.deployment-panel .row {
-  border-top: 1px solid var(--line);
-  padding-top: 18px;
-}
-.deployment-panel #deploy {
-  flex: 1;
-  min-width: 150px;
-}
-.deployment-panel #log {
-  min-height: 130px;
 }
 .package-presence {
   display: flex;
@@ -1093,15 +1069,6 @@ tbody tr:hover {
   }
   #workspace.active {
     grid-template-columns: 1fr;
-  }
-  .deployment-panel {
-    position: static;
-  }
-  .deployment-panel .grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .deployment-panel .grid label {
-    grid-column: auto !important;
   }
   .header-actions {
     justify-content: flex-end;
