@@ -67,6 +67,27 @@ class Regression(unittest.TestCase):
  def test_local_origin_boundaries(self):
   self.assertEqual(self.client.post('/api/deploy',headers={'Origin':'https://other.example'},json={}).status_code,403)
   self.assertEqual(self.client.get('/api/history',headers={'Host':'other.example'}).status_code,403)
+ def test_browser_revalidates_pages_and_scripts(self):
+  for path in ['/installer','/','/assets/console-directory.js','/assets/shared-ui.js','/assets/ui-tokens.css','/command-palette.js']:
+   with self.subTest(path=path):
+    response=self.client.get(path);self.assertEqual(response.status_code,200)
+    self.assertEqual(response.headers.get('cache-control'),'no-cache')
+  script=self.client.get('/assets/console-directory.js')
+  cached=self.client.get('/assets/console-directory.js',headers={'If-None-Match':script.headers['etag']})
+  self.assertEqual(cached.status_code,304);self.assertEqual(cached.headers.get('cache-control'),'no-cache')
+  self.assertNotIn('renderDaaSUser',script.text)
+  response=self.client.get('/api/user/id:'+str(self.user['id']))
+  self.assertEqual(response.status_code,200);self.assertEqual(response.headers.get('cache-control'),'no-store')
+  # A new URL escapes previously cached scripts; an unchanged file keeps its URL.
+  with tempfile.TemporaryDirectory() as tmp:
+   root=Path(tmp);(root/'assets').mkdir();script=root/'assets'/'test.js';script.write_text('old script')
+   (root/'index.html').write_text('<script src="/assets/test.js"></script>')
+   with patch.object(app,'WEB',root):
+    old=self.client.get('/installer').text
+    self.assertIn('/assets/test.js?v=',old);self.assertEqual(self.client.get('/installer').text,old)
+    script.write_text('new script');stat=script.stat()
+    app.os.utime(script,ns=(stat.st_atime_ns,stat.st_mtime_ns+1000000))
+    self.assertNotEqual(self.client.get('/installer').text,old)
  def test_outcomes_and_remote_failure(self):
   for code,expected in [('0','complete'),('3010','complete'),('1641','complete'),('1603','failed'),('not written','failed')]:
    j=uuid.uuid4().hex;app.jobs[j]={'state':'queued','events':[]};app.history_create(j,'TESTPC','Example','Install','setup_i.ps1','full')

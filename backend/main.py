@@ -5,7 +5,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, Literal
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, StreamingResponse, JSONResponse
+from fastapi.responses import FileResponse, StreamingResponse, JSONResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from directory_lookup import exact_users, linked_machines, search_directory, prepare_views
@@ -242,7 +242,11 @@ async def local_only(request:Request,call_next):
  origin=request.headers.get('origin')
  if origin and origin != str(request.base_url).rstrip('/'):
   return JSONResponse({'detail':'Cross-origin requests are not allowed'},status_code=403)
- return await call_next(request)
+ response=await call_next(request)
+ # Assets keep conditional caching, but every navigation must check for updates.
+ # Otherwise a new shared card can run alongside an older cached console script.
+ response.headers['Cache-Control']='no-store' if request.url.path.startswith('/api/') else 'no-cache'
+ return response
 @app.get('/api/health')
 def health():
  u=m=0
@@ -660,7 +664,15 @@ def master_resolve(value:str):
 
 app.mount('/assets',StaticFiles(directory=WEB/'assets'),name='assets')
 @app.get('/installer')
-def index():return FileResponse(WEB/'index.html')
+def index():
+ html=(WEB/'index.html').read_text(encoding='utf-8')
+ # A changed asset gets a new URL, including when an older response was cached
+ # before revalidation headers were introduced. Keep the static project simple.
+ def version(match):
+  stamp=(WEB/'assets'/match[2]).stat().st_mtime_ns
+  return f'{match[1]}{match[2]}?v={stamp}{match[3]}'
+ html=re.sub(r'((?:src|href)="/assets/)([^"?]+\.(?:js|css))(")',version,html)
+ return HTMLResponse(html)
 
 from atlas_api import register_atlas
 register_atlas(app)

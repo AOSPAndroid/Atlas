@@ -18,6 +18,8 @@ Git and Node.js are not needed to run the downloaded application. The download i
 
 If you already use Atlas, follow [Configuration and updates](#configuration-and-updates) to retain your live database and settings when updating.
 
+After updating and restarting Atlas, refresh any open browser tabs. Console scripts and styles use versioned URLs, and admin pages revalidate cached files so an older console script cannot keep adding removed interface sections. API responses are not cached.
+
 ### Open and share Atlas
 
 | Interface | Address | Access |
@@ -121,7 +123,7 @@ py -3.12 launcher.py stop
 
 `backend/main.py` hosts admin routes; `backend/viewer.py` hosts shared read routes; `directory_lookup.py` shares database-only lookup queries; `atlas/official-app.js` renders the common map; `atlas/viewer.js` provides read-only user and machine inspection.
 
-The test runner uses disposable database copies, starts isolated UI fixtures on ports 8892/8893, and runs 81 Python tests plus thirteen Node DOM suites. Remote operations are simulated. `npm run format:check` verifies formatting of the maintained browser sources.
+The test runner uses disposable database copies, starts isolated UI fixtures on ports 8892/8893, and runs 82 Python tests plus thirteen Node DOM suites. Remote operations are simulated. `npm run format:check` verifies formatting of the maintained browser sources.
 
 ## Optimization changes
 
