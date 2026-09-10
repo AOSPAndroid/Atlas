@@ -3,7 +3,7 @@
   if (window.AtlasCursor) return;
   const shapes = {
     default: [
-      "M5.3 3.8C4.7 3.3 4.1 3.7 4.2 4.5L5.4 25.2C5.5 26.3 6.1 26.5 6.9 25.8L11.4 21.6L15.5 29C15.9 29.7 16.4 29.8 17.1 29.4L19.3 28.1C20 27.7 20.1 27.2 19.7 26.5L15.7 19.8L22 18.8C23.1 18.6 23.3 17.9 22.4 17.2Z",
+      "M5.5 4.4C4.8 3.8 4.2 4.2 4.3 5.2L5.5 25.9C5.6 27.2 6.3 27.5 7.2 26.6L12.1 22.1L16.3 29.5C16.8 30.4 17.5 30.6 18.4 30.1L21 28.7C21.9 28.2 22.1 27.5 21.5 26.5L17.3 19.5L24.2 19C25.6 18.9 25.9 18 24.8 17.1Z",
       5,
       4,
       "default",
@@ -37,8 +37,8 @@
   };
   const styles = Object.fromEntries(
     Object.entries(shapes).map(([state, [path, x, y, fallback, line]]) => {
-      const fill = line ? "none" : "url(#blue)";
-      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="34" viewBox="0 0 32 34"><defs><linearGradient id="blue" x1="0" y1="0" x2=".8" y2="1"><stop stop-color="#53d4ff"/><stop offset=".48" stop-color="#00aeef"/><stop offset="1" stop-color="#008fc8"/></linearGradient></defs><g stroke-linecap="round" stroke-linejoin="round"><path d="${path}" fill="${fill}" stroke="white" stroke-width="${line ? 4.4 : 2.8}"/><path d="${path}" fill="${fill}" stroke="#12364a" stroke-width="${line ? 2.6 : 0.95}"/>${line ? `<path d="${path}" fill="none" stroke="#00aeef" stroke-width="1.4"/>` : ""}</g></svg>`;
+      const fill = line ? "none" : "white";
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="34" viewBox="0 0 32 34"><g stroke-linecap="round" stroke-linejoin="round"><path d="${path}" fill="${fill}" stroke="#00aeef" stroke-width="${line ? 4.6 : 3}"/>${line ? `<path d="${path}" fill="none" stroke="white" stroke-width="1.6"/>` : ""}</g></svg>`;
       return [
         state,
         `url("data:image/svg+xml,${encodeURIComponent(svg)}") ${x} ${y}, ${fallback}`,

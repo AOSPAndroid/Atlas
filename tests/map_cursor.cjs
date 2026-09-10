@@ -53,8 +53,8 @@ const { fixture, root } = require("./ui_fixture.cjs");
     const svg = decodeURIComponent(element.style.cursor);
     assert(
       svg.includes("#00aeef") &&
-        svg.includes('stroke="white"') &&
-        svg.includes('stroke="#12364a"'),
+        svg.includes('fill="white"') &&
+        svg.includes('stroke="#00aeef" stroke-width="3"'),
     );
   }
   for (let i = 0; i < 100; i++) cursor.set(canvas, "default", event);
