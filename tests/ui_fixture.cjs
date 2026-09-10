@@ -9,9 +9,9 @@ async function fixture({html='frontend/index.html',fetch:request,url='http://127
  w.fetch=request||((url,o)=>fetch(new URL(url,w.location.href),o));w.Headers=Headers;w.AbortController=AbortController;w.confirm=()=>false;w.matchMedia=()=>({matches:true,addEventListener(){}});w.ResizeObserver=class{observe(){}};
  w.HTMLElement.prototype.scrollIntoView=function(){};w.HTMLDialogElement.prototype.showModal=function(){this.open=true};w.HTMLDialogElement.prototype.close=function(){this.open=false;this.dispatchEvent(new w.Event('close'))};
  const modules=new Map();
- async function moduleFor(spec){const file=path.join(root,'atlas',path.basename(spec));if(modules.has(file))return modules.get(file);const pending=(async()=>{const mod=new vm.SourceTextModule(fs.readFileSync(file,'utf8'),{context,identifier:file});await mod.link(moduleFor);await mod.evaluate();return mod})();modules.set(file,pending);return pending}
+ async function moduleFor(spec){const file=path.join(root,'atlas',path.basename(spec.split(/[?#]/,1)[0]));if(modules.has(file))return modules.get(file);const pending=(async()=>{const mod=new vm.SourceTextModule(fs.readFileSync(file,'utf8'),{context,identifier:file});await mod.link(moduleFor);await mod.evaluate();return mod})();modules.set(file,pending);return pending}
  const run=(source)=>vm.runInContext(source,context,{importModuleDynamically:moduleFor});
- for(const file of ['client.js','shared-ui.js','machine-health.js'])run(fs.readFileSync(path.join(root,'frontend/assets',file),'utf8'));
+ for(const file of ['client.js','shared-ui.js','atlas-cursor.js','machine-health.js'])run(fs.readFileSync(path.join(root,'frontend/assets',file),'utf8'));
  return {dom,w,context,run,errors,async console(){run(consoleSource());run(fs.readFileSync(path.join(root,'frontend/assets/remote-software.js'),'utf8'))},async map(tail=''){const mod=new vm.SourceTextModule(fs.readFileSync(path.join(root,'atlas/official-app.js'),'utf8')+tail,{context,identifier:'official-app',importModuleDynamically:moduleFor});await mod.link(moduleFor);await mod.evaluate();return mod.namespace}};
 }
 module.exports={fixture,consoleSource,consoleFiles,root};

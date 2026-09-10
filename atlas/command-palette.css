@@ -2,6 +2,7 @@
   all: initial;
   font-family: system-ui, sans-serif;
   color-scheme: light;
+  cursor: var(--atlas-cursor-default, default);
 }
 * {
   box-sizing: border-box;
@@ -12,7 +13,7 @@
   padding: 10px 12px;
   background: #fff;
   font: 13px system-ui;
-  cursor: pointer;
+  cursor: var(--atlas-cursor-hover, pointer);
   display: flex;
   align-items: center;
   gap: 24px;
@@ -84,6 +85,7 @@
   color: #008aaa;
 }
 .palette-input-row input {
+  cursor: var(--atlas-cursor-text, text);
   min-width: 0;
   flex: 1;
   border: 0;
@@ -103,7 +105,7 @@
   padding: 5px 8px;
   background: #f8fafc;
   color: #456478;
-  cursor: pointer;
+  cursor: var(--atlas-cursor-hover, pointer);
 }
 #atlas-command-status {
   padding: 10px 20px;
@@ -122,7 +124,7 @@
   gap: 12px;
   padding: 12px;
   border-radius: 9px;
-  cursor: pointer;
+  cursor: var(--atlas-cursor-hover, pointer);
   border: 1px solid transparent;
 }
 .palette-result.selected {

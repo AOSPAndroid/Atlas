@@ -11,6 +11,84 @@
   --atlas-motion-enter: 260ms;
   --atlas-ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
+html.atlas-cursor-ready,
+.atlas-cursor-ready body,
+.atlas-cursor-ready dialog::backdrop {
+  cursor: var(--atlas-cursor-default, default);
+}
+.atlas-cursor-ready
+  :is(
+    button,
+    a[href],
+    summary,
+    select,
+    [role="button"],
+    [role="switch"],
+    [role="checkbox"],
+    [role="menuitem"],
+    [role="option"],
+    .machine,
+    .ops-machine,
+    .map-name,
+    .name-toggle,
+    .atlas-motion-toggle,
+    label[for],
+    input[type="button"],
+    input[type="submit"],
+    input[type="reset"],
+    input[type="checkbox"],
+    input[type="radio"],
+    input[type="range"],
+    input[type="file"],
+    input[type="color"]
+  ) {
+  cursor: var(--atlas-cursor-hover, pointer) !important;
+}
+.atlas-cursor-ready
+  :is(
+    input:not([type]),
+    input[type="text"],
+    input[type="search"],
+    input[type="email"],
+    input[type="password"],
+    input[type="number"],
+    input[type="tel"],
+    input[type="url"],
+    input[type="date"],
+    input[type="time"],
+    input[type="datetime-local"],
+    textarea,
+    [contenteditable="true"],
+    [role="textbox"]
+  ) {
+  cursor: var(--atlas-cursor-text, text) !important;
+}
+.atlas-cursor-ready :is(:disabled, [aria-disabled="true"]) {
+  cursor: var(--atlas-cursor-disabled, not-allowed) !important;
+}
+.atlas-cursor-feedback {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  padding: 0;
+  width: 34px;
+  height: 34px;
+  border: 1.5px solid #00aeef;
+  border-radius: 50%;
+  background: #00aeef0d;
+  box-shadow: 0 0 0 1px #ffffffc9;
+  z-index: 2147483647;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+.atlas-cursor-feedback::backdrop {
+  background: transparent;
+  pointer-events: none;
+}
+.atlas-cursor-feedback[hidden],
+html[data-atlas-motion="reduce"] .atlas-cursor-feedback {
+  display: none;
+}
 .atlas-person {
   display: grid;
   grid-template-columns: 42px minmax(0, 1fr);

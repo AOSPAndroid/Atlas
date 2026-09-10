@@ -45,7 +45,8 @@ const { fixture, root } = require("./ui_fixture.cjs");
     canvases: [canvas, second],
     reduced: () => reduced,
   });
-  const feedback = viewport.querySelector(".atlas-cursor-feedback");
+  const feedback = w.document.querySelector(".atlas-cursor-feedback");
+  w.AtlasUI.motion.isReduced = () => reduced;
   const event = { clientX: 110, clientY: 120, pointerType: "mouse" };
   for (const element of [canvas, second]) {
     assert.equal(element.dataset.mapCursor, "default");
@@ -53,7 +54,7 @@ const { fixture, root } = require("./ui_fixture.cjs");
     assert(
       svg.includes("#00aeef") &&
         svg.includes('stroke="white"') &&
-        svg.includes('stroke="#102c3d"'),
+        svg.includes('stroke="#12364a"'),
     );
   }
   for (let i = 0; i < 100; i++) cursor.set(canvas, "default", event);
@@ -69,7 +70,7 @@ const { fixture, root } = require("./ui_fixture.cjs");
     1,
     "Holding hover never creates an animation loop",
   );
-  assert.equal(measures, 1, "Pointer movement does not measure another layout");
+  assert.equal(measures, 0, "Cursor feedback does not measure page layout");
   canvas.dispatchEvent(
     new w.MouseEvent("pointerdown", {
       bubbles: true,
@@ -82,8 +83,8 @@ const { fixture, root } = require("./ui_fixture.cjs");
   assert.equal(animations.length, 2);
   animations[0].onfinish();
   assert(!feedback.hidden, "An old finish cannot hide new feedback");
-  assert.equal(feedback.style.left, "150px");
-  assert.equal(feedback.style.top, "160px");
+  assert.equal(feedback.style.left, "160px");
+  assert.equal(feedback.style.top, "180px");
   animations[1].onfinish();
   assert(feedback.hidden);
   const label = w.document.createElement("button");
@@ -97,20 +98,20 @@ const { fixture, root } = require("./ui_fixture.cjs");
   control.dispatchEvent(
     new w.MouseEvent("pointerdown", { bubbles: true, button: 0 }),
   );
-  assert.equal(animations.length, 3, "Map controls keep standard behaviour");
+  assert.equal(animations.length, 4, "Map controls share the same feedback");
   const touch = new w.MouseEvent("pointerdown", { bubbles: true, button: 0 });
   Object.defineProperty(touch, "pointerType", { value: "touch" });
   canvas.dispatchEvent(touch);
-  assert.equal(animations.length, 3, "No custom pointer feedback for touch");
+  assert.equal(animations.length, 4, "No custom pointer feedback for touch");
   reduced = true;
   w.dispatchEvent(new w.Event("atlas-motion-change"));
   assert(feedback.hidden);
-  assert(animations[2].cancelled);
+  assert(animations[3].cancelled);
   canvas.dispatchEvent(
     new w.MouseEvent("pointerdown", { bubbles: true, button: 0 }),
   );
   cursor.set(canvas, "place", event);
-  assert.equal(animations.length, 3);
+  assert.equal(animations.length, 4);
   assert(
     canvas.style.cursor.includes("crosshair"),
     "The coloured cursor remains with motion off",
@@ -125,12 +126,70 @@ const { fixture, root } = require("./ui_fixture.cjs");
   cursor.set(canvas, "hover", event);
   viewport.dispatchEvent(new w.Event("pointerleave"));
   assert(feedback.hidden);
-  assert.equal(viewport.querySelectorAll(".atlas-cursor-feedback").length, 1);
+  assert.equal(w.document.querySelectorAll(".atlas-cursor-feedback").length, 1);
   assert.equal(frames, 0, "Cursor never starts a rendering loop");
+  // The same service covers controls outside the map and inside shadow dialogs.
+  const outside = w.document.createElement("button");
+  w.document.body.append(outside);
+  const clicks = () => animations.length;
+  const send = (target) =>
+    target.dispatchEvent(
+      new w.MouseEvent("pointerdown", {
+        bubbles: true,
+        composed: true,
+        button: 0,
+        clientX: 12,
+        clientY: 24,
+      }),
+    );
+  let before = clicks();
+  send(outside);
+  assert.equal(clicks(), before + 1);
+  const input = w.document.createElement("input");
+  w.document.body.append(input);
+  before = clicks();
+  send(input);
+  outside.disabled = true;
+  send(outside);
+  assert.equal(
+    clicks(),
+    before,
+    "Text entry and disabled controls do not flash",
+  );
+  const host = w.document.createElement("div");
+  w.document.body.append(host);
+  const shadow = host.attachShadow({ mode: "open" });
+  shadow.innerHTML = "<dialog open><button>Run</button><input></dialog>";
+  before = clicks();
+  send(shadow.querySelector("button"));
+  assert.equal(clicks(), before + 1);
+  before = clicks();
+  send(shadow.querySelector("input"));
+  assert.equal(clicks(), before);
+  f.run(
+    fs.readFileSync(path.join(root, "frontend/assets/atlas-cursor.js"), "utf8"),
+  );
+  outside.disabled = false;
+  before = clicks();
+  send(outside);
+  assert.equal(
+    clicks(),
+    before + 1,
+    "Installing twice does not double click feedback",
+  );
+  assert.equal(w.document.querySelectorAll(".atlas-cursor-feedback").length, 1);
+  for (const kind of ["default", "hover", "text", "disabled"])
+    assert(
+      w.document.documentElement.style
+        .getPropertyValue("--atlas-cursor-" + kind)
+        .includes("00aeef"),
+    );
+  w.dispatchEvent(new w.Event("scroll"));
+  assert(feedback.hidden);
   assert.equal(f.errors.length, 0, f.errors.join("\n"));
   w.close();
   console.log(
-    "PASS: native branded cursors, bounded hover/click feedback, no pointer loop, controls/touch unchanged, reduced motion and cleanup",
+    "PASS: shared branded cursors, console/shadow dialog clicks, text/disabled/touch exclusions, idempotence, no pointer loop, reduced motion and cleanup",
   );
 })().catch((error) => {
   console.error(error);

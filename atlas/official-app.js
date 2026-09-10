@@ -1,5 +1,5 @@
 import { createCameraMotion } from "./camera-motion.js";
-import { installMapCursor } from "./map-cursor.js";
+import { installMapCursor } from "./map-cursor.js?v=2";
 const readOnly =
   document.querySelector('meta[name="atlas-mode"]')?.content === "viewer";
 const { createOperations } = readOnly
@@ -968,7 +968,6 @@ let canvas = planCanvas;
 const mapCursor = installMapCursor({
   viewport: $("#viewport"),
   canvases: [glCanvas, planCanvas],
-  reduced: () => motionPreference.matches,
 });
 const ctx2d = planCanvas.getContext("2d");
 let gl = null,

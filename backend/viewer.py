@@ -143,7 +143,7 @@ def home():
 
 @app.get('/assets/{filename}')
 def shared_asset(filename:str):
-    if filename not in ('shared-ui.js','ui-tokens.css','atlas-shell.css','barclays-eagle.svg','catalogue.css'):raise HTTPException(404,'Not available')
+    if filename not in ('shared-ui.js','atlas-cursor.js','ui-tokens.css','atlas-shell.css','barclays-eagle.svg','catalogue.css'):raise HTTPException(404,'Not available')
     return FileResponse(ROOT/'frontend/assets'/filename)
 
 
