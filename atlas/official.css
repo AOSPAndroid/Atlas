@@ -273,7 +273,7 @@ header button:hover,
   pointer-events: none;
 }
 #viewport .map-name {
-  cursor: var(--atlas-cursor-hover, pointer);
+  cursor: pointer;
 }
 .locator-ring {
   position: absolute;

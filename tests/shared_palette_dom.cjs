@@ -29,7 +29,7 @@ async function loadModule(file,context,cache=new Map()){
   const palette=namespace.installCommandPalette({getRecords:()=>records,onSelect:id=>calls.push(['desk',id]),toast:s=>calls.push(['toast',s]),runCommand:id=>calls.push(['command',id]),openPerson:id=>calls.push(['person',id]),openMachine:id=>calls.push(['machine',id]),...(mode==='map'?{triggerParent:w.document.querySelector('header')}:{replaceTrigger:w.document.querySelector('#old'),prepare:async()=>{}})});
   const input=palette.root.querySelector('input'),options=()=>[...palette.root.querySelectorAll('[role=option]')],type=s=>{input.value=s;input.dispatchEvent(new w.Event('input',{bubbles:true,composed:true}))},key=k=>input.dispatchEvent(new w.KeyboardEvent('keydown',{key:k,bubbles:true,composed:true}));
   const trigger=palette.root.querySelector('button');trigger.focus();await palette.open();
-  results.push(options().map(o=>o.textContent));assert.equal(options().length,registry.namespace.COMMANDS.length);assert.equal(palette.root.querySelector('link').getAttribute('href'),'/command-palette.css?v=70');
+  results.push(options().map(o=>o.textContent));assert.equal(options().length,registry.namespace.COMMANDS.length);assert.equal(palette.root.querySelector('link').getAttribute('href'),'/command-palette.css?v=71');
   type('> history');assert.equal(options().length,1);key('Enter');await sleep(0);assert.deepEqual(calls.pop(),['command','history']);assert(!palette.dialog.open);assert.equal(palette.root.activeElement,trigger);
   await palette.open();type('desk:04R024065');key('Enter');await sleep(0);assert.deepEqual(calls.pop(),['desk','04R024065']);
   await palette.open();type('person:Alice');await sleep(220);key('Enter');await sleep(10);assert.deepEqual(calls.pop(),['desk','04R024065']);

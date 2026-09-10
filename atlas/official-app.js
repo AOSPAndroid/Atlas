@@ -1,5 +1,5 @@
 import { createCameraMotion } from "./camera-motion.js";
-import { installMapCursor } from "./map-cursor.js?v=2";
+import { installMapCursor } from "./map-cursor.js?v=3";
 const readOnly =
   document.querySelector('meta[name="atlas-mode"]')?.content === "viewer";
 const { createOperations } = readOnly
@@ -1954,7 +1954,7 @@ onMap("pointermove", (e) => {
         Math.min(e.clientX - rect.left + 12, rect.width - 210) + "px";
       hover.style.top = e.clientY - rect.top - 35 + "px";
     }
-    mapCursor.set(canvas, placing ? "place" : r ? "hover" : "default", e);
+    mapCursor.set(canvas, placing ? "place" : r ? "hover" : "default");
   }
 });
 onMap("pointerup", async (e) => {

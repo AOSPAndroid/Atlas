@@ -1,26 +1,22 @@
-// Map interaction states use the same native cursor set as the rest of Atlas.
+// Standard system cursors communicate map interaction states.
 export function installMapCursor({ viewport, canvases }) {
-  const cursor = window.AtlasCursor;
-  cursor.install();
-  function set(element, state, event) {
+  const styles = {
+    default: "default",
+    hover: "pointer",
+    drag: "grabbing",
+    place: "crosshair",
+  };
+  function set(element, state) {
     if (element.dataset.mapCursor === state) return;
     element.dataset.mapCursor = state;
-    element.style.cursor = cursor.styles[state] || cursor.styles.default;
-    if (state === "hover" && event) cursor.pulse(event, true);
+    element.style.cursor = styles[state] || styles.default;
   }
   function reset() {
-    cursor.clear();
     for (const element of canvases) set(element, "default");
   }
-  viewport.addEventListener("pointerover", (event) => {
-    const label = event.target.closest(".map-name");
-    if (label && !label.contains(event.relatedTarget))
-      cursor.pulse(event, true);
-  });
-  viewport.addEventListener("pointerleave", cursor.clear);
   viewport.addEventListener("pointercancel", reset);
   window.addEventListener("blur", reset);
   window.addEventListener("pagehide", reset);
   reset();
-  return { set, clear: cursor.clear, reset };
+  return { set, reset };
 }

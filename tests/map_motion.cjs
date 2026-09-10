@@ -172,7 +172,7 @@ const { fixture, root } = require("./ui_fixture.cjs");
 
   t.setView("3d", true);
   assert.equal(t.currentCanvas().dataset.mapCursor, "default");
-  assert(t.currentCanvas().style.cursor.includes("data:image/svg+xml"));
+  assert.equal(t.currentCanvas().style.cursor, "default");
   step(480);
   const uploadCount = uploads;
   w.document.querySelector("#rotate").click();
