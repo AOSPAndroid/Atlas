@@ -15,7 +15,7 @@ function setTarget(pc, status = "") {
     x.classList.toggle("selected", S.machines[+x.dataset.machine]?.name === pc),
   );
   rememberTarget(pc);
-  refreshTargetHealth();
+  refreshTargetHealth(false);
   refreshConsoleSummary();
   updatePackagePresence();
 }
@@ -313,9 +313,8 @@ function machineContext(event, index) {
     button.onclick = async () => {
       close();
       try {
-        const wasTarget = S.target === m.name.trim().toUpperCase();
         if (select) setTarget(m.name, m.operational_status);
-        await run(wasTarget);
+        await run();
       } catch (error) {
         toast(error.message);
       }
@@ -323,10 +322,7 @@ function machineContext(event, index) {
     menu.append(button);
   };
   add("target", "Set as target", () => {});
-  add("health", "Refresh health", (wasTarget) => {
-    // Selecting a different target already starts its health checks.
-    if (wasTarget) return refreshTargetHealth();
-  });
+  add("health", "Refresh health", () => refreshTargetHealth());
   add("copy", "Copy hostname", () => copy(m.name, "Hostname"));
   add("details", "Copy machine details", () =>
     copy(JSON.stringify(m, null, 2), "Machine details"),

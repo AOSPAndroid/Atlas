@@ -43,6 +43,11 @@ const {snapshot} = require('./performance_sample.cjs');
   for (const file of ['app.js', 'console-processes.js', 'slowdown-diagnostics.js']) run(fs.readFileSync(path.join(root, 'frontend/assets', file), 'utf8'));
   w.copyFixture = text => copied.push(text);
   run('function toast(){}; function copy(text){copyFixture(text)}; bindProcessControls()');
+  assert.equal(calls,0,'loading Remote Admin does not start a scan');
+  get('adminPc').value='TESTPC';get('adminPc').dispatchEvent(new w.Event('input'));
+  await advance(120000);
+  assert.equal(calls,0,'selecting a machine and waiting does not start a scan');
+  assert.equal(get('diagnoseSlowness').textContent.trim(),'Scan for slowness');
   const analyze = w.AtlasDiagnostics.analyze;
   // Repeated pressure versus an isolated spike; no diagnosis based on thread count.
   const repeated = [0, 4, 8, 12].map(t => sample(95, t));
@@ -69,7 +74,7 @@ const {snapshot} = require('./performance_sample.cjs');
   assert.equal(analyze([disk]).length,0,'inactive disk is not a latency diagnosis');
   disk.summary.disks[0].read_bytes_sec=1024;assert.equal(analyze([disk])[0].id,'disk');
   // Bounded capture, automatic stop, readable evidence and report.
-  get('adminPc').value='TESTPC';await w.AtlasDiagnostics.start();
+  get('diagnoseSlowness').click();await settle();
   assert(!get('slowdownPanel').hidden);assert(get('diagnoseSlowness').disabled);
   get('slowdownFindings').querySelector('details').open=true;
   get('adminOverview').querySelector('details').open=true;

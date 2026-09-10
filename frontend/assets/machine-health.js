@@ -1,4 +1,4 @@
-/* Shared progressive health widget for the real Atlas and IT console. */
+/* Shared health widget. Rendering never starts remote checks; Scan is explicit. */
 (() => {
   "use strict";
   const esc = (v) =>
@@ -102,26 +102,36 @@
       active.delete(host);
     }
   }
-  async function mount(host, pc, isCurrent = () => true) {
+  function render(host, pc, isCurrent, scanning) {
+    host.classList.remove("hidden");
+    host.classList.add("atlas-health");
+    host.innerHTML = `<div class="atlas-health-heading"><b>${esc(pc)} · Machine health</b><button type="button" data-health-refresh ${scanning ? "disabled" : ""}>${scanning ? "Checking…" : "Scan health"}</button></div>${scanning ? "" : "<p>Health checks start only when you click Scan health.</p>"}<div class="atlas-health-grid">${Object.entries(
+      labels,
+    )
+      .map(
+        ([key, label]) =>
+          `<div class="atlas-health-item"><b>${label}</b><div data-metric="${key}">${scanning ? "Loading…" : "Not scanned"}</div><small data-time="${key}"></small></div>`,
+      )
+      .join("")}</div>`;
+    const button = host.querySelector("[data-health-refresh]");
+    button.onclick = () => scan(host, pc, isCurrent);
+    return button;
+  }
+  function mount(host, pc, isCurrent = () => true) {
     if (!host) return;
+    cancel(host);
+    snapshots.set(host, { pc, metrics: {}, state: "idle" });
+    render(host, pc, isCurrent, false);
+  }
+  async function scan(host, pc, isCurrent = () => true) {
+    if (!host?.isConnected || !isCurrent()) return;
     cancel(host);
     const controller = new AbortController();
     active.set(host, controller);
     const current = () =>
       active.get(host) === controller && host.isConnected && isCurrent();
-    snapshots.set(host, { pc, metrics: {} });
-    host.classList.remove("hidden");
-    host.classList.add("atlas-health");
-    host.innerHTML = `<div class="atlas-health-heading"><b>${esc(pc)} · Live health</b><button type="button" data-health-refresh disabled>Checking…</button></div><div class="atlas-health-grid">${Object.entries(
-      labels,
-    )
-      .map(
-        ([key, label]) =>
-          `<div class="atlas-health-item"><b>${label}</b><div data-metric="${key}">Loading…</div><small data-time="${key}"></small></div>`,
-      )
-      .join("")}</div>`;
-    const button = host.querySelector("[data-health-refresh]");
-    button.onclick = () => mount(host, pc, isCurrent);
+    snapshots.set(host, { pc, metrics: {}, state: "checking" });
+    const button = render(host, pc, isCurrent, true);
     await Promise.allSettled(
       Object.keys(labels).map(async (key) => {
         const timed = new AbortController();
@@ -173,6 +183,7 @@
       }),
     );
     if (current()) {
+      snapshots.get(host).state = "complete";
       button.disabled = false;
       button.textContent = "Refresh health";
     }
@@ -182,7 +193,7 @@
     const d = document.createElement("dialog");
     d.className = "atlas-spec-dialog";
     d.innerHTML =
-      '<div class="atlas-health-heading"><h2>Machine specifications</h2><button type="button" aria-label="Close specifications">Close</button></div><p>Live queries under your current account. Missing or failed readings are unavailable.</p><div data-spec-health></div>';
+      '<div class="atlas-health-heading"><h2>Machine specifications</h2><button type="button" aria-label="Close specifications">Close</button></div><p>Click Scan health to retrieve current specifications. Missing or failed readings are unavailable.</p><div data-spec-health></div>';
     document.body.append(d);
     const host = d.querySelector("[data-spec-health]");
     d.querySelector("button").onclick = () => d.close();
@@ -220,7 +231,9 @@
       const metric = snapshot?.pc === pc ? snapshot.metrics[key] : null;
       const d = metric?.data || {};
       let text = !metric
-        ? "Checking…"
+        ? snapshot?.pc === pc && snapshot.state === "checking"
+          ? "Checking…"
+          : "Not scanned"
         : metric.state !== "ready"
           ? "Unavailable"
           : format(key, d);
@@ -273,6 +286,7 @@
   }
   window.AtlasHealth = {
     mount,
+    scan,
     cancel,
     specs,
     badges,

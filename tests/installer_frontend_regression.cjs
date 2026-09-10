@@ -3,6 +3,12 @@ const assert=require('node:assert/strict');const {fixture}=require('./ui_fixture
  const pending=[],calls=[];let hold=false;
  const f=await fixture({fetch:async(url,options={})=>{calls.push(String(url));const reply=data=>({ok:true,status:200,json:async()=>data});if(hold&&(/api\/master\/resolve|api\/package-folder|api\/scripts|api\/job\//.test(url)))return new Promise(resolve=>pending.push({url:String(url),resolve:data=>resolve(reply(data))}));if(url==='/api/health')return reply({identity:'FIXTURE',version:'test',users:0,machines:0});if(url.includes('/catalog'))return reply({items:[]});if(url.includes('/session'))return reply({token:'test'});if(url.includes('/palette/desks'))return {...reply({records:[]}),headers:{get:()=>null}};if(url.includes('/deployments/'))return reply({deployments:[]});return reply({users:[],machines:[],available:false})}});
  await f.console();await sleep();await sleep();const {w,run}=f;
+ const remoteScans=()=>calls.filter(url=>/^\/api\/(machine-health|performance)\//.test(url)).length;
+ assert.equal(remoteScans(),0,'opening the console does not start remote checks');
+ run("setTarget('IDLE-PC');page('admin');page('workspace')");await sleep();await sleep();
+ assert.equal(remoteScans(),0,'selecting a target and opening Remote Admin must remain idle');
+ assert.equal(w.document.querySelector('[data-health-refresh]').textContent,'Scan health');
+ run('clearLookup()');
  // Export fields use their real names; inspecting inventory must not select or contact a target.
  const machine={name:'PC-A',serial_number:'SERIAL<&>',manufacturer:'Fixture vendor',model_id:'Fixture model',correlation_id:'CI-123',infrastructure_itsi:'WINDOWS VIRTUAL DESKTOPS',sys_class_name:'Computer',discovery_source:'ServiceNow Discovery',operational_status:'Operational',assigned_to:'',last_logon_user:'Example User',last_discovered:'2026-09-04 00:28:48',updated_on:'2026-09-04 02:31:40'};
  run(`S.machines=${JSON.stringify([machine,{name:'PC-B'}])};renderMachines()`);
@@ -42,11 +48,13 @@ const assert=require('node:assert/strict');const {fixture}=require('./ui_fixture
  let bottom=-20;kyc.getBoundingClientRect=health.getBoundingClientRect=()=>({bottom});
  w.document.querySelector('.lookup-column').getBoundingClientRect=()=>({left:240,width:500});
  run("S.user={name:'Alice <Example>',user_name:'alice',email:'alice@example.test'};renderKyc();S.target='PC-A'");
- await w.AtlasHealth.mount(health,'PC-A');const healthCalls=calls.length;
+ const beforeMount=remoteScans();w.AtlasHealth.mount(health,'PC-A');assert.equal(remoteScans(),beforeMount);
+ w.dispatchEvent(new w.Event('scroll'));await settle();assert(dock.textContent.includes('Not scanned'));assert.equal(remoteScans(),beforeMount);
+ await w.AtlasHealth.scan(health,'PC-A');const healthCalls=calls.length;
  w.dispatchEvent(new w.Event('scroll'));await settle();
  assert(!dock.hidden);assert(dock.textContent.includes('Alice <Example>'));assert(dock.textContent.includes('PC-A'));assert(dock.textContent.includes('Unavailable'));assert.equal(dock.querySelectorAll('.support-health-metrics > span').length,8);assert.equal(calls.length,healthCalls);
  bottom=300;w.dispatchEvent(new w.Event('scroll'));await settle();assert(dock.hidden);
- bottom=-20;run("S.target='PC-B'");w.dispatchEvent(new w.Event('scroll'));await settle();assert(dock.textContent.includes('PC-B'));assert(dock.querySelector('.support-health-metrics').textContent.includes('Checking'));assert(!dock.textContent.includes('PC-A'));
+ bottom=-20;run("S.target='PC-B'");w.dispatchEvent(new w.Event('scroll'));await settle();assert(dock.textContent.includes('PC-B'));assert(dock.querySelector('.support-health-metrics').textContent.includes('Not scanned'));assert(!dock.textContent.includes('PC-A'));
  run("page('admin')");await settle();assert(dock.hidden);run("page('workspace');clearLookup()");await settle();assert(dock.hidden);
  // Old lookup must not replace a newer selection.
  w.document.querySelector('#search').value='first';const first=run('search()');w.document.querySelector('#search').value='second';const second=run('search()');pending[1].resolve({matched:false});await second;pending[0].resolve({matched:true,user_key:'id:1'});await first;assert.equal(run('S.target'),'');

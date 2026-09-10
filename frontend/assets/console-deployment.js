@@ -574,10 +574,14 @@ async function loadFreshness() {
   el.innerHTML = `<b>${d.excel_newer ? "NEWER EXCEL AVAILABLE" : "DATABASE CURRENT"}</b><span>DB: ${esc(d.database_modified || "missing")}</span><span>Excel: ${esc(d.excel_modified || "missing")}</span>`;
   el.classList.toggle("stale", d.excel_newer);
 }
-function refreshTargetHealth() {
+function refreshTargetHealth(scan = true) {
   const pc = S.target;
   return pc
-    ? AtlasHealth.mount($("#healthLine"), pc, () => S.target === pc)
+    ? AtlasHealth[scan ? "scan" : "mount"](
+        $("#healthLine"),
+        pc,
+        () => S.target === pc,
+      )
     : Promise.resolve();
 }
 function renderQueue() {

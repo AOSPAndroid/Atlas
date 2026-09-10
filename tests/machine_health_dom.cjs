@@ -1,6 +1,124 @@
-const vm=require('vm'),fs=require('fs'),assert=require('assert/strict');
-const requests=[];const ctx={window:{},document:{},AbortController,setTimeout,clearTimeout,console,fetch:(url)=>new Promise(resolve=>requests.push({url,resolve}))};vm.createContext(ctx);vm.runInContext(fs.readFileSync('frontend/assets/machine-health.js','utf8'),ctx);const A=ctx.window.AtlasHealth;
-class Host{constructor(){this.isConnected=true;this.classList={remove(){},add(){}};this.nodes={}}set innerHTML(v){this.nodes={};for(const key of ['wmi','cshare','ping','cpu','ram','gpu','storage','system']){this.nodes['[data-metric="'+key+'"]']={textContent:'Loading…',dataset:{},classList:{toggle(){}}};this.nodes['[data-time="'+key+'"]']={};}this.nodes['[data-health-refresh]']={disabled:true}}querySelector(s){return this.nodes[s]}}
-const reply=(r,pc,metric,data={available:true})=>r.resolve({ok:true,json:async()=>({computer:pc,metric,state:'ready',data,checked_at:'2026-09-08T10:00:00Z'})});
-(async()=>{const host=new Host();const first=A.mount(host,'A');const second=A.mount(host,'B');for(const r of requests.slice(0,8))reply(r,'A',r.url.split('/').pop());await first;assert.equal(host.querySelector('[data-metric="wmi"]').textContent,'Loading…');reply(requests[8],'B','wmi');await new Promise(r=>setTimeout(r,0));assert.equal(host.querySelector('[data-metric="wmi"]').textContent,'Available');assert.equal(host.querySelector('[data-metric="cpu"]').textContent,'Loading…');for(const r of requests.slice(9))reply(r,'B',r.url.split('/').pop());await second;assert.equal(host.querySelector('[data-health-refresh]').disabled,false);
-assert(A.badges({assigned_relationship:1,logon_relationship:1}).includes('Last logged-on'));assert(A.badges({assigned_relationship:1,logon_relationship:1}).includes('Assigned'));assert(!A.badges({assigned_relationship:0,logon_relationship:0,assigned_to:'other'}).includes('Assigned'));assert(A.badges({assigned_to:'<unsafe>'}).includes('&lt;unsafe&gt;'));assert(A.format('cpu',{processors:[{Name:'CPU',LoadPercentage:0}]}).includes('0%'));assert(A.format('ram',{usable_kib:null,free_kib:null}).includes('Usage unavailable'));console.log('PASS progressive rendering, stale-target isolation, relationship badges, escaped names and missing versus zero metrics');})().catch(e=>{console.error(e);process.exit(1)});
+const assert = require("node:assert/strict");
+const { fixture } = require("./ui_fixture.cjs");
+const settle = () => new Promise((resolve) => setImmediate(resolve));
+
+(async () => {
+  const requests = [];
+  const f = await fixture({
+    fetch: (url, options) =>
+      new Promise((resolve) => requests.push({ url, options, resolve })),
+  });
+  const { w } = f,
+    A = w.AtlasHealth;
+  const host = w.document.getElementById("healthLine");
+  const metric = (key) => host.querySelector(`[data-metric="${key}"]`);
+  const button = () => host.querySelector("[data-health-refresh]");
+  const reply = (request, pc) =>
+    request.resolve({
+      ok: true,
+      json: async () => ({
+        computer: pc,
+        metric: request.url.split("/").pop(),
+        state: "ready",
+        data: { available: true },
+        checked_at: "2026-09-08T10:00:00Z",
+      }),
+    });
+
+  A.mount(host, "A");
+  await settle();
+  assert.equal(
+    requests.length,
+    0,
+    "mounting the widget must not query the target",
+  );
+  assert.equal(metric("wmi").textContent, "Not scanned");
+  assert.equal(button().textContent, "Scan health");
+  assert.equal(button().disabled, false);
+  assert(A.compact(host, "A").every((item) => item.text === "Not scanned"));
+
+  button().click();
+  assert.equal(requests.length, 8, "one click starts one health pass");
+  button().click();
+  assert.equal(
+    requests.length,
+    8,
+    "the scan button is disabled while checking",
+  );
+  assert.equal(metric("wmi").textContent, "Loading…");
+  A.mount(host, "B");
+  assert.equal(
+    requests.length,
+    8,
+    "changing target does not start another pass",
+  );
+  assert(requests.every((request) => request.options.signal.aborted));
+  button().click();
+  assert.equal(requests.length, 16);
+  requests.slice(0, 8).forEach((request) => reply(request, "A"));
+  await settle();
+  assert.equal(
+    metric("wmi").textContent,
+    "Loading…",
+    "old responses cannot replace the selected target",
+  );
+  reply(requests[8], "B");
+  await settle();
+  assert.equal(metric("wmi").textContent, "Available");
+  assert.equal(metric("cpu").textContent, "Loading…");
+  requests.slice(9).forEach((request) => reply(request, "B"));
+  await settle();
+  assert.equal(button().disabled, false);
+  assert.equal(button().textContent, "Refresh health");
+
+  A.mount(host, "STALE", () => false);
+  button().click();
+  await settle();
+  const detached = w.document.createElement("div");
+  await A.scan(detached, "DETACHED");
+  A.specs("B");
+  assert(w.document.querySelector(".atlas-spec-dialog").open);
+  assert.equal(
+    requests.length,
+    16,
+    "stale targets, detached panels and opening specifications do not scan",
+  );
+  w.document.querySelector(".atlas-spec-dialog").close();
+
+  assert(
+    A.badges({ assigned_relationship: 1, logon_relationship: 1 }).includes(
+      "Last logged-on",
+    ),
+  );
+  assert(
+    A.badges({ assigned_relationship: 1, logon_relationship: 1 }).includes(
+      "Assigned",
+    ),
+  );
+  assert(
+    !A.badges({
+      assigned_relationship: 0,
+      logon_relationship: 0,
+      assigned_to: "other",
+    }).includes("Assigned"),
+  );
+  assert(A.badges({ assigned_to: "<unsafe>" }).includes("&lt;unsafe&gt;"));
+  assert(
+    A.format("cpu", {
+      processors: [{ Name: "CPU", LoadPercentage: 0 }],
+    }).includes("0%"),
+  );
+  assert(
+    A.format("ram", { usable_kib: null, free_kib: null }).includes(
+      "Usage unavailable",
+    ),
+  );
+  assert.equal(f.errors.length, 0, f.errors.join("\n"));
+  w.close();
+  console.log(
+    "PASS: explicit health button, idle specifications, progressive rendering, stale-target isolation, relationships and missing versus zero metrics",
+  );
+})().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});
