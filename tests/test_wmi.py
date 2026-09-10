@@ -72,6 +72,8 @@ class Regression(unittest.TestCase):
   with patch.object(app,'run',return_value=type('Result',(),{'stdout':json.dumps(sample)})()) as remote:
    response=self.client.get('/api/performance/TESTPC?kind=memory')
    self.assertEqual(response.status_code,200);self.assertEqual(response.json()['summary']['memory_percent'],50)
+   response=self.client.get('/api/performance/TESTPC?kind=diagnose')
+   self.assertEqual(response.status_code,200);self.assertEqual(remote.call_args.args[0][-1],'diagnose')
    response=self.client.get('/api/performance/TESTPC/threads/42',params={'created':'20260910100000.000000+000','name':'example.exe'})
    self.assertEqual(response.status_code,200);self.assertIn('-ProcessId',remote.call_args.args[0])
    remote.reset_mock()

@@ -1,6 +1,6 @@
 param(
     [string]$Computer,
-    [ValidateSet('cpu', 'gpu', 'memory', 'threads')][string]$Kind = 'cpu',
+    [ValidateSet('cpu', 'gpu', 'memory', 'threads', 'diagnose')][string]$Kind = 'cpu',
     [long]$ProcessId = 0,
     [string]$ExpectedCreated = '',
     [string]$ExpectedName = ''
@@ -94,6 +94,16 @@ try {
         return
     }
     $identities = Index @(Query Win32_Process -Required) 'ProcessId'
+    # Diagnose at most three Excel instances. Both thread samples share the normal
+    # sampling interval; no trace, injected code or workbook automation is used.
+    $excelTargets = @(); $firstThreads = @{}; $lastThreads = @()
+    if ($Kind -eq 'diagnose') {
+        $excelTargets = @($identities.Values | Where-Object Name -ieq 'EXCEL.EXE' | Sort-Object WorkingSetSize -Descending | Select-Object -First 3)
+        if ($excelTargets.Count) {
+            $threadFilter = ($excelTargets | ForEach-Object { 'IDProcess=' + $_.ProcessId }) -join ' OR '
+            $firstThreads = Index @(Query Win32_PerfRawData_PerfProc_Thread $threadFilter) 'IDThread'
+        }
+    }
     $first = Index @(Query Win32_PerfRawData_PerfProc_Process) 'IDProcess'
     $firstCpu = Index @(Query Win32_PerfRawData_PerfOS_Processor) 'Name'
     $firstDisk = Index @(Query Win32_PerfRawData_PerfDisk_PhysicalDisk) 'Name'
@@ -101,6 +111,7 @@ try {
     $last = Index @(Query Win32_PerfRawData_PerfProc_Process) 'IDProcess'
     $lastCpu = @(Query Win32_PerfRawData_PerfOS_Processor)
     $lastDisk = @(Query Win32_PerfRawData_PerfDisk_PhysicalDisk)
+    if ($excelTargets.Count) { $lastThreads = @(Query Win32_PerfRawData_PerfProc_Thread $threadFilter) }
     $processes = @(Query Win32_Process -Required)
     $os = Query Win32_OperatingSystem
     $memory = Query Win32_PerfFormattedData_PerfOS_Memory
@@ -135,6 +146,17 @@ try {
         $cpu = Rate $old $metric PercentProcessorTime -Cpu
         $gpu = $gpuProcesses[$key]
         $workingSet = Number $record.WorkingSetSize
+        $measuredThreads = @()
+        if ($Kind -eq 'diagnose' -and $metric -and $old) {
+            $measuredThreads = @(foreach ($thread in $lastThreads) {
+                if ($thread.IDProcess -ne $record.ProcessId) { continue }
+                $oldThread = $firstThreads[[string]$thread.IDThread]
+                if (-not $oldThread -or $oldThread.IDProcess -ne $thread.IDProcess -or $null -eq $oldThread.ElapsedTime -or $oldThread.ElapsedTime -ne $thread.ElapsedTime) { continue }
+                $threadCpu = Rate $oldThread $thread PercentProcessorTime -Cpu
+                if ($null -ne $threadCpu) { [pscustomobject]@{id = [long]$thread.IDThread; cpu = Percent $threadCpu 100} }
+            })
+        }
+        $busiestThread = $measuredThreads | Sort-Object cpu -Descending | Select-Object -First 1
         [pscustomobject]@{
             PID = [long]$record.ProcessId; Process = [string]$record.Name; CreatedAt = [string]$record.CreationDate
             SessionId = Number $record.SessionId; CommandLine = [string]$record.CommandLine
@@ -145,15 +167,28 @@ try {
             MemoryMB = $(if ($null -ne $workingSet) { [math]::Round($workingSet / 1MB, 1) } else { $null })
             PrivateBytes = Number $metric.PrivateBytes; Threads = Number $record.ThreadCount; Handles = Number $record.HandleCount
             IOBytesPerSec = Rate $old $metric IODataBytesPersec; PageFaultsPerSec = Rate $old $metric PageFaultsPersec
+            BusiestThreadCPU = $(if ($busiestThread) { $busiestThread.cpu } else { $null })
+            BusiestThreadId = $(if ($busiestThread) { $busiestThread.id } else { $null })
+            MeasuredThreads = $measuredThreads.Count
         }
     })
     $uptime = $null
     try { if ($os.LastBootUpTime -and $os.LocalDateTime) { $uptime = ($os.ConvertToDateTime($os.LocalDateTime) - $os.ConvertToDateTime($os.LastBootUpTime)).TotalSeconds } } catch { $warnings.Add('Uptime unavailable') }
     $busiest = $gpuTotals.GetEnumerator() | Sort-Object Value -Descending | Select-Object -First 1
     $sort = switch ($Kind) { 'gpu' { 'GPU' }; 'memory' { 'MemoryBytes' }; default { 'CPU' } }
+    $selected = @($rows | Sort-Object $sort -Descending | Select-Object -First 100)
+    if ($Kind -eq 'diagnose') {
+        # Preserve memory/GPU/I/O consumers even when they are absent from CPU's top 100.
+        $leaders = @{}
+        foreach ($field in @('CPU', 'MemoryBytes', 'GPU', 'IOBytesPerSec')) {
+            foreach ($row in @($rows | Sort-Object $field -Descending | Select-Object -First 20)) { $leaders[[string]$row.PID] = $row }
+        }
+        foreach ($row in @($rows | Where-Object Process -ieq 'EXCEL.EXE' | Sort-Object MemoryBytes -Descending | Select-Object -First 20)) { $leaders[[string]$row.PID] = $row }
+        $selected = @($leaders.Values | Sort-Object CPU -Descending)
+    }
     [pscustomobject]@{
         ok = $true; computer = $Computer; kind = $Kind; checked_at = [datetime]::UtcNow.ToString('o')
-        total_processes = $rows.Count; limit = 100; items = @($rows | Sort-Object $sort -Descending | Select-Object -First 100); warnings = @($warnings)
+        total_processes = $rows.Count; limit = 100; items = $selected; warnings = @($warnings)
         summary = [pscustomobject]@{
             cpu_percent = ($cpuRows | Where-Object name -eq '_Total').percent; logical_processors = $cores
             cores = @($cpuRows | Where-Object name -ne '_Total'); total_memory_bytes = $totalMemory; available_memory_bytes = $freeMemory

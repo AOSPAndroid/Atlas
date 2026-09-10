@@ -11,6 +11,8 @@ async function copy(v, n = "Value") {
   toast(`${n} copied`);
 }
 function page(id) {
+  if (id !== "admin")
+    window.AtlasDiagnostics?.stop("Stopped — left Remote Admin");
   $$(".page,nav button").forEach((x) => x.classList.remove("active"));
   $("#" + id).classList.add("active");
   $(`[data-page="${id}"]`).classList.add("active");

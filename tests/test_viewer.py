@@ -28,7 +28,7 @@ class ViewerTests(unittest.TestCase):
         self.assertEqual(self.client.get('/api/official/state').json()['records'][0]['notes'],'new admin edit')
     def test_privileged_reads_and_all_writes_unavailable(self):
         before=hashlib.sha256(self.db.read_bytes()).digest()
-        for path in ['/api/performance/PC', '/api/performance/PC/threads/42?created=x&name=app.exe']:
+        for path in ['/api/performance/PC', '/api/performance/PC?kind=diagnose', '/api/performance/PC/threads/42?created=x&name=app.exe']:
             self.assertEqual(self.client.get(path).status_code,404,path)
         paths=['/api/save','/api/move','/api/vacate','/api/deploy','/api/kill','/api/reboot','/api/ops/settings','/api/database/apply/x','/api/open-tool/cmd/PC','/api/official/map-occupant']
         for method in ('POST','PUT','PATCH','DELETE'):

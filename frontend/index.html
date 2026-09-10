@@ -282,21 +282,44 @@
               <small>REMOTE ADMIN</small>
               <h2>What is slowing this machine down?</h2>
               <p class="muted">
-                Take a performance snapshot, find the busiest process, then
-                inspect its threads.
+                Start a short capture while the user reproduces the slowdown.
+                See likely bottlenecks, supporting evidence and the next check.
               </p>
             </div>
             <span class="pill">On-demand diagnostics</span>
           </div>
           <div class="row admin-tools">
-            <input id="adminPc" placeholder="Computer" /><button data-overview>
-              Performance overview</button
+            <input id="adminPc" placeholder="Computer" /><button
+              id="diagnoseSlowness"
+              class="primary"
+            >
+              Diagnose slowness</button
+            ><button data-overview>Performance overview</button
             ><button id="adminSoftware">Installed software</button
             ><button data-ping>Ping</button><button data-access>C$</button
             ><button data-disk>Disk</button><button data-cpu>CPU</button
             ><button data-gpu>GPU</button><button data-memory>Memory</button
             ><button class="danger" data-reboot>Reboot</button>
           </div>
+          <section
+            id="slowdownPanel"
+            class="slowdown-panel"
+            aria-label="Slowness diagnosis"
+            hidden
+          >
+            <div class="slowdown-heading">
+              <div>
+                <small>DIAGNOSE SLOWNESS</small>
+                <h3 id="slowdownTitle">Collecting evidence</h3>
+                <p id="slowdownStatus" role="status"></p>
+              </div>
+              <div class="row">
+                <button id="stopDiagnosis">Stop capture</button
+                ><button id="copyDiagnosis" disabled>Copy findings</button>
+              </div>
+            </div>
+            <div id="slowdownFindings"></div>
+          </section>
           <div id="adminOverview"></div>
           <div class="row">
             <input
@@ -606,6 +629,7 @@
     <script src="/assets/console-directory.js"></script>
     <script src="/assets/console-deployment.js"></script>
     <script src="/assets/console-processes.js"></script>
+    <script src="/assets/slowdown-diagnostics.js"></script>
     <script src="/assets/console-shell.js"></script>
     <script src="/assets/remote-software.js"></script>
   </body>

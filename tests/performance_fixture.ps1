@@ -12,7 +12,7 @@ function Get-WmiObject {
     switch ($Class) {
         'Win32_ComputerSystem' { return [pscustomobject]@{NumberOfLogicalProcessors = 4} }
         'Win32_Process' {
-            return [pscustomobject]@{ProcessId = 42; Name = $(if ($global:AtlasMode -eq 'identity' -and $sample -gt 1) { 'replacement.exe' } else { 'sample.exe' }); CreationDate = '20260910100000.000000+000'; WorkingSetSize = 4GB; ThreadCount = 650; HandleCount = 321; SessionId = 2; CommandLine = 'sample.exe -test'}
+            return [pscustomobject]@{ProcessId = 42; Name = $(if ($global:AtlasMode -like 'excel*') { 'EXCEL.EXE' } elseif ($global:AtlasMode -eq 'identity' -and $sample -gt 1) { 'replacement.exe' } else { 'sample.exe' }); CreationDate = $(if ($global:AtlasMode -eq 'excel_identity' -and $sample -gt 1) { '20260910110000.000000+000' } else { '20260910100000.000000+000' }); WorkingSetSize = 4GB; ThreadCount = 650; HandleCount = 321; SessionId = 2; CommandLine = 'sample.exe -test'}
         }
         'Win32_OperatingSystem' { return [pscustomobject]@{TotalVisibleMemorySize = 16777216; FreePhysicalMemory = 2097152; Caption = 'Test Windows'} }
         'Win32_PerfRawData_PerfProc_Process' {
@@ -37,6 +37,7 @@ function Get-WmiObject {
         }
         'Win32_PerfRawData_PerfProc_Thread' {
             if ($Filter -ne 'IDProcess=42') { throw 'Thread query not scoped to process' }
+            if ($global:AtlasMode -eq 'excel_missing') { throw 'Thread provider unavailable' }
             return @(
                 [pscustomobject]@{IDProcess = 42; IDThread = 100; ElapsedTime = 123; Timestamp_Sys100NS = (100000000 + $sample * 10000000); Timestamp_PerfTime = (100000000 + $sample * 10000000); Frequency_PerfTime = 10000000; PercentProcessorTime = ($sample * 8000000); ContextSwitchesPersec = ($sample * 120); ThreadState = 2; ThreadWaitReason = 6; PriorityCurrent = 8}
                 [pscustomobject]@{IDProcess = 42; IDThread = 101; ElapsedTime = $(if ($global:AtlasMode -eq 'reuse') { $sample } else { 125 }); Timestamp_Sys100NS = (100000000 + $sample * 10000000); Timestamp_PerfTime = (100000000 + $sample * 10000000); Frequency_PerfTime = 10000000; PercentProcessorTime = 1000000; ContextSwitchesPersec = 5; ThreadState = 5; ThreadWaitReason = 6; PriorityCurrent = 8}
@@ -67,4 +68,11 @@ $global:AtlasMode = 'identity'; $changed = Sample threads
 if ($changed.ok -or $changed.error -notmatch 'changed') { throw 'Changed process identity was accepted' }
 $global:AtlasMode = 'partial'; $partial = Sample
 if (-not $partial.ok -or $null -ne $partial.summary.cpu_percent -or $null -ne $partial.summary.gpu_percent -or $null -ne $partial.summary.commit_percent -or $partial.summary.memory_percent -ne 87.5 -or -not $partial.warnings.Count) { throw 'Partial counters must not become zero or hide working metrics' }
+$global:AtlasMode = 'excel'; $diagnose = Sample diagnose
+if (-not $diagnose.ok -or $diagnose.items[0].BusiestThreadCPU -ne 80 -or $diagnose.items[0].BusiestThreadId -ne 100 -or $diagnose.items[0].MeasuredThreads -ne 2) { throw "Excel thread sampling failed: $($diagnose | ConvertTo-Json -Depth 6 -Compress)" }
+if ($global:AtlasCalls['Win32_PerfRawData_PerfProc_Thread'] -ne 2) { throw 'Excel threads need two bounded samples' }
+$global:AtlasMode = 'excel_identity'; $diagnose = Sample diagnose
+if (-not $diagnose.ok -or $null -ne $diagnose.items[0].BusiestThreadCPU -or $diagnose.items[0].MeasuredThreads -ne 0) { throw 'Reused Excel PID was attributed to old thread samples' }
+$global:AtlasMode = 'excel_missing'; $diagnose = Sample diagnose
+if (-not $diagnose.ok -or $null -ne $diagnose.items[0].BusiestThreadCPU -or -not $diagnose.warnings.Count -or $diagnose.items[0].MemoryPercent -ne 25) { throw 'Missing Excel threads must retain unknowns and other counters' }
 Write-Output 'PASS: sampled CPU/thread rates, RAM capacity, GPU engine aggregation, disk latency, identity reuse and partial providers'

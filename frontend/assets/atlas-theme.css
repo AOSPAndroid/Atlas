@@ -1024,6 +1024,92 @@ tbody tr:hover {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
 }
+.slowdown-panel {
+  margin: 0 0 22px;
+  padding: 20px;
+  border: 1px solid #8fcde2;
+  border-radius: 16px;
+  background: #f4faff;
+}
+.slowdown-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.slowdown-heading small {
+  color: var(--accent);
+  letter-spacing: 0.08em;
+  font-size: 10px;
+  font-weight: 700;
+}
+.slowdown-heading h3 {
+  margin: 6px 0;
+  font-size: 21px;
+}
+#slowdownStatus,
+.slowdown-panel p {
+  font-size: 12px;
+  line-height: 1.65;
+}
+.slowdown-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 310px), 1fr));
+  gap: 12px;
+}
+.slowdown-finding {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: white;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.slowdown-finding.repeated {
+  border-top: 3px solid #cc7840;
+}
+.slowdown-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 10px;
+}
+.slowdown-label span {
+  border-radius: 20px;
+  padding: 4px 8px;
+  background: #eef4f8;
+  font-weight: 700;
+}
+.repeated .slowdown-label span {
+  color: #8f4b10;
+  background: #fff1df;
+}
+.slowdown-finding h4 {
+  font-size: 15px;
+  margin: 13px 0 8px;
+}
+.slowdown-next {
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+.slowdown-next b {
+  display: block;
+  color: var(--accent);
+}
+.slowdown-limits,
+.slowdown-empty {
+  color: var(--muted);
+}
+.slowdown-panel .tablewrap {
+  overflow-x: auto;
+}
+.slowdown-panel td {
+  white-space: nowrap;
+}
 .perf-normal {
   --perf-color: #0088b5;
 }

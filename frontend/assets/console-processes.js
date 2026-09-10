@@ -9,6 +9,7 @@ function closeProcessMenu() {
   $("#processMenu").classList.add("hidden");
 }
 function invalidateProcesses() {
+  window.AtlasDiagnostics?.clear();
   adminRequest();
   threadRequest();
   threadSelection = null;
@@ -216,6 +217,7 @@ function renderPerformance() {
     });
 }
 async function showProcessThreads(index) {
+  window.AtlasDiagnostics?.stop();
   const row = S.processes[index],
     snapshot = processSnapshot;
   if (!snapshot || snapshot.computer !== adminComputer() || !row?.CreatedAt)
