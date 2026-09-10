@@ -11,9 +11,12 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
     if(url.includes('/api/user/id%3A1'))data={user,machines:[{name:'PC-A'},{name:'PC-B'}]};
     else if(url.includes('/api/user/id%3A2'))data={user:{id:2,name:'Minimal Person',user_name:'minimal'},machines:[]};
     else if(url==='/api/health')data={identity:'FIXTURE',users:0,machines:0};
+    else if(url==='/api/history')data=[];
     else if(url.includes('/catalog'))data={items:[]};
     else if(url.includes('/session'))data={token:'test'};
-    else if(url.includes('/palette/desks'))data={records:[]};
+    else if(url.includes('/palette/desks'))data={records:[{id:'DESK-A',name:user.name,floor:4,team:'Support'}]};
+    else if(url.includes('/palette/person/'))data={desks:[{id:'DESK-A',floor:4,match:'confirmed account link'}]};
+    else if(url.includes('/api/search?')&&['Alice','user:Alice'].includes(new URL(url,'http://localhost').searchParams.get('term')))data={users:[user],machines:[]};
     else if(url.includes('/deployments/'))data={deployments:[]};
     return {ok:true,status:200,headers:{get:()=>null},json:async()=>data};
   }});
@@ -63,6 +66,27 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
   await f.run("loadUser('id:2')");
   assert.equal(doc.querySelectorAll('#kyc [data-person-search]').length,0);assert(!doc.querySelector('#kyc').textContent.includes('Technology'));
   assert(doc.querySelector('#kyc').textContent.includes('Last recorded loginNot supplied'));
+  // The real console wiring must keep mapped people in the Workspace, for both
+  // prefixed and ordinary name searches, with mouse and keyboard selection.
+  const consoleUrl=w.location.href;
+  for(const query of ['person:Alice','Alice']){
+    await f.run("loadUser('id:2')");
+    f.run(query.startsWith('person:')?"page('history')":"page('workspace')");
+    const start=calls.length;
+    await f.run('sharedPalette.open('+JSON.stringify(query)+')');await sleep(220);
+    const result=palette.querySelector('[role=option]');
+    assert.equal(result.querySelector('.palette-kind').textContent,'Person');
+    if(query.startsWith('person:'))result.click();
+    else palette.querySelector('input').dispatchEvent(new w.KeyboardEvent('keydown',{key:'Enter',bubbles:true,composed:true}));
+    await sleep(30);
+    assert(!palette.querySelector('dialog').open);
+    assert(doc.querySelector('#workspace').classList.contains('active'));
+    assert.equal(f.run('S.user.id'),1);assert.equal(f.run('S.target'),'');
+    assert.equal(f.run('S.machines.map(m=>m.name).join(",")'),'PC-A,PC-B');
+    assert.equal(w.location.href,consoleUrl);
+    assert(!calls.slice(start).some(url=>url.includes('/palette/person/')));
+    assert(calls.slice(start).some(url=>url.includes('/api/user/id%3A1')));
+  }
   assert.equal(f.errors.length,0,f.errors.join('\n'));w.close();
-  console.log('PASS: grouped user details, no legacy placeholders or duplicate devices, domain copy, manager/team/office search, unchanged target, modal protection and clean person switching');
+  console.log('PASS: grouped user details, no legacy placeholders or duplicate devices, domain copy, manager/team/office search, unchanged target, modal protection, clean person switching and mapped-person palette lookups staying in the Console Workspace');
 })().catch(error=>{console.error(error);process.exit(1);});

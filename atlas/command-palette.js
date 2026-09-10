@@ -25,6 +25,7 @@ export function installCommandPalette({
   triggerParent,
   replaceTrigger,
   readOnly = false,
+  preferPersonDetails = false,
 }) {
   const mount = document.createElement("span");
   mount.className = "atlas-palette-mount";
@@ -101,6 +102,15 @@ export function installCommandPalette({
     const row = rows[index];
     if (!row) return;
     if (row.person) {
+      if (preferPersonDetails) {
+        close();
+        try {
+          await openPerson(row.person);
+        } catch (e) {
+          toast(e.message);
+        }
+        return;
+      }
       invalidate();
       const request = generation;
       status.textContent = "Finding mapped desks…";
@@ -194,7 +204,10 @@ export function installCommandPalette({
       );
     const remote = q.length >= 2 && kind !== "desk" && kind !== "action";
     render(
-      local,
+      // Keep Enter from opening a desk while a console name lookup is pending.
+      remote && preferPersonDetails
+        ? local.filter((row) => row.kind !== "Desk")
+        : local,
       remote
         ? "Searching directory…"
         : q.length === 1 &&
@@ -239,7 +252,9 @@ export function installCommandPalette({
           run: () => openConsole("machine", m.name),
         }));
         render(
-          [...local, ...people, ...machines],
+          preferPersonDetails
+            ? [...people, ...machines, ...local]
+            : [...local, ...people, ...machines],
           data.users.length > 10 || data.machines.length > 10
             ? "Showing the first directory matches. Refine your search for more."
             : "",

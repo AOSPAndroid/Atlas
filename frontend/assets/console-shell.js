@@ -678,6 +678,7 @@ sharedPaletteReady = import("/command-palette.js").then(
       toast,
       runCommand: runSharedCommand,
       replaceTrigger: document.querySelector("#openCommands"),
+      preferPersonDetails: true,
       onSelect: (id) =>
         location.assign("/?" + new URLSearchParams({ desk: id })),
       openPerson: async (id) => {
