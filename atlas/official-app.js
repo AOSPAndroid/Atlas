@@ -1649,13 +1649,16 @@ function labelNode(id, room = false) {
   labelNodes.set(id, item);
   return item;
 }
+const orbitHint =
+  "Left-drag to move · Right-drag to rotate / tilt · Scroll to zoom";
 function renderNames() {
   const start = performance.now();
   applyNameVisibility();
   updateMapLayers();
   if (!showNameTags) {
     $("#location-banner").hidden = true;
-    $("#hint").textContent = "Name tags off · Click a desk to inspect";
+    $("#hint").textContent =
+      view === "3d" ? orbitHint : "Name tags off · Click a desk to inspect";
     metrics.labelsMs = performance.now() - start;
     return;
   }
@@ -1884,7 +1887,7 @@ function renderNames() {
   }
   $("#hint").textContent =
     view === "3d"
-      ? "Drag to move · Shift-drag to rotate / tilt · Scroll to zoom"
+      ? orbitHint
       : hidden
         ? `${hidden} more labels nearby · Zoom in to read them`
         : "Drag to pan · Scroll to zoom";
@@ -1934,7 +1937,7 @@ onMap("pointerdown", (e) => {
     yaw: cam.yaw,
     tilt: cam.tilt,
     moved: false,
-    orbit: view === "3d" && e.shiftKey && e.button === 0,
+    orbit: view === "3d" && (e.button === 2 || (e.shiftKey && e.button === 0)),
     button: e.button,
   };
 });

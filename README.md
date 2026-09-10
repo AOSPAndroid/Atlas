@@ -168,7 +168,7 @@ The test runner uses disposable database copies, starts isolated UI fixtures on 
 
 ## Motion and map navigation
 
-Left-drag grabs and moves the map in both 2D and 3D, following the pointer at any zoom level. In 3D, hold **Shift** before dragging to rotate and tilt around the spot you grab. Scroll to zoom, or use the rotation and reset buttons. A simple click still selects a desk; right-click still opens its menu. Admin and demo share these controls.
+**Left-drag moves the map; right-drag rotates and tilts it in 3D.** Rotation stays anchored around the spot you grab. **Shift + left-drag** is an alternative for trackpads. Scroll to zoom, or use the rotation and reset buttons. A simple left-click selects a desk; a right-click without dragging opens its admin menu (or inspects the desk in the read-only viewer). Left-drag moves the map in both 2D and 3D, following the pointer at any zoom level. Admin and demo share these controls.
 
 Search or select a person to glide to their desk with a brief location highlight. Longer moves pull back slightly before closing in, so the destination stays in context. Search groups are framed smoothly; zoom buttons, cursor-anchored wheel zoom, reset, and rotation share the same camera controller. Switching to 3D tilts the map into place, while floor changes fade in briefly.
 

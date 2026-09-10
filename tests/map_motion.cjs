@@ -259,42 +259,68 @@ const { fixture, root } = require("./ui_fixture.cjs");
       }
     }
 
-    t.setCamera({ scale: 2, yaw: 0.7, tilt: 0.9 });
+    for (const orbitButton of [{ button: 2 }, { button: 0, shiftKey: true }]) {
+      t.setCamera({ scale: 2, yaw: 0.7, tilt: 0.9 });
+      step(0);
+      const pivot = [680, 210],
+        floorPoint = t.inversePoint(...pivot),
+        beforeOrbit = t.state();
+      const orbitUploads = uploads;
+      const orbitSelection = t.selection();
+      pointer("pointerdown", ...pivot, orbitButton);
+      pointer("pointermove", 740, 250, { shiftKey: false });
+      close(t.inversePoint(...pivot), floorPoint);
+      assert.notEqual(t.state().yaw, beforeOrbit.yaw);
+      assert.notEqual(t.state().tilt, beforeOrbit.tilt);
+      assert.notEqual(
+        t.state().cx,
+        beforeOrbit.cx,
+        "rotation uses the grabbed point, not a fixed centre",
+      );
+      pointer("pointermove", 760, 2000);
+      close(t.inversePoint(...pivot), floorPoint);
+      assert(
+        t.state().tilt < Math.PI / 2,
+        "tilt stays above the floor without flipping",
+      );
+      pointer("pointermove", 760, -2000);
+      close(t.inversePoint(...pivot), floorPoint);
+      assert(t.state().tilt > 0, "tilt never reaches the singular horizon");
+      pointer("pointerup", 760, -2000, { button: orbitButton.button });
+      if (orbitButton.button === 2) {
+        pointer("contextmenu", 760, -2000, { button: 2 });
+        assert.equal(
+          w.document.querySelector(".desk-menu"),
+          null,
+          "right-drag does not open a desk menu",
+        );
+        assert.equal(
+          t.selection(),
+          orbitSelection,
+          "right-drag does not inspect another desk",
+        );
+        assert.equal(t.cameraMotion.active, false);
+      }
+      step(0);
+      assert.equal(
+        uploads,
+        orbitUploads,
+        "manual rotation reuses cached geometry",
+      );
+      assert.match(
+        w.document.querySelector("#hint").textContent,
+        /Right-drag to rotate/,
+      );
+    }
+
+    // The instructions remain visible when names are hidden, too.
+    w.document.querySelector("#name-tags").click();
     step(0);
-    const pivot = [680, 210],
-      floorPoint = t.inversePoint(...pivot),
-      beforeOrbit = t.state();
-    const orbitUploads = uploads;
-    pointer("pointerdown", ...pivot, { shiftKey: true });
-    pointer("pointermove", 740, 250, { shiftKey: false });
-    close(t.inversePoint(...pivot), floorPoint);
-    assert.notEqual(t.state().yaw, beforeOrbit.yaw);
-    assert.notEqual(t.state().tilt, beforeOrbit.tilt);
-    assert.notEqual(
-      t.state().cx,
-      beforeOrbit.cx,
-      "rotation uses the grabbed point, not a fixed centre",
-    );
-    pointer("pointermove", 760, 2000);
-    close(t.inversePoint(...pivot), floorPoint);
-    assert(
-      t.state().tilt < Math.PI / 2,
-      "tilt stays above the floor without flipping",
-    );
-    pointer("pointermove", 760, -2000);
-    close(t.inversePoint(...pivot), floorPoint);
-    assert(t.state().tilt > 0, "tilt never reaches the singular horizon");
-    pointer("pointerup", 760, -2000);
-    step(0);
-    assert.equal(
-      uploads,
-      orbitUploads,
-      "manual rotation reuses cached geometry",
-    );
     assert.match(
       w.document.querySelector("#hint").textContent,
-      /Shift-drag to rotate/,
+      /Right-drag to rotate/,
     );
+    w.document.querySelector("#name-tags").click();
 
     // Normal clicks retain selection; several tiny moves form a drag, not a click.
     t.setFloor(2);
@@ -309,7 +335,39 @@ const { fixture, root } = require("./ui_fixture.cjs");
       "a simple click still selects a desk",
     );
     step(720);
-    const deskPoint = t.projected(t.world(people[0])).slice(0, 2);
+    let deskPoint = t.projected(t.world(people[0])).slice(0, 2);
+    pointer("pointerdown", ...deskPoint, { button: 2 });
+    pointer("pointermove", deskPoint[0] + 25, deskPoint[1] + 15);
+    pointer("pointerup", deskPoint[0] + 25, deskPoint[1] + 15, { button: 2 });
+    step(0);
+    deskPoint = t.projected(t.world(people[0])).slice(0, 2);
+    // Context-menu events can arrive on release, directly over a real desk.
+    pointer("contextmenu", ...deskPoint, { button: 2 });
+    assert.equal(w.document.querySelector(".desk-menu"), null);
+    assert.equal(
+      t.cameraMotion.active,
+      false,
+      "right-drag does not refocus a desk in the viewer",
+    );
+    const beforeRightClick = t.state();
+    pointer("pointerdown", ...deskPoint, { button: 2 });
+    pointer("pointerup", ...deskPoint, { button: 2 });
+    close(t.state(), beforeRightClick);
+    pointer("contextmenu", ...deskPoint, { button: 2 });
+    if (readOnly) {
+      assert.equal(
+        t.selection(),
+        people[0].id,
+        "viewer right-click still inspects the desk",
+      );
+      assert.equal(w.document.querySelector(".desk-menu"), null);
+    } else {
+      assert(
+        w.document.querySelector(".desk-menu"),
+        "admin right-click still opens desk actions",
+      );
+      w.dispatchEvent(new w.KeyboardEvent("keydown", { key: "Escape" }));
+    }
     pointer("pointerdown", ...deskPoint);
     for (let delta = 1; delta <= 8; delta++)
       pointer("pointermove", deskPoint[0] + delta, deskPoint[1]);
