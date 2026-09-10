@@ -136,8 +136,8 @@ def home():
     html = re.sub(r'<(?:script|link)\b[^>]*(?:src|href)="/assets/(?:machine-health|client)[^"]*"[^>]*>(?:</script>)?', '', html)
     # The mode is supplied by this server, never by a URL or browser preference.
     html = html.replace('<head>', '<head><meta name="atlas-mode" content="viewer"><link rel="stylesheet" href="/viewer.css">')
-    html = html.replace('<span>Atlas</span>', '<span>Atlas</span><span class="atlas-demo-badge">Demo</span>', 1)
-    html = html.replace('aria-label="Atlas home"', 'aria-label="Atlas Demo home"', 1)
+    html = html.replace('<span class="atlas-admin-badge">Admin</span>', '<span class="atlas-demo-badge">Demo</span>', 1)
+    html = html.replace('aria-label="Atlas Admin home"', 'aria-label="Atlas Demo home"', 1)
     return HTMLResponse(html)
 
 
