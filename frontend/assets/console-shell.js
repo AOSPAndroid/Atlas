@@ -524,6 +524,11 @@ async function runInitialSharedCommand(params) {
   await runSharedCommand(id);
 }
 async function runSharedCommand(id) {
+  if (window.AtlasReadOnly) {
+    const { COMMANDS } = await import("/command-registry.js");
+    if (!COMMANDS.some((c) => c.id === id && c.viewer))
+      return toast(AtlasReadOnly.reason);
+  }
   if (id === "vlans" || id === "contacts") {
     const { openSiteInfo } = await import("/site-info.js?v=1");
     return openSiteInfo(id);
@@ -651,6 +656,7 @@ sharedPaletteReady = import("/command-palette.js").then(
   ({ installCommandPalette }) => {
     let records = [];
     sharedPalette = installCommandPalette({
+      readOnly: !!window.AtlasReadOnly,
       getRecords: () => records,
       prepare: async () => {
         records = await AtlasClient.deskIndex();

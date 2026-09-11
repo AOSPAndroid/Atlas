@@ -196,3 +196,7 @@
     margin-top: 3vh;
   }
 }
+:host .palette-result[aria-disabled="true"] {
+  opacity: 0.48;
+  cursor: not-allowed;
+}

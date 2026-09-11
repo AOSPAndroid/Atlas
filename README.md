@@ -1,10 +1,10 @@
-# Atlas 6.9.5
+# Atlas 7.0.0
 
 **One workspace to find people, locate equipment and get IT work done.**
 
 Atlas is a self-hosted Windows IT support and administration tool with a browser interface. It connects interactive office floor plans, directory users, machine inventory, application deployment and remote administration. Start with a colleague, a computer or a desk, then follow the links to the information and actions you need.
 
-The **map** helps you explore floors and seating in 2D or 3D. The **IT console** brings user lookup, linked machines, health checks and deployment into one workspace. Both share the same command palette, package catalogue and detail panels. A separate **read-only demo/viewer** lets colleagues browse maps and look up people and stored machine details from their own browsers.
+The **map** helps you explore floors and seating in 2D or 3D. The **IT console** brings user lookup, linked machines, health checks and deployment into one workspace. Both share the same command palette, package catalogue and detail panels. A separate **read-only demo/viewer** now includes the full IT console alongside maps, people and stored machine details.
 
 ## What Atlas can do
 
@@ -22,6 +22,14 @@ The **map** helps you explore floors and seating in 2D or 3D. The **IT console**
 | **Shared viewer** | Host a separate read-only interface on the local network for maps, people lookup and stored inventory. Editing, deployment and elevated remote operations stay in the admin tool. |
 
 Atlas runs from Python source with FastAPI and SQLite; the interface uses HTML, CSS and JavaScript. The Windows launcher starts the local admin service and shared viewer together. Runtime records live in a persistent database, while deployment packages stay in your configured package repository.
+
+## Atlas 7: Admin, Demo and private preview
+
+All three versions share the current map and full console: Workspace, Remote Admin, Bulk Deploy, History, PsExec and the package catalogue. Demo and the owner-private preview let you explore every console page, select stored machines, switch between Overview/CPU/GPU/Memory, and prepare or copy any of the 30 PsExec commands.
+
+**Deployment, live metrics/health, remote tools and PsExec execution are greyed out** with an explanation: use Atlas Admin from an elevated Windows account. Demo remains read-only even if its host is elevated; its server has no remote execution routes and rejects all writes. The hosted preview has no Windows backend. Neither starts scans or commands when browsing. Real metrics, package-share contents, deployment history and terminal transcripts are not fabricated or copied into the preview.
+
+Admin and Demo use the same console source. The hosted preview receives those same assets while retaining its private directory snapshot and existing owner-only access.
 
 ## Map previews
 
@@ -58,7 +66,7 @@ After updating and restarting Atlas, refresh any open browser tabs. Console scri
 | Interface | Address | Access |
 | --- | --- | --- |
 | Your admin tool | `http://127.0.0.1:8770` | Local computer only; existing editing and IT operations |
-| Shared read-only viewer | `http://YOUR-IP:8771` | People on your reachable network; maps and directory lookup |
+| Shared read-only viewer | `http://YOUR-IP:8771` | People on your reachable network; full console, maps and stored directory lookup; execution disabled |
 
 Use the host computer's Wi-Fi/Ethernet IPv4 address in place of `YOUR-IP`. The launcher prints candidate addresses and saves them in `data/share-addresses.txt`. Share the address belonging to the network your colleagues use. The viewer requires only a browser, not Python or Windows elevation on their computers.
 
@@ -77,7 +85,7 @@ To change ports, set `ATLAS_ADMIN_PORT` and `ATLAS_VIEWER_PORT` before launching
 
 Press **Ctrl+K** (or **Cmd+K** on a Mac browser), or click **Search Atlas** in either header. Search people, machines, desk codes, teams and admin views in one place. Use arrow keys and Enter to open a result, and Escape to close.
 
-Use `person:`, `machine:`, `desk:` or `>` to narrow results. In the IT console, person results open their details and linked machines in the Workspace, even when they have assigned desks; name searches prioritize directory people over desk matches. Explicit desk results open the map. From the map, people with a single mapped desk open there; multiple locations offer a choice. Unmapped people and machines open selected in the existing IT console. Name-only desk matches are identified as unconfirmed. Actions open the existing admin interface and keep its review/confirmation flow. Both admin views load the same component, isolated stylesheet and command catalogue. Commands belonging to the other view navigate there; selected machines carry across where available. Deployment, file-access and remote-operation commands open their existing controls for review. The shared viewer uses the same component, styling, keyboard controls and animation setting, with ten read-only commands: lookup, map, 2D/3D, reset, refresh, export, animations, shortcut help, VLANs and contacts. Its person and machine results stay inside the read-only viewer.
+Use `person:`, `machine:`, `desk:` or `>` to narrow results. In the IT console, person results open their details and linked machines in the Workspace, even when they have assigned desks; name searches prioritize directory people over desk matches. Explicit desk results open the map. From the map, people with a single mapped desk open there; multiple locations offer a choice. Unmapped people and machines open selected in the existing IT console. Name-only desk matches are identified as unconfirmed. Actions open the existing admin interface and keep its review/confirmation flow. Both admin views load the same component, isolated stylesheet and command catalogue. Commands belonging to the other view navigate there; selected machines carry across where available. Deployment, file-access and remote-operation commands open their existing controls for review. The shared viewer uses the same component, styling, keyboard controls and animation setting, with console navigation enabled and privileged commands shown greyed out. Its person and machine results stay inside the read-only viewer.
 
 ## Site information
 
@@ -197,7 +205,7 @@ No frontend runtime library was added. Camera movement shares the existing rende
 
 Machine, person and health cards fade and lift briefly when they first enter view while scrolling. The floating support summary has the same short entrance. Effects share the existing Animations preference across the interface, stop immediately when disabled, and never hide content while waiting to enter view. Scroll reveals use one visibility observer, limit simultaneous effects, and add no scroll animation loop. The shared card effects also apply to the admin map and demo inspectors.
 
-The map renderer, camera controller, animation switch, person cards, dialog styles and palette are shared source files across admin and viewer. Viewer commands are filtered through the common command catalogue; permissions continue to be enforced by the separate read-only server.
+The map renderer, camera controller, animation switch, person cards, dialog styles and palette are shared source files across admin and viewer. Viewer commands use the common command catalogue and clearly mark unavailable operations; permissions continue to be enforced by the separate read-only server.
 
 Remote Admin shows up to 100 processes sorted by CPU, GPU or memory, with the full process count alongside. Right-click a row, press Shift+F10, or use its **•••** button to **Kill process**, copy its PID or copy its details. Killing a row confirms its name, PID and machine, rechecks the process creation time, reports Windows' result, and refreshes after success. Core Windows processes are blocked. The manual PID/name field also confirms before terminating; a name targets every matching instance. GPU usage reports the busiest engine per process and requires counters exposed by the remote graphics driver; unavailable counters produce an explicit message. These remote operations remain available only in the local admin version.
 

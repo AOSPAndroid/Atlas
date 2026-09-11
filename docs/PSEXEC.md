@@ -39,7 +39,7 @@ Repair commands can interrupt work. Ending Excel can lose unsaved changes; that 
 
 Copy remains available for a separate PowerShell or Command Prompt window. **Copy format** changes the clipboard syntax, not the server's execution method. PowerShell scripts use an encoded UTF-16LE payload to preserve quoting; the readable script is always displayed for review. Copied repair commands execute when you run them in your terminal; the Atlas Run confirmation does not apply outside Atlas.
 
-Favourites, executable path and copy format are remembered in this browser. The target, command parameters and elevation choice are not saved as preferences. Elevation resets when selecting another template. PsExec execution and transcripts are Admin-only; Demo and the private read-only preview expose none of these endpoints.
+Favourites, executable path and copy format are remembered in this browser. The target, command parameters and elevation choice are not saved as preferences. Elevation resets when selecting another template. In Atlas 7, Demo and the private preview show the entire command workbench: search templates, enter a target and parameters, review and copy commands. Run, Stop and terminal input are greyed out and require elevated Atlas Admin. Execution and transcripts are Admin-only; Demo and the private read-only preview expose none of these endpoints.
 
 ## All 30 templates
 

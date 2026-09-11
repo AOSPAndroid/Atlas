@@ -33,7 +33,7 @@ export function installCommandPalette({
   const root = mount.attachShadow({ mode: "open" });
   const sheet = document.createElement("link");
   sheet.rel = "stylesheet";
-  sheet.href = "/command-palette.css?v=74";
+  sheet.href = "/command-palette.css?v=75";
   root.append(sheet);
   const trigger = document.createElement("button");
   trigger.id = "atlas-commands";
@@ -57,8 +57,13 @@ export function installCommandPalette({
     previousFocus;
   const openConsole = (key, value) =>
     key === "person" ? openPerson(value) : openMachine(value);
-  const actions = COMMANDS.filter((a) => !readOnly || a.viewer).map((a) => ({
+  const actions = COMMANDS.map((a) => ({
     ...a,
+    disabled: readOnly && !a.viewer,
+    detail:
+      readOnly && !a.viewer
+        ? a.detail + " · Requires elevated Atlas Admin"
+        : a.detail,
     run: () => runCommand(a.id),
   }));
   function invalidate() {
@@ -87,7 +92,7 @@ export function installCommandPalette({
     list.innerHTML = rows
       .map(
         (r, i) =>
-          `<div id="atlas-command-${i}" class="palette-result" role="option" aria-selected="false" data-index="${i}"><span class="palette-kind">${esc(r.kind)}</span><span><strong>${esc(r.title)}</strong><small>${esc(r.detail)}</small></span><span aria-hidden="true">${esc(r.shortcut || "↵")}</span></div>`,
+          `<div id="atlas-command-${i}" class="palette-result" role="option" aria-disabled="${!!r.disabled}" aria-selected="false" data-index="${i}"><span class="palette-kind">${esc(r.kind)}</span><span><strong>${esc(r.title)}</strong><small>${esc(r.detail)}</small></span><span aria-hidden="true">${esc(r.disabled ? "Unavailable" : r.shortcut || "↵")}</span></div>`,
       )
       .join("");
     status.textContent =
@@ -100,6 +105,11 @@ export function installCommandPalette({
   async function choose(index) {
     const row = rows[index];
     if (!row) return;
+    if (row.disabled) {
+      status.textContent =
+        "Requires Atlas Admin running from an elevated Windows account. Disabled in Demo and Preview.";
+      return;
+    }
     if (row.person) {
       if (preferPersonDetails) {
         close();

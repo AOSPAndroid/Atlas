@@ -556,6 +556,11 @@ function currentPackagePayload(mode = "full") {
   };
 }
 async function loadFreshness() {
+  if (window.AtlasReadOnly) {
+    $("#dbFreshness").textContent =
+      "Read-only · Database updates are managed in Atlas Admin.";
+    return;
+  }
   const d = await api("/api/database-freshness");
   const el = document.querySelector("#dbFreshness");
   if (!el) return;
@@ -563,6 +568,12 @@ async function loadFreshness() {
   el.classList.toggle("stale", d.excel_newer);
 }
 function refreshTargetHealth(scan = true) {
+  if (window.AtlasReadOnly) {
+    const host = $("#healthLine");
+    host.classList.remove("hidden");
+    host.textContent = "Live health · " + AtlasReadOnly.reason;
+    return Promise.resolve();
+  }
   const pc = S.target;
   return pc
     ? AtlasHealth[scan ? "scan" : "mount"](
@@ -710,6 +721,13 @@ function renderDeploymentMonitor(data) {
     .forEach((pre) => (pre.scrollTop = pre.scrollHeight));
 }
 function refreshDeploymentMonitor(mode = deploymentMonitorMode) {
+  if (window.AtlasReadOnly) {
+    renderDeploymentMonitor({ deployments: [], count: 0 });
+    $("#deploymentsState").textContent = "Read-only";
+    $("#deploymentsList").textContent =
+      "Deployment history and active jobs are available in Atlas Admin.";
+    return;
+  }
   deploymentMonitorMode = mode;
   deploymentMonitorTimer?.();
   const visible = () => $("#deploymentsDrawer").classList.contains("open");
@@ -847,6 +865,7 @@ function refreshConsoleSummary() {
   const choosing = $("#packagePicker").open,
     script = $("#script"),
     unavailable =
+      !!window.AtlasReadOnly ||
       !S.target ||
       packageBusy ||
       choosing ||

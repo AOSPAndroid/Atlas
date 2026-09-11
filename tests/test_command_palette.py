@@ -40,7 +40,7 @@ class PaletteTests(unittest.TestCase):
    self.assertEqual(client.get(path).json(),self.client.get(path).json())
    self.assertEqual(client.get('/api/palette/person/not-an-id').status_code,400)
    self.assertEqual(client.get('/api/palette/person/id:999999999').status_code,404)
-   for path in ('/api/session','/operations.js','/installer','/api/preflight/PC1'):
+   for path in ('/api/session','/operations.js','/api/preflight/PC1'):
     self.assertEqual(client.get(path).status_code,404)
 
 if __name__=='__main__':unittest.main()

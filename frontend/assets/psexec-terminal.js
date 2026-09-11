@@ -23,7 +23,8 @@
     );
   function controls() {
     const active = current && !finished(current.state);
-    get("Run").disabled = !review || submitting || !!active;
+    get("Run").disabled =
+      !!window.AtlasReadOnly || !review || submitting || !!active;
     get("Run").textContent = submitting
       ? "Starting…"
       : active
@@ -33,7 +34,7 @@
     get("InputForm").hidden = !(
       current?.interactive && current.state === "running"
     );
-    get("Send").disabled = sending;
+    get("Send").disabled = !!window.AtlasReadOnly || sending;
   }
   function show(data) {
     current = data;

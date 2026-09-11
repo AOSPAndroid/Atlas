@@ -33,9 +33,27 @@ class ViewerTests(unittest.TestCase):
         paths=['/api/save','/api/move','/api/vacate','/api/deploy','/api/kill','/api/reboot','/api/ops/settings','/api/database/apply/x','/api/open-tool/cmd/PC','/api/official/map-occupant']
         for method in ('POST','PUT','PATCH','DELETE'):
             for path in paths:self.assertEqual(self.client.request(method,path,json={}).status_code,403,(method,path))
-        for path in ['/api/processes/PC?kind=gpu','/assets/console-processes.js','/api/preflight/PC','/api/overview/PC','/api/v28/software/PC','/api/access/PC','/api/backup','/api/package-script','/api/ops/settings','/installer','/manage-database','/office_atlas.db','/config.json','/api/docs','/openapi.json','/operations.js','/.git/config','/%2e%2e/config.json']:
+        for path in ['/api/processes/PC?kind=gpu','/api/preflight/PC','/api/overview/PC','/api/v28/software/PC','/api/access/PC','/api/backup','/api/package-script','/api/ops/settings','/manage-database','/office_atlas.db','/config.json','/api/docs','/openapi.json','/operations.js','/.git/config','/%2e%2e/config.json']:
             self.assertEqual(self.client.get(path).status_code,404,path)
         self.assertEqual(before,hashlib.sha256(self.db.read_bytes()).digest())
+    def test_full_console_is_visible_but_execution_is_blocked(self):
+        import re
+        html=self.client.get('/installer?mode=admin').text
+        self.assertIn('content="viewer"',html)
+        self.assertIn('atlas-demo-badge',html)
+        for page in ('workspace','admin','bulk','history','psexec'):
+            self.assertIn('data-page="'+page+'"',html)
+        for filename in re.findall(r'/assets/([\w.-]+)',html):
+            self.assertEqual(self.client.get('/assets/'+filename).status_code,200,filename)
+        self.assertEqual(self.client.get('/installer/').status_code,200)
+        self.assertEqual(self.client.get('/api/capabilities').json()['elevated_operations'],False)
+        for path in ('/api/psexec/runs','/api/overview/PC','/api/machine-health/PC/cpu','/api/catalog','/api/session'):
+            self.assertEqual(self.client.get(path).status_code,404,path)
+        for path in ('/api/psexec/run','/api/psexec/runs/fake/input','/api/bulk/deploy','/api/queue'):
+            self.assertEqual(self.client.post(path,json={}).status_code,403,path)
+        for path in ('/api/palette/desks','/api/master/status','/api/master/resolve/nobody'):
+            self.assertEqual(self.client.get(path).status_code,200,path)
+
     def test_machine_inspector_uses_stored_relationships_only(self):
         before=hashlib.sha256(self.db.read_bytes()).digest()
         with viewer.connect() as con:

@@ -28,6 +28,17 @@ const targeted = new Set([
   "report",
 ]);
 const viewerCommands = new Set([
+  "workspace",
+  "admin",
+  "bulk",
+  "history",
+  "psexec",
+  "catalogue",
+  "active",
+  "recent",
+  "queue",
+  "summary",
+  "report",
   "vlans",
   "contacts",
   "atlas",

@@ -15,6 +15,8 @@
     return session;
   }
   async function request(url, options = {}) {
+    const local = window.AtlasReadOnly?.read(url, options);
+    if (local) return local.data;
     const headers = new Headers(options.headers || {});
     const method = (options.method || "GET").toUpperCase();
     if (!["GET", "HEAD"].includes(method) && !headers.has("X-Atlas-Token"))

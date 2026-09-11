@@ -126,21 +126,15 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const commands = [...rootEl.querySelectorAll("[role=option]")].map(
     (el) => el.textContent,
   );
-  assert.equal(commands.length, 10);
-  for (const name of [
-    "User & machine lookup",
-    "Toggle animations",
-    "Export records",
-    "Keyboard shortcuts",
-  ])
-    assert(commands.some((c) => c.includes(name)));
-  for (const name of [
-    "Deploy selected package",
-    "Remote Admin",
-    "Clean package",
-    "Operation recovery",
-  ])
-    assert(!commands.some((c) => c.includes(name)));
+  assert(commands.length > 20);
+  for (const name of ["Remote Admin", "PsExec", "User & machine lookup"]) {
+    const option = [...rootEl.querySelectorAll("[role=option]")].find(el => el.querySelector("strong").textContent === name);
+    assert(option, name); assert.equal(option.getAttribute("aria-disabled"), "false");
+  }
+  const deploy = [...rootEl.querySelectorAll("[role=option]")].find(el => el.textContent.includes("Deploy selected package"));
+  assert.equal(deploy.getAttribute("aria-disabled"), "true");
+  deploy.click(); assert(rootEl.querySelector("dialog").open);
+  assert(rootEl.querySelector("[role=status]").textContent.includes("elevated"));
   type("person:Alice");
   await sleep(220);
   key("Enter");

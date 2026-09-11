@@ -82,7 +82,7 @@ function selectPerformanceView(kind) {
     renderPerformance();
   } else {
     $("#adminOverview").innerHTML =
-      `<div class="perf-empty"><b>${esc(performanceViews[kind].title)}</b><p>No ${esc(performanceViews[kind].label)} scan for this machine yet. Select a machine and click Scan ${esc(performanceViews[kind].label)} when you need a reading.</p><small>Changing views makes no remote requests.</small></div>`;
+      `<div class="perf-empty"><b>${esc(performanceViews[kind].title)}</b><p>${window.AtlasReadOnly ? esc(AtlasReadOnly.reason) : `No ${esc(performanceViews[kind].label)} scan for this machine yet. Select a machine and click Scan ${esc(performanceViews[kind].label)} when you need a reading.`}</p><small>Changing views makes no remote requests.</small></div>`;
     $("#adminOut").replaceChildren();
   }
   updatePerformanceControls();
@@ -94,13 +94,16 @@ function updatePerformanceControls() {
   $("#refreshProcesses").textContent = busy
     ? `Scanning ${performanceViews[busy.kind].label}…`
     : `${processSnapshot ? "Refresh" : "Scan"} ${label}`;
-  $("#refreshProcesses").disabled = !adminComputer() || !!busy || !!capturing;
-  $("#diagnoseSlowness").disabled = !!busy || !!capturing;
+  $("#refreshProcesses").disabled =
+    !!window.AtlasReadOnly || !adminComputer() || !!busy || !!capturing;
+  $("#diagnoseSlowness").disabled =
+    !!window.AtlasReadOnly || !!busy || !!capturing;
   $("#copyPerformance").disabled = !processSnapshot;
   $("#adminOut").setAttribute("aria-busy", String(!!busy));
   if (processSnapshot) renderProcesses();
   else
     $("#processStatus").textContent =
+      window.AtlasReadOnly?.reason ||
       performanceErrors.get(activePerformance) ||
       (busy
         ? `Scanning ${performanceViews[busy.kind].label} on ${busy.computer}…`

@@ -51,12 +51,32 @@ async def read_only(request: Request, call_next):
 def health():
     with connect() as con:
         con.execute('select body from official_records limit 1').fetchone()
-    return {'application': 'Office Atlas', 'mode': 'viewer', 'version': __version__, 'read_only': True, 'instance_id': os.environ.get('ATLAS_INSTANCE_ID')}
+        counts = {key: con.execute(f'select count(*) from {key}').fetchone()[0] for key in ('users','machines','assignments')}
+    return {'application': 'Office Atlas', 'mode': 'viewer', 'version': __version__, 'read_only': True, 'instance_id': os.environ.get('ATLAS_INSTANCE_ID'), 'identity': 'Demo · read-only directory', 'database': True, 'repository': False, **counts}
 
 
 @app.get('/api/capabilities')
 def capabilities():
     return {'read_only': True, 'elevated_operations': False}
+
+
+@app.get('/api/master/status')
+def master_status():
+    data = health()
+    return {'available': True, **{key: data[key] for key in ('users','machines','assignments')}}
+
+
+@app.get('/api/master/resolve/{key}')
+def resolve(key: str):
+    with connect() as con:
+        rows = exact_users(con, key)
+        return {'matched': True, 'user_key': 'id:' + str(rows[0]['id'])} if len(rows) == 1 else {'matched': False}
+
+
+@app.get('/api/palette/desks')
+def palette_desks():
+    with connect() as con:
+        return {'records': [json.loads(row[0]) for row in con.execute('select body from official_records order by id')]}
 
 
 @app.get('/api/official/state')
@@ -145,15 +165,28 @@ def home():
     return HTMLResponse(html)
 
 
+@app.get('/installer')
+@app.get('/installer/')
+def console():
+    html = (ROOT / 'frontend/index.html').read_text(encoding='utf-8')
+    html = html.replace('<head>', '<head><meta name="atlas-mode" content="viewer">')
+    html = html.replace('<span class="atlas-admin-badge">Admin</span>', '<span class="atlas-demo-badge">Demo</span>')
+    html = html.replace('Atlas Admin home', 'Atlas Demo home')
+    return HTMLResponse(html)
+
+
 @app.get('/assets/{filename}')
 def shared_asset(filename:str):
-    if filename not in ('shared-ui.js','ui-tokens.css','atlas-shell.css','barclays-eagle.svg','catalogue.css'):raise HTTPException(404,'Not available')
+    # Only assets referenced by the shared console template. No API registration.
+    template = (ROOT / 'frontend/index.html').read_text(encoding='utf-8')
+    allowed = set(re.findall(r'/assets/([\w.-]+)', template))
+    if filename not in allowed:raise HTTPException(404,'Not available')
     return FileResponse(ROOT/'frontend/assets'/filename)
 
 
 @app.get('/{filename}')
 def asset(filename: str):
-    allowed = {'site-info.js','command-palette.js', 'command-palette.css', 'command-registry.js', 'map-furniture.js','map-amenities.js','official-app.js','camera-motion.js','map-cursor.js', 'official-data.json', 'official.css', 'style.css', 'operations.css', 'viewer.js', 'viewer.css'}
+    allowed = {'catalogue.js','site-info.js','command-palette.js', 'command-palette.css', 'command-registry.js', 'map-furniture.js','map-amenities.js','official-app.js','camera-motion.js','map-cursor.js', 'official-data.json', 'official.css', 'style.css', 'operations.css', 'viewer.js', 'viewer.css'}
     if filename not in allowed and not re.fullmatch(r'(official-floor-(-1|[0-8])\.(jpg|pdf)|studio-floor-(-1|[0-8])\.svg)', filename):
         raise HTTPException(404, 'Not available in the shared viewer')
     return FileResponse(ATLAS / filename)
