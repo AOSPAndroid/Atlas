@@ -830,6 +830,15 @@ const elevatorBank = {
   points: [[552.01, 900], [730.3, 738.88], [774.15, 784.64], [598.73, 939.09]],
   anchor: [663.5593220338983, 810.3813559322034],
 };
+// Stairwells confirmed by the office owner; outlines follow the Level 2 treads.
+const stairwells = [
+  { id: "stairs-left", name: "Stairs · left", kind: "stairs",
+    anchor: [138, 922], points: [[103.13, 884.74], [173.74, 884.74], [173.74, 955.35], [103.13, 955.35]] },
+  { id: "stairs-centre", name: "Stairs · centre", kind: "stairs",
+    anchor: [807, 940], points: [[766, 904.23], [848, 904.23], [848, 974], [766, 974]] },
+  { id: "stairs-right", name: "Stairs · right", kind: "stairs",
+    anchor: [1480, 775], points: [[1405, 750], [1463, 697], [1556, 800], [1498, 853]] },
+];
 const registrations = {
   2: [[92.16, 850.3], [739.52, 449.53]],
   3: [[13.85, 627.18], [723.48, 188]],
@@ -845,7 +854,8 @@ export function applyMapAmenities(data) {
     const [a, b] = registrations[2], [c, d] = registrations[floor.level];
     const project = p => p.map((value, i) => c[i] + (value - a[i]) * (d[i] - c[i]) / (b[i] - a[i]));
     const elevator = {...elevatorBank, anchor: project(elevatorBank.anchor), points: elevatorBank.points.map(project)};
-    const additions = [...locations, elevator];
+    const stairs = stairwells.map(stair => ({...stair, anchor: project(stair.anchor), points: stair.points.map(project)}));
+    const additions = [...locations, elevator, ...stairs];
     const ids = new Set(additions.map(item => item.id));
     floor.geometry.wayfinding = [...(floor.geometry.wayfinding || []).filter(item => item.kind !== "lift" && !ids.has(item.id)), ...additions];
   }

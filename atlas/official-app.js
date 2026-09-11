@@ -1,5 +1,5 @@
 import { applyFurnitureCorrections } from "./map-furniture.js";
-import { applyMapAmenities } from "./map-amenities.js?v=2";
+import { applyMapAmenities } from "./map-amenities.js?v=3";
 import { createCameraMotion } from "./camera-motion.js";
 import { installMapCursor } from "./map-cursor.js?v=4";
 const readOnly =
@@ -146,9 +146,9 @@ function paintArchitecture(c) {
         .slice(0, 3)
         .map((x) => Math.round(x * 255))
         .join(",") +
-      ",0.55)";
+      (r.kind === "stairs" ? ",0.12)" : ",0.55)");
     c.fill();
-    if (r.kind === "lift") {
+    if (r.kind === "lift" || r.kind === "stairs") {
       c.strokeStyle = "#0084b4";
       c.lineWidth = 0.12;
       c.stroke();
@@ -1565,8 +1565,9 @@ function architecturalMesh() {
     }
   for (const r of g.wayfinding || [])
     if (facilityVisible(r)) {
-      polygonMesh(arr, r.points, 0.025, mapColors[r.kind]);
-      if (r.kind === "lift") for (let i = 0; i < r.points.length; i++)
+      // Keep the source stair treads visible beneath the amenity outline.
+      if (r.kind !== "stairs") polygonMesh(arr, r.points, 0.025, mapColors[r.kind]);
+      if (r.kind === "lift" || r.kind === "stairs") for (let i = 0; i < r.points.length; i++)
         beam(arr, modelPoint(...r.points[i]), modelPoint(...r.points[(i + 1) % r.points.length]), 0.12, 0.035, [0, 0.52, 0.71, 1], 0.03);
     }
   for (const points of [...(g.tables || []), ...(g.curvedTables || [])]) {
