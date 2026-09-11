@@ -237,7 +237,9 @@ const { fixture, root } = require("./ui_fixture.cjs");
 
     t.setView("3d", true);
     assert.equal(t.currentCanvas().dataset.mapCursor, "default");
-    assert.equal(t.currentCanvas().style.cursor, "default");
+    assert(t.currentCanvas().style.cursor.includes("data:image/svg+xml"));
+    assert(t.currentCanvas().style.cursor.endsWith("5 3, default"));
+    assert(w.document.querySelector("#viewport").style.getPropertyValue("--atlas-map-hover").includes("data:image/svg+xml"));
     step(480);
     const uploadCount = uploads;
     w.document.querySelector("#rotate").click();

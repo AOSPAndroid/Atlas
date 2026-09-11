@@ -217,7 +217,7 @@ header button:hover,
   pointer-events: none;
 }
 #viewport .map-name {
-  cursor: pointer;
+  cursor: var(--atlas-map-hover, pointer);
 }
 .locator-ring {
   position: absolute;
@@ -278,4 +278,16 @@ html[data-atlas-motion="reduce"] .map-tools button:active {
   padding: 8px 12px;
   font-size: 12px;
   white-space: nowrap;
+}
+
+/* Scoped to the map; forms elsewhere retain their normal system cursors. */
+#viewport {
+  cursor: var(--atlas-map-arrow, default);
+}
+#viewport
+  :is(button, a, summary, label, input[type="checkbox"], input[type="radio"]) {
+  cursor: var(--atlas-map-hover, pointer);
+}
+#viewport :is(button, input):disabled {
+  cursor: not-allowed;
 }

@@ -1,5 +1,5 @@
 import { createCameraMotion } from "./camera-motion.js";
-import { installMapCursor } from "./map-cursor.js?v=3";
+import { installMapCursor } from "./map-cursor.js?v=4";
 const readOnly =
   document.querySelector('meta[name="atlas-mode"]')?.content === "viewer";
 const { createOperations } = readOnly
