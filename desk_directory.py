@@ -59,10 +59,10 @@ def desk_context(c, desk):
             machine.update(link_source='Desk equipment record',match_type='Recorded at this desk',desk_equipment=True,assigned_relationship=0,logon_relationship=0)
             machines.insert(0, machine)
     for machine in machines:
-        machine['relationship_group'] = 'Desk equipment' if machine.get('desk_equipment') else 'Assigned to user' if machine.get('assigned_relationship') else 'Last logged on (inventory)'
+        machine['relationship_group'] = 'Assigned to user' if machine.get('assigned_relationship') else 'Desk equipment' if machine.get('desk_equipment') else 'Last logged on (inventory)'
         machine['inventory_discovered_at'] = machine.get('last_discovered') or None
         machine['inventory_updated_at'] = machine.get('updated_on') or None
-    order = {'Desk equipment':0,'Assigned to user':1,'Last logged on (inventory)':2}
+    order = {'Assigned to user':0,'Desk equipment':1,'Last logged on (inventory)':2}
     machines.sort(key=lambda m:(order[m['relationship_group']], m['name']))
     return {'desk':desk,'user':person,'candidates':candidates,'match_method':method,'machines':machines}
 

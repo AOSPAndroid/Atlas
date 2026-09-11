@@ -119,10 +119,15 @@ class MergedAtlas(unittest.TestCase):
   ctx=self.client.get('/api/desks/L3-093/context').json();self.assertEqual(len(ctx['machines']),8)
   self.assertTrue(any(m['assigned_relationship'] for m in ctx['machines']))
   self.assertTrue(any(m['logon_relationship'] for m in ctx['machines']))
+  assigned=[bool(row['assigned_relationship']) for row in ctx['machines']]
+  self.assertEqual(assigned,sorted(assigned,reverse=True))
+  user_machines=self.client.get('/api/user/id:'+str(ctx['user']['id'])).json()['machines']
+  assigned=[bool(row['assigned_relationship']) for row in user_machines]
+  self.assertEqual(assigned,sorted(assigned,reverse=True))
   pc=ctx['machines'][0]['name'];fixture=self.create_desk('group-overlap',name='Sabri El Jailani',hostname=pc)
   merged=self.client.get('/api/desks/'+fixture['id']+'/context').json()['machines']
   self.assertEqual(len(merged),8);match=next(m for m in merged if m['name']==pc)
-  self.assertTrue(match['desk_equipment']);self.assertEqual(match['relationship_group'],'Desk equipment')
+  self.assertTrue(match['desk_equipment']);self.assertEqual(match['relationship_group'],'Assigned to user' if match['assigned_relationship'] else 'Desk equipment')
   self.assertIn('inventory_discovered_at',match)
  def test_11_catalog_metadata_scripts_and_revision(self):
   pkg=m.REPO/'Example';(pkg/'remove_u.vbs').write_text('test')
