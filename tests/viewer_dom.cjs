@@ -126,7 +126,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const commands = [...rootEl.querySelectorAll("[role=option]")].map(
     (el) => el.textContent,
   );
-  assert.equal(commands.length, 8);
+  assert.equal(commands.length, 10);
   for (const name of [
     "User & machine lookup",
     "Toggle animations",

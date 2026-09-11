@@ -117,6 +117,9 @@ class Handler(BaseHTTPRequestHandler):
         path = urlsplit(self.path).path
         if path == '/':
             body, kind = preview_html(), 'text/html'
+        elif path == '/site-info.js':
+            # Never put real site contacts or network identifiers in the public screenshot fixture.
+            body, kind = b'export function openSiteInfo(){const {body}=AtlasUI.dialog("Site information");body.textContent="Fictional preview: site references are omitted.";}', 'text/javascript'
         elif path == '/official-data.json':
             body, kind = json.dumps({'floors': FLOORS, 'records': RECORDS}).encode(), 'application/json'
         elif path == '/api/official/state':

@@ -524,6 +524,10 @@ async function runInitialSharedCommand(params) {
   await runSharedCommand(id);
 }
 async function runSharedCommand(id) {
+  if (id === "vlans" || id === "contacts") {
+    const { openSiteInfo } = await import("/site-info.js?v=1");
+    return openSiteInfo(id);
+  }
   if (id === "animations") return AtlasUI.motion.toggle();
   if (id === "catalogue") return openConsoleCatalogue();
   const { MAP_COMMANDS, commandUrl } = await import("/command-registry.js");

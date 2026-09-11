@@ -2,6 +2,11 @@
   max-height: 85%;
   overflow: auto;
 }
+.map-info-button {position:absolute;right:16px;bottom:64px;z-index:5;width:40px;height:40px;display:grid;place-items:center;padding:7px;border:1px solid #c7dce8;border-radius:50%;background:#fff;color:#0084ad;box-shadow:0 2px 9px #17334612;cursor:pointer;}
+.map-info-button svg {width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;}
+.map-info-button .info-dot {fill:currentColor;stroke:none;}
+.map-info-button:hover {background:#edf9fd;border-color:#0084ad;}
+.map-info-button:focus-visible {outline:2px solid #0084ad;outline-offset:3px;}
 .floor-rail button {
   min-height: 30px;
   height: 30px;

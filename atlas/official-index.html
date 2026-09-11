@@ -9,7 +9,7 @@
     <title>Atlas</title>
     <link rel="stylesheet" href="style.css?v=8" />
     <link rel="stylesheet" href="operations.css?v=2" />
-    <link rel="stylesheet" href="official.css?v=76" />
+    <link rel="stylesheet" href="official.css?v=77" />
     <link rel="stylesheet" href="/assets/machine-health.css" />
     <link rel="stylesheet" href="/assets/atlas-shell.css" />
     <link rel="stylesheet" href="/assets/catalogue.css" />
@@ -105,6 +105,19 @@
           </div>
         </div>
         <div id="viewport">
+          <button
+            id="site-info"
+            class="map-info-button"
+            type="button"
+            aria-label="Site information: VLANs and contacts"
+            title="VLANs &amp; contacts"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="9" />
+              <path d="M12 11v6" />
+              <circle cx="12" cy="7.5" r=".8" class="info-dot" />
+            </svg>
+          </button>
           <div id="map-labels" aria-label="Names on the map"></div>
           <svg id="label-lines" aria-hidden="true"></svg>
           <div
@@ -189,6 +202,6 @@
       </aside>
     </div>
     <div id="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="official-app.js?v=85"></script>
+    <script type="module" src="official-app.js?v=86"></script>
   </body>
 </html>

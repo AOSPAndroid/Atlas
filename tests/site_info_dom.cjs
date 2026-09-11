@@ -1,0 +1,27 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
+const {fixture,root}=require('./ui_fixture.cjs');
+(async()=>{
+  let calls=0,copied='';
+  const {w,context,errors}=await fixture({fetch:async()=>{calls++;throw Error('No network expected')}});
+  Object.defineProperty(w.navigator,'clipboard',{value:{writeText:async value=>copied=value}});
+  const mod=new vm.SourceTextModule(fs.readFileSync(path.join(root,'atlas/site-info.js'),'utf8'),{context});
+  await mod.link(()=>{});await mod.evaluate();
+  const trigger=w.document.querySelector('#openCommands');trigger.focus();
+  const {openSiteInfo,VLANS,CONTACTS}=mod.namespace;
+  assert.deepEqual(Array.from(VLANS,r=>r[0]),[101,102,200,301,302,303,400,401,601,602,999]);
+  assert.deepEqual(Array.from(CONTACTS,r=>r[2]),['+33144583110','+33144583232','+33144583114','+442077735553']);
+  const dialog=openSiteInfo('vlans');assert(dialog.open);
+  assert.equal(dialog.querySelectorAll('tbody tr').length,11);
+  assert.equal(dialog.querySelector('#site-info-contacts').hidden,true);
+  dialog.querySelector('#site-info-tab-vlans').dispatchEvent(new w.KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}));
+  assert.equal(dialog.querySelector('#site-info-contacts').hidden,false);
+  assert.equal(dialog.querySelector('#site-info-tab-contacts').getAttribute('aria-selected'),'true');
+  assert.equal(dialog.querySelectorAll('a[href^="tel:"]').length,4);
+  await dialog.querySelector('.site-copy').onclick();assert.equal(copied,'+33144583110');
+  assert(dialog.textContent.includes('Security number copied'));
+  assert.equal(openSiteInfo('vlans'),dialog);assert.equal(w.document.querySelectorAll('.atlas-site-info').length,1);
+  dialog.close();assert.equal(w.document.activeElement,trigger);
+  const next=openSiteInfo('contacts');assert(!next.querySelector('#site-info-contacts').hidden);next.close();
+  assert.equal(calls,0);assert.equal(errors.length,0,errors.join('\n'));w.close();
+  console.log('PASS: all reference values, direct tabs, keyboard navigation, phone copying, single dialog and focus restoration.');
+})().catch(e=>{console.error(e);process.exit(1)});

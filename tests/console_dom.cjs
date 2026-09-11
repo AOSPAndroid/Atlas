@@ -13,7 +13,7 @@ async function until(fn){for(let i=0;i<100;i++){if(fn())return;await sleep(30)}t
  w.AtlasHealth={cancel(){},badges(){return ''},mount(){return Promise.resolve()},report(){return []}};
  const context=dom.getInternalVMContext(),modules=new Map();
  async function moduleFor(spec){
-  const file=path.join(root,'atlas',path.basename(spec));
+  const file=path.join(root,'atlas',path.basename(spec.split(/[?#]/,1)[0]));
   if(modules.has(file))return modules.get(file);
   const promise=(async()=>{const mod=new vm.SourceTextModule(fs.readFileSync(file,'utf8'),{context,identifier:file});await mod.link(moduleFor);await mod.evaluate();return mod})();modules.set(file,promise);return promise;
  }
@@ -26,6 +26,11 @@ async function until(fn){for(let i=0;i<100;i++){if(fn())return;await sleep(30)}t
  assert.equal(w.document.querySelector('.header-actions .atlas-motion-toggle'),null);
  await vm.runInContext("runSharedCommand('animations')",context);assert(w.AtlasUI.motion.isReduced());assert.equal(w.localStorage.getItem('atlas-motion'),'reduce');
  await vm.runInContext("runSharedCommand('animations')",context);assert(!w.AtlasUI.motion.isReduced());assert.equal(w.localStorage.getItem('atlas-motion'),'full');
+ await vm.runInContext("runSharedCommand('contacts')",context);
+ assert(w.document.querySelector('.atlas-site-info'));
+ assert.equal(w.document.querySelectorAll('.site-contact').length,4);
+ assert.equal(w.location.pathname,'/installer');
+ w.document.querySelector('.atlas-site-info').close();
  for(const page of ['admin','bulk','history','psexec','workspace']){w.document.querySelector(`[data-page="${page}"]`).click();assert(w.document.querySelector('#'+page).classList.contains('active'));assert(w.document.querySelector('#pageTitle').textContent.trim().length>0)}
  assert.equal(w.document.querySelectorAll('nav .nav-label').length,5);
  for(const [toggle,drawer,close] of [['queueToggle','queueDrawer','closeQueue'],['deploymentsToggle','deploymentsDrawer','closeDeployments']]){w.document.querySelector('#'+toggle).click();assert(w.document.querySelector('#'+drawer).classList.contains('open'));w.document.querySelector('#'+close).click();assert(!w.document.querySelector('#'+drawer).classList.contains('open'))}

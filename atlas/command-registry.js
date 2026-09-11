@@ -28,6 +28,8 @@ const targeted = new Set([
   "report",
 ]);
 const viewerCommands = new Set([
+  "vlans",
+  "contacts",
   "atlas",
   "lookup",
   "view",
@@ -39,6 +41,18 @@ const viewerCommands = new Set([
 ]);
 // The single command catalogue used by the map and IT console.
 export const COMMANDS = [
+  [
+    "vlans",
+    "VLANs",
+    "Open site VLAN IDs, names and purposes",
+    "vlan network subnet info information",
+  ],
+  [
+    "contacts",
+    "Contacts",
+    "Open Security, Reception, Print room and AV/VC phone numbers",
+    "contacts contact phone telephone reception security print av info",
+  ],
   [
     "lookup",
     "User & machine lookup",
@@ -221,6 +235,8 @@ export const COMMANDS = [
   viewer: viewerCommands.has(id),
 }));
 export const MAP_COMMANDS = new Set([
+  "vlans",
+  "contacts",
   "atlas",
   "catalogue",
   "settings",
