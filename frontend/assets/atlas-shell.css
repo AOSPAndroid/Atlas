@@ -58,6 +58,65 @@ body > .atlas-app-header {
   max-width: none;
   min-width: 0;
 }
+body.atlas-console > .atlas-app-header {
+  flex-wrap: nowrap;
+}
+body.atlas-console .atlas-header-actions {
+  flex-wrap: nowrap;
+  gap: 3px;
+  padding: 4px;
+  border: 1px solid #dde8ee;
+  border-radius: 13px;
+  background: #f3f7f9;
+  box-shadow: inset 0 1px 0 #ffffffcc;
+}
+body.atlas-console .atlas-header-actions > button,
+body.atlas-console .atlas-header-actions > a {
+  min-height: 38px;
+  padding: 8px 11px;
+  border-color: transparent;
+  border-radius: 9px;
+  background: transparent;
+  white-space: nowrap;
+}
+body.atlas-console .atlas-header-actions > :is(button, a):hover {
+  border-color: #cbdde6;
+  background: white;
+  box-shadow: 0 2px 7px #17334612;
+}
+body.atlas-console .atlas-header-actions > :is(button, a)[aria-disabled="true"],
+body.atlas-console .atlas-header-actions > :is(button, a):disabled {
+  box-shadow: none;
+}
+body.atlas-console .atlas-header-actions kbd {
+  padding: 1px 5px;
+  border: 1px solid #cfdee6;
+  border-radius: 5px;
+  background: #fff;
+  color: #527080;
+  font: 10px/1.5 var(--atlas-font);
+}
+body.atlas-console .atlas-header-actions .atlas-display-mode {
+  flex-direction: row;
+  align-items: center;
+  align-self: stretch;
+  gap: 7px;
+  min-width: 0;
+  padding: 0 3px 0 10px;
+  border-left: 1px solid #d7e3e9;
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 600;
+}
+body.atlas-console .atlas-header-actions .atlas-display-mode select {
+  min-height: 34px;
+  max-width: 118px;
+  padding: 6px 28px 6px 9px;
+  border-color: transparent;
+  border-radius: 8px;
+  background-color: white;
+  font-size: 12px;
+}
 .atlas-app-header .atlas-header-actions > button,
 .atlas-app-header .atlas-header-actions > a,
 .atlas-header-more > summary {
@@ -421,6 +480,16 @@ body.atlas-console > main {
   .atlas-app-header .atlas-header-actions {
     justify-content: flex-start;
     gap: 6px;
+  }
+  body.atlas-console > .atlas-app-header {
+    flex-wrap: wrap;
+  }
+  body.atlas-console .atlas-header-actions {
+    width: 100%;
+    overflow-x: auto;
+    justify-content: flex-start;
+    flex-wrap: nowrap;
+    scrollbar-width: thin;
   }
   .atlas-header-menu {
     position: fixed;

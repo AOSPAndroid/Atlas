@@ -27,11 +27,21 @@
         /><span>Atlas</span><span class="atlas-admin-badge">Admin</span></a
       >
       <div class="header-actions atlas-header-actions">
-        <a class="atlas-return" href="/manage-database">Manage Database</a>
+        <a
+          class="atlas-return"
+          href="/manage-database"
+          title="Manage database"
+          aria-label="Manage database"
+          >Database</a
+        >
         <button id="openCommands">Commands <kbd>Ctrl K</kbd></button>
-        <button id="openShortcuts">Shortcuts <kbd>?</kbd></button>
-        <button id="openCatalogue">Package catalogue</button>
-        <a class="atlas-return" href="/">Floor map</a>
+        <button id="openShortcuts" title="Keyboard shortcuts">
+          Help <kbd>?</kbd>
+        </button>
+        <button id="openCatalogue" title="Open package catalogue">
+          Packages
+        </button>
+        <a class="atlas-return" href="/" title="Open floor map">Map</a>
       </div>
     </header>
     <aside class="console-sidebar">
