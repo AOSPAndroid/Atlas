@@ -1759,44 +1759,92 @@ function labelNode(id, room = false) {
 }
 const orbitHint =
   "Left-drag to move · Right-drag to rotate / tilt · Scroll to zoom";
-function renderAmenities() {
+const labelZoomSteps = [1.35, 1.85, 2.7, 4];
+let labelZoomScene = "", labelFitScale = 1, labelZoomLevel = 0;
+function labelPolicy(w, h) {
+  const scene = `${floor}:${view}:${w}:${h}`;
+  if (scene !== labelZoomScene) {
+    labelZoomScene = scene;
+    labelFitScale = fitTarget().scale;
+    labelZoomLevel = labelZoomSteps.filter(step => cam.scale / labelFitScale >= step).length;
+  }
+  const zoom = cam.scale / labelFitScale;
+  // A small dead band prevents tags flickering at a zoom threshold.
+  while (labelZoomLevel < 4 && zoom >= labelZoomSteps[labelZoomLevel] + 0.06) labelZoomLevel++;
+  while (labelZoomLevel > 0 && zoom < labelZoomSteps[labelZoomLevel - 1] - 0.06) labelZoomLevel--;
+  const area = Math.max(0.4, Math.min(1.5, w * h / 650000));
+  return {
+    level: labelZoomLevel,
+    names: Math.round([0, 6, 14, 24, 40][labelZoomLevel] * area),
+    amenities: Math.max(1, Math.round([2, 4, 6, 10, 14][labelZoomLevel] * area)),
+  };
+}
+function labelBounds(w, h) {
+  return { left: Math.min(65, w * 0.15), right: w - 12, top: 60, bottom: h - 48 };
+}
+function labelsOverlap(a, b, gap = 8) {
+  return a.x < b.x + b.w + gap && a.x + a.w + gap > b.x &&
+    a.y < b.y + b.h + gap && a.y + a.h + gap > b.y;
+}
+function labelFits(rect, bounds, occupied) {
+  return rect.x >= bounds.left && rect.x + rect.w <= bounds.right &&
+    rect.y >= bounds.top && rect.y + rect.h <= bounds.bottom &&
+    !occupied.some(other => labelsOverlap(rect, other));
+}
+function selectedLabelSpot(p, w, h) {
+  const bounds = labelBounds(w, h), wide = Math.min(210, bounds.right - bounds.left);
+  return { x: Math.max(bounds.left, Math.min(bounds.right - wide, p[0] - wide / 2)),
+    y: Math.max(bounds.top, Math.min(bounds.bottom - 54, p[1] - 68)), w: wide, h: 54 };
+}
+function amenityPriority(room) {
+  if (["elevator-bank", "lift-main", "main-entrance"].includes(room.id)) return 0;
+  if (room.kind === "stairs" && /centre|center/.test(room.id)) return 1;
+  return { lift: 2, stairs: 3, wc: 4, kitchen: 5, print: 6, room: 7 }[room.kind] ?? 8;
+}
+function renderAmenities(occupied, policy, bounds) {
   amenityOverlay.hidden = !mapLayers.facilities || view === "source";
+  for (const el of amenityNodes.values()) el.hidden = true;
   if (amenityOverlay.hidden) return;
   const geometry = data.floors.find((f) => f.level === floor).geometry;
-  const amenities = (geometry.wayfinding || []).filter(facilityVisible);
-  const visible = new Set();
-  amenities.forEach((room, i) => {
-    if (!room.points?.length) return;
-    const id = `${floor}:${i}`;
-    visible.add(id);
+  const amenities = (geometry.wayfinding || []).filter(facilityVisible)
+    .map((room, i) => ({ room, id: `${floor}:${room.id || i}` }))
+    .sort((a, b) => amenityPriority(a.room) - amenityPriority(b.room));
+  const retained = new Set(amenities.map(item => item.id));
+  let count = 0;
+  for (const {room, id} of amenities) {
+    if (!room.points?.length) continue;
+    const minimum = /seating/.test(room.id) ? 3 : amenityPriority(room) <= 1 ? 0 : 1;
+    if (policy.level < minimum || count >= policy.amenities) continue;
+    const title = room.kind === "lift" ? `↕ ${room.name || "Elevators"}` : room.name || "Room";
+    const center = room.anchor || room.points.reduce((a, p) => [a[0] + p[0] / room.points.length, a[1] + p[1] / room.points.length], [0, 0]);
+    const pt = projected(modelPoint(center[0], center[1], floor, 0));
+    if (!pt.every(Number.isFinite)) continue;
+    const width = Math.min(190, Math.max(72, title.length * 6.8 + 22)), height = 28;
+    const rect = {x: pt[0] - width / 2, y: pt[1] - height / 2, w: width, h: height};
+    if (!labelFits(rect, bounds, occupied)) continue;
     let el = amenityNodes.get(id);
     if (!el) {
       el = document.createElement("span");
       el.className = "amenity-tag";
-      el.textContent = room.kind === "lift" ? "↕ Elevators" : (room.name || { wc: "Toilets", stairs: "Stairs", room: "Room" }[room.kind]);
       amenityOverlay.append(el);
       amenityNodes.set(id, el);
     }
-    const center = room.anchor || room.points.reduce((a, p) => [a[0] + p[0] / room.points.length, a[1] + p[1] / room.points.length], [0, 0]);
-    const pt = projected(modelPoint(center[0], center[1], floor, 0));
-    el.hidden = !pt.every(Number.isFinite) || pt[0] < 45 || pt[0] > canvas.clientWidth - 45 || pt[1] < 20 || pt[1] > canvas.clientHeight - 25;
-    el.style.left = `${pt[0]}px`;
-    el.style.top = `${pt[1]}px`;
-  });
-  for (const [id, el] of amenityNodes) if (!visible.has(id)) { el.remove(); amenityNodes.delete(id); }
+    el.textContent = title;
+    el.title = title;
+    el.hidden = false;
+    el.style.cssText = `left:${rect.x}px;top:${rect.y}px;width:${width}px;height:${height}px`;
+    occupied.push(rect);
+    count++;
+  }
+  for (const [id, el] of amenityNodes) if (!retained.has(id)) { el.remove(); amenityNodes.delete(id); }
 }
 function renderNames() {
-  renderAmenities();
   const start = performance.now();
   applyNameVisibility();
   updateMapLayers();
-  if (!showNameTags) {
-    $("#location-banner").hidden = true;
-    $("#hint").textContent =
-      view === "3d" ? orbitHint : "Name tags off · Click a desk to inspect";
-    metrics.labelsMs = performance.now() - start;
-    return;
-  }
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  if (!w || !h) return;
+  const policy = labelPolicy(w, h), bounds = labelBounds(w, h);
   const key = JSON.stringify([
     floor,
     view,
@@ -1808,10 +1856,23 @@ function renderNames() {
     lastMatches.map((r) => r.id),
     canvas.clientWidth,
     canvas.clientHeight,
+    showNameTags,
+    mapLayers.facilities,
+    policy.level,
   ]);
   if (key === labelScene && records === labelRecords) return;
   labelScene = key;
   labelRecords = records;
+  const activeScreen = showNameTags && screenRecords.find(item => item.r.id === selected?.id);
+  const activeSpot = activeScreen && selectedLabelSpot(activeScreen.p, w, h);
+  const occupied = activeSpot ? [activeSpot] : [];
+  renderAmenities(occupied, policy, bounds);
+  if (!showNameTags) {
+    $("#location-banner").hidden = true;
+    $("#hint").textContent = view === "3d" ? orbitHint : "Name tags off · Click a desk to inspect";
+    metrics.labelsMs = performance.now() - start;
+    return;
+  }
   // Prune labels when the floor or underlying record set changes; the pool stays bounded.
   const floorIds = new Set(
     records.filter((r) => r.floor === floor).map((r) => r.id),
@@ -1830,13 +1891,13 @@ function renderNames() {
       }
     }
   }
-  const w = canvas.clientWidth,
-    h = canvas.clientHeight,
-    occupied = [];
+  const searching = !!$("#search").value.trim(), matches = new Set(lastMatches.map(r => r.id));
+  const nameBudget = Math.max(policy.names, searching ? 3 : 0);
   const candidates = screenRecords
     .filter(
       ({ r }) =>
         (!AtlasUI.performance.isCitrix() || !moving || r.id === selected?.id) &&
+        (!searching || matches.has(r.id) || r.id === selected?.id) &&
         (r.id === selected?.id ||
           r.kind === "area" ||
           (r.occupancy !== "vacant" &&
@@ -1848,48 +1909,36 @@ function renderNames() {
     .sort(
       (a, b) =>
         (b.r.id === selected?.id) - (a.r.id === selected?.id) ||
-        a.p[1] - b.p[1],
+        (Math.hypot(a.p[0] - w / 2, a.p[1] - h / 2) - Math.hypot(b.p[0] - w / 2, b.p[1] - h / 2)),
     );
-  let hidden = 0;
+  let hidden = 0, shown = 0;
   for (const { r, p } of candidates) {
     const active = r.id === selected?.id;
     if (!active && (p[0] < 0 || p[0] > w || p[1] < 50 || p[1] > h - 45))
       continue;
+    if (!active && shown >= nameBudget) { hidden++; continue; }
     const wide = Math.min(
-        w - 16,
+        bounds.right - bounds.left,
         active ? 210 : Math.min(160, Math.max(100, r.name.length * 6.1)),
       ),
       height = active ? 54 : 34;
     let spot = null;
     if (active)
-      spot = {
-        x: Math.max(8, Math.min(w - wide - 8, p[0] - wide / 2)),
-        y: Math.max(60, Math.min(h - height - 50, p[1] - height - 14)),
-        w: wide,
-        h: height,
-      };
+      spot = activeSpot || selectedLabelSpot(p, w, h);
     else if (moving && labelNodes.get(r.id)?.offset) {
       const offset = labelNodes.get(r.id).offset;
       spot = { x: p[0] + offset.x, y: p[1] + offset.y, w: wide, h: height };
+      if (!labelFits(spot, bounds, occupied)) spot = null;
     } else
       for (const dy of [-height - 14, 14, -height - 54, 54]) {
         for (const dx of [0, -wide * 0.6, wide * 0.6]) {
           const rect = {
-            x: Math.max(8, Math.min(w - wide - 8, p[0] - wide / 2 + dx)),
+            x: Math.max(bounds.left, Math.min(bounds.right - wide, p[0] - wide / 2 + dx)),
             y: p[1] + dy,
             w: wide,
             h: height,
           };
-          if (rect.y < 60 || rect.y + height > h - 48) continue;
-          if (
-            !occupied.some(
-              (b) =>
-                rect.x < b.x + b.w + 4 &&
-                rect.x + rect.w + 4 > b.x &&
-                rect.y < b.y + b.h + 4 &&
-                rect.y + rect.h + 4 > b.y,
-            )
-          ) {
+          if (labelFits(rect, bounds, occupied)) {
             spot = rect;
             break;
           }
@@ -1900,7 +1949,7 @@ function renderNames() {
       hidden++;
       continue;
     }
-    occupied.push(spot);
+    if (!active) { occupied.push(spot); shown++; }
     const n = labelNode(r.id);
     n.offset = { x: spot.x - p[0], y: spot.y - p[1] };
     n.el.hidden = false;
@@ -1932,11 +1981,13 @@ function renderNames() {
     n.line.classList.toggle("chosen", active);
     n.circle.classList.toggle("chosen", active);
   }
-  if (!moving && cam.scale < 3 && !$("#search").value.trim()) {
+  if (!moving && policy.level >= 2 && !searching) {
+    let roomsShown = 0;
     for (const [i, room] of data.floors
       .find((f) => f.level === floor)
       .geometry.rooms.entries()) {
       if (room.kind === "core" || room.name === "Office") continue;
+      if (roomsShown >= 2) break;
       const center = room.points.reduce(
           (s, p) => [
             s[0] + p[0] / room.points.length,
@@ -1946,26 +1997,14 @@ function renderNames() {
         ),
         pt = projected(modelPoint(center[0], center[1], floor, 0)),
         rect = { x: pt[0] - 48, y: pt[1] - 8, w: 96, h: 22 };
-      if (
-        rect.x < 50 ||
-        rect.x + 96 > w - 45 ||
-        rect.y < 55 ||
-        rect.y + 22 > h - 50 ||
-        occupied.some(
-          (b) =>
-            rect.x < b.x + b.w + 3 &&
-            rect.x + 96 > b.x &&
-            rect.y < b.y + b.h + 3 &&
-            rect.y + 22 > b.y,
-        )
-      )
-        continue;
+      if (!labelFits(rect, bounds, occupied)) continue;
       occupied.push(rect);
+      roomsShown++;
       const n = labelNode("room:" + floor + ":" + i, true);
       n.el.hidden = false;
       n.el.textContent = room.name;
-      n.el.style.left = rect.x + "px";
-      n.el.style.top = rect.y + "px";
+      n.el.title = room.name;
+      n.el.style.cssText = `left:${rect.x}px;top:${rect.y}px;width:${rect.w}px;height:${rect.h}px`;
     }
   }
   updateMapLayers();
@@ -2026,7 +2065,7 @@ function renderNames() {
     view === "3d"
       ? orbitHint
       : hidden
-        ? `${hidden} more labels nearby · Zoom in to read them`
+        ? "Zoom in to reveal names and more places"
         : "Drag to pan · Scroll to zoom";
   metrics.labelsMs = performance.now() - start;
 }
