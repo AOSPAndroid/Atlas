@@ -10,6 +10,7 @@ const root = path.resolve(__dirname, '..');
   const data = JSON.parse(fs.readFileSync(path.join(root, 'atlas/official-data.json'), 'utf8'));
   const before = new Map(data.floors.map(f => [f.level, f.geometry.doorSwings.length]));
   const beforeWalls = new Map(data.floors.map(f => [f.level, f.geometry.walls.length]));
+  const beforeLines = new Map(data.floors.map(f => [f.level, f.geometry.planLinework.length]));
   const source = fs.readFileSync(path.join(root, 'atlas/official-app.js'), 'utf8');
   const triangulate = vm.runInNewContext(source.slice(source.indexOf('function triangulate('), source.indexOf('function polygonMesh(')) + '\ntriangulate');
   applyFurnitureCorrections(data);
@@ -21,7 +22,8 @@ const root = path.resolve(__dirname, '..');
   for (const floor of data.floors) {
     if (!(floor.level in exclusions)) continue;
     assert.equal(floor.geometry.doorSwings.length, before.get(floor.level) - exclusions[floor.level], 'Keep real door swings');
-    assert.equal(floor.geometry.walls.length, beforeWalls.get(floor.level) - (floor.level === -1 ? 21 : 0), 'Only restaurant furniture outlines lose their false walls');
+    assert.equal(floor.geometry.walls.length, beforeWalls.get(floor.level) - (floor.level === -1 ? 22 : 0), 'Only restaurant furniture and the confirmed demolished partition lose raised walls');
+    assert.equal(floor.geometry.planLinework.length, beforeLines.get(floor.level) - (floor.level === -1 ? 1 : 0), 'Only the demolished partition is removed from the source underlay');
     for (const points of floor.geometry.curvedTables) {
       const triangles = triangulate(points);
       assert.equal(triangles.length, points.length - 2, `Floor ${floor.level} table must render in 3D`);
@@ -34,7 +36,10 @@ const root = path.resolve(__dirname, '..');
   assert(containsBounds(835, 905), 'Rounded private-office desk recovered');
   const restaurant = data.floors.find(f => f.level === -1).geometry;
   assert.equal(restaurant.curvedTables.filter(p => p.length === 32).length, 9, 'Nine round dining tables');
-  assert.equal(restaurant.curvedTables.filter(p => p.length === 4).length, 2, 'Two long communal table tops');
+  assert.equal(restaurant.curvedTables.filter(p => p.length === 4).length, 3, 'Two communal tables plus the highlighted dining table');
+  assert(restaurant.curvedTables.some(points => points.length === 4 &&
+    Math.abs(points.reduce((sum,p) => sum+p[0],0)/4-884) < .1 &&
+    Math.abs(points.reduce((sum,p) => sum+p[1],0)/4-552) < .1), 'New table occupies the highlighted restaurant location');
   assert.equal(restaurant.chairSeats.length, 23, 'Dining chairs use seat height rather than table height');
   assert.equal(restaurant.tables.length, 0, 'Do not also draw the dining chairs as tables');
   assert.equal(restaurant.counters.length, 2, 'Salad island and serving counter recovered');
@@ -51,6 +56,10 @@ const root = path.resolve(__dirname, '..');
   assert(covered([795,665]), 'Countertop surface remains filled');
   assert(!covered([800,695]), 'Keep the opening between the two salad-bar arms');
   const walls = new Set(restaurant.walls.map(segment => JSON.stringify(segment)));
+  const oldPartition = JSON.stringify([[728.74,597.23],[885.81,742.3]]);
+  assert(!walls.has(oldPartition), 'Open the passage between the salad bar and seating');
+  assert(!restaurant.planLinework.some(segment => JSON.stringify(segment) === oldPartition), 'The demolished partition must not remain as a floor line in 3D');
+  assert(walls.has(JSON.stringify([[710.4,616.72],[728.74,597.23]])), 'Keep the adjoining kitchen wall at the end of the demolished partition');
   assert(!walls.has(JSON.stringify([[749.52,679.7],[803.2,729.28]])), 'Salad island sides are not room walls');
   assert(!walls.has(JSON.stringify([[712.33,740.69],[728.42,740.69]])), 'Serving units are not room walls');
   assert(walls.has(JSON.stringify([[710.4,653.92],[710.4,782.25]])), 'Keep the kitchen partition beside the salad bar');

@@ -1,5 +1,5 @@
-import { applyFurnitureCorrections } from "./map-furniture.js?v=4";
-import { applyMapAmenities } from "./map-amenities.js?v=5";
+import { applyFurnitureCorrections } from "./map-furniture.js?v=5";
+import { applyMapAmenities } from "./map-amenities.js?v=6";
 import { createCameraMotion } from "./camera-motion.js";
 import { installMapCursor } from "./map-cursor.js?v=4";
 const readOnly =
@@ -2363,7 +2363,7 @@ function officialImage(level) {
       draw();
     };
     img.onerror = () => toast("Plan image could not load.");
-    img.src = `studio-floor-${level}.svg`;
+    img.src = `studio-floor-${level}.svg?v=2`;
     officialImages.set(level, img);
     if (officialImages.size > 2)
       officialImages.delete(officialImages.keys().next().value);
