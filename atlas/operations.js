@@ -133,6 +133,7 @@ export function createOperations({
               .querySelectorAll(".ops-machine")
               .forEach((n) => n.classList.toggle("chosen", n.contains(input)));
             updateDeploy();
+            AtlasUI.motion.slideUp(q(".ops-deployment"));
             health(g, target);
           }),
       );

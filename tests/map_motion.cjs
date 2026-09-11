@@ -49,6 +49,11 @@ const { fixture, root } = require("./ui_fixture.cjs");
       meta.content = "viewer";
       w.document.head.append(meta);
     }
+    const entrances=[];
+    w.HTMLElement.prototype.animate=function(keyframes,options){
+      const animation={element:this,keyframes,options,cancel(){this.oncancel?.()}};
+      entrances.push(animation);return animation;
+    };
     let clock = 0,
       id = 0,
       uploads = 0;
@@ -147,8 +152,12 @@ const { fixture, root } = require("./ui_fixture.cjs");
     const initial = t.state();
     t.selectRecord(people[0].id);
     const inspector = w.document.querySelector("#detail");
+    const panelEntrances=()=>entrances.filter(e=>e.element===inspector);
+    assert.equal(panelEntrances().length,1,'Clicking a person slides up the right panel');
+    assert.equal(panelEntrances()[0].keyframes[0].transform,'translateY(48px)');
     inspector.scrollTop = 320;
     t.renderDetail();
+    assert.equal(panelEntrances().length,1,"Refreshing details does not replay selection motion");
     assert.equal(
       inspector.scrollTop,
       320,

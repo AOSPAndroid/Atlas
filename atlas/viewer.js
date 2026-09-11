@@ -120,6 +120,7 @@ export function createViewerOperations({ onSelect, toast }) {
       const data = await api(url, lookupRequest.signal);
       if (version !== lookupVersion || !current.element.isConnected) return;
       current.results.innerHTML = render(data);
+      if (url.startsWith("/api/user/")) AtlasUI.motion.slideUp(current.results);
       bindLinks(current.results);
       const copy = current.results.querySelector("[data-copy-report]");
       if (copy)

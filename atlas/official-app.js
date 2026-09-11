@@ -651,6 +651,7 @@ function selectRecord(id) {
   $("#add").textContent = "＋ Add location";
   renderDetail();
   $("#detail").scrollTop = 0;
+  AtlasUI.motion.slideUp($("#detail"));
   search();
   focusPerson(r);
 }
@@ -2206,6 +2207,7 @@ function renderNames() {
           () => {
             $("#detail").classList.add("open");
             renderDetail();
+            AtlasUI.motion.slideUp($("#detail"));
           },
         ],
       ]) {

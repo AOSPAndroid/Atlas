@@ -71,16 +71,29 @@
     applyMotion();
   }
   const activeReveals = new Map();
-  function reveal(element) {
+  function reveal(element, { distance = 8, duration = 220 } = {}) {
     activeReveals.get(element)?.cancel();
-    if (isReduced() || isCitrix() || !element?.animate || document.hidden)
+    if (
+      isReduced() ||
+      isCitrix() ||
+      !element?.animate ||
+      element.hidden ||
+      document.hidden
+    )
       return;
+    // A panel entrance already moves its cards; don't stack scroll effects inside it.
+    for (
+      let parent = element.parentElement;
+      parent;
+      parent = parent.parentElement
+    )
+      if (activeReveals.has(parent)) return;
     const animation = element.animate(
       [
-        { opacity: 0.45, transform: "translateY(8px)" },
+        { opacity: 0.45, transform: `translateY(${distance}px)` },
         { opacity: 1, transform: "translateY(0)" },
       ],
-      { duration: 220, easing: "cubic-bezier(0.22, 1, 0.36, 1)" },
+      { duration, easing: "cubic-bezier(0.22, 1, 0.36, 1)" },
     );
     activeReveals.set(element, animation);
     const clear = () => {
@@ -90,6 +103,7 @@
     animation.onfinish = clear;
     animation.oncancel = clear;
   }
+  const slideUp = (element) => reveal(element, { distance: 48, duration: 380 });
   const clearReveals = () => {
     for (const animation of activeReveals.values()) animation.cancel();
     activeReveals.clear();
@@ -662,6 +676,7 @@
     motion: {
       isReduced,
       reveal,
+      slideUp,
       install: motionControl,
       toggle: () => setMotion(isReduced()),
     },

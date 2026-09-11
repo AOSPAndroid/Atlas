@@ -5,7 +5,7 @@ function setTarget(pc, status = "") {
   if (!pc || pc === S.target) return;
   S.target = pc;
   window.AtlasPsExec?.syncTarget(pc);
-  syncDeploymentPanel();
+  syncDeploymentPanel({ selection: true });
   $("#deployTarget").textContent = pc;
   $("#adminPc").value = pc;
   invalidateProcesses();
@@ -93,6 +93,7 @@ async function loadUser(id, sequence) {
   $("#users").innerHTML = "";
   renderKyc();
   renderMachines();
+  AtlasUI.motion.slideUp($("#kyc"));
 }
 function renderKyc() {
   const u = S.user;

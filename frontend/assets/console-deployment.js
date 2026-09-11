@@ -3,7 +3,7 @@ let packageChoice = null,
   packageBusy = false,
   currentDeployment = null;
 const packageLabels = new Map();
-function syncDeploymentPanel() {
+function syncDeploymentPanel({ selection = false } = {}) {
   const workspace = $("#workspace"),
     panel = $("#deploymentPanel"),
     toggle = $("#deploymentToggle");
@@ -11,13 +11,14 @@ function syncDeploymentPanel() {
   const available = !!S.target && workspace.classList.contains("active"),
     compact = window.matchMedia("(max-width: 760px)").matches;
   if (!available) deploymentExpanded = false;
+  else if (selection) deploymentExpanded = true;
   const wasHidden = panel.hidden;
   workspace.classList.toggle("has-target", !!S.target);
   panel.hidden = !available || (compact && !deploymentExpanded);
   toggle.hidden = !available || !compact;
   toggle.textContent = "Deployment · " + S.target;
   toggle.setAttribute("aria-expanded", String(!panel.hidden));
-  if (!panel.hidden && wasHidden) AtlasUI.motion.reveal(panel);
+  if (!panel.hidden && (wasHidden || selection)) AtlasUI.motion.slideUp(panel);
   if (!available && packageChoice) cancelPackageChoice();
   syncDeploymentProgress();
   refreshConsoleSummary();
