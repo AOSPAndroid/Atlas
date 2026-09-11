@@ -1,5 +1,5 @@
-import { applyFurnitureCorrections } from "./map-furniture.js";
-import { applyMapAmenities } from "./map-amenities.js?v=3";
+import { applyFurnitureCorrections } from "./map-furniture.js?v=2";
+import { applyMapAmenities } from "./map-amenities.js?v=4";
 import { createCameraMotion } from "./camera-motion.js";
 import { installMapCursor } from "./map-cursor.js?v=4";
 const readOnly =
@@ -1570,8 +1570,12 @@ function architecturalMesh() {
       if (r.kind === "lift" || r.kind === "stairs") for (let i = 0; i < r.points.length; i++)
         beam(arr, modelPoint(...r.points[i]), modelPoint(...r.points[(i + 1) % r.points.length]), 0.12, 0.035, [0, 0.52, 0.71, 1], 0.03);
     }
-  for (const points of [...(g.tables || []), ...(g.curvedTables || [])]) {
-    polygonMesh(arr, points, 0.84, [0.67, 0.82, 0.89, 1]);
+  const furniture = [
+    ...[...(g.tables || []), ...(g.curvedTables || [])].map(points => ({ points, height: 0.84 })),
+    ...(g.chairSeats || []).map(points => ({ points, height: 0.44 })),
+  ];
+  for (const { points, height } of furniture) {
+    polygonMesh(arr, points, height, [0.67, 0.82, 0.89, 1]);
     for (let i = 0; i < points.length; i++)
       beam(
         arr,
@@ -1580,14 +1584,14 @@ function architecturalMesh() {
         0.035,
         0.17,
         [0.43, 0.6, 0.69, 1],
-        0.67,
+        height - 0.17,
       );
     const center = points.reduce(
         (a, p) => [a[0] + p[0] / points.length, a[1] + p[1] / points.length],
         [0, 0],
       ),
       p = modelPoint(...center);
-    box(arr, p[0], 0.05, p[2], 0.12, 0.62, 0.12, [0.34, 0.45, 0.52, 1]);
+    box(arr, p[0], 0.05, p[2], 0.12, height - 0.22, 0.12, [0.34, 0.45, 0.52, 1]);
   }
   geometryCache.set(key, arr);
   if (geometryCache.size > 3)
