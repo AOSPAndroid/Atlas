@@ -35,22 +35,34 @@ try {
     "The directory could not load. Refresh to try again.";
   throw Error("Directory unavailable");
 }
-const mapLayers = { walls: true, facilities: true, doors: true };
+let showAmenities = true;
+try { showAmenities = localStorage.getItem("atlas.map.amenities") !== "off"; } catch {}
+const mapLayers = { walls: true, facilities: showAmenities, doors: true };
 const mapColors = {
   lift: [0.7, 0.85, 1, 1],
   wc: [0.76, 0.91, 0.86, 1],
   room: [0.88, 0.83, 0.98, 1],
   stairs: [0.87, 0.9, 0.93, 1],
 };
-const facilityVisible = (r) => r.kind === "lift" && mapLayers.facilities;
+const facilityVisible = (r) => Object.hasOwn(mapColors, r.kind) && mapLayers.facilities;
 const mapPanel = document.createElement("div");
 mapPanel.className = "floor2-layers";
 mapPanel.innerHTML =
-  '<b>LEVEL 02</b><label><input type="checkbox" data-layer="walls" checked> Walls</label><label><input type="checkbox" data-layer="facilities" checked> Elevators</label><label><input type="checkbox" data-layer="doors" checked> Doors</label>';
+  '<b>LEVEL 02</b><label><input type="checkbox" data-layer="walls" checked> Walls</label><label class="amenities-toggle"><input type="checkbox" role="switch" data-layer="facilities" checked> Amenities <span class="amenities-state">On</span></label><label><input type="checkbox" data-layer="doors" checked> Doors</label>';
 document.querySelector("#map-labels").parentElement.append(mapPanel);
+mapPanel.querySelector('[data-layer="facilities"]').checked = showAmenities;
+mapPanel.querySelector('.amenities-state').textContent = showAmenities ? "On" : "Off";
+const amenityOverlay = document.createElement("div");
+amenityOverlay.className = "amenity-labels";
+document.querySelector("#map-labels").parentElement.append(amenityOverlay);
+const amenityNodes = new Map();
 mapPanel.onchange = (e) => {
   if (e.target.dataset.layer) {
     mapLayers[e.target.dataset.layer] = e.target.checked;
+    if (e.target.dataset.layer === "facilities") {
+      mapPanel.querySelector('.amenities-state').textContent = e.target.checked ? "On" : "Off";
+      try { localStorage.setItem("atlas.map.amenities", e.target.checked ? "on" : "off"); } catch {}
+    }
     draw();
   }
 };
@@ -1695,7 +1707,34 @@ function labelNode(id, room = false) {
 }
 const orbitHint =
   "Left-drag to move · Right-drag to rotate / tilt · Scroll to zoom";
+function renderAmenities() {
+  amenityOverlay.hidden = !mapLayers.facilities || view === "source";
+  if (amenityOverlay.hidden) return;
+  const geometry = data.floors.find((f) => f.level === floor).geometry;
+  const amenities = (geometry.wayfinding || []).filter(facilityVisible);
+  const visible = new Set();
+  amenities.forEach((room, i) => {
+    if (!room.points?.length) return;
+    const id = `${floor}:${i}`;
+    visible.add(id);
+    let el = amenityNodes.get(id);
+    if (!el) {
+      el = document.createElement("span");
+      el.className = "amenity-tag";
+      el.textContent = room.kind === "lift" ? "↕ Elevators" : (room.name || { wc: "Toilets", stairs: "Stairs", room: "Room" }[room.kind]);
+      amenityOverlay.append(el);
+      amenityNodes.set(id, el);
+    }
+    const center = room.anchor || room.points.reduce((a, p) => [a[0] + p[0] / room.points.length, a[1] + p[1] / room.points.length], [0, 0]);
+    const pt = projected(modelPoint(center[0], center[1], floor, 0));
+    el.hidden = !pt.every(Number.isFinite) || pt[0] < 45 || pt[0] > canvas.clientWidth - 45 || pt[1] < 20 || pt[1] > canvas.clientHeight - 25;
+    el.style.left = `${pt[0]}px`;
+    el.style.top = `${pt[1]}px`;
+  });
+  for (const [id, el] of amenityNodes) if (!visible.has(id)) { el.remove(); amenityNodes.delete(id); }
+}
 function renderNames() {
+  renderAmenities();
   const start = performance.now();
   applyNameVisibility();
   updateMapLayers();

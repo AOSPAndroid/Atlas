@@ -291,3 +291,14 @@ html[data-atlas-motion="reduce"] .map-tools button:active {
 #viewport :is(button, input):disabled {
   cursor: not-allowed;
 }
+
+/* Amenity tags remain independent of people/name visibility. */
+.amenity-labels { position:absolute; inset:0; pointer-events:none; overflow:hidden; z-index:7; }
+.amenity-labels[hidden], .amenity-tag[hidden] { display:none; }
+.amenity-tag { position:absolute; transform:translate(-50%,-50%); padding:5px 9px; border:1px solid #0084b4; border-radius:8px; background:#f0faff; color:#005b7c; box-shadow:0 2px 6px #14365018; font:600 12px system-ui; white-space:nowrap; }
+.amenities-state { color:#536d7e; font-size:12px; min-width:20px; }
+.floor2-layers .amenities-toggle input { appearance:none; width:30px; height:18px; border-radius:12px; background:#91a6b2; position:relative; cursor:pointer; }
+.floor2-layers .amenities-toggle input::after { content:""; position:absolute; width:12px; height:12px; top:3px; left:3px; border-radius:50%; background:white; }
+.floor2-layers .amenities-toggle input:checked { background:#0084b4; }
+.floor2-layers .amenities-toggle input:checked::after { left:15px; }
+.floor2-layers .amenities-toggle input:focus-visible { outline:2px solid #005b7c; outline-offset:3px; }
