@@ -1,6 +1,5 @@
 """Official plan register, kept separate from reconstructed seating until reviewed."""
-import json,re,sqlite3
-from pathlib import Path
+import json
 from fastapi import Request,HTTPException
 import atlas_store as store
 

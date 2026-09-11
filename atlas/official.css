@@ -37,15 +37,7 @@
     top: 80px;
   }
 }
-.brand b,
-.brandmark {
-  font-family:
-    system-ui,
-    -apple-system,
-    "Segoe UI",
-    Arial,
-    sans-serif;
-}
+
 .header-right .atlas-return {
   font-size: 12px;
   text-decoration: none;
@@ -101,17 +93,7 @@ label:has(input[name="angle"]),
 }
 
 /* Atlas control family: identical action shapes, explicit boolean switches. */
-.atlas-wordmark {
-  font:
-    700 28px/1.15 system-ui,
-    -apple-system,
-    "Segoe UI",
-    sans-serif !important;
-  letter-spacing: -1px;
-  color: #123e54 !important;
-  text-decoration: none;
-  gap: 0 !important;
-}
+
 button,
 .header-right a,
 .ops-header-link,
@@ -205,8 +187,7 @@ header button:hover,
   box-shadow: 0 3px 12px #14365018;
   font: 13px system-ui;
 }
-.floor2-layers[hidden],
-.floor2-labels[hidden] {
+.floor2-layers[hidden] {
   display: none;
 }
 .floor2-layers label {
@@ -214,40 +195,7 @@ header button:hover,
   align-items: center;
   gap: 5px;
 }
-.floor2-labels {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 9;
-  overflow: hidden;
-}
-.facility-label {
-  position: absolute;
-  transform: translate(-50%, -50%);
-  padding: 5px 8px;
-  border: 1px solid #526b7c;
-  border-radius: 6px;
-  background: #fff;
-  color: #173344;
-  font: 600 12px system-ui;
-  white-space: nowrap;
-  box-shadow: 0 2px 5px #102e4320;
-}
-.facility-label.lift {
-  background: #e1efff;
-  border-color: #2565a0;
-  color: #174c80;
-}
-.facility-label.wc {
-  background: #e0f5eb;
-  border-color: #277555;
-  color: #145c3d;
-}
-.facility-label.room {
-  background: #efe7ff;
-  border-color: #725399;
-  color: #573775;
-}
+
 @media (max-width: 600px) {
   .floor2-layers {
     left: 8px;
@@ -255,10 +203,6 @@ header button:hover,
     bottom: 8px;
     gap: 8px;
     font-size: 12px;
-  }
-  .facility-label {
-    font-size: 11px;
-    padding: 3px 5px;
   }
 }
 

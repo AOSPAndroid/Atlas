@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+"""Read directory workbooks and build validated import candidates."""
 import argparse, os, re, shutil, sqlite3, zipfile, uuid
 from identity_links import rebuild_links
 import xml.etree.ElementTree as ET
@@ -7,8 +8,6 @@ from pathlib import Path
 
 NS='{http://schemas.openxmlformats.org/spreadsheetml/2006/main}'
 REL='{http://schemas.openxmlformats.org/officeDocument/2006/relationships}'
-# Compatibility name for older import callers; entries are scoped below.
-SS_CACHE={}
 from contextvars import ContextVar
 from functools import wraps
 _STRINGS=ContextVar('atlas_workbook_strings',default=None)
@@ -81,14 +80,6 @@ def schema(c):
     create view user_machine_links as select u.canonical_key,u.user_id as login_id,u.employee_number as brid,u.email,u.full_name,m.machine_name,a.relationship_type from assignments a join users u on u.id=a.user_id_ref join machines m on m.id=a.machine_id;
     ''')
 
-def name_keys(v):
-    s=norm(v).replace(',', ' ')
-    s=re.sub(r'[^a-z0-9 ]+',' ',s);s=re.sub(r'\s+',' ',s).strip()
-    keys={s}
-    parts=s.split()
-    if len(parts)>=2:keys.add(' '.join(parts[1:]+parts[:1]))
-    return {x for x in keys if x}
-
 def normalise_vendor(v):
     x=clean(v);low=x.lower()
     if low.startswith('dell'):return 'Dell Inc.'
@@ -101,7 +92,6 @@ def normalise_vendor(v):
 def build(src,out):
     src=Path(src);out=Path(out);candidate=out.with_name(out.stem+'_'+uuid.uuid4().hex+'_new.db')
     if candidate.exists():candidate.unlink()
-    SS_CACHE.clear()
     c=sqlite3.connect(candidate)
     try:
         schema(c)
@@ -121,7 +111,6 @@ def build(src,out):
             key=('uid:'+norm(uid)) if uid else ('email:'+norm(email)) if email else ('name:'+norm(name))
             vals=(key,uid,norm(uid),name,norm(name),email,norm(email),d.get('organisational_unit',''),d.get('business_unit',''),excel_date(d.get('start_date','')),d.get('manager',''),d.get('location',''),excel_date(d.get('last_login','')),d.get('job_role',''),d.get('job_type',''),d.get('employee_number',''),d.get('department',''),d.get('last_login_time',''))
             c.execute('insert into users(canonical_key,user_id,user_id_norm,full_name,full_name_norm,email,email_norm,organisational_unit,business_unit,start_date,manager,location,last_login,job_role,job_type,employee_number,department,last_login_time) values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) on conflict(canonical_key) do update set user_id=excluded.user_id,user_id_norm=excluded.user_id_norm,full_name=excluded.full_name,full_name_norm=excluded.full_name_norm,email=excluded.email,email_norm=excluded.email_norm,organisational_unit=excluded.organisational_unit,business_unit=excluded.business_unit,start_date=excluded.start_date,manager=excluded.manager,location=excluded.location,last_login=excluded.last_login,job_role=excluded.job_role,job_type=excluded.job_type,employee_number=excluded.employee_number,department=excluded.department,last_login_time=excluded.last_login_time',vals)
-            ref=c.execute('select id from users where canonical_key=?',(key,)).fetchone()[0]
             user_count+=1
             if user_count%5000==0:c.commit()
         c.commit()
@@ -143,7 +132,6 @@ def build(src,out):
             if not name:continue
             values=(name,norm(name),d.get('u_infrastructure_itsi',''),d.get('sys_class_name',''),d.get('operational_status',''),d.get('u_barclays_correlation_id','').upper(),re.sub(r'\s+',' ',d.get('serial_number','')).strip(),normalise_vendor(d.get('manufacturer','')),re.sub(r'\s+',' ',d.get('model_id','')).strip(),d.get('short_description',''),excel_date(d.get('sys_updated_on','')),excel_date(d.get('last_discovered','')),d.get('discovery_source',''),d.get('assigned_to',''),d.get('u_last_logon_user',''))
             c.execute('insert or replace into machines(machine_name,machine_name_norm,infrastructure_itsi,sys_class_name,operational_status,correlation_id,serial_number,manufacturer,model_id,short_description,updated_on,last_discovered,discovery_source,assigned_to,last_logon_user) values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',values)
-            mid=c.execute('select id from machines where machine_name_norm=?',(norm(name),)).fetchone()[0]
             machine_count+=1
             if machine_count%5000==0:c.commit()
         links=rebuild_links(c)

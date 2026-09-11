@@ -15,12 +15,13 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from directory_lookup import exact_users, linked_machines, search_directory, prepare_views
 from desk_directory import desk_context,person_desks,machine_context,palette_search
 import directory_exports
+from backend import __version__
 
 ROOT = Path(__file__).resolve().parent.parent
 from runtime_paths import database_path
 DB = database_path()
 ATLAS = ROOT / 'atlas'
-app = FastAPI(title='Atlas read-only viewer', docs_url=None, redoc_url=None, openapi_url=None)
+app = FastAPI(title='Atlas read-only viewer', version=__version__, docs_url=None, redoc_url=None, openapi_url=None)
 
 
 @contextmanager
@@ -50,7 +51,7 @@ async def read_only(request: Request, call_next):
 def health():
     with connect() as con:
         con.execute('select body from official_records limit 1').fetchone()
-    return {'application': 'Office Atlas', 'mode': 'viewer', 'version': '6.9.2', 'read_only': True, 'instance_id': os.environ.get('ATLAS_INSTANCE_ID')}
+    return {'application': 'Office Atlas', 'mode': 'viewer', 'version': __version__, 'read_only': True, 'instance_id': os.environ.get('ATLAS_INSTANCE_ID')}
 
 
 @app.get('/api/capabilities')

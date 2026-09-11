@@ -1,4 +1,4 @@
-# Atlas 6.9.2
+# Atlas 6.9.5
 
 **One workspace to find people, locate equipment and get IT work done.**
 
@@ -110,7 +110,7 @@ The included export supplies **14 person columns and 14 machine columns**. All a
 
 Open **User details → All export fields**, or **Machine details → All export fields**, to inspect, filter and copy every field for that record. Original column headings, empty values and zero values remain inspectable. When an original value differs from Atlas's formatted or normalized value, both are shown. Fields are fetched only when this inspector opens, so ordinary searches and map animations do not download the source archive.
 
-**User details** groups useful information into Organisation and Account activity. It shows the most precise recorded login, removes duplicate account/date values and omits empty legacy DaaS fields. **Find manager**, **Same department** and **Same office** open a prefilled search in the shared palette; your current person remains selected until you choose a result. These shortcuts and the grouped details work in the console, map and demo. The console retains its domain-account display and copy action.
+**User details** groups useful information into Organisation and Account activity. It shows the most precise recorded login, removes duplicate account/date values and omits empty fields. **Find manager**, **Same department** and **Same office** open a prefilled search in the shared palette; your current person remains selected until you choose a result. These shortcuts and the grouped details work in the console, map and demo. The console retains its domain-account display and copy action.
 
 **Domain account** follows the confirmed Windows-login convention: an exported `G` followed entirely by digits uses `x` with the same digits for its login (for example, `G00123456` → `INTRANET\x00123456`). Other usernames and existing domain prefixes are preserved. The console, map and demo show the same derived login; console copies and support reports use it too. Searches accept either the original G identifier or the X login, including domain-qualified logins. The imported Account, Employee ID, original export values and stored relationships remain unchanged. If separate G and X records exist, Atlas asks you to select a result.
 
@@ -142,7 +142,7 @@ Leave `package_repository` blank in `config.json` (as in `config.example.json`),
 
 The database and floor plans were already part of this private repository's embedded package and are now ordinary files. Keep the repository private. The launcher copies the distributed `office_atlas.db` seed into ignored `data/office_atlas.db` once, preserving existing records with SQLite backup. Subsequent launches keep that runtime database. Stop both servers and back up `data/office_atlas.db` before updating; preserve the `data` directory and `config.json` when moving to a fresh checkout. Set `ATLAS_DB_PATH` to use another existing Atlas database. Direct backend development uses the runtime database if present, otherwise the root seed. Use the admin database manager for supported directory refreshes.
 
-See [README.txt](README.txt) for the existing IT operations and import documentation.
+See [IT operations and imports](docs/operations.md) for deployment modes, software repair/uninstall, directory replacement, seating Excel sync and backup workflows.
 
 ## Development
 
@@ -157,6 +157,13 @@ py -3.12 launcher.py stop
 `backend/main.py` hosts admin routes; `backend/viewer.py` hosts shared read routes; `directory_lookup.py` shares database-only lookup queries; `atlas/official-app.js` renders the common map; `atlas/viewer.js` provides read-only user and machine inspection.
 
 The test runner uses disposable database copies, starts isolated UI fixtures on ports 8892/8893, and runs the Python regressions plus eighteen Node DOM suites. Remote operations are simulated. `npm run format:check` verifies formatting of the maintained browser sources.
+
+The source tree also retains inputs and maintenance tools that are needed to reproduce or import data:
+
+- `directory_workbook.py` provides the workbook parser and schema used by directory imports, seating sync and desk moves.
+- `database040926.xlsx`, `atlas/data.json` and `atlas/visual-seating-matches.json` support the initial directory and previous-seating migration. The Excel templates remain available from Manage Database.
+- `tools/build_official_3d.py` extracts geometry into `atlas/official-data.json`; `tools/build_studio_plans.py` generates the current `atlas/studio-floor-*.svg` backgrounds from the retained official PDFs. These optional build tools require PyMuPDF and rewrite their outputs; normal startup does not run them.
+- `scripts/serve_documentation_preview.py` generates the fictional map used for the [documentation screenshots](docs/images/README.md).
 
 ## Optimization changes
 

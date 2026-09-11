@@ -1,5 +1,5 @@
 """Atlas desk register, directory resolution and deployment orchestration."""
-import json,re,secrets,sqlite3,tempfile,threading,uuid,unicodedata
+import json,re,secrets,sqlite3,tempfile,uuid
 from datetime import datetime,timezone
 from pathlib import Path
 from fastapi import HTTPException,Request
@@ -7,7 +7,7 @@ from starlette.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse,Response,JSONResponse
 import atlas_store as store
 from merge_data import atlas_schema,import_atlas
-from desk_directory import name_key,resolve_person,desk_context as shared_context,person_desks
+from desk_directory import resolve_person,desk_context as shared_context,person_desks
 TOKEN=secrets.token_urlsafe(32)
 
 def now():return datetime.now(timezone.utc).isoformat()
@@ -306,7 +306,7 @@ def register_atlas(app):
 
  @app.get('/{filename}')
  def atlas_asset(filename:str):
-  allowed={'command-registry.js','command-palette.js','command-palette.css','catalogue.js','official-app.js','camera-motion.js','map-cursor.js','official-data.json','official.css','style.css','data.json','operations.js','operations.css'}|{'floor-'+str(n)+'.jpg' for n in range(2,8)}
+  allowed={'command-registry.js','command-palette.js','command-palette.css','catalogue.js','official-app.js','camera-motion.js','map-cursor.js','official-data.json','official.css','style.css','data.json','operations.js','operations.css'}
   allowed|={'official-floor-'+str(n)+ext for n in range(-1,9) for ext in ('.jpg','.pdf')}
   allowed|={'studio-floor-'+str(n)+'.svg' for n in range(-1,9)}
   if filename not in allowed:raise HTTPException(404,'Not found')

@@ -1,6 +1,7 @@
 """Compare an Excel seating snapshot with live desks before an atomic import."""
-import hashlib, io, json, re, sqlite3, tempfile, time, uuid, zipfile
+import hashlib, io, json, sqlite3, tempfile, time, uuid, zipfile
 from collections import defaultdict
+from contextlib import closing
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import unquote
@@ -10,7 +11,7 @@ from fastapi.responses import Response
 from starlette.concurrency import run_in_threadpool
 import atlas_store as store
 from desk_moves import snapshot
-from Build_MasterDB_From_database040926 import workbook_parts, iter_rows, canonical_header, SS_CACHE
+from directory_workbook import workbook_parts, iter_rows, canonical_header
 from identity_links import key, identifier
 from atlas_store import ClosingConnection
 
@@ -44,8 +45,8 @@ def read_sheet(path):
         xml = ET.fromstring(z.read(choices[0][1]))
         if xml.find('.//'+NS+'f') is not None: raise ValueError('Use plain values, not formulas, in the seating worksheet.')
         if any(c.get('t')=='e' for c in xml.iter(NS+'c')): raise ValueError('Correct Excel error cells before importing.')
-    try:
-        it=iter_rows(path,choices[0][1]); _, header=next(it)
+    with closing(iter_rows(path,choices[0][1])) as it:
+        _, header=next(it)
         mapped=[ALIASES.get(canonical_header(h)) for h in header]
         known=[h for h in mapped if h]
         if len(known)!=len(set(known)): raise ValueError('Two columns map to the same field. Keep one Desk ID, Name, Team, Account and Status column.')
@@ -58,8 +59,6 @@ def read_sheet(path):
             row['_row']=number; rows.append(row)
         if not rows: raise ValueError('Empty sheet refused. Use explicit vacant rows to clear desks.')
         return rows
-    finally:
-        SS_CACHE.pop(str(path),None)
 
 def account_index(c):
     index=defaultdict(set); users={}

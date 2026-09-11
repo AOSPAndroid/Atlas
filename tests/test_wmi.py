@@ -44,12 +44,30 @@ class Regression(unittest.TestCase):
   self.assertTrue(self.client.get('/api/search',params={'term':self.user['full_name'][:4]}).json()['users'])
   for q in ['','%','not-present-unique-938291']:
    r=self.client.get('/api/search',params={'term':q});self.assertEqual(r.status_code,200);self.assertFalse(r.json()['users'])
- def test_daas_reverse_master_routes(self):
+ def test_current_directory_and_master_routes(self):
   from urllib.parse import quote
-  paths=['/api/health','/api/master/status','/api/daas/status','/api/database-freshness','/api/master/resolve/'+quote(self.user['user_id']),'/api/master/resolve/'+quote(self.machine),'/api/daas/user/'+quote(self.user['email']),'/api/daas/machine/'+quote(self.machine),'/api/v2814/reverse/'+quote(self.machine)]
+  paths=['/api/health','/api/master/status','/api/database-freshness','/api/master/resolve/'+quote(self.user['user_id']),'/api/master/resolve/'+quote(self.machine)]
   for path in paths:
    r=self.client.get(path);self.assertEqual(r.status_code,200);self.assertNotIn('error',r.json())
-  r=self.client.post('/api/daas/machines',json={'computers':[self.machine]});self.assertEqual(r.status_code,200)
+  person=self.client.get('/api/user/id:'+str(self.user['id'])).json()
+  self.assertEqual(person['user']['canonical_key'],self.user['canonical_key'])
+  self.assertEqual(person['user']['full_name'],self.user['full_name'])
+  self.assertTrue(person['machines']);self.assertIn('match_type',person['machines'][0])
+  machine=self.client.get('/api/search',params={'term':'machine:'+self.machine}).json()['machines'][0]
+  self.assertEqual(machine['machine_name'],self.machine)
+  for field in ('model_id','serial_number','operational_status'):self.assertIn(field,machine)
+ def test_retired_duplicate_directory_routes_are_unregistered(self):
+  self.assertFalse(any(getattr(route,'path','').startswith(('/api/daas/','/api/v2814/')) for route in app.app.routes))
+  with patch.object(app,'db') as db,patch.object(app,'ps') as powershell:
+   for path in ('/api/daas/status','/api/daas/user/example','/api/daas/machine/TESTPC','/api/v2814/reverse/TESTPC'):
+    self.assertEqual(self.client.get(path).status_code,404)
+   self.assertEqual(self.client.post('/api/daas/machines',json={'computers':['TESTPC']}).status_code,404)
+   db.assert_not_called();powershell.assert_not_called()
+ def test_previous_map_bookmark_redirects_without_retired_image_routes(self):
+  response=self.client.get('/legacy-atlas',follow_redirects=False)
+  self.assertEqual(response.status_code,307);self.assertEqual(response.headers['location'],'/')
+  self.assertEqual(self.client.get('/legacy-atlas').status_code,200)
+  for floor in range(2,8):self.assertEqual(self.client.get('/floor-'+str(floor)+'.jpg').status_code,404)
  def test_identity_ambiguity_never_guessed(self):
   c=sqlite3.connect(':memory:')
   c.executescript('create table users(id,user_id,email,employee_number,full_name);create table user_aliases(user_id_ref,alias_norm,alias_type);')

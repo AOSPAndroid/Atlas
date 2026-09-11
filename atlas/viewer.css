@@ -58,19 +58,6 @@
   overflow-wrap: anywhere;
 }
 
-.viewer-facts {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 10px 18px;
-  margin: 12px 0;
-}
-.viewer-facts dt {
-  margin-top: 0 !important;
-}
-.viewer-facts dd {
-  margin-left: 0;
-  overflow-wrap: anywhere;
-}
 .viewer-desk-links {
   display: flex;
   flex-wrap: wrap;

@@ -1,40 +1,33 @@
 from __future__ import annotations
 from datetime import datetime
-import base64, csv, io, json, logging, os, re, shutil, sqlite3, subprocess, threading, time, uuid
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import base64, json, logging, os, re, shutil, sqlite3, subprocess, threading, time, uuid
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Any, Literal
+from typing import Literal
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, StreamingResponse, JSONResponse, HTMLResponse
+from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+from backend import __version__
 from directory_lookup import exact_users, linked_machines, search_directory, prepare_views
 
 ROOT=Path(__file__).resolve().parent.parent
-# V309_PATHS_START
 WEB=ROOT/'frontend'
-FRONTEND=WEB
-ASSETS=WEB/'assets'
 LOGS=ROOT/'logs'
 DATA=ROOT/'data'
 from runtime_paths import database_path
 MASTER_DB=database_path()
 DB=MASTER_DB
-DAAS_DB=MASTER_DB
 HISTORY_DB=MASTER_DB
 LOGS.mkdir(parents=True,exist_ok=True)
 DATA.mkdir(parents=True,exist_ok=True)
-# V309_PATHS_END
-
-# V308_BOOTSTRAP_START
-# V308_BOOTSTRAP_END
 
 CONFIG=json.loads((ROOT/'config.json').read_text(encoding='utf-8')) if (ROOT/'config.json').exists() else {}
 from package_paths import package_repository
 REPO=package_repository(CONFIG,ROOT)
 REMOTE_ROOT=r'C:\Temp\Packages'; NW=0x08000000 if os.name=='nt' else 0
 logging.basicConfig(filename=LOGS/'application.log',level=logging.INFO,format='%(asctime)s %(levelname)s %(message)s')
-app=FastAPI(title='WMI Packager Web v2',docs_url='/api/docs',redoc_url=None)
+app=FastAPI(title='Office Atlas',version=__version__,docs_url='/api/docs',redoc_url=None)
 from job_service import JobService, TERMINAL
 job_service=JobService(lambda:HISTORY_DB)
 jobs=job_service.jobs;lock=job_service.lock
@@ -42,11 +35,6 @@ jobs=job_service.jobs;lock=job_service.lock
 def recover_operations():job_service.recover()
 NAME_RE=re.compile(r'^[A-Za-z0-9_.-]{1,64}$')
 
-def norm(v):
- s=str(v or '').strip().lower()
- if '\\' in s:s=s.rsplit('\\',1)[-1]
- if '@' in s:s=s.split('@',1)[0]
- return s
 def validate_pc(pc):
  pc=pc.strip().upper()
  if not NAME_RE.fullmatch(pc) or pc.startswith(('-', '.')) or '..' in pc:raise HTTPException(400,'Invalid computer name')
@@ -60,8 +48,6 @@ def run(args,check=True,timeout=120):
 def ps(script,timeout=120):
  encoded=base64.b64encode(script.encode('utf-16le')).decode('ascii')
  return run(['powershell.exe','-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-EncodedCommand',encoded],timeout=timeout).stdout.strip()
-def source_db():
- return db()
 def hist_db():
  c=sqlite3.connect(HISTORY_DB,timeout=20,factory=ClosingConnection);c.row_factory=sqlite3.Row
  c.execute('''create table if not exists deployments(id text primary key,started text,finished text,operator text,target text,package text,action text,script text,mode text,state text,robocopy_code text,pid text,exit_code text,details text)''');c.commit();return c
@@ -133,8 +119,6 @@ class Deploy(BaseModel):computer:str;folder:str;script:str;action:Literal['Insta
 class Bulk(BaseModel):computers:list[str]=Field(min_length=1,max_length=200);folder:str;script:str;action:Literal['Install','Uninstall','Repair']='Install';fresh:bool=False;threads:int=Field(8,ge=1,le=128);concurrency:int=Field(5,ge=1,le=10)
 class Kill(BaseModel):computer:str;value:str;created:str|None=None;name:str|None=None
 class Machine(BaseModel):computer:str
-class DaaSMachineBatch(BaseModel):
- computers:list[str]
 class QueueItem(BaseModel):
  computer:str;folder:str;script:str;action:Literal['Install','Uninstall','Repair']='Install';fresh:bool=False;threads:int=Field(8,ge=1,le=128);mode:Literal['full','copy','execute']='full'
 class QueueRequest(BaseModel):
@@ -223,16 +207,6 @@ def db():
  prepare_views(c)
  return c
 
-def daas_db():
- c=db()
- c.executescript("""
- create temp view daas_users as select *,id as user_key,id as source_row,lower(employee_number) as brid_norm,department as team,organisational_unit as organisation_unit,job_role as employee_job_description,'' as persona,'' as corporate_grade,'' as ba2,'' as ba3,'' as ba4,'' as ba5,'' as ba6,'' as leaver,'' as out_of_office from legacy_users;
- create temp view daas_devices as select *,id as device_key,operational_status as device_online,correlation_id as asset_number,last_logon_user as last_user,'' as data_centre,'' as hall,'' as cabinet,'' as shelf,'' as slot,'' as registered_status,'' as maintenance_mode,'' as hard_drive_capacity,'' as remaining_disk_space,'' as os_version,'' as cpu_model,'' as ema_status,'' as notes from legacy_machines;
- create temp view daas_assignments as select a.*,a.id as source_row,u.id as user_key,u.user_id as login_id,u.user_id_norm as login_norm,m.machine_name,m.machine_name_norm,'' as last_connected from main.assignments a join main.users u on u.id=a.user_id_ref join main.machines m on m.id=a.machine_id;
- create temp view daas_records as select *,id as source_row from daas_devices;
- """)
- return c
-
 @app.middleware('http')
 async def local_only(request:Request,call_next):
  if request.client and request.client.host not in ('127.0.0.1','::1'):
@@ -251,8 +225,8 @@ async def local_only(request:Request,call_next):
 def health():
  u=m=0
  if DB.exists():
-  with source_db() as c:u=c.execute('select count(*) from users').fetchone()[0];m=c.execute('select count(*) from machines').fetchone()[0]
- return {'identity':identity(),'users':u,'machines':m,'database':DB.exists(),'repository':REPO.is_dir(),'application':'Office Atlas','mode':'admin','version':'6.9.2','instance_id':os.environ.get('ATLAS_INSTANCE_ID'),'instance_root':str(ROOT)}
+  with db() as c:u=c.execute('select count(*) from users').fetchone()[0];m=c.execute('select count(*) from machines').fetchone()[0]
+ return {'identity':identity(),'users':u,'machines':m,'database':DB.exists(),'repository':REPO.is_dir(),'application':'Office Atlas','mode':'admin','version':__version__,'instance_id':os.environ.get('ATLAS_INSTANCE_ID'),'instance_root':str(ROOT)}
 
 
 
@@ -534,67 +508,6 @@ def database_freshness():
     db=DB
     return {'database_exists':db.exists(),'excel_exists':excel.exists(),'database_modified':datetime.fromtimestamp(db.stat().st_mtime).isoformat(sep=' ',timespec='seconds') if db.exists() else '', 'excel_modified':datetime.fromtimestamp(excel.stat().st_mtime).isoformat(sep=' ',timespec='seconds') if excel.exists() else '', 'excel_newer':bool(excel.exists() and db.exists() and excel.stat().st_mtime>db.stat().st_mtime), 'database_size':db.stat().st_size if db.exists() else 0}
 
-@app.get('/api/daas/status')
-def daas_status():
-    result={'available':DAAS_DB.exists(),'path':str(DAAS_DB),'devices':0,'users':0,'assignments':0,'imported_at':''}
-    if not DAAS_DB.exists():return result
-    try:
-        with daas_db() as c:
-            result['devices']=c.execute('select count(*) from daas_devices').fetchone()[0]
-            result['users']=c.execute('select count(*) from daas_users').fetchone()[0]
-            result['assignments']=c.execute('select count(*) from daas_assignments').fetchone()[0]
-            row=c.execute("select value from metadata where key='imported_at'").fetchone()
-            result['imported_at']=row[0] if row else ''
-    except Exception as exc:result.update(available=False,error=str(exc))
-    return result
-
-@app.get('/api/daas/machine/{computer}')
-def daas_machine(computer:str):
-    machine=validate_pc(computer).lower()
-    if not DAAS_DB.exists():return {'available':False,'matched':False,'device':None,'assignments':[]}
-    with daas_db() as c:
-        device=c.execute('select * from daas_devices where machine_name_norm=?',(machine,)).fetchone()
-        assignments=c.execute("select a.*,u.brid,u.login_id,u.full_name,u.email,u.team,u.persona,u.organisation_unit,u.corporate_grade,u.employee_job_description,u.ba2,u.ba3,u.ba4,u.ba5,u.ba6,u.leaver,u.out_of_office from daas_assignments a left join daas_users u on u.user_key=a.user_key where a.machine_name_norm=? order by a.last_connected desc",(machine,)).fetchall()
-    return {'available':True,'matched':bool(device),'device':dict(device) if device else None,'assignments':[dict(x) for x in assignments]}
-
-@app.get('/api/daas/user/{user_value}')
-def daas_user(user_value:str):
-    raw=user_value.strip();login=norm(raw);email=raw.lower()
-    if not DAAS_DB.exists():return {'available':False,'matched':False,'users':[],'assignments':[],'devices':[]}
-    with daas_db() as c:
-        resolved=c.execute('select * from legacy_users where id=?',(int(raw[3:]),)).fetchall() if raw.startswith('id:') and raw[3:].isdigit() else exact_users(c,raw)
-        ids=[u['id'] for u in resolved]
-        users=c.execute('select * from daas_users where user_key in ('+','.join('?' for _ in ids)+')',ids).fetchall() if ids else []
-        keys=[r['user_key'] for r in users]
-        assignments=[];devices=[]
-        if keys:
-            marks=','.join('?' for _ in keys)
-            assignments=c.execute(f'select * from daas_assignments where user_key in ({marks}) order by last_connected desc',keys).fetchall()
-            machines=list(dict.fromkeys(r['machine_name_norm'] for r in assignments if r['machine_name_norm']))
-            if machines:
-                mm=','.join('?' for _ in machines)
-                devices=c.execute(f'select * from daas_devices where machine_name_norm in ({mm}) order by machine_name',machines).fetchall()
-    return {'available':True,'matched':bool(users),'users':[dict(x) for x in users],'assignments':[dict(x) for x in assignments],'devices':[dict(x) for x in devices]}
-
-
-
-@app.post('/api/daas/machines')
-def daas_machines_batch(request:DaaSMachineBatch):
-    names=list(dict.fromkeys(validate_pc(x).lower() for x in request.computers if x.strip()))[:200]
-    output={name:{'matched':False,'device':None,'assignments':[]} for name in names}
-    if not names or not DAAS_DB.exists():return {'available':DAAS_DB.exists(),'machines':output}
-    marks=','.join('?' for _ in names)
-    with daas_db() as c:
-        devices=c.execute(f'select * from daas_devices where machine_name_norm in ({marks})',names).fetchall()
-        assignments=c.execute(f"select a.*,u.brid,u.login_id,u.full_name,u.email,u.team,u.persona,u.organisation_unit,u.corporate_grade,u.employee_job_description,u.ba2,u.ba3,u.ba4,u.ba5,u.ba6,u.leaver,u.out_of_office from daas_assignments a left join daas_users u on u.user_key=a.user_key where a.machine_name_norm in ({marks}) order by a.last_connected desc",names).fetchall()
-    for row in devices:
-        name=row['machine_name_norm'];output[name]['matched']=True;output[name]['device']=dict(row)
-    for row in assignments:
-        output[row['machine_name_norm']]['assignments'].append(dict(row))
-    return {'available':True,'machines':output}
-
-
-
 @app.get('/api/deployments/active')
 def active_deployments():
     active_states={'queued','running','launched','monitoring','paused'}
@@ -636,19 +549,6 @@ def recent_deployments():
             'last_message':events[-1].get('message','') if events else ''
         })
     return {'deployments':result}
-
-
-
-@app.get('/api/v2814/reverse/{computer}')
-def v2814_reverse_machine_lookup(computer:str):
- computer=validate_pc(computer)
- with db() as c:
-  m=c.execute('select * from legacy_machines where name_norm=?',(computer.lower(),)).fetchone()
-  if not m:return {'matched':False,'computer':computer,'reason':'machine_not_found'}
-  rows=c.execute('select distinct u.* from assignments a join legacy_users u on u.id=a.user_id_ref where a.machine_id=? order by u.id',(m['id'],)).fetchall()
-  result={'matched':True,'computer':computer,'machine':dict(m),'user_found':len(rows)==1,'ambiguous':len(rows)>1,'candidates':[r['user_name'] or r['name'] for r in rows]}
-  if len(rows)==1:result.update(user=dict(rows[0]),search_value=rows[0]['user_name'] or rows[0]['email'] or rows[0]['name'],matched_by='MasterDB relationship')
-  return result
 
 
 

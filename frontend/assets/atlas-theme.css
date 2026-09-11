@@ -116,40 +116,7 @@ body > aside:first-of-type {
   flex-direction: column;
   gap: 24px;
 }
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 0 8px;
-}
-.brand-mark {
-  display: grid;
-  place-items: center;
-  width: 38px;
-  height: 42px;
-  color: var(--accent);
-  background: #e9f5fa;
-  border: 1px solid #cbe4ef;
-  border-radius: 10px;
-  font:
-    24px Georgia,
-    serif;
-}
-.brand-copy {
-  display: flex;
-  flex-direction: column;
-}
-.brand-copy b {
-  font:
-    20px Georgia,
-    serif;
-  letter-spacing: -0.5px;
-}
-.brand-copy small {
-  font-size: 9px;
-  letter-spacing: 2px;
-  margin-top: 3px;
-}
+
 .nav-section {
   font-size: 10px;
   text-transform: uppercase;
@@ -183,9 +150,7 @@ nav button.active {
 .nav-label {
   display: block;
 }
-.dock-dot {
-  display: none;
-}
+
 .sidebar-status {
   margin-top: auto;
   padding: 16px 10px 0;
@@ -198,7 +163,6 @@ nav button.active {
   color: var(--muted);
 }
 #dbFreshness,
-#daasStatus,
 #masterDbStatus {
   font-size: 10px;
   color: var(--muted);
@@ -208,9 +172,7 @@ nav button.active {
 #masterDbStatus span {
   display: block;
 }
-#daasStatus {
-  display: none;
-}
+
 main {
   min-width: 0;
   width: 100%;
@@ -265,9 +227,7 @@ header p {
   background: white;
   font-size: 12px;
 }
-#themeToggle {
-  display: none;
-}
+
 small,
 .eyebrow,
 .section-label {
@@ -301,18 +261,7 @@ small,
   font-size: 15px;
   margin: 0;
 }
-.step-number {
-  display: inline-grid;
-  place-items: center;
-  border: 1px solid #bcdde9;
-  background: #ecf7fb;
-  color: var(--accent);
-  border-radius: 50%;
-  width: 23px;
-  height: 23px;
-  font: 11px Consolas;
-  margin-right: 8px;
-}
+
 .panel,
 .card {
   background: white;
@@ -335,11 +284,7 @@ small,
   margin: 6px 0 16px;
   overflow-wrap: anywhere;
 }
-.panel-description {
-  font-size: 12px;
-  color: var(--muted);
-  margin: 0 0 18px;
-}
+
 .searchbox {
   position: relative;
 }
@@ -369,14 +314,7 @@ kbd {
   top: 15px;
   pointer-events: none;
 }
-.search-leading-icon {
-  display: none;
-}
-.search-help {
-  font-size: 11px;
-  color: var(--muted);
-  margin: 8px 2px 16px;
-}
+
 .lookup-empty {
   margin: 22px 0;
   padding: 32px 22px;
@@ -508,8 +446,7 @@ kbd {
 .facts span {
   min-width: 90px;
 }
-.facts b,
-.detailgrid b {
+.facts b {
   display: block;
   font-size: 12px;
   font-weight: 600;
@@ -640,16 +577,7 @@ summary {
   font-size: 11px;
   padding: 6px 0;
 }
-.detailgrid,
-.daas-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  font-size: 11px;
-}
-.detailgrid span {
-  color: var(--muted);
-}
+
 .grid,
 .grid2 {
   display: grid;
@@ -733,17 +661,14 @@ pre {
 }
 .status-ok,
 .good,
-.check.ok,
-.counter-ok {
+.check.ok {
   color: var(--green);
 }
 .status-bad,
-.bad,
-.counter-bad {
+.bad {
   color: var(--red);
 }
-.status-warn,
-.counter-warn {
+.status-warn {
   color: var(--status-yellow);
 }
 .status-neutral,
@@ -927,7 +852,6 @@ tbody tr:hover {
 .deployments-toggle.has-active {
   border-color: var(--green);
 }
-.command-overlay,
 .shortcut-help {
   position: fixed;
   inset: 0;
@@ -937,7 +861,6 @@ tbody tr:hover {
   padding-top: 12vh;
   background: #17334666;
 }
-.command-box,
 .shortcut-help-box {
   background: white;
   border: 1px solid var(--line);
@@ -948,10 +871,7 @@ tbody tr:hover {
   overflow: auto;
   box-shadow: 0 20px 70px #17334630;
 }
-.command-box input {
-  width: 100%;
-}
-#commandList button,
+
 .shortcut-help-list button {
   display: flex;
   justify-content: space-between;
@@ -1400,10 +1320,8 @@ tbody tr:hover {
   z-index: 250;
   max-width: 85vw;
 }
-.switch-visual {
-  display: none;
-}
-.switch-input {
+
+input[type="checkbox"] {
   position: static;
   opacity: 1;
   width: 16px;
@@ -1448,12 +1366,7 @@ tbody tr:hover {
     border-right: 0;
     border-bottom: 1px solid var(--line);
   }
-  .brand {
-    padding: 0;
-  }
-  .brand-copy b {
-    font-size: 19px;
-  }
+
   .sidebar-status,
   .nav-section {
     display: none;
@@ -1528,9 +1441,6 @@ tbody tr:hover {
   .deployments-toggle {
     right: 140px;
   }
-  .detailgrid {
-    grid-template-columns: 1fr;
-  }
 }
 
 /* Unified modern typography; no external font downloads. */
@@ -1547,15 +1457,7 @@ body {
   font-size: 14px;
   line-height: 1.55;
 }
-.brand-copy b {
-  font: 650 20px/1.25 var(--font-ui);
-  letter-spacing: -0.6px;
-}
-.brand-mark {
-  font: 700 23px var(--font-ui);
-  height: 38px;
-  border-radius: 12px;
-}
+
 h1 {
   font: 650 30px/1.2 var(--font-ui);
   letter-spacing: -0.8px;
@@ -1566,8 +1468,7 @@ h3 {
   letter-spacing: -0.3px;
 }
 small,
-.nav-section,
-.brand-copy small {
+.nav-section {
   letter-spacing: 0.8px;
 }
 button,
@@ -1619,18 +1520,13 @@ nav button.active {
   font: 650 14px/1.4 var(--font-ui);
   letter-spacing: 0.1px;
 }
-.step-number {
-  font: 650 12px var(--font-ui);
-}
+
 label,
-.panel-description,
-.search-help,
 .facts,
 .package-presence {
   font-size: 12px;
 }
-.facts b,
-.detailgrid b {
+.facts b {
   font-size: 13px;
 }
 .panel,
@@ -1709,51 +1605,6 @@ label,
   }
 }
 
-.command-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 16px;
-}
-.command-head h2 {
-  font-size: 20px;
-  margin: 0;
-}
-.command-head button {
-  font-size: 24px;
-  width: 40px;
-  padding: 0;
-}
-.command-box {
-  padding: 20px;
-}
-.command-box input {
-  font-size: 16px;
-  min-height: 48px;
-}
-#commandList {
-  max-height: 45vh;
-  overflow: auto;
-  margin-top: 12px;
-}
-#commandList button {
-  min-height: 44px;
-  font-size: 14px;
-}
-#commandList button.command-selected {
-  background: #e5f2fa;
-  color: #006f9b;
-  box-shadow: inset 3px 0 var(--accent);
-}
-.command-hint {
-  font-size: 12px;
-  color: var(--muted);
-  margin: 16px 0 0;
-}
-.command-empty {
-  padding: 20px 8px;
-}
 #openCommands,
 #openShortcuts {
   display: flex;
@@ -1770,14 +1621,7 @@ button,
 .toolmenu-btn {
   border-radius: 12px !important;
 }
-.brand-copy b {
-  font-family:
-    system-ui,
-    -apple-system,
-    "Segoe UI",
-    sans-serif;
-  letter-spacing: -0.5px;
-}
+
 #fresh,
 #bulkFresh {
   appearance: none;

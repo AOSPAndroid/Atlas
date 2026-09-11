@@ -14,14 +14,14 @@ class MergedAtlas(unittest.TestCase):
   cls.original=m.MASTER_DB;cls.original_repo=m.REPO
   cls.tmp=tempfile.TemporaryDirectory();cls.base=Path(cls.tmp.name)
   cls.db=cls.base/'shared.db';src=sqlite3.connect(cls.original);dst=sqlite3.connect(cls.db);src.backup(dst);src.close();dst.close()
-  m.MASTER_DB=m.DB=m.DAAS_DB=m.HISTORY_DB=atlas_store.DB=cls.db
+  m.MASTER_DB=m.DB=m.HISTORY_DB=atlas_store.DB=cls.db
   m.REPO=cls.base/'packages';m.REPO.mkdir();pkg=m.REPO/'Example';pkg.mkdir();(pkg/'app_i.ps1').write_text('exit 0')
   cls.client=TestClient(m.app,base_url='http://127.0.0.1',client=('127.0.0.1',42000))
   cls.token=cls.client.get('/api/state').json()['token'];cls.headers={'X-Atlas-Token':cls.token}
   cls.operator=patch.object(m,'identity',return_value='TEST OPERATOR');cls.operator.start()
  @classmethod
  def tearDownClass(cls):
-  cls.client.close();cls.operator.stop();m.MASTER_DB=m.DB=m.DAAS_DB=m.HISTORY_DB=atlas_store.DB=cls.original;m.REPO=cls.original_repo;cls.tmp.cleanup()
+  cls.client.close();cls.operator.stop();m.MASTER_DB=m.DB=m.HISTORY_DB=atlas_store.DB=cls.original;m.REPO=cls.original_repo;cls.tmp.cleanup()
  def post(self,path,data):return self.client.post(path,headers=self.headers,json=data)
  def create_desk(self,slug,occupancy='assigned',name='Fixture Person',hostname=''):
   item={'id':'custom-'+slug,'floor':3,'x':0.5,'y':0.5,'angle':90,'kind':'desk','occupancy':occupancy,'name':name,'team':'Fixture','hostname':hostname,'revision':0}

@@ -62,7 +62,7 @@ def copy_archive(source, target):
 
 
 def capture(con, path):
-    from Build_MasterDB_From_database040926 import workbook_parts, iter_rows, canonical_header, clean, norm
+    from directory_workbook import workbook_parts, iter_rows, canonical_header, clean, norm
     schema(con)
     for sheet, part in workbook_parts(path):
         kind = {'users': 'user', 'computers': 'machine'}.get(sheet.casefold(), '')
@@ -102,7 +102,7 @@ def capture(con, path):
 
 
 def column_info(kind, headers, populated):
-    from Build_MasterDB_From_database040926 import canonical_header
+    from directory_workbook import canonical_header
     mapping = field_map(kind)
     result = []
     for i, header in enumerate(headers):

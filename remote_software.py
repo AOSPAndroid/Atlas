@@ -1,8 +1,7 @@
 """Reviewed remote uninstall plans; execution stays on the selected Windows host."""
-import base64,copy,json,re,threading,time,uuid
+import copy,json,re,threading,time,uuid
 from pathlib import Path
 from fastapi import Request,HTTPException
-from fastapi.responses import FileResponse
 GUID=re.compile(r'^\{[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}\}$')
 ROOT=Path(__file__).resolve().parent
 

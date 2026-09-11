@@ -1,6 +1,8 @@
 // Deployment UI exercises use a simulated transport; no host is contacted.
 const assert = require("node:assert/strict");
-const { fixture } = require("./ui_fixture.cjs");
+const fs = require("node:fs"),
+  path = require("node:path");
+const { fixture, root } = require("./ui_fixture.cjs");
 const settle = () => new Promise((resolve) => setTimeout(resolve, 15));
 (async () => {
   const writes = [];
@@ -60,6 +62,31 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 15));
   await settle();
   const { w, run } = f,
     doc = w.document;
+  const style = doc.createElement("style");
+  style.textContent = fs.readFileSync(
+    path.join(root, "frontend/assets/atlas-theme.css"),
+    "utf8",
+  );
+  doc.head.append(style);
+  for (const id of ["fresh", "bulkFresh"]) {
+    const control = doc.getElementById(id);
+    assert.equal(control.getAttribute("role"), "switch");
+    assert.equal(w.getComputedStyle(control).width, "36px");
+    assert.equal(w.getComputedStyle(control).height, "22px");
+    assert.equal(control.checked, false);
+    control.click();
+    assert.equal(
+      control.checked,
+      true,
+      "native switch changes its checked state",
+    );
+    control.click();
+    assert.equal(control.checked, false);
+  }
+  assert.equal(
+    w.getComputedStyle(doc.getElementById("softwareCache")).width,
+    "16px",
+  );
   if (!doc.querySelector("#deploymentPanel").dataset.installed) {
     doc.dispatchEvent(new w.Event("DOMContentLoaded"));
     await settle();
@@ -163,6 +190,7 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 15));
     "true",
   );
 
+  doc.querySelector("#fresh").click();
   const deployment = run("deploy()");
   await settle();
   assert(doc.querySelector("#deploy").disabled);
@@ -176,6 +204,11 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 15));
   assert.equal(writes[0].folder, "B");
   assert.equal(writes[0].action, "Repair");
   assert.equal(writes[0].script, "B_Repair.ps1");
+  assert.equal(
+    writes[0].fresh,
+    true,
+    "Fresh-copy choice reaches the deployment payload",
+  );
   job("failed");
   await settle();
   assert(

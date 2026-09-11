@@ -9,7 +9,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
-from Build_MasterDB_From_database040926 import schema
+from directory_workbook import schema
 from desk_directory import palette_search, people_desks, person_desks
 from directory_lookup import prepare_views, search_directory
 

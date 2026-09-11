@@ -375,19 +375,7 @@ function renderRecent() {
       }),
   );
 }
-function table(rows) {
-  if (!rows.length) return "";
-  return `<table><thead><tr>${Object.keys(rows[0])
-    .map((k) => `<th>${esc(k)}</th>`)
-    .join("")}</tr></thead><tbody>${rows
-    .map(
-      (r) =>
-        `<tr>${Object.values(r)
-          .map((v) => `<td>${esc(v)}</td>`)
-          .join("")}</tr>`,
-    )
-    .join("")}</tbody></table>`;
-}
+
 function bulkTargets() {
   return [
     ...new Set(

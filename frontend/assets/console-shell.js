@@ -114,10 +114,7 @@ function openPalette() {
 function closePalette() {
   sharedPalette?.close();
 }
-function typing() {
-  const a = document.activeElement;
-  return a && ["INPUT", "TEXTAREA", "SELECT"].includes(a.tagName);
-}
+
 function bindQueueControls() {
   loadFreshness();
   renderQueue();
@@ -336,35 +333,9 @@ function renderNavigationIcons() {
     button.innerHTML = `<span class="nav-icon">${navigationIcons[pageName] || ""}</span><span class="nav-label">${esc(label)}</span>`;
   });
 }
-function formatUptime(seconds) {
-  if (seconds === null || seconds === undefined) return "—";
-  const d = Math.floor(seconds / 86400),
-    h = Math.floor((seconds % 86400) / 3600),
-    m = Math.floor((seconds % 3600) / 60);
-  return `${d}d ${String(h).padStart(2, "0")}h ${String(m).padStart(2, "0")}m`;
-}
-function makeSwitch(input) {
-  if (!input || input.dataset.switchReady) return;
-  input.dataset.switchReady = "1";
-  input.classList.add("switch-input");
-  const visual = document.createElement("span");
-  visual.className = "switch-visual";
-  visual.innerHTML = "<i></i><b></b>";
-  input.insertAdjacentElement("afterend", visual);
-  const update = () => {
-    visual.classList.toggle("on", input.checked);
-    visual.querySelector("b").textContent = input.checked ? "ON" : "OFF";
-    input.setAttribute("aria-checked", String(input.checked));
-  };
-  input.addEventListener("change", update);
-  update();
-}
-function applySwitches() {
-  document.querySelectorAll('input[type="checkbox"]').forEach(makeSwitch);
-}
+
 function bindSoftwareControls() {
   renderNavigationIcons();
-  applySwitches();
   $("#closeSoftware").onclick = () =>
     $("#softwareDrawer").classList.remove("open");
   $("#refreshSoftware").onclick = () =>

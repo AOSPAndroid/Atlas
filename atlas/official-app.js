@@ -993,29 +993,8 @@ function onMap(type, handler, options) {
 
 const dot = (a, b) => a.reduce((s, n, i) => s + n * b[i], 0),
   sub = (a, b) => a.map((n, i) => n - b[i]);
-function basis() {
-  const sy = Math.sin(cam.yaw),
-    cy = Math.cos(cam.yaw),
-    st = Math.sin(cam.tilt),
-    ct = Math.cos(cam.tilt);
-  return {
-    right: [cy, 0, -sy],
-    up: [sy * st, ct, cy * st],
-    forward: [sy * ct, -st, cy * ct],
-  };
-}
+
 // World coordinates: x east, y height, z toward the page bottom. Up vector points toward page top.
-function cameraBasis() {
-  const cy = Math.cos(cam.yaw),
-    sy = Math.sin(cam.yaw),
-    st = Math.sin(cam.tilt),
-    ct = Math.cos(cam.tilt);
-  return {
-    right: [cy, 0, -sy],
-    up: [sy * st, ct, cy * st].map((v, i) => (i === 1 ? v : -v)),
-    forward: [sy * ct, -st, cy * ct],
-  };
-}
 function getBasis() {
   const cy = Math.cos(cam.yaw),
     sy = Math.sin(cam.yaw),
@@ -1296,54 +1275,7 @@ function beam(arr, a, b, width, height, color, bottom = 0) {
     );
   }
 }
-const zoneColors = {
-  credit: [0.88, 0.94, 0.83, 1],
-  research: [0.79, 0.9, 0.96, 1],
-  rates: [0.79, 0.9, 0.96, 1],
-  support: [0.88, 0.9, 0.93, 1],
-  audit: [0.97, 0.87, 0.77, 1],
-  fx: [0.97, 0.87, 0.77, 1],
-  equities: [0.97, 0.94, 0.77, 1],
-  qa: [0.9, 0.85, 0.95, 1],
-  green: [0.81, 0.92, 0.86, 1],
-  banking: [0.91, 0.84, 0.94, 1],
-  dcm: [0.96, 0.82, 0.88, 1],
-};
-function transformFurniture(arr, vertices, p, angle = 0) {
-  const a = (angle * Math.PI) / 180,
-    c = Math.cos(a),
-    sn = Math.sin(a);
-  for (let i = 0; i < vertices.length; i += 9) {
-    const x = vertices[i],
-      z = vertices[i + 2];
-    arr.push(
-      p[0] + x * c - z * sn,
-      vertices[i + 1],
-      p[2] + x * sn + z * c,
-      ...vertices.slice(i + 3, i + 9),
-    );
-  }
-}
-function stationAt(arr, p, angle = 0, dim = false, active = false) {
-  const tmp = [];
-  workstation(tmp, [0, 0, 0], dim, active);
-  transformFurniture(arr, tmp, p, angle);
-}
-function meetingAt(arr, p, angle = 0, small = false) {
-  const v = [],
-    w = small ? 1.7 : 3.8,
-    d = small ? 1.7 : 1.8;
-  box(v, 0, 0.8, 0, w, 0.13, d, [0.93, 0.89, 0.81, 1]);
-  box(v, 0, 0.05, 0, 0.16, 0.74, 0.16, [0.32, 0.39, 0.43, 1]);
-  for (const side of [-1, 1])
-    for (let i = 0; i < (small ? 1 : 3); i++) {
-      const x = small ? 0 : (i - 1) * 1.15,
-        z = side * (d / 2 + 0.5);
-      box(v, x, 0.43, z, 0.58, 0.14, 0.55, [0.19, 0.29, 0.36, 1]);
-      box(v, x, 0.55, z + side * 0.24, 0.58, 0.45, 0.08, [0.23, 0.33, 0.4, 1]);
-    }
-  transformFurniture(arr, v, p, angle);
-}
+
 // Recover the hinge from the endpoint normals of each source quarter-circle swing.
 function doorGeometry(curve) {
   const [a, b, c, d] = curve.map((p) => modelPoint(...p)),
@@ -1489,7 +1421,7 @@ function architecturalMesh() {
   return arr;
 }
 
-// Coalesce pointer events; reuse workstation vertices until scene data changes.
+// Coalesce pointer events; reuse desk markers until scene data changes.
 let pendingDraw = 0,
   deskSceneKey = "",
   deskSceneRecords = null,
@@ -1559,13 +1491,7 @@ function renderFrame() {
     const verts = [];
     for (const r of floorRecords) {
       const p = world(r),
-        isSelected = selected?.id === r.id,
-        dim = filtering && !matches.has(r.id);
-      const c = dim
-        ? [0.65, 0.72, 0.76, 0.35]
-        : isSelected
-          ? [1, 0.57, 0.19, 1]
-          : [0.62, 0.4, 0.76, 0.9];
+        isSelected = selected?.id === r.id;
       if (r.occupancy === "assigned")
         box(
           verts,
@@ -1609,20 +1535,6 @@ function renderFrame() {
   mesh(deskVertices, false, "desks");
   renderNames();
   finishFrame(started);
-}
-
-// Three boxes per station: desktop, display bank and seat. Angle is unchanged.
-function workstation(arr, p, dim, active) {
-  const [x, , z] = p,
-    c = dim
-      ? [0.72, 0.79, 0.82, 0.45]
-      : active
-        ? [0.12, 0.62, 0.82, 1]
-        : [0.85, 0.93, 0.96, 1],
-    dark = dim ? [0.6, 0.68, 0.72, 0.4] : [0.18, 0.35, 0.44, 1];
-  box(arr, x, 0.75, z, 2.55, 0.12, 1.6, c);
-  box(arr, x, 1.0, z - 0.48, 2.2, 0.65, 0.1, dark);
-  box(arr, x, 0.3, z + 1.15, 0.65, 0.35, 0.55, dark);
 }
 
 // Reuse label/connector nodes by desk ID; only their text and coordinates change.
@@ -2157,7 +2069,7 @@ window.addEventListener("keydown", (e) => {
   if (e.key === "Escape") contextMenu?.remove();
 });
 // Both renderers use the same world coordinates, selection and hit testing.
-const planBackgrounds = new Map();
+
 let moving = false,
   motionKey = "",
   motionTimer = 0;
@@ -2207,57 +2119,9 @@ function finishFrame(start) {
           Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))
         ].toFixed(1)
       : "—";
-  output.textContent = `Atlas 6.9.2 · studio map · ${view === "plan" ? "Canvas 2D" : "Simple WebGL"}\nDraw + labels: ${metrics.renderMs.toFixed(1)} ms\nLabel layout: ${metrics.labelsMs.toFixed(1)} ms\nMovement frame interval p95: ${p95} ms\nBuffer: ${canvas.width} × ${canvas.height}\n${moving ? "Moving · names follow desks" : "Idle"}\nFrame interval includes event scheduling.\nRemote-display latency is not measured.`;
+  output.textContent = `Atlas 6.9.5 · studio map · ${view === "plan" ? "Canvas 2D" : "Simple WebGL"}\nDraw + labels: ${metrics.renderMs.toFixed(1)} ms\nLabel layout: ${metrics.labelsMs.toFixed(1)} ms\nMovement frame interval p95: ${p95} ms\nBuffer: ${canvas.width} × ${canvas.height}\n${moving ? "Moving · names follow desks" : "Idle"}\nFrame interval includes event scheduling.\nRemote-display latency is not measured.`;
 }
 
-function planBackground() {
-  if (planBackgrounds.has(floor)) return planBackgrounds.get(floor);
-  const bg = document.createElement("canvas");
-  bg.width = bg.height = 2400;
-  const c = bg.getContext("2d"),
-    g = data.floors.find((f) => f.level === floor).geometry;
-  c.setTransform(18, 0, 0, 18, 1200, 1200);
-  c.lineWidth = 0.18;
-  function polygon(points, color, stroke) {
-    c.beginPath();
-    points.forEach((pt, i) => {
-      const p = modelPoint(...pt);
-      i ? c.lineTo(p[0], p[2]) : c.moveTo(p[0], p[2]);
-    });
-    c.closePath();
-    c.fillStyle = color;
-    c.fill();
-    if (stroke) {
-      c.strokeStyle = stroke;
-      c.stroke();
-    }
-  }
-  polygon(g.outline, "#eef3f6", "#718e9e");
-  for (const z of g.zones) {
-    const color = zoneColors[z.color] || [0.9, 0.94, 0.97, 1];
-    polygon(
-      z.points,
-      `rgba(${color
-        .slice(0, 3)
-        .map((v) => Math.round(v * 255))
-        .join(",")},${color[3]})`,
-    );
-  }
-  for (const r of g.rooms)
-    polygon(
-      r.points,
-      r.kind === "core"
-        ? "#cbd5dc"
-        : r.kind === "support"
-          ? "#f5dccb"
-          : "#dde9ef",
-      "#92aab8",
-    );
-  if (planBackgrounds.size >= 2)
-    planBackgrounds.delete(planBackgrounds.keys().next().value);
-  planBackgrounds.set(floor, bg);
-  return bg;
-}
 const officialImages = new Map();
 function officialImage(level) {
   if (!officialImages.has(level)) {

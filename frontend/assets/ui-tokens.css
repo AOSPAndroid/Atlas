@@ -35,8 +35,7 @@
   height: 42px;
   color: var(--atlas-accent);
 }
-.atlas-person .facts,
-.atlas-person .detailgrid {
+.atlas-person .facts {
   display: flex;
   gap: 12px 20px;
   flex-wrap: wrap;

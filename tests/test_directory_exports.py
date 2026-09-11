@@ -10,7 +10,7 @@ from types import SimpleNamespace
 from xml.etree import ElementTree as ET
 
 import directory_exports as exports
-from Build_MasterDB_From_database040926 import build, NS, REL
+from directory_workbook import build, NS, REL
 from directory_lookup import prepare_views, search_directory
 from merge_data import merge_directory
 from refresh_directory import prepare
