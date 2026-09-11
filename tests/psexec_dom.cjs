@@ -7,11 +7,12 @@ const {fixture,root}=require('./ui_fixture.cjs');
   const {w,run}=f, get=id=>w.document.getElementById('px'+id);
   run(fs.readFileSync(path.join(root,'frontend/assets/app.js'),'utf8'));
   run('function toast(){}');
+  run(fs.readFileSync(path.join(root,'frontend/assets/psexec-catalogue.js'),'utf8'));
   run(fs.readFileSync(path.join(root,'frontend/assets/psexec-commands.js'),'utf8'));
   run(fs.readFileSync(path.join(root,'frontend/assets/console-psexec.js'),'utf8'));
   const {build,commands}=w.AtlasPsExecCommands;
   const options={target:'TESTPC',path:'C:\\Data\\PsExec.exe',shell:'powershell'};
-  assert.equal(commands.length,22);
+  assert.equal(commands.length,30);
   assert.equal(get('Path').value,options.path);
   assert(get('Copy').disabled);
   assert.equal(w.document.querySelector('[data-page="history"]').nextElementSibling.dataset.page,'psexec');
@@ -50,7 +51,7 @@ const {fixture,root}=require('./ui_fixture.cjs');
   for(const executable of ['psexec.exe','\\\\server\\share\\PsExec.exe','C:\\%PATH%\\PsExec.exe','C:\\Data\\other.exe','C:\\Data!x\\PsExec.exe']) assert.throws(()=>build('identity',{...options,path:executable}));
   for(const port of ['0','65536','1;2']) assert.throws(()=>build('tcp',{...options,values:{destination:'SERVER01',port}}));
   // Parse every generated remote PowerShell script without executing it.
-  const scripts=commands.map(c=>build(c.id,{...options,values:{service:'MSSQL$INSTANCE',destination:'SERVER01',port:'445',pid:'1234'}})).filter(c=>c.encoded).map(c=>c.readable);
+  const scripts=commands.map(c=>build(c.id,{...options,values:{service:'MSSQL$INSTANCE',destination:'SERVER01',port:'445',pid:'1234',session:'1'}})).filter(c=>c.encoded).map(c=>c.readable);
   const os=require('node:os'), cp=require('node:child_process'), dir=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-psexec-'));
   try {
     const source=path.join(dir,'scripts.json');fs.writeFileSync(source,JSON.stringify(scripts));

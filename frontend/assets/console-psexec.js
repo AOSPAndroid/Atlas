@@ -178,6 +178,18 @@
       get("Copy").disabled = true;
       get("Encoding").textContent = "";
     }
+    window.AtlasPsExecTerminal?.review(
+      current
+        ? {
+            template: selected.id,
+            target: current.target,
+            path: get("Path").value.trim(),
+            elevated: get("Elevated").checked,
+            values: { ...values },
+          }
+        : null,
+      selected,
+    );
   }
   function syncTarget(target) {
     if (follow) {
@@ -229,6 +241,7 @@
     open() {
       syncTarget(S.target);
       preview();
+      window.AtlasPsExecTerminal?.open();
     },
   });
   select(selected);

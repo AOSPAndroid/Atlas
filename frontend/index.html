@@ -488,8 +488,8 @@
             <small>REMOTE COMMAND WORKBENCH</small>
             <h2>The right command, ready to go.</h2>
             <p>
-              Choose a task, review the target and copy into your terminal.
-              Nothing runs from this page.
+              Choose a task, review the target and run it here. Output appears
+              in the terminal below. Nothing starts until you click Run.
             </p>
           </div>
           <a
@@ -516,7 +516,7 @@
               spellcheck="false"
           /></label>
           <label
-            >Paste into<select id="pxShell">
+            >Copy format<select id="pxShell">
               <option value="powershell">PowerShell</option>
               <option value="cmd">Command Prompt</option>
             </select></label
@@ -569,21 +569,63 @@
               <pre id="pxCommand" tabindex="0"></pre>
             </details>
             <p id="pxError" class="px-error" role="status"></p>
-            <button id="pxCopy" class="primary" type="button" disabled>
+            <button id="pxRun" class="primary" type="button" disabled>
+              Run on target
+            </button>
+            <button id="pxCopy" type="button" disabled>
               Copy PowerShell command
             </button>
             <p class="px-footnote" id="pxEncoding"></p>
+            <section class="px-terminal" aria-label="PsExec terminal">
+              <div class="px-terminal-toolbar">
+                <b>Terminal</b
+                ><button id="pxStop" type="button" disabled>Stop session</button
+                ><button id="pxCopyOutput" type="button">Copy output</button>
+              </div>
+              <p id="pxHost" class="muted">Uses the account running Atlas.</p>
+              <p id="pxRunStatus" role="status">No command running.</p>
+              <pre id="pxOutput" tabindex="0" aria-label="Terminal output">
+Ready. Choose a command and click Run.</pre>
+              <form id="pxInputForm" hidden>
+                <label
+                  >Remote Command Prompt<input
+                    id="pxInput"
+                    autocomplete="off"
+                    spellcheck="false"
+                    maxlength="4096"
+                    placeholder="Type a command, or exit to close" /></label
+                ><button id="pxSend" type="submit">Send ↵</button>
+              </form>
+              <p id="pxTerminalMessage" role="status"></p>
+              <div class="px-terminal-toolbar">
+                <label
+                  ><input id="pxAutoScroll" type="checkbox" checked /> Follow
+                  output</label
+                ><button id="pxReconnect" type="button">
+                  Refresh sessions
+                </button>
+              </div>
+              <label
+                >Recent sessions<select id="pxSessions">
+                  <option value="">No sessions yet</option>
+                </select></label
+              >
+              <p class="px-footnote">
+                Sessions stay on their original target. Stop ends the local
+                PsExec connection; a remote command may continue. Type exit to
+                close a Command Prompt normally.
+              </p>
+            </section>
             <details class="px-help">
               <summary>First run &amp; connection help</summary>
               <ul>
                 <li>
                   Point to your existing PsExec.exe or PsExec64.exe in C:\Data.
-                  Atlas does not install or verify the executable.
+                  Atlas checks the executable exists before starting it.
                 </li>
                 <li>
-                  Run the copied command on your admin computer with the
-                  required remote access. PsExec starts a service on the target
-                  even for a diagnostic command.
+                  The Atlas host needs remote administration access. PsExec
+                  starts a service on the target even for a diagnostic command.
                 </li>
                 <li>
                   Review the Microsoft licence prompt on first use. Atlas does
@@ -597,8 +639,10 @@
                 </li>
                 <li>
                   The ten-second option limits connection attempts, not command
-                  runtime. Output appears in your terminal; Atlas does not
-                  capture it or add it to deployment History.
+                  runtime. Atlas limits commands to three minutes and
+                  interactive sessions to fifteen minutes. Recent output is held
+                  in memory, not deployment History, and clears when Atlas
+                  restarts.
                 </li>
               </ul>
             </details>
@@ -790,8 +834,10 @@
     <script src="/assets/console-deployment.js"></script>
     <script src="/assets/console-processes.js"></script>
     <script src="/assets/slowdown-diagnostics.js"></script>
+    <script src="/assets/psexec-catalogue.js"></script>
     <script src="/assets/psexec-commands.js"></script>
     <script src="/assets/console-psexec.js"></script>
+    <script src="/assets/psexec-terminal.js"></script>
     <script src="/assets/console-shell.js"></script>
     <script src="/assets/remote-software.js"></script>
   </body>

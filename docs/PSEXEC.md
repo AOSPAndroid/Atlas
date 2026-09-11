@@ -1,18 +1,49 @@
-# PsExec command workbench
+# PsExec terminal and command workbench
 
-Open **IT Console → PsExec**, directly below **History**. This Admin-only page builds commands for your existing PsExec installation. It does not execute them, download PsExec, start scans or open remote sessions automatically.
+Open **IT Console → PsExec**, below **History**. Atlas can now run commands through your existing PsExec installation and display live output in the embedded terminal. There are **30 templates**. Nothing starts when you open the page, select a machine or browse commands: click **Run on target** explicitly.
 
-1. Select a machine in Workspace, or enter a target hostname in the PsExec tab. **Follow selected target** uses the Workspace selection. Entering a different hostname creates a separate command target without changing the deployment target.
-2. Check the executable path. The default is `C:\Data\PsExec.exe`; use `C:\Data\PsExec64.exe` if that is your executable. Atlas does not check whether that file exists on your admin computer.
-3. Choose **PowerShell** or **Command Prompt** to match the terminal you will paste into.
-4. Search or filter the templates, complete any parameters, and review **Command on target**. Expand **Full PsExec command** to inspect exactly what will be copied.
-5. Click **Copy**, paste into your terminal and review before pressing Enter. Results appear there, not in Atlas History.
+## Run a command
 
-Star frequently used commands to find them under **Favourites**. Favourites, executable path and shell choice are saved in this browser. The target and command parameters are not saved. Elevated execution is off initially and resets when changing templates.
+1. Select a machine in Workspace, or enter a hostname in PsExec. **Follow selected target** follows Workspace; manually entering another hostname does not change the deployment target.
+2. Set your executable path, normally `C:\Data\PsExec.exe` or `C:\Data\PsExec64.exe`. It must exist on the computer hosting Atlas.
+3. Choose a template, fill in its required fields and review **Command on target**. **Full PsExec command** shows the generated invocation; the server independently rebuilds the command from the same catalogue.
+4. Click **Run on target**. A command marked **Changes target** asks you to type the target hostname before it starts.
+5. Watch **Terminal** for output, state and exit code. **Follow output** scrolls with new output; disable it to inspect earlier lines. **Copy output** copies the transcript for a ticket.
 
-## Included templates
+The process inherits the account running Atlas. The terminal shows that account and whether the Atlas host process is elevated. Starting Atlas from elevated PowerShell does not guarantee that the account has remote permissions on every target. The optional **Use elevated token (-h)** requests an available elevated token on the target; it does not grant rights or switch accounts.
 
-| Template | Required input beyond the target | What it does |
+## Type commands directly
+
+Choose **Open a remote Command Prompt**. Enter the Windows session ID shown by **Logged-on sessions**, then click Run. This uses PsExec's interactive-session option; a console window may also appear on that remote desktop. Type subsequent commands in the terminal input and press **Send** or Enter. Type `exit` to finish normally.
+
+This is a line-oriented Command Prompt, not a full terminal emulator. Full-screen applications and interactive keystroke shortcuts are not supported. Commands typed in this session run with the Atlas account's permissions and can change the target. Template confirmation applies to repair templates; free-form commands execute when you explicitly send them. See [Microsoft's PsExec usage reference](https://learn.microsoft.com/en-us/sysinternals/downloads/psexec) for interactive sessions and account behavior.
+
+## Session controls and limits
+
+- **Stop session** ends the local PsExec process. It does not guarantee the remote command stopped; inspect the target before retrying.
+- One PsExec session runs at a time per Atlas server. Ordinary commands have a three-minute limit; interactive sessions have a fifteen-minute limit. The PsExec connection attempt has its own ten-second limit.
+- Changing the target or template does not redirect a running session. Its terminal retains the original hostname and command.
+- **Refresh sessions** reconnects after a page reload or connection problem. **Recent sessions** opens retained transcripts. Start requests use unique run IDs to prevent duplicate starts after an uncertain response; Atlas does not automatically rerun a command.
+- The latest 20 sessions are retained in memory, with up to 262,144 output characters each. Older output is trimmed and labelled. Transcripts are not written into deployment History and clear when Atlas restarts. A remote command could outlive that restart.
+- Polling reads the local PsExec output only while a session is active. It does not create repeated WMI scans. Closing the tab does not cancel an already running session.
+
+## First run and troubleshooting
+
+Atlas checks the executable and the current Windows account's PsExec licence-acceptance record before launch. If the licence has not been accepted, open PsExec once on the Atlas host under that same account and review Microsoft's prompt. Atlas does not accept the licence automatically, download PsExec or store credentials.
+
+PsExec uses remote administrative connectivity and starts a service on the target. Access denied means checking account permissions, elevation and target policy. Connection errors call for checking hostname resolution, administrative shares and service-control connectivity. A command's nonzero exit status is shown in the terminal; it is not a successful run.
+
+Repair commands can interrupt work. Ending Excel can lose unsaved changes; that template checks the process name, while Remote Admin's process action also performs creation-time identity checks. CPU time in Excel snapshots is cumulative seconds, not a utilization percentage. For sampled CPU/GPU activity, use [Remote Admin performance](REMOTE_ADMIN_PERFORMANCE.md).
+
+## Copying and favourites
+
+Copy remains available for a separate PowerShell or Command Prompt window. **Copy format** changes the clipboard syntax, not the server's execution method. PowerShell scripts use an encoded UTF-16LE payload to preserve quoting; the readable script is always displayed for review. Copied repair commands execute when you run them in your terminal; the Atlas Run confirmation does not apply outside Atlas.
+
+Favourites, executable path and copy format are remembered in this browser. The target, command parameters and elevation choice are not saved as preferences. Elevation resets when selecting another template. PsExec execution and transcripts are Admin-only; Demo and the private read-only preview expose none of these endpoints.
+
+## All 30 templates
+
+| Template | Required input beyond the target | Purpose |
 | --- | --- | --- |
 | **Check execution identity** | None | See the account and groups used on the remote machine. |
 | **Logged-on sessions** | None | List session IDs, users and active/disconnected state. |
@@ -35,44 +66,19 @@ Star frequently used commands to find them under **Favourites**. Favourites, exe
 | **Restart one service** | Service name (not display name) | Stop and start a specific service after reviewing its dependencies. **Changes target.** |
 | **Refresh computer Group Policy** | None | Reapply computer policy and wait up to 60 seconds for its status. **Changes target.** |
 | **End one Excel process** | Excel process ID | Stop only a reviewed Excel PID, without targeting all Excel instances. **Changes target.** |
-| **Open a remote Command Prompt** | None | Start an interactive command session in your existing terminal. |
-
-Repairs are marked **Changes target** and explain their effects. Ending Excel can lose unsaved work. The Excel termination template checks that the PID belongs to Excel, but for creation-time identity checks use Remote Admin's existing process action.
-
-## Reading and running commands
-
-PowerShell templates show the readable script and use an encoded UTF-16LE payload in the copied invocation. This keeps pipes, quotes and dollar signs intact through the local and remote command interpreters. The script is visible for review; encoding is not encryption. Native Windows command templates use their executable and arguments directly.
-
-Excel CPU time is cumulative seconds, not current CPU percentage. Tasklist and memory templates are snapshots. Use the [Remote Admin performance tools](REMOTE_ADMIN_PERFORMANCE.md) for sampled CPU/GPU utilization, thread measurements and a bounded slowness capture.
-
-Commands use the current Windows account. The optional **Use elevated token (-h)** requests its elevated token where available; it does not supply credentials or grant missing rights. There is no automatic SYSTEM mode, password storage or automatic licence acceptance. Review Microsoft's licence prompt on first use. The `-n 10` option limits the connection attempt, not the command's runtime. See the [Microsoft PsExec reference](https://learn.microsoft.com/en-us/sysinternals/downloads/psexec).
-
-PsExec starts a service on the remote target even for diagnostic commands. Remote permissions and administrative-share/service-control connectivity must be available. A connection failure is separate from a command reporting an error after it starts. This workbench introduces no remote execution endpoint in Atlas, and privileged tools remain excluded from Demo and the private read-only preview.
-
-
-## Example: check who is logged on
-
-Choose **Logged-on sessions**, enter your target, then copy the command for your terminal. For the fictional target `TESTPC`, Atlas produces:
-
-**PowerShell:**
-
-```powershell
-& 'C:\Data\PsExec.exe' '\\TESTPC' '-n' '10' '-nobanner' 'query.exe' 'user'
-```
-
-**Command Prompt:**
-
-```bat
-"C:\Data\PsExec.exe" "\\TESTPC" "-n" "10" "-nobanner" "query.exe" "user"
-```
-
-Replace `TESTPC` with the machine you intend to inspect. The output appears in that terminal. To inspect a network destination instead, choose **Test a destination TCP port**, fill in its hostname and port, and generate a new command. To reuse a template, star it and select **Favourites**.
+| **Open a remote Command Prompt** | Windows session ID (from Logged-on sessions) | Start an interactive Command Prompt in a selected Windows session, with input and output here. |
+| **Time synchronization status** | None | Check Windows Time source and synchronization status. |
+| **Installed drivers** | None | List installed driver names, types and status. |
+| **Recent Windows hotfixes** | None | List the 20 latest hotfix records exposed by Windows. |
+| **Scheduled task states** | None | List scheduled tasks and current state. |
+| **Configured printers** | None | List printer queues, drivers, ports and status. |
+| **Pending print jobs** | None | Show jobs in queues visible to the execution account. |
+| **Start one service** | Service name (not display name) | Start a named Windows service. **Changes target.** |
+| **Stop one service** | Service name (not display name) | Stop a named Windows service without forcing dependencies. **Changes target.** |
 
 ## Complete command reference
 
-Below are the readable commands or PowerShell payloads used by all 22 templates. These are **commands for the target**, not complete local PsExec invocations. Use the workbench to add the target and executable path and generate the correctly quoted command for your terminal. PowerShell payloads are encoded in the full invocation.
-
-Parameterized examples use `EXAMPLE_SERVICE`, `SERVER01`, port `445` and PID `1234`; these are illustrative values, not suggested targets. Enter the actual values in the workbench.
+These are commands or readable PowerShell payloads for the target, not complete local PsExec invocations. Generate the full invocation in Atlas. `{service}`, `{destination}`, `{port}` and `{pid}` below are filled from validated form fields. Interactive Command Prompt also requires the session ID for its PsExec `-i` option.
 
 ### Check execution identity
 
@@ -117,7 +123,7 @@ Sessions & Excel
 List Excel instances, sessions, resident RAM, CPU time and thread counts.
 
 ```powershell
-$ErrorActionPreference='Stop'; Get-Process -Name EXCEL -ErrorAction SilentlyContinue | Select-Object Id,SessionId,@{n='RAM_MB';e={[math]::Round($_.WorkingSet64/1MB,1)}},@{n='CPU_seconds';e={$_.CPU}},@{n='Threads';e={$_.Threads.Count}},Responding | Format-Table -AutoSize
+Get-Process -Name EXCEL -ErrorAction SilentlyContinue | Select-Object Id,SessionId,@{n='RAM_MB';e={[math]::Round($_.WorkingSet64/1MB,1)}},@{n='CPU_seconds';e={$_.CPU}},@{n='Threads';e={$_.Threads.Count}},Responding | Format-Table -AutoSize
 ```
 
 CPU seconds are cumulative, not CPU utilization. Use Remote Admin CPU for a sampled percentage. Responding is not a diagnosis of workbook health.
@@ -141,7 +147,7 @@ Diagnostics
 Show the 20 largest resident working sets with private memory and handles.
 
 ```powershell
-$ErrorActionPreference='Stop'; Get-Process | Sort-Object WorkingSet64 -Descending | Select-Object -First 20 Name,Id,@{n='RAM_MB';e={[math]::Round($_.WorkingSet64/1MB,1)}},@{n='Private_MB';e={[math]::Round($_.PrivateMemorySize64/1MB,1)}},Handles | Format-Table -AutoSize
+Get-Process | Sort-Object WorkingSet64 -Descending | Select-Object -First 20 Name,Id,@{n='RAM_MB';e={[math]::Round($_.WorkingSet64/1MB,1)}},@{n='Private_MB';e={[math]::Round($_.PrivateMemorySize64/1MB,1)}},Handles | Format-Table -AutoSize
 ```
 
 Shared memory can appear in several processes. Do not add working sets to calculate total RAM usage.
@@ -153,7 +159,7 @@ Diagnostics
 Get the last boot time, OS version and elapsed uptime.
 
 ```powershell
-$ErrorActionPreference='Stop'; $os=Get-CimInstance Win32_OperatingSystem; [pscustomobject]@{Windows=$os.Caption;Version=$os.Version;LastBoot=$os.LastBootUpTime;Uptime=((Get-Date)-$os.LastBootUpTime).ToString()} | Format-List
+$os=Get-CimInstance Win32_OperatingSystem; [pscustomobject]@{Windows=$os.Caption;Version=$os.Version;LastBoot=$os.LastBootUpTime;Uptime=((Get-Date)-$os.LastBootUpTime).ToString()} | Format-List
 ```
 
 This executes one local CIM query on the target after PsExec connects.
@@ -165,7 +171,7 @@ Diagnostics
 Show fixed volumes, capacity and free space in GiB.
 
 ```powershell
-$ErrorActionPreference='Stop'; Get-CimInstance Win32_LogicalDisk -Filter 'DriveType=3' | Select-Object DeviceID,VolumeName,@{n='Size_GiB';e={[math]::Round($_.Size/1GB,1)}},@{n='Free_GiB';e={[math]::Round($_.FreeSpace/1GB,1)}} | Format-Table -AutoSize
+Get-CimInstance Win32_LogicalDisk -Filter 'DriveType=3' | Select-Object DeviceID,VolumeName,@{n='Size_GiB';e={[math]::Round($_.Size/1GB,1)}},@{n='Free_GiB';e={[math]::Round($_.FreeSpace/1GB,1)}} | Format-Table -AutoSize
 ```
 
 Capacity is not disk latency. Use Overview in Remote Admin for sampled disk response times.
@@ -177,7 +183,7 @@ Diagnostics
 Read the latest 30 application errors from the last 24 hours.
 
 ```powershell
-$ErrorActionPreference='Stop'; Get-WinEvent -FilterHashtable @{LogName='Application';Level=1,2;StartTime=(Get-Date).AddDays(-1)} -MaxEvents 30 -ErrorAction SilentlyContinue | Select-Object TimeCreated,Id,ProviderName,Message | Format-List
+Get-WinEvent -FilterHashtable @{LogName='Application';Level=1,2;StartTime=(Get-Date).AddDays(-1)} -MaxEvents 30 -ErrorAction SilentlyContinue | Select-Object TimeCreated,Id,ProviderName,Message | Format-List
 ```
 
 Event messages may include workbook paths or user details. Review output before sharing a ticket.
@@ -189,7 +195,7 @@ Diagnostics
 Read the latest 30 system errors from the last 24 hours.
 
 ```powershell
-$ErrorActionPreference='Stop'; Get-WinEvent -FilterHashtable @{LogName='System';Level=1,2;StartTime=(Get-Date).AddDays(-1)} -MaxEvents 30 -ErrorAction SilentlyContinue | Select-Object TimeCreated,Id,ProviderName,Message | Format-List
+Get-WinEvent -FilterHashtable @{LogName='System';Level=1,2;StartTime=(Get-Date).AddDays(-1)} -MaxEvents 30 -ErrorAction SilentlyContinue | Select-Object TimeCreated,Id,ProviderName,Message | Format-List
 ```
 
 Match timestamps to the reported issue; an old error may be unrelated.
@@ -213,7 +219,7 @@ Networking
 Check DNS resolution from the remote machine.
 
 ```bat
-nslookup.exe SERVER01
+nslookup.exe {destination}
 ```
 
 Compare the answer with the affected application destination.
@@ -225,7 +231,7 @@ Networking
 Test one TCP connection from the target, for example to a file server.
 
 ```powershell
-$ErrorActionPreference='Stop'; Test-NetConnection -ComputerName 'SERVER01' -Port 445 -InformationLevel Detailed
+Test-NetConnection -ComputerName '{destination}' -Port {port} -InformationLevel Detailed
 ```
 
 A successful TCP connection does not prove application performance. Test duration depends on the network timeout.
@@ -261,7 +267,7 @@ Services
 List service names, display names and current state.
 
 ```powershell
-$ErrorActionPreference='Stop'; Get-Service | Sort-Object Status,Name | Format-Table Status,Name,DisplayName -AutoSize
+Get-Service | Sort-Object Status,Name | Format-Table Status,Name,DisplayName -AutoSize
 ```
 
 Use the service name, not its display name, in the service-specific templates.
@@ -273,7 +279,7 @@ Services
 Read status, start mode, executable, account and PID for a named service.
 
 ```powershell
-$ErrorActionPreference='Stop'; Get-CimInstance Win32_Service -Filter 'Name=''EXAMPLE_SERVICE''' | Select-Object Name,DisplayName,State,StartMode,StartName,ProcessId,PathName | Format-List
+Get-CimInstance Win32_Service -Filter 'Name=''{service}''' | Select-Object Name,DisplayName,State,StartMode,StartName,ProcessId,PathName | Format-List
 ```
 
 The configured service account is not necessarily the identity running this diagnostic.
@@ -297,7 +303,7 @@ Repairs · **Changes target**
 Stop and start a specific service after reviewing its dependencies.
 
 ```powershell
-$ErrorActionPreference='Stop'; Restart-Service -Name 'EXAMPLE_SERVICE' -ErrorAction Stop; Get-Service -Name 'EXAMPLE_SERVICE' | Format-Table Status,Name,DisplayName -AutoSize
+Restart-Service -Name '{service}' -ErrorAction Stop; Get-Service -Name '{service}' | Format-Table Status,Name,DisplayName -AutoSize
 ```
 
 Interrupts clients of the selected service. Does not force dependent services to stop. Agree the interruption with the affected users first.
@@ -321,7 +327,7 @@ Repairs · **Changes target**
 Stop only a reviewed Excel PID, without targeting all Excel instances.
 
 ```powershell
-$ErrorActionPreference='Stop'; $p=Get-Process -Id 1234 -ErrorAction Stop; if($p.ProcessName -ne 'EXCEL'){throw 'This PID is not Excel'}; Stop-Process -InputObject $p -Confirm
+$p=Get-Process -Id {pid} -ErrorAction Stop; if($p.ProcessName -ne 'EXCEL'){throw 'This PID is not Excel'}; Stop-Process -InputObject $p -Confirm:$false
 ```
 
 Can lose unsaved work. Recheck the PID before running and confirm in the terminal. For stronger creation-time identity checks, use Kill process in Remote Admin.
@@ -330,10 +336,110 @@ Can lose unsaved work. Recheck the PID before running and confirm in the termina
 
 Terminal
 
-Start an interactive command session in your existing terminal.
+Start an interactive Command Prompt in a selected Windows session, with input and output here.
 
 ```bat
 cmd.exe
 ```
 
-The shell uses your current account. Type exit to close it. Commands you type can change the target; this is not the logged-on user’s desktop.
+Uses PsExec -i with the session ID you enter. A console window may also appear on that remote desktop. Type exit to finish; commands run as the Atlas account and can change the target.
+
+### Time synchronization status
+
+Networking
+
+Check Windows Time source and synchronization status.
+
+```bat
+w32tm.exe /query /status
+```
+
+Clock skew can affect authentication; this query does not change the clock.
+
+### Installed drivers
+
+Diagnostics
+
+List installed driver names, types and status.
+
+```bat
+driverquery.exe /fo table
+```
+
+Compare relevant driver versions with your supported workstation baseline.
+
+### Recent Windows hotfixes
+
+Diagnostics
+
+List the 20 latest hotfix records exposed by Windows.
+
+```powershell
+Get-HotFix | Sort-Object InstalledOn -Descending | Select-Object -First 20 HotFixID,Description,InstalledOn | Format-Table -AutoSize
+```
+
+Get-HotFix does not list every update or application patch.
+
+### Scheduled task states
+
+Diagnostics
+
+List scheduled tasks and current state.
+
+```powershell
+Get-ScheduledTask | Select-Object TaskPath,TaskName,State | Format-Table -AutoSize
+```
+
+This inspects tasks without starting or changing them.
+
+### Configured printers
+
+Services
+
+List printer queues, drivers, ports and status.
+
+```powershell
+Get-Printer | Select-Object Name,DriverName,PortName,PrinterStatus | Format-Table -AutoSize
+```
+
+Requires the PrintManagement module; user-specific printer visibility depends on execution context.
+
+### Pending print jobs
+
+Services
+
+Show jobs in queues visible to the execution account.
+
+```powershell
+Get-Printer | ForEach-Object { Get-PrintJob -PrinterName $_.Name -ErrorAction Continue } | Select-Object PrinterName,ID,UserName,JobStatus,SubmittedTime | Format-Table -AutoSize
+```
+
+Lists jobs only; it does not clear queues or delete documents.
+
+### Start one service
+
+Repairs · **Changes target**
+
+Start a named Windows service.
+
+```powershell
+Start-Service -Name '{service}' -ErrorAction Stop; Get-Service -Name '{service}' | Format-Table Status,Name,DisplayName -AutoSize
+```
+
+Starts the selected service and any required dependencies.
+
+### Stop one service
+
+Repairs · **Changes target**
+
+Stop a named Windows service without forcing dependencies.
+
+```powershell
+Stop-Service -Name '{service}' -ErrorAction Stop; Get-Service -Name '{service}' | Format-Table Status,Name,DisplayName -AutoSize
+```
+
+Interrupts users of the service. Does not force dependent services to stop.
+
+## Maintaining the catalogue
+
+`psexec_catalogue.json` is the shared source for the server and browser. After editing it, run `py -3.12 tools/build_psexec_catalogue.py` to regenerate the browser asset. Tests verify that the generated catalogue matches the server definitions. The backend accepts template IDs and validated parameters, never a client-supplied script for a template run.

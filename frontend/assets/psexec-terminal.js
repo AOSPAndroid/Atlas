@@ -1,0 +1,215 @@
+/* A single polling owner follows the explicitly started local PsExec process. */
+(() => {
+  const get = (id) => document.getElementById("px" + id);
+  let review = null,
+    item = null,
+    current = null,
+    submitting = false,
+    sending = false,
+    unwatch = null,
+    opened = false;
+  const finished = (s) =>
+    ["complete", "failed", "stopped", "timed_out"].includes(s);
+  const request = (url, body) =>
+    AtlasClient.request(
+      url,
+      body === undefined
+        ? {}
+        : {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          },
+    );
+  function controls() {
+    const active = current && !finished(current.state);
+    get("Run").disabled = !review || submitting || !!active;
+    get("Run").textContent = submitting
+      ? "Starting…"
+      : active
+        ? "Session running"
+        : "Run on " + (review?.target || "target");
+    get("Stop").disabled = !active || submitting;
+    get("InputForm").hidden = !(
+      current?.interactive && current.state === "running"
+    );
+    get("Send").disabled = sending;
+  }
+  function show(data) {
+    current = data;
+    get("RunStatus").textContent =
+      `${data.target} · ${data.title} · ${data.state}${data.exit_code == null ? "" : ` · exit ${data.exit_code}`}`;
+    get("Host").textContent =
+      `Atlas account: ${data.account} · ${data.host_elevated ? "Elevated" : "Not elevated"}`;
+    get("Output").textContent =
+      (data.truncated ? "[Earlier output trimmed]\n" : "") + data.output;
+    if (get("AutoScroll").checked)
+      get("Output").scrollTop = get("Output").scrollHeight;
+    controls();
+  }
+  function follow(data) {
+    unwatch?.();
+    show(data);
+    if (finished(data.state)) return;
+    const id = data.id;
+    unwatch = AtlasClient.watch(
+      "psexec-terminal",
+      `/api/psexec/runs/${id}`,
+      (result) => {
+        if (current?.id !== id) return;
+        show(result);
+        if (finished(result.state)) refreshSessions(false).catch(() => {});
+      },
+      {
+        interval: 1000,
+        done: (result) => finished(result.state),
+        onError: (error) => {
+          get("TerminalMessage").textContent =
+            "Connection lost: " +
+            error.message +
+            " Use Refresh sessions to reconnect; do not rerun blindly.";
+        },
+      },
+    );
+  }
+  async function refreshSessions(restore = true) {
+    const rows = await request("/api/psexec/runs");
+    const select = get("Sessions"),
+      previous = current?.id || "";
+    select.replaceChildren(
+      new Option("Choose a session…", ""),
+      ...rows.map(
+        (r) => new Option(`${r.target} · ${r.title} · ${r.state}`, r.id),
+      ),
+    );
+    select.value = previous;
+    if (restore) {
+      const active = rows.find((r) => !finished(r.state));
+      const id =
+        active?.id ||
+        (rows.some((r) => r.id === previous) ? previous : rows[0]?.id);
+      if (id) {
+        select.value = id;
+        follow(await request("/api/psexec/runs/" + id));
+      } else {
+        unwatch?.();
+        current = null;
+        controls();
+      }
+    }
+  }
+  get("Run").onclick = async () => {
+    if (!review || submitting || (current && !finished(current.state))) return;
+    const payload = {
+      ...review,
+      values: { ...review.values },
+      id: crypto.randomUUID(),
+    };
+    if (item.change) {
+      const answer = prompt(
+        `${item.title} on ${payload.target}\n${item.insight}\n\nType ${payload.target} to confirm:`,
+      );
+      if (answer?.trim().toUpperCase() !== payload.target) return;
+      payload.confirmation = answer.trim();
+    }
+    submitting = true;
+    controls();
+    get("TerminalMessage").textContent = "";
+    get("RunStatus").textContent =
+      `Starting ${item.title} on ${payload.target}…`;
+    try {
+      follow(await request("/api/psexec/run", payload));
+      await refreshSessions(false);
+    } catch (error) {
+      get("TerminalMessage").textContent = error.message;
+      get("RunStatus").textContent = "Start not confirmed. No automatic retry.";
+      // Reconcile the exact run ID after an uncertain response, never rerun it.
+      try {
+        follow(await request("/api/psexec/runs/" + payload.id));
+      } catch {}
+    } finally {
+      submitting = false;
+      controls();
+    }
+  };
+  get("Stop").onclick = async () => {
+    if (!current || finished(current.state)) return;
+    const id = current.id;
+    get("Stop").disabled = true;
+    try {
+      await request(`/api/psexec/runs/${id}/stop`, {});
+      get("TerminalMessage").textContent =
+        "Stopping local session. Remote completion is not guaranteed.";
+    } catch (error) {
+      get("TerminalMessage").textContent = error.message;
+      controls();
+    }
+  };
+  get("InputForm").onsubmit = async (event) => {
+    event.preventDefault();
+    if (sending || !current?.interactive || current.state !== "running") return;
+    const id = current.id,
+      line = get("Input").value;
+    if (!line.trim()) return;
+    sending = true;
+    controls();
+    try {
+      await request(`/api/psexec/runs/${id}/input`, { line });
+      if (current?.id === id) get("Input").value = "";
+    } catch (error) {
+      get("TerminalMessage").textContent =
+        error.message +
+        " Input was not retried; check the terminal before sending again.";
+    } finally {
+      sending = false;
+      controls();
+      get("Input").focus();
+    }
+  };
+  get("CopyOutput").onclick = async () => {
+    try {
+      await navigator.clipboard.writeText(
+        get("RunStatus").textContent + "\n" + get("Output").textContent,
+      );
+      toast("Terminal output copied");
+    } catch {
+      get("TerminalMessage").textContent =
+        "Clipboard unavailable. Select terminal output to copy it.";
+    }
+  };
+  get("Reconnect").onclick = () =>
+    refreshSessions().catch(
+      (e) => (get("TerminalMessage").textContent = e.message),
+    );
+  get("Sessions").onchange = async () => {
+    if (current && !finished(current.state)) {
+      get("Sessions").value = current.id;
+      get("TerminalMessage").textContent =
+        "Finish the active session before switching transcripts.";
+      return;
+    }
+    const id = get("Sessions").value;
+    if (!id) return;
+    try {
+      follow(await request("/api/psexec/runs/" + id));
+    } catch (e) {
+      get("TerminalMessage").textContent = e.message;
+    }
+  };
+  window.AtlasPsExecTerminal = {
+    review(payload, command) {
+      review = payload;
+      item = command;
+      controls();
+    },
+    open() {
+      if (!opened) {
+        opened = true;
+        refreshSessions().catch((e) => {
+          opened = false;
+          get("TerminalMessage").textContent = e.message;
+        });
+      }
+    },
+  };
+})();
