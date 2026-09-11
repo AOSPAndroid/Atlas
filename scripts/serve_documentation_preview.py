@@ -12,7 +12,7 @@ from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
 MAP_ASSETS = (
-    'map-amenities.js','official-app.js', 'camera-motion.js', 'map-cursor.js', 'operations.js',
+    'map-furniture.js','map-amenities.js','official-app.js', 'camera-motion.js', 'map-cursor.js', 'operations.js',
     'catalogue.js', 'command-palette.js', 'command-registry.js',
     'style.css', 'operations.css', 'official.css', 'command-palette.css',
 )

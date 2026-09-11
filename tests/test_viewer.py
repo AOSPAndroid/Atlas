@@ -48,7 +48,7 @@ class ViewerTests(unittest.TestCase):
         self.assertEqual(before,hashlib.sha256(self.db.read_bytes()).digest())
     def test_assets_and_untrusted_mode_override(self):
         home=self.client.get('/?mode=admin');self.assertIn('content="viewer"',home.text);self.assertNotIn('/assets/machine-health',home.text)
-        for path in ['/viewer.js','/viewer.css','/official-app.js','/camera-motion.js','/map-cursor.js','/official-data.json','/style.css','/operations.css','/official.css','/studio-floor-2.svg','/assets/atlas-shell.css','/assets/barclays-eagle.svg']:
+        for path in ['/viewer.js','/viewer.css','/map-furniture.js','/map-amenities.js','/official-app.js','/camera-motion.js','/map-cursor.js','/official-data.json','/style.css','/operations.css','/official.css','/studio-floor-2.svg','/assets/atlas-shell.css','/assets/barclays-eagle.svg']:
             self.assertEqual(self.client.get(path).status_code,200,path)
         self.assertEqual(self.client.post('/api/save',headers={'X-Atlas-Token':'anything','X-Forwarded-For':'127.0.0.1'}).status_code,403)
 

@@ -1,3 +1,4 @@
+import { applyFurnitureCorrections } from "./map-furniture.js";
 import { applyMapAmenities } from "./map-amenities.js?v=2";
 import { createCameraMotion } from "./camera-motion.js";
 import { installMapCursor } from "./map-cursor.js?v=4";
@@ -32,6 +33,7 @@ try {
   if (!response.ok) throw Error();
   data = await response.json();
   applyMapAmenities(data);
+  applyFurnitureCorrections(data);
 } catch {
   $("#results").textContent =
     "The directory could not load. Refresh to try again.";
@@ -105,6 +107,19 @@ function doorPoints(curve) {
 }
 function paintArchitecture(c) {
   const g = data.floors.find((f) => f.level === floor).geometry;
+  for (const points of g.curvedTables || []) {
+    c.beginPath();
+    points.forEach((point, i) => {
+      const p = modelPoint(...point);
+      i ? c.lineTo(p[0], p[2]) : c.moveTo(p[0], p[2]);
+    });
+    c.closePath();
+    c.fillStyle = "#c5deea";
+    c.fill();
+    c.strokeStyle = "#7396aa";
+    c.lineWidth = 0.08;
+    c.stroke();
+  }
   if (mapLayers.doors) {
     c.beginPath();
     for (const curve of g.doorSwings || []) {
@@ -1554,7 +1569,7 @@ function architecturalMesh() {
       if (r.kind === "lift") for (let i = 0; i < r.points.length; i++)
         beam(arr, modelPoint(...r.points[i]), modelPoint(...r.points[(i + 1) % r.points.length]), 0.12, 0.035, [0, 0.52, 0.71, 1], 0.03);
     }
-  for (const points of g.tables || []) {
+  for (const points of [...(g.tables || []), ...(g.curvedTables || [])]) {
     polygonMesh(arr, points, 0.84, [0.67, 0.82, 0.89, 1]);
     for (let i = 0; i < points.length; i++)
       beam(

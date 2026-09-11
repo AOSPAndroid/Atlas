@@ -153,7 +153,7 @@ def shared_asset(filename:str):
 
 @app.get('/{filename}')
 def asset(filename: str):
-    allowed = {'command-palette.js', 'command-palette.css', 'command-registry.js', 'map-amenities.js','official-app.js','camera-motion.js','map-cursor.js', 'official-data.json', 'official.css', 'style.css', 'operations.css', 'viewer.js', 'viewer.css'}
+    allowed = {'command-palette.js', 'command-palette.css', 'command-registry.js', 'map-furniture.js','map-amenities.js','official-app.js','camera-motion.js','map-cursor.js', 'official-data.json', 'official.css', 'style.css', 'operations.css', 'viewer.js', 'viewer.css'}
     if filename not in allowed and not re.fullmatch(r'(official-floor-(-1|[0-8])\.(jpg|pdf)|studio-floor-(-1|[0-8])\.svg)', filename):
         raise HTTPException(404, 'Not available in the shared viewer')
     return FileResponse(ATLAS / filename)
