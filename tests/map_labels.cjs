@@ -51,11 +51,11 @@ function assertNoOverlap(w) {
     w.HTMLCanvasElement.prototype.getBoundingClientRect = () => ({ left: 0, top: 0,
       width: viewport.width, height: viewport.height, right: viewport.width, bottom: viewport.height });
     const t = await f.map(`
-      export function installLabelScenario(mode = 'plan') {
+      export function installLabelScenario(mode = 'plan', spacing = 1.8) {
         setView(mode); floor = 2; selected = null; moving = false;
         const fit = fitTarget();
         records = Array.from({length: 63}, (_, i) => {
-          const point = sourcePoint([fit.cx + (i % 9 - 4) * 1.8, fit.cz + (Math.floor(i / 9) - 3) * 1.8]);
+          const point = sourcePoint([fit.cx + (i % 9 - 4) * spacing, fit.cz + (Math.floor(i / 9) - 3) * spacing]);
           return {id:'test-desk-' + i, name:'Person ' + String(i).padStart(2,'0'), floor:2,
             kind:'desk', occupancy:'assigned', x:point[0], y:point[1]};
         });
@@ -87,7 +87,7 @@ function assertNoOverlap(w) {
       t.installLabelScenario(mode);
       t.labelPose(1);
       const overviewNames = visible(w, '.map-name').length;
-      assert(overviewNames > 0 && overviewNames <= 8, `${mode}: overview includes a restrained set of names`);
+      assert(overviewNames > 0 && overviewNames <= 16, `${mode}: overview shows more names within the doubled allowance`);
       const overviewAmenities = visible(w, '.amenity-tag');
       assert(overviewAmenities.length <= 4, `${mode}: overview keeps a small selection of landmark tags`);
       assert(overviewAmenities.some(el => el.textContent.includes('Elevators')), `${mode}: elevators take priority over lower-value amenities`);
@@ -95,7 +95,7 @@ function assertNoOverlap(w) {
 
       t.labelPose(2);
       const middleNames = visible(w, '.map-name').length;
-      assert(middleNames > overviewNames && middleNames <= 20, `${mode}: names appear gradually at intermediate zoom`);
+      assert(middleNames > overviewNames && middleNames <= 40, `${mode}: names appear gradually at intermediate zoom`);
       const middleAmenities = visible(w, '.amenity-tag').length;
       assertNoOverlap(w);
       t.labelPose(4.2);
@@ -135,7 +135,7 @@ function assertNoOverlap(w) {
 
       t.labelPose(1);
       t.labelPose(1.37);
-      assert(visible(w, '.map-name').length <= 8, `${mode}: small movement retains the overview budget`);
+      assert(visible(w, '.map-name').length <= 16, `${mode}: small movement retains the overview budget`);
       t.labelPose(1.43);
       assert(visible(w, '.map-name').length > 0, `${mode}: a deliberate zoom reveals names`);
       for (const zoom of [1.33, 1.37, 1.33]) {
@@ -143,17 +143,22 @@ function assertNoOverlap(w) {
         assert(visible(w, '.map-name').length > 0, `${mode}: small zoom reversals retain the current label level`);
       }
       t.labelPose(1.27);
-      assert(visible(w, '.map-name').length > 0 && visible(w, '.map-name').length <= 8, `${mode}: zooming out retains a few useful names`);
+      assert(visible(w, '.map-name').length > 0 && visible(w, '.map-name').length <= 16, `${mode}: zooming out retains a few useful names`);
 
       t.searchLabelScenario(); t.labelPose(1);
       assert(visible(w, '.map-name').length > 0 && visible(w, '.map-name').length <= 3,
         `${mode}: search exposes a few matches without flooding the overview`);
     }
 
+    // A spread-out floor can use the larger allowance; dense clusters still avoid collisions.
+    t.installLabelScenario('plan', 4); t.labelPose(1);
+    assert(visible(w, '.map-name').length > 8 && visible(w, '.map-name').length <= 16);
+    assertNoOverlap(w);
+
     // Fit-relative behavior should remain quiet on a phone-sized viewport.
     viewport.width = 420; viewport.height = 600;
     t.installLabelScenario('plan'); t.labelPose(1);
-    assert(visible(w, '.map-name').length > 0 && visible(w, '.map-name').length <= 4);
+    assert(visible(w, '.map-name').length > 0 && visible(w, '.map-name').length <= 8);
     assert(visible(w, '.amenity-tag').length <= 2);
     assertNoOverlap(w);
     assert.equal(f.errors.length, 0, f.errors.join('\n'));

@@ -1827,7 +1827,7 @@ function labelPolicy(w, h) {
   const area = Math.max(0.4, Math.min(1.5, (w * h) / 650000));
   return {
     level: labelZoomLevel,
-    names: Math.round([8, 12, 20, 30, 40][labelZoomLevel] * area),
+    names: 2 * Math.round([8, 12, 20, 30, 40][labelZoomLevel] * area),
     amenities: Math.max(
       1,
       Math.round([4, 6, 8, 12, 14][labelZoomLevel] * area),
