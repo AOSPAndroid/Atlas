@@ -58,8 +58,10 @@ export function createViewerOperations({ onSelect, toast }) {
     lookupVersion = 0,
     lookupRequest;
   const button = document.createElement("button");
-  button.textContent = "User lookup";
+  button.textContent = "People";
   button.id = "viewer-lookup";
+  button.title = "Search directory users";
+  button.setAttribute("aria-label", "Search directory users");
   document.querySelector(".header-right").prepend(button);
   document.querySelector(".empty-detail").innerHTML =
     '<span class="eyebrow">SHARED ATLAS</span><h2>Find a desk or colleague.</h2><p>Search people, machines and locations with Ctrl+K, or explore all ten floors.</p><small>Shared directory and inventory. Changes and elevated operations require the local admin version.</small>';

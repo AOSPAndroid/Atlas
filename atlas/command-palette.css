@@ -34,7 +34,7 @@
   outline: 2px solid #00aeef;
   outline-offset: 2px;
 }
-:host-context(.atlas-console) #atlas-commands {
+:host-context(.atlas-app-header) #atlas-commands {
   min-height: 38px;
   padding: 8px 11px;
   gap: 9px;
@@ -44,12 +44,12 @@
   color: #16465e;
   font: 500 12px/1.5 system-ui;
 }
-:host-context(.atlas-console) #atlas-commands:hover {
+:host-context(.atlas-app-header) #atlas-commands:hover {
   border-color: #cbdde6;
   background: white;
   box-shadow: 0 2px 7px #17334612;
 }
-:host-context(.atlas-console) #atlas-commands kbd {
+:host-context(.atlas-app-header) #atlas-commands kbd {
   padding: 1px 5px;
   border-color: #cfdee6;
   background: white;

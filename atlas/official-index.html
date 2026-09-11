@@ -26,20 +26,28 @@
         /><span>Atlas</span><span class="atlas-admin-badge">Admin</span></a
       >
       <div class="header-right atlas-header-actions">
-        <a class="atlas-return" href="/manage-database">Manage Database</a
+        <a
+          class="atlas-return"
+          href="/manage-database"
+          title="Manage database"
+          aria-label="Manage database"
+          >Database</a
         ><button id="ops-audit" hidden>Review previous mappings</button
-        ><button id="ops-catalog">Package catalogue</button
+        ><button id="ops-catalog" title="Open package catalogue">
+          Packages</button
         ><button id="ops-settings">Settings</button
-        ><button id="ops-history">Deployments</button
+        ><button id="ops-history" title="View deployment history">
+          Deployments</button
         ><a
           class="ops-header-link"
           href="/installer"
           target="_blank"
           rel="noopener"
-          >IT console ↗</a
+          title="Open IT console"
+          >Console ↗</a
         >
         <details class="atlas-header-more">
-          <summary aria-label="More actions">More</summary>
+          <summary aria-label="More actions" title="More actions">More</summary>
           <div id="atlasMoreActions" class="atlas-header-menu">
             <button id="export">Export records ↗</button>
             <button id="import">Import records</button>

@@ -188,6 +188,42 @@ body.atlas-console .atlas-header-actions .atlas-display-mode select {
   outline: 2px solid var(--atlas-focus);
   outline-offset: 3px;
 }
+body:not(.atlas-console) .atlas-header-actions {
+  flex-wrap: nowrap;
+  gap: 3px;
+  max-width: 100%;
+  margin-left: auto;
+  padding: 4px;
+  border: 1px solid #dde8ee;
+  border-radius: 13px;
+  background: #f3f7f9;
+  box-shadow: inset 0 1px 0 #ffffffcc;
+}
+body:not(.atlas-console) .atlas-header-actions > button,
+body:not(.atlas-console) .atlas-header-actions > a,
+body:not(.atlas-console) .atlas-header-actions > .atlas-header-more > summary {
+  min-height: 38px;
+  padding: 8px 11px;
+  border-color: transparent;
+  border-radius: 9px;
+  background: transparent;
+  white-space: nowrap;
+}
+body:not(.atlas-console)
+  .atlas-header-actions
+  > :is(button, a, .atlas-header-more > summary):hover {
+  border-color: #cbdde6;
+  background: white;
+  box-shadow: 0 2px 7px #17334612;
+}
+body:not(.atlas-console) .atlas-header-actions kbd {
+  padding: 1px 5px;
+  border: 1px solid #cfdee6;
+  border-radius: 5px;
+  background: white;
+  color: #527080;
+  font: 10px/1.5 var(--atlas-font);
+}
 body > .workspace {
   grid-template-columns: var(--atlas-sidebar-width) minmax(320px, 1fr) 380px;
 }
@@ -503,6 +539,13 @@ body.atlas-console > main {
     overflow-x: auto;
     justify-content: flex-start;
     flex-wrap: nowrap;
+    scrollbar-width: thin;
+  }
+  body:not(.atlas-console) .atlas-header-actions {
+    width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    justify-content: flex-start;
     scrollbar-width: thin;
   }
   .atlas-header-menu {

@@ -1112,7 +1112,9 @@ backup.onclick = () => {
 };
 if (!readOnly) document.querySelector("#atlasMoreActions").append(backup);
 const refresh = document.createElement("button");
-refresh.textContent = "Refresh records";
+refresh.textContent = "Refresh";
+refresh.title = "Refresh records";
+refresh.setAttribute("aria-label", "Refresh records");
 refresh.onclick = () => window.location.reload();
 document.querySelector(".header-right").append(refresh);
 // Self-contained WebGL renderer: orthographic 3D plan, raised desk markers and traced perimeter walls.
