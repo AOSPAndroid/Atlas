@@ -8,6 +8,8 @@ The **map** helps you explore floors and seating in 2D or 3D. The **IT console**
 
 ## What Atlas can do
 
+**New to the performance tools?** Read the [Remote Admin performance guide](docs/REMOTE_ADMIN_PERFORMANCE.md) for what each CPU, GPU, Memory and Overview button does, how to interpret the results, and a practical slowness investigation workflow. All scans require an explicit button click.
+
 | Area | Capabilities |
 | --- | --- |
 | **Office maps** | Explore multiple floors in 2D and 3D, search desks and rooms, locate colleagues, and manage seating and directory links. |
