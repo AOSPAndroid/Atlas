@@ -64,7 +64,7 @@ const settle = () => new Promise((resolve) => setImmediate(resolve));
   intersect([{ target: card, isIntersecting: true }]);
   assert.equal(effects.length, 1);
   assert(!watched.has(card), "a card reveals only once");
-  assert.equal(effects[0].options.duration, 220);
+  assert.equal(effects[0].options.duration, 320);
   w.AtlasUI.motion.toggle();
   assert(
     effects[0].cancelled,
@@ -102,19 +102,68 @@ const settle = () => new Promise((resolve) => setImmediate(resolve));
     "large batches limit simultaneous effects",
   );
   assert.equal(watched.size, 0);
+  assert.deepEqual(
+    effects.slice(count).map((e) => e.options.delay),
+    [0, 32, 64, 96, 128, 160],
+    "Stagger is bounded so a long list cannot delay reading",
+  );
+  const panel = w.document.createElement("section");
+  w.document.body.append(panel);
+  panel.append(cards[0]);
+  const cardEffect = effects[count];
+  w.AtlasUI.motion.slideUp(panel);
+  assert(
+    cardEffect.cancelled,
+    "A parent entrance replaces active child motion",
+  );
+  const panelEffect = effects.at(-1),
+    nestedCount = effects.length;
+  w.AtlasUI.motion.reveal(cards[0]);
+  assert.equal(
+    effects.length,
+    nestedCount,
+    "Child effects cannot stack inside a moving panel",
+  );
+  panelEffect.onfinish();
+  w.AtlasUI.motion.reveal(cards[0]);
+  assert.equal(
+    effects.length,
+    nestedCount + 1,
+    "Completed effects release the panel",
+  );
+  Object.defineProperty(w.document, "hidden", {
+    configurable: true,
+    value: true,
+  });
+  w.document.dispatchEvent(new w.Event("visibilitychange"));
+  assert(effects.at(-1).cancelled, "Leaving the tab cancels running motion");
+  Object.defineProperty(w.document, "hidden", {
+    configurable: true,
+    value: false,
+  });
   w.dispatchEvent(new w.Event("pagehide"));
-  assert(effects.every((effect) => effect.cancelled));
-  w.AtlasUI.performance.setDisplay('citrix');
-  const remoteCard=w.document.createElement('div');remoteCard.className='machine';
-  w.document.body.append(remoteCard);await settle();
-  assert.equal(watched.size,0,'Citrix mode disconnects scroll observation');
-  const remoteCount=effects.length;
+  assert(effects.every((effect) => effect === panelEffect || effect.cancelled));
+  w.AtlasUI.performance.setDisplay("citrix");
+  const remoteCard = w.document.createElement("div");
+  remoteCard.className = "machine";
+  w.document.body.append(remoteCard);
+  await settle();
+  assert.equal(watched.size, 0, "Citrix mode disconnects scroll observation");
+  const remoteCount = effects.length;
   w.AtlasUI.motion.reveal(remoteCard);
-  assert.equal(effects.length,remoteCount,'Citrix mode skips decorative Web Animations');
-  assert.equal(w.AtlasUI.motion.isReduced(),false,'Display profile preserves the separate animation preference');
-  w.AtlasUI.performance.setDisplay('standard');
-  assert(watched.has(remoteCard),'Standard mode restores scroll observation');
-  w.dispatchEvent(new w.Event('pagehide'));
+  assert.equal(
+    effects.length,
+    remoteCount,
+    "Citrix mode skips decorative Web Animations",
+  );
+  assert.equal(
+    w.AtlasUI.motion.isReduced(),
+    false,
+    "Display profile preserves the separate animation preference",
+  );
+  w.AtlasUI.performance.setDisplay("standard");
+  assert(watched.has(remoteCard), "Standard mode restores scroll observation");
+  w.dispatchEvent(new w.Event("pagehide"));
   w.close();
   console.log(
     "PASS: shared scroll reveals, readable fallback, reduced motion, single entry, removed-card cleanup and bounded batches",

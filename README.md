@@ -203,7 +203,9 @@ Palettes, dialogs, person cards, console pages, and drawers use the same short m
 
 No frontend runtime library was added. Camera movement shares the existing render loop and stops when settled. Cached geometry is reused throughout animations. Regression checks cover rapid selection, manual interruption, cursor anchoring, reduced motion, and rendering after the animation ends.
 
-Machine, person and health cards fade and lift briefly when they first enter view while scrolling. The floating support summary has the same short entrance. Effects share the existing Animations preference across the interface, stop immediately when disabled, and never hide content while waiting to enter view. Scroll reveals use one visibility observer, limit simultaneous effects, and add no scroll animation loop. The shared card effects also apply to the admin map and demo inspectors.
+With **Animations On**, selecting a user or machine brings their details or deployment panel up with a quick slide and soft settle. A brief blue outline marks a selected machine; dialogs and the command palette lift into view. Machine, person and health cards appear in a short cascade while scrolling, with at most six effects per batch and 160 ms of stagger. Buttons also give a small press response. Admin, Demo and the private preview share these effects.
+
+Movement and fades use transforms and opacity; there is no idle animation loop, extra library or remote scan. A panel entrance replaces any card effects inside it, rapid selections replace unfinished entrances, and leaving the tab cancels running effects. Completed effects leave no permanent transforms behind. **Animations Off** and **Citrix / remote** skip these decorative effects immediately. Content stays readable before observation and throughout the stagger.
 
 The map renderer, camera controller, animation switch, person cards, dialog styles and palette are shared source files across admin and viewer. Viewer commands use the common command catalogue and clearly mark unavailable operations; permissions continue to be enforced by the separate read-only server.
 

@@ -154,7 +154,7 @@ const { fixture, root } = require("./ui_fixture.cjs");
     const inspector = w.document.querySelector("#detail");
     const panelEntrances=()=>entrances.filter(e=>e.element===inspector);
     assert.equal(panelEntrances().length,1,'Clicking a person slides up the right panel');
-    assert.equal(panelEntrances()[0].keyframes[0].transform,'translateY(48px)');
+    assert.equal(panelEntrances()[0].keyframes[0].transform,'translateY(58px) scale(0.985)');
     inspector.scrollTop = 320;
     t.renderDetail();
     assert.equal(panelEntrances().length,1,"Refreshing details does not replay selection motion");

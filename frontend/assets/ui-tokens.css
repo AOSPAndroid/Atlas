@@ -8,7 +8,7 @@
   --atlas-surface: #fff;
   --atlas-font: system-ui, sans-serif;
   --atlas-motion-fast: 160ms;
-  --atlas-motion-enter: 260ms;
+  --atlas-motion-enter: 380ms;
   --atlas-ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
 .atlas-person {
@@ -214,7 +214,7 @@
 @keyframes atlas-reveal {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(18px);
   }
   to {
     opacity: 1;
@@ -224,7 +224,7 @@
 @keyframes atlas-dialog-enter {
   from {
     opacity: 0;
-    transform: translateY(10px) scale(0.985);
+    transform: translateY(30px) scale(0.975);
   }
   to {
     opacity: 1;
@@ -246,7 +246,6 @@ dialog[open]::backdrop {
   animation: atlas-backdrop-enter var(--atlas-motion-fast) ease-out;
 }
 .page.active,
-#detail.open > .record-head,
 #toast > .toast {
   animation: atlas-reveal var(--atlas-motion-enter) var(--atlas-ease);
 }
@@ -258,9 +257,45 @@ dialog[open]::backdrop {
     background-color var(--atlas-motion-fast),
     border-color var(--atlas-motion-fast);
 }
+/* One quiet blue pulse marks a new target; the card itself stays steady. */
+.machine,
+.ops-machine {
+  position: relative;
+}
+.machine.selected::after,
+.ops-machine.chosen::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border: 2px solid #00aeef;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  animation: atlas-target-pulse 460ms var(--atlas-ease);
+}
+@keyframes atlas-target-pulse {
+  from {
+    opacity: 0.65;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.045);
+  }
+}
+/* Independent scale preserves positioning transforms used by floating controls. */
+html[data-atlas-motion="full"]:not([data-atlas-display="citrix"])
+  button:enabled:not([aria-disabled="true"]):active {
+  scale: 0.97;
+}
 html[data-atlas-motion="reduce"] {
   --atlas-motion-fast: 0ms;
   --atlas-motion-enter: 0ms;
+}
+html[data-atlas-display="citrix"] {
+  --atlas-motion-fast: 0ms;
+  --atlas-motion-enter: 0ms;
+  --atlas-palette-backdrop: none;
 }
 html[data-atlas-motion="reduce"] *,
 html[data-atlas-motion="reduce"] *::before,

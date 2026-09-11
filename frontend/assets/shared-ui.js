@@ -71,7 +71,10 @@
     applyMotion();
   }
   const activeReveals = new Map();
-  function reveal(element, { distance = 8, duration = 220 } = {}) {
+  function reveal(
+    element,
+    { distance = 18, duration = 320, delay = 0, settle = false } = {},
+  ) {
     activeReveals.get(element)?.cancel();
     if (
       isReduced() ||
@@ -88,13 +91,35 @@
       parent = parent.parentElement
     )
       if (activeReveals.has(parent)) return;
-    const animation = element.animate(
-      [
-        { opacity: 0.45, transform: `translateY(${distance}px)` },
-        { opacity: 1, transform: "translateY(0)" },
-      ],
-      { duration, easing: "cubic-bezier(0.22, 1, 0.36, 1)" },
-    );
+    // If a panel opens after its cards appeared, replace their entrances with one motion.
+    for (const [child, animation] of activeReveals)
+      if (element.contains(child)) animation.cancel();
+    const frames = settle
+      ? [
+          {
+            opacity: 0.2,
+            transform: `translateY(${distance}px) scale(0.985)`,
+            offset: 0,
+            easing: "cubic-bezier(0.16, 1, 0.3, 1)",
+          },
+          {
+            opacity: 1,
+            transform: "translateY(-2px) scale(1)",
+            offset: 0.78,
+            easing: "ease-in-out",
+          },
+          { opacity: 1, transform: "translateY(0) scale(1)", offset: 1 },
+        ]
+      : [
+          { opacity: 0.3, transform: `translateY(${distance}px)` },
+          { opacity: 1, transform: "translateY(0)" },
+        ];
+    const animation = element.animate(frames, {
+      duration,
+      delay,
+      fill: "backwards",
+      easing: settle ? "linear" : "cubic-bezier(0.22, 1, 0.36, 1)",
+    });
     activeReveals.set(element, animation);
     const clear = () => {
       if (activeReveals.get(element) === animation)
@@ -103,7 +128,8 @@
     animation.onfinish = clear;
     animation.oncancel = clear;
   }
-  const slideUp = (element) => reveal(element, { distance: 48, duration: 380 });
+  const slideUp = (element) =>
+    reveal(element, { distance: 58, duration: 440, settle: true });
   const clearReveals = () => {
     for (const animation of activeReveals.values()) animation.cancel();
     activeReveals.clear();
@@ -112,6 +138,9 @@
     if (isReduced() || isCitrix()) clearReveals();
   });
   window.addEventListener("pagehide", clearReveals);
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) clearReveals();
+  });
   function installScrollReveals() {
     if (typeof IntersectionObserver === "undefined") return;
     const selector =
@@ -127,7 +156,7 @@
           observed.delete(entry.target);
           seen.add(entry.target);
           // Limit simultaneous effects when a long result list first appears.
-          if (animated++ < 6) reveal(entry.target);
+          if (animated < 6) reveal(entry.target, { delay: animated++ * 32 });
         }
       },
       { threshold: 0.08 },

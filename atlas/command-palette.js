@@ -33,7 +33,7 @@ export function installCommandPalette({
   const root = mount.attachShadow({ mode: "open" });
   const sheet = document.createElement("link");
   sheet.rel = "stylesheet";
-  sheet.href = "/command-palette.css?v=75";
+  sheet.href = "/command-palette.css?v=76";
   root.append(sheet);
   const trigger = document.createElement("button");
   trigger.id = "atlas-commands";
