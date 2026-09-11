@@ -9,7 +9,7 @@
     <title>Atlas</title>
     <link rel="stylesheet" href="style.css?v=8" />
     <link rel="stylesheet" href="operations.css?v=2" />
-    <link rel="stylesheet" href="official.css?v=77" />
+    <link rel="stylesheet" href="official.css?v=78" />
     <link rel="stylesheet" href="/assets/machine-health.css" />
     <link rel="stylesheet" href="/assets/atlas-shell.css" />
     <link rel="stylesheet" href="/assets/catalogue.css" />
@@ -148,16 +148,19 @@
             </div>
           </div>
           <nav class="floor-rail" aria-label="Floor selection"></nav>
-          <div class="map-tools">
-            <button id="zoom-in" aria-label="Zoom in">＋</button
-            ><button id="zoom-out" aria-label="Zoom out">−</button
+          <div class="map-tools" role="group" aria-label="Map navigation">
+            <button id="zoom-in" aria-label="Zoom in" title="Zoom in">＋</button
+            ><button id="zoom-out" aria-label="Zoom out" title="Zoom out">
+              −</button
             ><button
               id="reset"
               aria-label="Fit floor"
               title="Fit the whole floor to the map"
             >
-              ⌖ Fit floor</button
-            ><button id="rotate" aria-label="Rotate view">↻</button>
+              ⛶</button
+            ><button id="rotate" aria-label="Rotate view" title="Rotate view">
+              ↻
+            </button>
           </div>
           <output id="map-metrics" hidden></output>
           <div id="hover" hidden></div>
