@@ -90,6 +90,26 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
     assert(calls.slice(start).some(url=>url.includes('/api/user/id%3A1')));
     assert(!calls.slice(start).some(url=>/\/api\/(assistant|machine-health|performance)\//.test(url)));
   }
+  // Filters are local and preserve target identity, row indices and assignment order.
+  const machines = [
+    {name:'GBRPWMF123', assigned_relationship:1}, {name:'PARPWMK123', assigned_relationship:1},
+    {name:'NYKPWMK234'}, {name:'SGPPWMVDI345'}, {name:'NYKPLM456'}, {name:'ODD-PC'}
+  ];
+  f.run('S.machines='+JSON.stringify(machines)+';S.target="GBRPWMF123";renderMachines()');
+  const filterHost=doc.querySelector('#machines'), networkBefore=calls.length;
+  const visible=()=>[...filterHost.querySelectorAll('[data-machine]:not([hidden])')].map(row=>Number(row.dataset.machine));
+  const press=kind=>filterHost.querySelector('[data-kind="'+kind+'"]').click();
+  assert.deepEqual(visible(),[0,1,2,3,4,5]);
+  press('kiosk');assert.deepEqual(visible(),[1,2]);
+  press('vdi');assert.deepEqual(visible(),[1,2,3]);
+  assert.equal(f.run('S.target'),'GBRPWMF123');
+  press('all');assert.deepEqual(visible(),[0,1,2,3,4,5]);
+  assert(filterHost.querySelector('[data-machine="0"]').classList.contains('selected'));
+  press('other');assert.deepEqual(visible(),[4,5]);
+  assert.equal(calls.length,networkBefore,'Filtering performs no fetch or remote scan');
+  for(const name of ['GBRPWMK1','PARPWMK2','NYKPWMK3','SGPPWMK4','nykpwmk5.example.test'])
+    assert.equal(w.AtlasUI.machineKind({name}),'kiosk');
+  assert.equal(w.AtlasUI.machineKind({name:'NYKPLM1'}),'other','K in country code is not a kiosk');
   assert.equal(f.errors.length,0,f.errors.join('\n'));w.close();
   console.log('PASS: grouped user details, no legacy placeholders or duplicate devices, domain copy, manager/team/office search, unchanged target, modal protection, clean person switching and mapped-person palette lookups staying in the Console Workspace');
 })().catch(error=>{console.error(error);process.exit(1);});

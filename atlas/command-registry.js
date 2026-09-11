@@ -124,7 +124,7 @@ export const COMMANDS = [
     "database import excel moves",
   ],
   ["view", "Switch 2D / 3D map", "Change the map view", "map view 2d 3d"],
-  ["reset", "Reset map view", "Fit the current floor", "reset zoom map"],
+  ["reset", "Fit floor", "Fit the current floor", "reset zoom map"],
   [
     "refresh",
     "Refresh records",

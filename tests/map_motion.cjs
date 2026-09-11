@@ -24,7 +24,12 @@ const { fixture, root } = require("./ui_fixture.cjs");
                     desk,
                     user: null,
                     candidates: [],
-                    machines: [],
+                    machines: [
+                      {name:'GBRPWMF123',assigned_relationship:1,relationship_group:'Assigned to user'},
+                      {name:'PARPWMK123',assigned_relationship:1,relationship_group:'Assigned to user'},
+                      {name:'NYKPWMK456',relationship_group:'Last logged on (inventory)'},
+                      {name:'SGPPWMVDI123',relationship_group:'Last logged on (inventory)'}
+                    ],
                     deployments: [],
                     match_method: "unmatched",
                   }
@@ -105,21 +110,25 @@ const { fixture, root } = require("./ui_fixture.cjs");
       Object.defineProperty(event, "pointerId", { value: id });
       this.dispatchEvent(event);
     };
+    const viewport = { clientWidth: 900, clientHeight: 650 };
+    let resize;
+    w.ResizeObserver = class { constructor(callback) { resize = callback; } observe() {} };
     w.HTMLCanvasElement.prototype.getBoundingClientRect = () => ({
       left: 0,
       top: 0,
-      width: 900,
-      height: 650,
+      width: viewport.clientWidth,
+      height: viewport.clientHeight,
+      right: viewport.clientWidth,
     });
     for (const [key, value] of [
       ["clientWidth", 900],
       ["clientHeight", 650],
     ])
       Object.defineProperty(w.HTMLCanvasElement.prototype, key, {
-        get: () => value,
+        get: () => viewport[key],
       });
     const t = await f.map(`
-    export {selectRecord, renderDetail, setFloor, setView, focusTarget, cameraMotion, inversePoint, projected, world, settleMotion, draw};
+    export {fitTarget, mapArea, modelPoint, resetCam, selectRecord, renderDetail, setFloor, setView, focusTarget, cameraMotion, inversePoint, projected, world, settleMotion, draw};
     export function graphicsState(){return {ready:glReady,error:glError,view}}
     export function state(){return {...cam}}
     export function currentCanvas(){return canvas}
@@ -497,6 +506,46 @@ const { fixture, root } = require("./ui_fixture.cjs");
     t.setView('3d');step(34);assert(t.graphicsState().ready,'Explicit retry succeeds without reloading');
     assert.equal(t.graphicsState().view,'3d');assert(uploads>beforeUploads,'Recovered context gets fresh buffers');
     await new Promise(setImmediate);
+    // Fit every floor in both renderers, including narrow / short remote windows.
+    for (const [width, height] of [[420, 380], [900, 650], [1600, 440]]) {
+      viewport.clientWidth = width; viewport.clientHeight = height;
+      for (const mode of ["plan", "3d"]) {
+        t.setView(mode);
+        for (const floor of data.floors) {
+          t.setFloor(floor.level); step(600);
+          const area = t.mapArea();
+          for (const point of floor.geometry.outline) {
+            for (const elevation of mode === "3d" ? [0, 4] : [0]) {
+              const [x, y] = t.projected(t.modelPoint(...point, floor.level, elevation));
+              assert(x >= area.left - .01 && x <= area.right + .01, "Floor fits horizontally");
+              assert(y >= area.top - .01 && y <= area.bottom + .01, "Floor fits vertically");
+            }
+          }
+        }
+      }
+    }
+    t.setFloor(2); t.setView("plan"); step(600);
+    viewport.clientWidth = 600; resize(); step(600);
+    close(t.state(), t.fitTarget());
+    t.selectRecord(people[0].id); step(430);
+    assert(!t.cameraMotion.active, "Gentle focus completes within 420 ms");
+    assert(t.state().scale < 3, "Search never forces the old 3x minimum zoom");
+    const area = t.mapArea(), point = t.projected(t.world(people[0]));
+    assert(Math.abs(point[0] - (area.left + area.right) / 2) < 1);
+    assert(Math.abs(point[1] - (area.top + area.bottom) / 2) < 1);
+    const manual = t.state(); viewport.clientWidth = 800; resize(); step(600);
+    close(t.state(), manual); // Resizing must not undo a user's focused/panned view.
+    await new Promise(setImmediate);
+    const machineHost=w.document.querySelector(readOnly ? '#ops-context [data-machine-list]' : '.ops-machines');
+    assert(machineHost, 'Both map modes expose filterable linked machines');
+    const shown=()=>[...machineHost.querySelectorAll('[data-machine-kind]:not([hidden])')].map(row=>row.dataset.machineKind);
+    machineHost.querySelector('[data-kind="kiosk"]').click();
+    assert.deepEqual(shown(),['kiosk','kiosk']);
+    machineHost.querySelector('[data-kind="vdi"]').click();
+    assert.deepEqual(shown(),['kiosk','kiosk','vdi']);
+    machineHost.querySelector('[data-kind="all"]').click();
+    assert.deepEqual(shown(),['desktop','kiosk','kiosk','vdi']);
+
     assert.equal(f.errors.length, 0, f.errors.join("\n"));
     w.close();
   }

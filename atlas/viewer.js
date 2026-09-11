@@ -20,13 +20,14 @@ const relationship = (row) =>
         : row.match_type || "Directory inventory";
 function machinesCard(machines, inspect = true) {
   return (
-    '<h3>Stored machine details</h3><p class="ops-muted">Directory inventory; no live or elevated checks are run.</p>' +
+    `<div${inspect ? " data-machine-list" : ""}><h3>Stored machine details</h3><p class="ops-muted">Directory inventory; no live or elevated checks are run.</p>` +
     (machines
       .map((m) => {
         const name = m.name || m.machine_name;
-        return `<article class="viewer-machine"><b>${esc(name)}</b><p class="ops-muted">${esc(relationship(m))}</p><p>${esc(m.model_id || "Model not supplied")} · ${esc(m.operational_status || "Status not supplied")} (inventory)</p>${AtlasUI.machineDetails(m, { open: !inspect })}${inspect ? `<button type="button" data-machine="${esc(name)}">Inspect machine</button>` : ""}</article>`;
+        return `<article class="viewer-machine" data-machine-kind="${AtlasUI.machineKind(m)}"><b>${esc(name)}</b><p class="ops-muted">${esc(relationship(m))}</p><p>${esc(m.model_id || "Model not supplied")} · ${esc(m.operational_status || "Status not supplied")} (inventory)</p>${AtlasUI.machineDetails(m, { open: !inspect })}${inspect ? `<button type="button" data-machine="${esc(name)}">Inspect machine</button>` : ""}</article>`;
       })
-      .join("") || "<p>No linked machines recorded.</p>")
+      .join("") || "<p>No linked machines recorded.</p>") +
+    "</div>"
   );
 }
 function deskButtons(desks) {
@@ -63,6 +64,9 @@ export function createViewerOperations({ onSelect, toast }) {
   document.querySelector(".empty-detail").innerHTML =
     '<span class="eyebrow">SHARED ATLAS</span><h2>Find a desk or colleague.</h2><p>Search people, machines and locations with Ctrl+K, or explore all ten floors.</p><small>Shared directory and inventory. Changes and elevated operations require the local admin version.</small>';
   function bindLinks(host) {
+    host
+      .querySelectorAll("[data-machine-list]")
+      .forEach(AtlasUI.machineFilters);
     host
       .querySelectorAll("[data-person]")
       .forEach((b) => (b.onclick = () => openPerson(b.dataset.person)));

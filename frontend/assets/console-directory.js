@@ -116,7 +116,7 @@ function renderKyc() {
 function renderMachines() {
   if (!S.machines.length) return ($("#machines").innerHTML = "");
   $("#machines").innerHTML =
-    `<small>LINKED MACHINES · ${S.machines.length}</small><div class=machinegrid>${S.machines.map((m, i) => `<div class="card machine" data-machine="${i}"><button class=copyhost data-host="${i}">Copy</button><span class="state ${String(m.operational_status).toLowerCase() === "operational" ? "" : "bad"}">● ${esc(m.operational_status)}</span><h3>${esc(m.name)}</h3><div class=facts><span>Match<b>${esc(m.match_type || "Hostname")}</b></span><span>Model<b>${esc(m.model_id || "—")}</b></span><span>Inventory discovered<b>${esc(m.last_discovered || "Not supplied")}</b></span><span>Record updated<b>${esc(m.updated_on || "Not supplied")}</b></span></div></div>`).join("")}</div>`;
+    `<small>LINKED MACHINES · ${S.machines.length}</small><div class=machinegrid>${S.machines.map((m, i) => `<div class="card machine ${m.name === S.target ? "selected" : ""}" data-machine-kind="${AtlasUI.machineKind(m)}" data-machine="${i}"><button class=copyhost data-host="${i}">Copy</button><span class="state ${String(m.operational_status).toLowerCase() === "operational" ? "" : "bad"}">● ${esc(m.operational_status)}</span><h3>${esc(m.name)}</h3><div class=facts><span>Match<b>${esc(m.match_type || "Hostname")}</b></span><span>Model<b>${esc(m.model_id || "—")}</b></span><span>Inventory discovered<b>${esc(m.last_discovered || "Not supplied")}</b></span><span>Record updated<b>${esc(m.updated_on || "Not supplied")}</b></span></div></div>`).join("")}</div>`;
   $$("[data-machine]").forEach(
     (x) =>
       (x.onclick = () =>
@@ -136,6 +136,7 @@ function renderMachines() {
     let m = S.machines[0];
     setTarget(m.name, m.operational_status);
   }
+  AtlasUI.machineFilters($("#machines"));
   bindMachineContext();
   document.querySelectorAll("#machines [data-machine]").forEach((card) => {
     const m = S.machines[Number(card.dataset.machine)];

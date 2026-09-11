@@ -120,6 +120,7 @@ export function createOperations({
         findUser(g);
       }
     };
+    AtlasUI.machineFilters(q(".ops-machines"));
     showCandidates(current.candidates, g);
     host()
       .querySelectorAll('[name="ops-machine"]')
@@ -469,7 +470,7 @@ export function createOperations({
                 group,
             );
           return rows.length
-            ? `<div class="ops-machine-group"><h4>${esc(group)} <span>${rows.length}</span></h4>${rows.map(({ m, i }) => `<div class="ops-machine-entry"><label class="ops-machine"><input type="radio" name="ops-machine" value="${i}"><div><b>${esc(m.name)}</b>${window.AtlasHealth.badges(m)}<span>${esc(m.model_id || "Model unavailable")} · ${esc(m.operational_status || "Status unavailable")} (inventory)</span><small>${esc(m.match_type || m.link_source || "Recorded at this desk")}${m.desk_equipment && m.assigned_relationship ? " · Also recorded at this desk" : ""}</small><small>Inventory discovered: ${esc(m.inventory_discovered_at || m.last_discovered || "Not supplied")}</small><small>Record updated: ${esc(m.inventory_updated_at || m.updated_on || "Not supplied")}</small></div></label>${AtlasUI.machineDetails(m)}</div>`).join("")}</div>`
+            ? `<div class="ops-machine-group"><h4>${esc(group)} <span>${rows.length}</span></h4>${rows.map(({ m, i }) => `<div class="ops-machine-entry" data-machine-kind="${AtlasUI.machineKind(m)}"><label class="ops-machine"><input type="radio" name="ops-machine" value="${i}"><div><b>${esc(m.name)}</b>${window.AtlasHealth.badges(m)}<span>${esc(m.model_id || "Model unavailable")} · ${esc(m.operational_status || "Status unavailable")} (inventory)</span><small>${esc(m.match_type || m.link_source || "Recorded at this desk")}${m.desk_equipment && m.assigned_relationship ? " · Also recorded at this desk" : ""}</small><small>Inventory discovered: ${esc(m.inventory_discovered_at || m.last_discovered || "Not supplied")}</small><small>Record updated: ${esc(m.inventory_updated_at || m.updated_on || "Not supplied")}</small></div></label>${AtlasUI.machineDetails(m)}</div>`).join("")}</div>`
             : "";
         })
         .join("") ||

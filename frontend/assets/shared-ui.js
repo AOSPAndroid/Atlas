@@ -565,7 +565,93 @@
     },
     true,
   );
+  function machineKind(machine) {
+    const name = String(machine.name || machine.machine_name || "")
+      .trim()
+      .toUpperCase()
+      .split(".")[0];
+    // The K belongs to PWMK, not the country prefix (e.g. NYK).
+    if (/^[A-Z]{3}PWMK/.test(name)) return "kiosk";
+    if (name.includes("VDI")) return "vdi";
+    if (/^[A-Z]{3}PWMF/.test(name)) return "desktop";
+    return "other";
+  }
+  function machineFilters(host) {
+    if (!host || host.querySelector(":scope > .atlas-machine-filters")) return;
+    const rows = [...host.querySelectorAll("[data-machine-kind]")];
+    if (!rows.length) return;
+    const types = [
+      ["all", "All"],
+      ["desktop", "Dedicated desktops"],
+      ["vdi", "VDI"],
+      ["kiosk", "Kiosks"],
+      ["other", "Other"],
+    ];
+    const bar = document.createElement("div");
+    bar.className = "atlas-machine-filters";
+    bar.innerHTML =
+      '<div role="group" aria-label="Filter machine types"></div><small aria-live="polite"></small>';
+    const group = bar.firstElementChild,
+      status = bar.lastElementChild;
+    const selected = new Set();
+    const empty = document.createElement("p");
+    empty.className = "atlas-machine-filter-empty";
+    empty.textContent =
+      "No machines match these filters. Choose All to show every linked machine.";
+    empty.hidden = true;
+    host.prepend(bar);
+    host.append(empty);
+    const update = () => {
+      for (const row of rows)
+        row.hidden =
+          selected.size > 0 && !selected.has(row.dataset.machineKind);
+      for (const button of group.children)
+        button.setAttribute(
+          "aria-pressed",
+          button.dataset.kind === "all"
+            ? !selected.size
+            : selected.has(button.dataset.kind),
+        );
+      const count = rows.filter((row) => !row.hidden).length;
+      status.textContent = `${count} of ${rows.length} machines · Select one or more types`;
+      empty.hidden = count > 0;
+      for (const section of host.querySelectorAll(".ops-machine-group")) {
+        const visible = [
+          ...section.querySelectorAll("[data-machine-kind]"),
+        ].filter((row) => !row.hidden).length;
+        section.hidden = !visible;
+        const countLabel = section.querySelector("h4 span");
+        if (countLabel) countLabel.textContent = visible;
+      }
+    };
+    for (const [kind, label] of types) {
+      const count =
+        kind === "all"
+          ? rows.length
+          : rows.filter((row) => row.dataset.machineKind === kind).length;
+      if (kind === "other" && !count) continue;
+      const button = document.createElement("button");
+      button.type = "button";
+      button.dataset.kind = kind;
+      button.textContent = `${label} (${count})`;
+      button.disabled = !count;
+      button.title =
+        kind === "other"
+          ? "Hostnames outside the confirmed PWMF, PWMK and VDI patterns"
+          : "Filter this machine list; the selected target stays unchanged";
+      button.onclick = () => {
+        if (kind === "all") selected.clear();
+        else if (selected.has(kind)) selected.delete(kind);
+        else selected.add(kind);
+        update();
+      };
+      group.append(button);
+    }
+    update();
+  }
   window.AtlasUI = {
+    machineKind,
+    machineFilters,
     esc,
     person,
     domainAccount,

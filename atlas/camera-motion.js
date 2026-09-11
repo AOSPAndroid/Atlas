@@ -76,7 +76,7 @@ export function createCameraMotion({
       for (const key of ["cx", "cz", "yaw", "tilt"])
         value[key] = blend(from[key], target[key], t);
       value.scale = Math.max(
-        0.5,
+        Math.min(0.5, from.scale, target.scale),
         Math.min(
           16,
           Math.exp(

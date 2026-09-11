@@ -137,6 +137,7 @@ let records = data.records,
   selected = null,
   view = "plan",
   placing = false,
+  floorFitted = true,
   lastMatches = [],
   cam = { yaw: -0.14, tilt: 1.0, scale: 1, cx: 0, cz: 0 };
 const motionPreference = {
@@ -467,21 +468,86 @@ function setFloor(n, reset = true) {
 function stopFocus() {
   cameraMotion.cancel();
 }
-function focusTarget(r) {
+// Canvas dimensions already exclude the desktop sidebars. Also leave room for
+// the floor rail, map controls and any inspector overlapping a narrow map.
+function mapArea() {
+  const w = Math.max(1, canvas.clientWidth),
+    h = Math.max(1, canvas.clientHeight);
+  const rect = canvas.getBoundingClientRect();
+  const detail = $("#detail.open")?.getBoundingClientRect();
+  let right = w - Math.min(60, w * 0.12);
+  if (
+    detail?.width &&
+    detail.left > rect.left + 180 &&
+    detail.left < rect.right
+  )
+    right = Math.min(right, detail.left - rect.left - 18);
+  return {
+    left: Math.min(65, w * 0.15),
+    right,
+    top: Math.min(65, h * 0.15),
+    bottom: h - Math.min(65, h * 0.15),
+  };
+}
+function fitTarget() {
   const saved = cam,
-    w = canvas.clientWidth,
-    h = canvas.clientHeight;
-  const unit = Math.min(w / 112, h / 78),
-    deskPixels = w < 600 ? 55 : 65;
+    area = mapArea();
   const goal = {
     yaw: view === "plan" ? 0 : -0.14,
-    tilt: view === "plan" ? Math.PI / 2 : 1.12,
-    scale: Math.min(16, Math.max(3, deskPixels / (2.55 * unit))),
+    tilt: view === "plan" ? Math.PI / 2 : 1,
+    scale: 1,
+    cx: 0,
+    cz: 0,
+  };
+  cam = goal;
+  const geometry = data.floors.find((f) => f.level === floor).geometry;
+  const points = geometry.outline.flatMap((p) =>
+    (view === "3d" ? [0, 4] : [0]).map((height) =>
+      projected(modelPoint(...p, floor, height)),
+    ),
+  );
+  const xs = points.map((p) => p[0]),
+    ys = points.map((p) => p[1]);
+  const minX = Math.min(...xs),
+    maxX = Math.max(...xs),
+    minY = Math.min(...ys),
+    maxY = Math.max(...ys);
+  const center = inversePoint((minX + maxX) / 2, (minY + maxY) / 2);
+  goal.cx = center[0];
+  goal.cz = center[1];
+  goal.scale = Math.max(
+    0.05,
+    Math.min(
+      16,
+      (area.right - area.left) / Math.max(1, maxX - minX),
+      (area.bottom - area.top) / Math.max(1, maxY - minY),
+    ),
+  );
+  const desired = inversePoint(
+    (area.left + area.right) / 2,
+    (area.top + area.bottom) / 2,
+  );
+  goal.cx += goal.cx - desired[0];
+  goal.cz += goal.cz - desired[1];
+  cam = saved;
+  return goal;
+}
+function focusTarget(r) {
+  const saved = cam,
+    area = mapArea(),
+    fit = fitTarget();
+  // Keep the surrounding desk bank visible, even on smaller Citrix windows.
+  const goal = {
+    ...fit,
+    scale: Math.min(2.2, fit.scale * 1.65),
     cx: world(r)[0],
     cz: world(r)[2],
   };
   cam = goal;
-  const desired = inversePoint(w * 0.5, h * 0.46);
+  const desired = inversePoint(
+    (area.left + area.right) / 2,
+    (area.top + area.bottom) / 2,
+  );
   goal.cx += goal.cx - desired[0];
   goal.cz += goal.cz - desired[1];
   cam = saved;
@@ -489,7 +555,8 @@ function focusTarget(r) {
 }
 function focusPerson(r) {
   stopFocus();
-  cameraMotion.to(focusTarget(r), { duration: 720, panoramic: true });
+  floorFitted = false;
+  cameraMotion.to(focusTarget(r), { duration: 420 });
   locateBeacon();
   draw();
 }
@@ -825,6 +892,7 @@ function setView(v, animate = false) {
     yaw: v === "plan" ? 0 : -0.14,
     tilt: v === "plan" ? Math.PI / 2 : 1,
   };
+  if (floorFitted) Object.assign(goal, fitTarget());
   if (animate && changed) {
     revealMap();
     if (v === "3d") cameraMotion.to(goal, { duration: 480, kind: "view" });
@@ -839,27 +907,17 @@ function resetCam(animate = true) {
   stopFocus();
   cancelMapGesture();
   clearLocator();
-  const goal = {
-    yaw: view === "plan" ? 0 : -0.14,
-    tilt: view === "plan" ? Math.PI / 2 : 1,
-    scale: 1.06,
-    cx: 0,
-    cz: 0,
-  };
-  const g = data.floors.find((f) => f.level === floor).geometry,
-    points = g.outline.map((p) => modelPoint(...p));
-  goal.cz =
-    (Math.min(...points.map((p) => p[2])) +
-      Math.max(...points.map((p) => p[2]))) /
-    2;
+  floorFitted = true;
+  const goal = fitTarget();
   if (animate) cameraMotion.to(goal, { duration: 550, kind: "reset" });
   else cam = goal;
   draw();
 }
 $("#reset").onclick = () => resetCam();
 function zoomCamera(factor, anchor) {
+  floorFitted = false;
   const goal = cameraMotion.destination("zoom");
-  goal.scale = Math.max(0.5, Math.min(16, goal.scale * factor));
+  goal.scale = Math.max(0.05, Math.min(16, goal.scale * factor));
   if (anchor) {
     const saved = cam;
     const before = inversePoint(...anchor);
@@ -874,6 +932,7 @@ function zoomCamera(factor, anchor) {
 $("#zoom-in").onclick = () => zoomCamera(1.25);
 $("#zoom-out").onclick = () => zoomCamera(1 / 1.25);
 $("#rotate").onclick = () => {
+  floorFitted = false;
   const goal = cameraMotion.destination("rotate");
   goal.yaw += Math.PI / 8;
   cameraMotion.to(goal, { duration: 340, kind: "rotate" });
@@ -1886,7 +1945,10 @@ $("#map-labels").onclick = (e) => {
   if (b) selectRecord(b.dataset.person);
 };
 
-new ResizeObserver(() => draw()).observe($("#viewport"));
+new ResizeObserver(() => {
+  if (floorFitted && ready) resetCam(false);
+  else draw();
+}).observe($("#viewport"));
 function cancelMapGesture() {
   drag = null;
   pinchDistance = 0;
@@ -1901,6 +1963,7 @@ function cancelMapGesture() {
 onMap("pointerdown", (e) => {
   if (e.currentTarget !== canvas || e.button > 2 || pointers.size >= 2) return;
   e.preventDefault();
+  floorFitted = false;
   stopFocus();
   clearLocator();
   draggedContext = false;
@@ -1936,7 +1999,7 @@ onMap("pointermove", (e) => {
     const p = [...pointers.values()],
       d = Math.hypot(p[0][0] - p[1][0], p[0][1] - p[1][1]);
     if (pinchDistance)
-      cam.scale = Math.max(0.5, Math.min(16, (cam.scale * d) / pinchDistance));
+      cam.scale = Math.max(0.05, Math.min(16, (cam.scale * d) / pinchDistance));
     pinchDistance = d;
     draw();
     return;

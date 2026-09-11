@@ -272,3 +272,10 @@ html[data-atlas-motion="reduce"] .map-tools button:hover,
 html[data-atlas-motion="reduce"] .map-tools button:active {
   transform: none;
 }
+
+.map-tools #reset {
+  width: auto;
+  padding: 8px 12px;
+  font-size: 12px;
+  white-space: nowrap;
+}
