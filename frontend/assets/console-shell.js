@@ -22,6 +22,7 @@ function page(id) {
     else b.removeAttribute("aria-current");
   });
   if (id === "history") history();
+  if (id === "psexec") window.AtlasPsExec?.open();
   syncDeploymentPanel();
 }
 async function init() {
@@ -488,6 +489,7 @@ function bindCommandDiscovery() {
     .setAttribute("aria-label", "Close keyboard shortcuts");
 }
 async function openPaletteTarget() {
+  if (location.hash === "#psexec") page("psexec");
   const params = new URLSearchParams(location.search),
     person = params.get("person"),
     machine = params.get("machine");

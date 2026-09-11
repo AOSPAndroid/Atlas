@@ -26,8 +26,8 @@ async function until(fn){for(let i=0;i<100;i++){if(fn())return;await sleep(30)}t
  assert.equal(w.document.querySelector('.header-actions .atlas-motion-toggle'),null);
  await vm.runInContext("runSharedCommand('animations')",context);assert(w.AtlasUI.motion.isReduced());assert.equal(w.localStorage.getItem('atlas-motion'),'reduce');
  await vm.runInContext("runSharedCommand('animations')",context);assert(!w.AtlasUI.motion.isReduced());assert.equal(w.localStorage.getItem('atlas-motion'),'full');
- for(const page of ['admin','bulk','history','workspace']){w.document.querySelector(`[data-page="${page}"]`).click();assert(w.document.querySelector('#'+page).classList.contains('active'));assert(w.document.querySelector('#pageTitle').textContent.trim().length>0)}
- assert.equal(w.document.querySelectorAll('nav .nav-label').length,4);
+ for(const page of ['admin','bulk','history','psexec','workspace']){w.document.querySelector(`[data-page="${page}"]`).click();assert(w.document.querySelector('#'+page).classList.contains('active'));assert(w.document.querySelector('#pageTitle').textContent.trim().length>0)}
+ assert.equal(w.document.querySelectorAll('nav .nav-label').length,5);
  for(const [toggle,drawer,close] of [['queueToggle','queueDrawer','closeQueue'],['deploymentsToggle','deploymentsDrawer','closeDeployments']]){w.document.querySelector('#'+toggle).click();assert(w.document.querySelector('#'+drawer).classList.contains('open'));w.document.querySelector('#'+close).click();assert(!w.document.querySelector('#'+drawer).classList.contains('open'))}
  // Disclosure clicks, panel exclusivity, Escape, and focus restoration.
  const q=w.document.querySelector('#queueToggle'),live=w.document.querySelector('#deploymentsToggle');
@@ -50,5 +50,5 @@ async function until(fn){for(let i=0;i<100;i++){if(fn())return;await sleep(30)}t
  await until(()=>w.document.querySelector('#kyc .usercard'));assert(w.document.querySelector('.lookup-column #kyc .usercard'));
  assert(w.document.querySelector('.deployment-panel #deploy'));
  const ids=[...w.document.querySelectorAll('[id]')].map(e=>e.id);assert.equal(ids.length,new Set(ids).size,'unique control IDs');
- await sleep(200);assert.equal(errors.length,0,errors.join('\n'));console.log('PASS: console initialization, labelled navigation, four pages, queue/live drawers, real directory lookup, new layout anchors, unique IDs');w.close();
+ await sleep(200);assert.equal(errors.length,0,errors.join('\n'));console.log('PASS: console initialization, labelled navigation, five pages, queue/live drawers, real directory lookup, new layout anchors, unique IDs');w.close();
 })().catch(e=>{console.error(e);process.exit(1)});

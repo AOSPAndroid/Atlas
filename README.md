@@ -10,6 +10,8 @@ The **map** helps you explore floors and seating in 2D or 3D. The **IT console**
 
 **New to the performance tools?** Read the [Remote Admin performance guide](docs/REMOTE_ADMIN_PERFORMANCE.md) for what each CPU, GPU, Memory and Overview button does, how to interpret the results, and a practical slowness investigation workflow. All scans require an explicit button click.
 
+**PsExec workbench:** In the admin IT console, open **PsExec** below **History** for 22 searchable command templates: Excel and session checks, process/memory snapshots, events, networking, services and repairs. The selected machine carries over and the executable defaults to `C:\Data\PsExec.exe` (editable for `PsExec64.exe` or another folder). Choose PowerShell or Command Prompt, review the target command and copy it to your terminal. Favourite commands and executable/shell preferences are remembered in this browser. Nothing runs from the tab; terminal output is not recorded in deployment History. [Using the PsExec workbench](docs/PSEXEC.md).
+
 | Area | Capabilities |
 | --- | --- |
 | **Office maps** | Explore multiple floors in 2D and 3D, search desks and rooms, locate colleagues, and manage seating and directory links. |

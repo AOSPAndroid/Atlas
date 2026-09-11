@@ -4,6 +4,7 @@ function setTarget(pc, status = "") {
     .toUpperCase();
   if (!pc || pc === S.target) return;
   S.target = pc;
+  window.AtlasPsExec?.syncTarget(pc);
   syncDeploymentPanel();
   $("#deployTarget").textContent = pc;
   $("#adminPc").value = pc;
@@ -25,6 +26,7 @@ function clearLookup() {
   S.users = [];
   S.machines = [];
   S.target = "";
+  window.AtlasPsExec?.syncTarget("");
   syncDeploymentPanel();
   masterState.resolution = null;
   $("#kyc").innerHTML = "";

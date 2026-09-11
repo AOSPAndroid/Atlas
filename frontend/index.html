@@ -11,6 +11,7 @@
     <link rel="stylesheet" href="/assets/machine-health.css" />
     <link rel="stylesheet" href="/assets/atlas-shell.css" />
     <link rel="stylesheet" href="/assets/catalogue.css" />
+    <link rel="stylesheet" href="/assets/console-psexec.css" />
     <script src="/assets/machine-health.js"></script>
   </head>
   <body class="atlas-console">
@@ -47,6 +48,10 @@
           ><button data-page="history">
             <span class="nav-icon">◷</span
             ><span class="nav-label">History</span>
+          </button>
+          <button data-page="psexec">
+            <span class="nav-icon" aria-hidden="true">&gt;_</span
+            ><span class="nav-label">PsExec</span>
           </button>
         </nav>
       </div>
@@ -477,6 +482,129 @@
           </div>
         </div>
       </section>
+      <section id="psexec" class="page" aria-label="PsExec command workbench">
+        <div class="px-intro">
+          <div>
+            <small>REMOTE COMMAND WORKBENCH</small>
+            <h2>The right command, ready to go.</h2>
+            <p>
+              Choose a task, review the target and copy into your terminal.
+              Nothing runs from this page.
+            </p>
+          </div>
+          <a
+            href="https://learn.microsoft.com/en-us/sysinternals/downloads/psexec"
+            target="_blank"
+            rel="noopener noreferrer"
+            >PsExec reference ↗</a
+          >
+        </div>
+        <div class="px-settings panel">
+          <label
+            >Target machine<input
+              id="pxTarget"
+              placeholder="Select or enter a hostname"
+              autocomplete="off"
+              spellcheck="false"
+              maxlength="64"
+          /></label>
+          <label
+            >PsExec executable<input
+              id="pxPath"
+              value="C:\Data\PsExec.exe"
+              autocomplete="off"
+              spellcheck="false"
+          /></label>
+          <label
+            >Paste into<select id="pxShell">
+              <option value="powershell">PowerShell</option>
+              <option value="cmd">Command Prompt</option>
+            </select></label
+          >
+          <button id="pxFollow" type="button" aria-pressed="true">
+            Follow selected target
+          </button>
+          <p class="px-settings-note" id="pxTargetNote"></p>
+        </div>
+        <div class="px-layout">
+          <div class="px-library">
+            <label class="px-search"
+              >Find a command<input
+                id="pxSearch"
+                type="search"
+                placeholder="Try Excel, sessions, DNS, service…"
+            /></label>
+            <div
+              id="pxCategories"
+              class="px-filters"
+              role="group"
+              aria-label="Command categories"
+            ></div>
+            <p id="pxCount" class="muted" role="status"></p>
+            <div id="pxCards" class="px-cards"></div>
+          </div>
+          <aside class="px-review panel" aria-label="Command review">
+            <div class="head">
+              <small id="pxCategory"></small
+              ><button id="pxFavourite" type="button" aria-pressed="false">
+                ☆ Favourite
+              </button>
+            </div>
+            <h2 id="pxTitle"></h2>
+            <p id="pxDescription"></p>
+            <div id="pxFields" class="px-fields"></div>
+            <label class="px-elevation"
+              ><input id="pxElevated" type="checkbox" /> Use elevated token
+              (-h)</label
+            >
+            <p class="muted">
+              Uses your current Windows account. No saved passwords or automatic
+              SYSTEM account.
+            </p>
+            <div id="pxImpact" class="px-impact"></div>
+            <small>COMMAND ON TARGET</small>
+            <pre id="pxReadable" tabindex="0"></pre>
+            <details class="px-full">
+              <summary>Full PsExec command</summary>
+              <pre id="pxCommand" tabindex="0"></pre>
+            </details>
+            <p id="pxError" class="px-error" role="status"></p>
+            <button id="pxCopy" class="primary" type="button" disabled>
+              Copy PowerShell command
+            </button>
+            <p class="px-footnote" id="pxEncoding"></p>
+            <details class="px-help">
+              <summary>First run &amp; connection help</summary>
+              <ul>
+                <li>
+                  Point to your existing PsExec.exe or PsExec64.exe in C:\Data.
+                  Atlas does not install or verify the executable.
+                </li>
+                <li>
+                  Run the copied command on your admin computer with the
+                  required remote access. PsExec starts a service on the target
+                  even for a diagnostic command.
+                </li>
+                <li>
+                  Review the Microsoft licence prompt on first use. Atlas does
+                  not add automatic EULA acceptance.
+                </li>
+                <li>
+                  Access denied: check your account's remote administration
+                  rights and elevation. Path not found: check the executable
+                  path and target administrative share. Connection failures:
+                  check name resolution, SMB and the service-control connection.
+                </li>
+                <li>
+                  The ten-second option limits connection attempts, not command
+                  runtime. Output appears in your terminal; Atlas does not
+                  capture it or add it to deployment History.
+                </li>
+              </ul>
+            </details>
+          </aside>
+        </div>
+      </section>
     </main>
     <aside id="queueDrawer" class="queue-drawer">
       <div class="queue-head">
@@ -662,6 +790,8 @@
     <script src="/assets/console-deployment.js"></script>
     <script src="/assets/console-processes.js"></script>
     <script src="/assets/slowdown-diagnostics.js"></script>
+    <script src="/assets/psexec-commands.js"></script>
+    <script src="/assets/console-psexec.js"></script>
     <script src="/assets/console-shell.js"></script>
     <script src="/assets/remote-software.js"></script>
   </body>
