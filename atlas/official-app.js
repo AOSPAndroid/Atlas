@@ -1,4 +1,4 @@
-import { applyMapAmenities } from "./map-amenities.js";
+import { applyMapAmenities } from "./map-amenities.js?v=2";
 import { createCameraMotion } from "./camera-motion.js";
 import { installMapCursor } from "./map-cursor.js?v=4";
 const readOnly =
@@ -37,9 +37,10 @@ try {
     "The directory could not load. Refresh to try again.";
   throw Error("Directory unavailable");
 }
-let showAmenities = true;
-try { showAmenities = localStorage.getItem("atlas.map.amenities") !== "off"; } catch {}
-const mapLayers = { walls: true, facilities: showAmenities, doors: true };
+const layerPreference = (name) => {
+  try { return localStorage.getItem(`atlas.map.${name}`) !== "off"; } catch { return true; }
+};
+const mapLayers = { walls: layerPreference("walls"), facilities: layerPreference("amenities"), doors: layerPreference("doors") };
 const mapColors = {
   lift: [0.7, 0.85, 1, 1],
   wc: [0.76, 0.91, 0.86, 1],
@@ -49,13 +50,33 @@ const mapColors = {
   stairs: [0.87, 0.9, 0.93, 1],
 };
 const facilityVisible = (r) => Object.hasOwn(mapColors, r.kind) && mapLayers.facilities;
-const mapPanel = document.createElement("div");
-mapPanel.className = "floor2-layers";
-mapPanel.innerHTML =
-  '<b>LEVEL 02</b><label><input type="checkbox" data-layer="walls" checked> Walls</label><label class="amenities-toggle"><input type="checkbox" role="switch" data-layer="facilities" checked> Amenities <span class="amenities-state">On</span></label><label><input type="checkbox" data-layer="doors" checked> Doors</label>';
+const mapPanel = document.createElement("details");
+mapPanel.className = "map-settings";
+mapPanel.innerHTML = '<summary>⚙ <span>Map settings</span></summary><div class="map-settings-body"><div class="map-settings-view"></div><div class="map-settings-layers" role="group" aria-label="Map layers"></div></div>';
 document.querySelector("#map-labels").parentElement.append(mapPanel);
-mapPanel.querySelector('[data-layer="facilities"]').checked = showAmenities;
-mapPanel.querySelector('.amenities-state').textContent = showAmenities ? "On" : "Off";
+const settingsBody = mapPanel.querySelector(".map-settings-body");
+const settingsView = mapPanel.querySelector(".map-settings-view");
+settingsView.append($(".view-switch"), $("#name-tags").closest("label"));
+const displayControl = document.querySelector(".atlas-display-mode");
+if (displayControl) settingsBody.append(displayControl);
+settingsBody.append($(".map-tools"));
+for (const [layer, title] of [["walls", "Walls"], ["doors", "Doors"], ["facilities", "Amenities"]]) {
+  const label = document.createElement("label");
+  label.className = "name-toggle layer-toggle";
+  label.innerHTML = `<input type="checkbox" role="switch" data-layer="${layer}"><span class="switch-track" aria-hidden="true"></span><span>${title}</span>`;
+  label.querySelector("input").checked = mapLayers[layer];
+  mapPanel.querySelector(".map-settings-layers").append(label);
+}
+document.addEventListener("pointerdown", (event) => {
+  if (mapPanel.open && !mapPanel.contains(event.target)) mapPanel.open = false;
+});
+mapPanel.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    event.stopPropagation();
+    mapPanel.open = false;
+    mapPanel.querySelector("summary").focus();
+  }
+});
 const amenityOverlay = document.createElement("div");
 amenityOverlay.className = "amenity-labels";
 document.querySelector("#map-labels").parentElement.append(amenityOverlay);
@@ -63,10 +84,8 @@ const amenityNodes = new Map();
 mapPanel.onchange = (e) => {
   if (e.target.dataset.layer) {
     mapLayers[e.target.dataset.layer] = e.target.checked;
-    if (e.target.dataset.layer === "facilities") {
-      mapPanel.querySelector('.amenities-state').textContent = e.target.checked ? "On" : "Off";
-      try { localStorage.setItem("atlas.map.amenities", e.target.checked ? "on" : "off"); } catch {}
-    }
+    const name = e.target.dataset.layer === "facilities" ? "amenities" : e.target.dataset.layer;
+    try { localStorage.setItem(`atlas.map.${name}`, e.target.checked ? "on" : "off"); } catch {}
     draw();
   }
 };
@@ -114,6 +133,11 @@ function paintArchitecture(c) {
         .join(",") +
       ",0.55)";
     c.fill();
+    if (r.kind === "lift") {
+      c.strokeStyle = "#0084b4";
+      c.lineWidth = 0.12;
+      c.stroke();
+    }
   }
   if (mapLayers.walls) {
     c.beginPath();
@@ -143,9 +167,8 @@ function paintArchitecture(c) {
   }
 }
 function updateMapLayers() {
-  mapPanel.hidden = view === "source";
-  mapPanel.querySelector("b").textContent =
-    "LEVEL " + String(floor).padStart(2, "0");
+  settingsBody.style.maxHeight = `${Math.max(80, canvas.clientHeight - 108)}px`;
+  for (const input of mapPanel.querySelectorAll("[data-layer]")) input.disabled = view === "source";
 }
 
 let records = data.records,
@@ -1526,8 +1549,11 @@ function architecturalMesh() {
         );
     }
   for (const r of g.wayfinding || [])
-    if (facilityVisible(r))
+    if (facilityVisible(r)) {
       polygonMesh(arr, r.points, 0.025, mapColors[r.kind]);
+      if (r.kind === "lift") for (let i = 0; i < r.points.length; i++)
+        beam(arr, modelPoint(...r.points[i]), modelPoint(...r.points[(i + 1) % r.points.length]), 0.12, 0.035, [0, 0.52, 0.71, 1], 0.03);
+    }
   for (const points of g.tables || []) {
     polygonMesh(arr, points, 0.84, [0.67, 0.82, 0.89, 1]);
     for (let i = 0; i < points.length; i++)

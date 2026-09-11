@@ -824,11 +824,29 @@ const amenities = {
   ]
 };
 
+// Shared elevator bank, registered against the same two architectural corners on each plan.
+const elevatorBank = {
+  name: "Elevators", kind: "lift", id: "elevator-bank",
+  points: [[552.01, 900], [730.3, 738.88], [774.15, 784.64], [598.73, 939.09]],
+  anchor: [663.5593220338983, 810.3813559322034],
+};
+const registrations = {
+  2: [[92.16, 850.3], [739.52, 449.53]],
+  3: [[13.85, 627.18], [723.48, 188]],
+  4: [[13.85, 627.18], [723.48, 188]],
+  5: [[13.85, 627.18], [723.48, 188]],
+  6: [[13.85, 627.18], [723.48, 188]],
+  7: [[13.85, 628.78], [723.1, 189.6]],
+};
 export function applyMapAmenities(data) {
   for (const floor of data.floors) {
-    const additions = amenities[floor.level];
-    if (!additions) continue;
+    const locations = amenities[floor.level];
+    if (!locations) continue;
+    const [a, b] = registrations[2], [c, d] = registrations[floor.level];
+    const project = p => p.map((value, i) => c[i] + (value - a[i]) * (d[i] - c[i]) / (b[i] - a[i]));
+    const elevator = {...elevatorBank, anchor: project(elevatorBank.anchor), points: elevatorBank.points.map(project)};
+    const additions = [...locations, elevator];
     const ids = new Set(additions.map(item => item.id));
-    floor.geometry.wayfinding = [...(floor.geometry.wayfinding || []).filter(item => !ids.has(item.id)), ...additions];
+    floor.geometry.wayfinding = [...(floor.geometry.wayfinding || []).filter(item => item.kind !== "lift" && !ids.has(item.id)), ...additions];
   }
 }
