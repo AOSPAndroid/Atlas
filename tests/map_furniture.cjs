@@ -21,7 +21,7 @@ const root = path.resolve(__dirname, '..');
   for (const floor of data.floors) {
     if (!(floor.level in exclusions)) continue;
     assert.equal(floor.geometry.doorSwings.length, before.get(floor.level) - exclusions[floor.level], 'Keep real door swings');
-    assert.equal(floor.geometry.walls.length, beforeWalls.get(floor.level) - (floor.level === -1 ? 8 : 0), 'Only the two restaurant table outlines lose their false walls');
+    assert.equal(floor.geometry.walls.length, beforeWalls.get(floor.level) - (floor.level === -1 ? 21 : 0), 'Only restaurant furniture outlines lose their false walls');
     for (const points of floor.geometry.curvedTables) {
       const triangles = triangulate(points);
       assert.equal(triangles.length, points.length - 2, `Floor ${floor.level} table must render in 3D`);
@@ -37,5 +37,24 @@ const root = path.resolve(__dirname, '..');
   assert.equal(restaurant.curvedTables.filter(p => p.length === 4).length, 2, 'Two long communal table tops');
   assert.equal(restaurant.chairSeats.length, 23, 'Dining chairs use seat height rather than table height');
   assert.equal(restaurant.tables.length, 0, 'Do not also draw the dining chairs as tables');
+  assert.equal(restaurant.counters.length, 2, 'Salad island and serving counter recovered');
+  for (const points of restaurant.counters) {
+    assert.equal(triangulate(points).length, points.length - 2, 'Counter surfaces must render completely in 3D');
+  }
+  const island = restaurant.counters[0];
+  const cross = (a, b, p) => (b[0]-a[0])*(p[1]-a[1])-(b[1]-a[1])*(p[0]-a[0]);
+  const covered = point => triangulate(island).some(ids => {
+    const [a, b, c] = ids.map(i => island[i]);
+    const sides = [cross(a,b,point), cross(b,c,point), cross(c,a,point)];
+    return sides.every(n => n >= 0) || sides.every(n => n <= 0);
+  });
+  assert(covered([795,665]), 'Countertop surface remains filled');
+  assert(!covered([800,695]), 'Keep the opening between the two salad-bar arms');
+  const walls = new Set(restaurant.walls.map(segment => JSON.stringify(segment)));
+  assert(!walls.has(JSON.stringify([[749.52,679.7],[803.2,729.28]])), 'Salad island sides are not room walls');
+  assert(!walls.has(JSON.stringify([[712.33,740.69],[728.42,740.69]])), 'Serving units are not room walls');
+  assert(walls.has(JSON.stringify([[710.4,653.92],[710.4,782.25]])), 'Keep the kitchen partition beside the salad bar');
+  assert(walls.has(JSON.stringify([[762.35,782.38],[848.54,782.51]])), 'Keep the room boundary below the counters');
+  assert(data.floors.filter(f => f.level !== -1).every(f => !f.geometry.counters), 'Counter correction is limited to B1');
   console.log(`PASS: ${count} curved tables triangulate; both reference shapes recovered; real doors retained`);
 })().catch(error => { console.error(error); process.exitCode = 1; });

@@ -1,4 +1,4 @@
-import { applyFurnitureCorrections } from "./map-furniture.js?v=2";
+import { applyFurnitureCorrections } from "./map-furniture.js?v=3";
 import { applyMapAmenities } from "./map-amenities.js?v=4";
 import { createCameraMotion } from "./camera-motion.js";
 import { installMapCursor } from "./map-cursor.js?v=4";
@@ -107,7 +107,7 @@ function doorPoints(curve) {
 }
 function paintArchitecture(c) {
   const g = data.floors.find((f) => f.level === floor).geometry;
-  for (const points of g.curvedTables || []) {
+  for (const points of [...(g.curvedTables || []), ...(g.counters || [])]) {
     c.beginPath();
     points.forEach((point, i) => {
       const p = modelPoint(...point);
@@ -1573,8 +1573,9 @@ function architecturalMesh() {
   const furniture = [
     ...[...(g.tables || []), ...(g.curvedTables || [])].map(points => ({ points, height: 0.84 })),
     ...(g.chairSeats || []).map(points => ({ points, height: 0.44 })),
+    ...(g.counters || []).map(points => ({ points, height: 1, solid: true })),
   ];
-  for (const { points, height } of furniture) {
+  for (const { points, height, solid } of furniture) {
     polygonMesh(arr, points, height, [0.67, 0.82, 0.89, 1]);
     for (let i = 0; i < points.length; i++)
       beam(
@@ -1582,10 +1583,11 @@ function architecturalMesh() {
         modelPoint(...points[i]),
         modelPoint(...points[(i + 1) % points.length]),
         0.035,
-        0.17,
+        solid ? height - 0.06 : 0.17,
         [0.43, 0.6, 0.69, 1],
-        height - 0.17,
+        solid ? 0.06 : height - 0.17,
       );
+    if (solid) continue;
     const center = points.reduce(
         (a, p) => [a[0] + p[0] / points.length, a[1] + p[1] / points.length],
         [0, 0],
