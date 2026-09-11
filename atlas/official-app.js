@@ -1,3 +1,4 @@
+import { applyMapAmenities } from "./map-amenities.js";
 import { createCameraMotion } from "./camera-motion.js";
 import { installMapCursor } from "./map-cursor.js?v=4";
 const readOnly =
@@ -30,6 +31,7 @@ try {
   const response = await fetch("official-data.json", { cache: "no-cache" });
   if (!response.ok) throw Error();
   data = await response.json();
+  applyMapAmenities(data);
 } catch {
   $("#results").textContent =
     "The directory could not load. Refresh to try again.";
@@ -41,6 +43,8 @@ const mapLayers = { walls: true, facilities: showAmenities, doors: true };
 const mapColors = {
   lift: [0.7, 0.85, 1, 1],
   wc: [0.76, 0.91, 0.86, 1],
+  print: [0.83, 0.88, 1, 1],
+  kitchen: [1, 0.9, 0.73, 1],
   room: [0.88, 0.83, 0.98, 1],
   stairs: [0.87, 0.9, 0.93, 1],
 };
