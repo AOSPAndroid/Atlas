@@ -16,7 +16,7 @@ const root = path.resolve(__dirname, '..');
   const once = JSON.stringify(data);
   applyFurnitureCorrections(data);
   assert.equal(JSON.stringify(data), once, 'Repeated loading must not duplicate tables');
-  const exclusions = {'-1': 36, 2: 0, 3: 1, 4: 1, 5: 0, 6: 1, 7: 2};
+  const exclusions = {'-1': 36, 0: 0, 2: 0, 3: 1, 4: 1, 5: 0, 6: 1, 7: 2};
   let count = 0;
   for (const floor of data.floors) {
     if (!(floor.level in exclusions)) continue;
@@ -55,6 +55,28 @@ const root = path.resolve(__dirname, '..');
   assert(!walls.has(JSON.stringify([[712.33,740.69],[728.42,740.69]])), 'Serving units are not room walls');
   assert(walls.has(JSON.stringify([[710.4,653.92],[710.4,782.25]])), 'Keep the kitchen partition beside the salad bar');
   assert(walls.has(JSON.stringify([[762.35,782.38],[848.54,782.51]])), 'Keep the room boundary below the counters');
-  assert(data.floors.filter(f => f.level !== -1).every(f => !f.geometry.counters), 'Counter correction is limited to B1');
+  const ground = data.floors.find(f => f.level === 0).geometry;
+  assert.equal(ground.curvedTables.length, 28, 'Keep one surface for each cafe and lobby round furniture symbol');
+  const centres = ground.curvedTables.map(points => [0,1].map(i => (Math.min(...points.map(p => p[i]))+Math.max(...points.map(p => p[i])))/2));
+  assert(centres.every((p, i) => centres.slice(i+1).every(q => Math.hypot(p[0]-q[0],p[1]-q[1]) > .2)), 'Concentric source circles must not duplicate furniture');
+  assert.equal(ground.chairSeats.length, 6, 'Two three-section sofas use seat height');
+  assert.equal(ground.tables.length, 25, 'Other ground-floor furniture stays intact');
+  assert.equal(ground.counters.length, 1, 'Reception counter recovered');
+  assert.equal(triangulate(ground.counters[0]).length, ground.counters[0].length-2, 'L-shaped reception counter renders in 3D');
+  assert(data.floors.filter(f => ![-1,0].includes(f.level)).every(f => !f.geometry.counters), 'Counter corrections are limited to the confirmed lower floors');
+
+  const {applyMapAmenities} = await import(pathToFileURL(path.join(root, 'atlas/map-amenities.js')));
+  applyMapAmenities(data);
+  const amenitiesOnce = JSON.stringify(data);
+  applyMapAmenities(data);
+  assert.equal(JSON.stringify(data), amenitiesOnce, 'Reloading must not duplicate amenity labels');
+  const places = new Map(ground.wayfinding.map(p => [p.id,p]));
+  for (const id of ['coffee','coffee-seating','lobby-seating','reception','build-room','main-entrance','secondary-entrance']) {
+    assert(places.has(id), `Annotated ground-floor location ${id} is labelled`);
+  }
+  assert.equal(places.get('build-room').name, 'Build room');
+  assert.equal(ground.wayfinding.filter(p => p.id === 'lift-main').length, 1, 'One main elevator-bank marker');
+  assert(Math.max(...places.get('lift-main').points.map(p => p[0]))-Math.min(...places.get('lift-main').points.map(p => p[0])) > 170, 'Outline the entire bank, not one lift');
+  for (const place of places.values()) assert.equal(triangulate(place.points).length, place.points.length-2, 'Ground-floor markers render in 3D');
   console.log(`PASS: ${count} curved tables triangulate; both reference shapes recovered; real doors retained`);
 })().catch(error => { console.error(error); process.exitCode = 1; });

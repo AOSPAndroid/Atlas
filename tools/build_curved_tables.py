@@ -58,7 +58,7 @@ def furniture_edges(path, colors=('#7396aa',)):
     return edges
 
 
-def recover(geometry, edges, dining=False):
+def recover(geometry, edges, dining=False, accept=None):
     nodes, adjacency, bins = [], defaultdict(list), defaultdict(list)
     def node(point):
         key = tuple(math.floor(v/.2) for v in point)
@@ -111,7 +111,10 @@ def recover(geometry, edges, dining=False):
         area = abs(sum(p[0]*q[1]-q[0]*p[1] for p, q in zip(points, points[1:]+points[:1])))/2
         width = max(p[0] for p in points)-min(p[0] for p in points)
         height = max(p[1] for p in points)-min(p[1] for p in points)
-        if dining:
+        if accept is not None:
+            if not accept(points):
+                continue
+        elif dining:
             cx = (max(p[0] for p in points)+min(p[0] for p in points))/2
             cy = (max(p[1] for p in points)+min(p[1] for p in points))/2
             # Only the owner-confirmed round restaurant tables, not small symbols elsewhere.
@@ -134,10 +137,38 @@ if __name__ == '__main__':
     corrections = {}
     for floor in data['floors']:
         level = floor['level']
-        if level != -1 and not 2 <= level <= 7:
+        if level not in (-1, 0) and not 2 <= level <= 7:
             continue
-        corrections[level] = recover(floor['geometry'], furniture_edges(ROOT/f'atlas/studio-floor-{level}.svg'), dining=level == -1)
+        def ground_floor_round_furniture(points):
+            xs, ys = zip(*points)
+            cx, cy = (min(xs)+max(xs))/2, (min(ys)+max(ys))/2
+            width, height = max(xs)-min(xs), max(ys)-min(ys)
+            # Only the cafe and reception seating confirmed on the annotated plan.
+            in_cafe = 660 < cx < 830 and 700 < cy < 975
+            in_lobby = 1060 < cx < 1210 and 765 < cy < 875
+            return (in_cafe or in_lobby) and 8 < width < 18 and abs(width-height) < .2
+        corrections[level] = recover(
+            floor['geometry'], furniture_edges(ROOT/f'atlas/studio-floor-{level}.svg'),
+            dining=level == -1, accept=ground_floor_round_furniture if level == 0 else None)
         item = corrections[level]
+        if level == 0:
+            # The cafe symbols have concentric inner/outer paths. Keep one
+            # surface per physical circle, using the outer outline.
+            circles = []
+            for points in sorted(item['tables'], key=lambda p: max(x for x,y in p)-min(x for x,y in p), reverse=True):
+                center = lambda p: [(min(v[i] for v in p)+max(v[i] for v in p))/2 for i in (0, 1)]
+                if not any(math.dist(center(points), center(other)) < .2 for other in circles):
+                    circles.append(points)
+            item['tables'] = circles
+            # Follow the complete L-shaped reception desk outline from the source.
+            item['counters'] = [[
+                [1098.53,1029.04],[1055.89,982.92],[1068.9,971.0],
+                [1100.65,1005.5],[1106.42,1000.11],[1117.2,1011.78],
+            ]]
+            # The two three-section sofas beside the coffee seating are seats.
+            item['chairSeats'] = [points for points in floor['geometry']['tables']
+                if 830 < sum(p[0] for p in points)/len(points) < 900
+                and 760 < sum(p[1] for p in points)/len(points) < 830]
         if level == -1:
             # Exact parallel tabletop edges from the restaurant's source linework.
             item['tables'].extend([

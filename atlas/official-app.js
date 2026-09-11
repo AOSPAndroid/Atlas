@@ -1,5 +1,5 @@
-import { applyFurnitureCorrections } from "./map-furniture.js?v=3";
-import { applyMapAmenities } from "./map-amenities.js?v=4";
+import { applyFurnitureCorrections } from "./map-furniture.js?v=4";
+import { applyMapAmenities } from "./map-amenities.js?v=5";
 import { createCameraMotion } from "./camera-motion.js";
 import { installMapCursor } from "./map-cursor.js?v=4";
 const readOnly =
