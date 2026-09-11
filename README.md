@@ -195,6 +195,16 @@ Remote Admin shows up to 100 processes sorted by CPU, GPU or memory, with the fu
 
 ## Troubleshooting performance in Remote Admin
 
+### Citrix and remote display mode
+
+Choose **Display → Citrix / remote** in the shared header on the map, console or demo. This browser preference is remembered and synchronized between tabs on the same origin; choose it separately in the demo or another browser when needed. It does not start scans or change permissions.
+
+In this mode, map drawing is capped at 30 rendered frames per second. Camera transitions take at most 280 ms and skip the panoramic zoom detour. While moving, the 3D buffer uses 75% width and height (about 44% fewer pixels) and only the selected person's name label remains visible. Full resolution and nearby labels return when movement settles; all desks remain selectable. Decorative CSS animations, scroll reveals, locator pulses and backdrop blur are disabled. The existing Animations Off setting still makes camera transitions immediate. Standard mode retains the normal presentation.
+
+There is no continuous idle rendering or background performance probe. Lower render resolution is a standard [WebGL performance technique](https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API/WebGL_best_practices#consider_rendering_to_a_smaller_back_buffer), but actual Citrix smoothness also depends on the session and connection; validate on the affected desktop.
+
+If WebGL initialization fails, Atlas reports the available error and lets you retry by switching 3D on again. A lost graphics context falls back to 2D; after restoration, manually enable 3D to rebuild the graphics resources. The display mode cannot enable WebGL when the browser or enterprise configuration blocks it.
+
 ### Manual performance capture
 
 Click **Scan for slowness** while the user reproduces the problem. Opening Remote Admin, selecting a machine or waiting on the page never starts a scan. Each click starts a light capture: at most six samples over 60 seconds, with at least 10 seconds of rest after each completed check. It highlights busy CPU consumers, individual logical-processor saturation, memory pressure with paging activity, elevated disk response during I/O and commit headroom. Each finding includes measured evidence and a next check. Repeated evidence requires at least three matching observations spanning eight seconds and 60% of the available samples; brief spikes and limited evidence remain labelled separately. These thresholds guide investigation and do not establish a root cause.

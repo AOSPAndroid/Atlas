@@ -4,6 +4,7 @@ export function createCameraMotion({
   write,
   requestFrame,
   reduced,
+  light = () => false,
   now = () => performance.now(),
 }) {
   let flight = null;
@@ -27,6 +28,10 @@ export function createCameraMotion({
     },
     finish,
     to(target, { duration = 600, kind = "focus", panoramic = false } = {}) {
+      if (light()) {
+        duration = Math.min(duration, 280);
+        panoramic = false;
+      }
       const from = { ...read() };
       const goal = { ...from, ...target };
       // Take the shorter orbit, including after repeated rotate-button presses.

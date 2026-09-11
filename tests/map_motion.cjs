@@ -78,17 +78,20 @@ const { fixture, root } = require("./ui_fixture.cjs");
       frames.clear();
       for (const [, fn] of pending) fn(clock);
     };
+    let gpuAvailable = true, shaderWorks = true, gpuDraws = 0;
     const gl = new Proxy(
       {
         bufferData: () => uploads++,
-        getShaderParameter: () => true,
+        getShaderParameter: () => shaderWorks,
+        getShaderInfoLog: () => "Simulated shader failure",
+        drawArrays: () => gpuDraws++,
         getProgramParameter: () => true,
       },
       { get: (o, k) => o[k] || (() => ({})) },
     );
     const ctx = new Proxy({}, { get: () => () => ({}) });
     w.HTMLCanvasElement.prototype.getContext = (type) =>
-      type === "webgl" ? gl : type === "2d" ? ctx : null;
+      type === "webgl" ? (gpuAvailable ? gl : null) : type === "2d" ? ctx : null;
     const captures = new Map();
     w.HTMLCanvasElement.prototype.setPointerCapture = function (id) {
       captures.set(id, this);
@@ -116,7 +119,8 @@ const { fixture, root } = require("./ui_fixture.cjs");
         get: () => value,
       });
     const t = await f.map(`
-    export {selectRecord, renderDetail, setFloor, setView, focusTarget, cameraMotion, inversePoint, projected, world};
+    export {selectRecord, renderDetail, setFloor, setView, focusTarget, cameraMotion, inversePoint, projected, world, settleMotion, draw};
+    export function graphicsState(){return {ready:glReady,error:glError,view}}
     export function state(){return {...cam}}
     export function currentCanvas(){return canvas}
     export function setCamera(value){cam = {...cam, ...value}; draw()}
@@ -454,6 +458,44 @@ const { fixture, root } = require("./ui_fixture.cjs");
       ),
       "Switches follow changes in another tab",
     );
+    await new Promise(setImmediate);
+    const display = w.document.querySelector('.atlas-display-mode select');
+    assert(display, 'Display mode available in shared admin/viewer header');
+    display.value='citrix';display.dispatchEvent(new w.Event('change'));
+    assert(w.AtlasUI.performance.isCitrix());
+    assert.equal(w.localStorage.getItem('atlas-display-mode'),'citrix');
+    t.setView('3d');step(34);
+    t.selectRecord(people[0].id);step(140);
+    assert(t.cameraMotion.active);
+    assert.equal(t.currentCanvas().width,675,'Moving 3D uses 75% resolution');
+    assert.equal(w.document.querySelectorAll('.map-name:not([hidden]):not(.chosen)').length,0,'Only selected person label moves in remote mode');
+    step(150);assert(!t.cameraMotion.active,'Remote camera completes within 280ms');
+    close(t.state(),t.focusTarget(people[0]));
+    t.settleMotion();step(34);
+    assert.equal(t.currentCanvas().width,900,'Full resolution returns when settled');
+    assert.equal(frames.size,0,'No idle rendering loop');
+    const beforeFrames=gpuDraws, beforeUploads=uploads;
+    for(let i=0;i<120;i++){ t.setCamera({cx:t.state().cx+.01});step(1000/120); }
+    assert((gpuDraws-beforeFrames)/2<=31,'Remote rendering capped around 30 frames/s at 120Hz input');
+    assert((gpuDraws-beforeFrames)/2>=29,'Latest pointer input continues rendering');
+    assert.equal(uploads,beforeUploads,'Remote motion does not re-upload geometry');
+    t.settleMotion();step(34);
+    assert.equal(frames.size,0);
+    w.localStorage.setItem('atlas-display-mode','standard');
+    w.dispatchEvent(new w.StorageEvent('storage',{key:'atlas-display-mode'}));
+    assert(!w.AtlasUI.performance.isCitrix());assert.equal(display.value,'standard');
+    // Lost contexts rebuild cached buffers only after an explicit retry.
+    const lostCanvas=t.currentCanvas(), loss=new w.Event('webglcontextlost',{cancelable:true});
+    lostCanvas.dispatchEvent(loss);assert(loss.defaultPrevented);
+    assert.equal(t.graphicsState().view,'plan');assert(!t.graphicsState().ready);
+    gpuAvailable=false;t.setView('3d');assert(!t.graphicsState().ready);
+    assert(t.graphicsState().error.includes('context creation failed'));
+    gpuAvailable=true;shaderWorks=false;t.setView('3d');
+    assert(t.graphicsState().error.includes('Simulated shader failure'));
+    shaderWorks=true;lostCanvas.dispatchEvent(new w.Event('webglcontextrestored'));
+    assert.equal(t.graphicsState().view,'plan','Recovery does not force 3D');
+    t.setView('3d');step(34);assert(t.graphicsState().ready,'Explicit retry succeeds without reloading');
+    assert.equal(t.graphicsState().view,'3d');assert(uploads>beforeUploads,'Recovered context gets fresh buffers');
     await new Promise(setImmediate);
     assert.equal(f.errors.length, 0, f.errors.join("\n"));
     w.close();

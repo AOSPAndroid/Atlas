@@ -152,11 +152,17 @@ const cameraMotion = createCameraMotion({
   },
   requestFrame: () => draw(),
   reduced: () => motionPreference.matches,
+  light: () => AtlasUI.performance.isCitrix(),
 });
 const mapEffects = new Map();
 function revealMap(element = canvas) {
   mapEffects.get(element)?.cancel();
-  if (motionPreference.matches || !element.animate) return;
+  if (
+    motionPreference.matches ||
+    AtlasUI.performance.isCitrix() ||
+    !element.animate
+  )
+    return;
   const animation = element.animate([{ opacity: 0.45 }, { opacity: 1 }], {
     duration: 260,
     easing: "ease-out",
@@ -179,7 +185,12 @@ function clearLocator() {
 }
 function locateBeacon() {
   clearLocator();
-  if (motionPreference.matches || !locator.animate) return;
+  if (
+    motionPreference.matches ||
+    AtlasUI.performance.isCitrix() ||
+    !locator.animate
+  )
+    return;
   locator.hidden = false;
   positionLocator();
   const ring = locator.querySelector(".locator-ring");
@@ -205,7 +216,7 @@ function positionLocator() {
   locator.style.transform = `translate3d(${x}px, ${y}px, 0)`;
 }
 window.addEventListener("atlas-motion-change", () => {
-  if (!motionPreference.matches) return;
+  if (!motionPreference.matches && !AtlasUI.performance.isCitrix()) return;
   cameraMotion.finish();
   clearLocator();
   for (const animation of mapEffects.values()) animation.cancel();
@@ -213,9 +224,14 @@ window.addEventListener("atlas-motion-change", () => {
 });
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
+    cancelMapGesture();
     cameraMotion.finish();
     clearLocator();
-  }
+    clearTimeout(motionTimer);
+    moving = false;
+    if (pendingDraw) cancelAnimationFrame(pendingDraw);
+    pendingDraw = 0;
+  } else draw();
 });
 window.addEventListener("pagehide", () => {
   cameraMotion.cancel();
@@ -785,7 +801,9 @@ function setView(v, animate = false) {
   cancelMapGesture();
   if (v === "3d") init3d();
   if (v === "3d" && !glReady) {
-    toast("3D unavailable on this device. Using the simple map.");
+    toast(
+      `3D could not start: ${glError || "WebGL is unavailable in this browser session"}. Using 2D; switch on 3D to retry.`,
+    );
     v = "plan";
   }
   if (v === "plan" && !ctx2d) {
@@ -983,7 +1001,7 @@ let gl = null,
   loc = {},
   ready = !!ctx2d,
   glReady = false,
-  glAttempted = false,
+  glError = "",
   screenRecords = [];
 const gpuGeometryCache = new Map();
 function onMap(type, handler, options) {
@@ -1049,53 +1067,92 @@ function world(r) {
   return modelPoint(r.x * 1800, r.y * 1800, r.floor, 1.1);
 }
 function init3d() {
-  if (glAttempted) return;
-  glAttempted = true;
-  gl = glCanvas.getContext("webgl", { antialias: false, alpha: true });
-  if (gl) {
-    try {
-      const shader = (type, source) => {
-        const s = gl.createShader(type);
-        gl.shaderSource(s, source);
-        gl.compileShader(s);
-        if (!gl.getShaderParameter(s, gl.COMPILE_STATUS))
-          throw Error(gl.getShaderInfoLog(s));
-        return s;
-      };
-      program = gl.createProgram();
-      gl.attachShader(
-        program,
-        shader(
-          gl.VERTEX_SHADER,
-          "attribute vec3 position; attribute vec4 color; uniform vec3 right; uniform vec3 up; uniform vec3 forward; uniform vec3 center; uniform vec2 scale; varying vec4 vColor; void main(){vec3 p=position-center;gl_Position=vec4(dot(p,right)*scale.x,dot(p,up)*scale.y,-dot(p,forward)/200.0,1.0);vColor=color;}",
-        ),
+  if (glReady) return;
+  glError = "";
+  const shaders = [];
+  try {
+    gl = glCanvas.getContext("webgl", { antialias: false, alpha: true });
+    if (!gl) throw Error(glError || "WebGL context creation failed");
+    const shader = (type, source) => {
+      const s = gl.createShader(type);
+      if (!s)
+        throw Error("Shader allocation failed; graphics context may be lost");
+      shaders.push(s);
+      gl.shaderSource(s, source);
+      gl.compileShader(s);
+      if (!gl.getShaderParameter(s, gl.COMPILE_STATUS))
+        throw Error(gl.getShaderInfoLog(s));
+      return s;
+    };
+    program = gl.createProgram();
+    gl.attachShader(
+      program,
+      shader(
+        gl.VERTEX_SHADER,
+        "attribute vec3 position; attribute vec4 color; uniform vec3 right; uniform vec3 up; uniform vec3 forward; uniform vec3 center; uniform vec2 scale; varying vec4 vColor; void main(){vec3 p=position-center;gl_Position=vec4(dot(p,right)*scale.x,dot(p,up)*scale.y,-dot(p,forward)/200.0,1.0);vColor=color;}",
+      ),
+    );
+    gl.attachShader(
+      program,
+      shader(
+        gl.FRAGMENT_SHADER,
+        "precision mediump float; varying vec4 vColor; void main(){gl_FragColor=vColor;}",
+      ),
+    );
+    gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS))
+      throw Error(
+        gl.getProgramInfoLog(program) || "Shader program could not link",
       );
-      gl.attachShader(
-        program,
-        shader(
-          gl.FRAGMENT_SHADER,
-          "precision mediump float; varying vec4 vColor; void main(){gl_FragColor=vColor;}",
-        ),
-      );
-      gl.linkProgram(program);
-      if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw Error();
-      gl.useProgram(program);
-      for (const n of ["right", "up", "forward", "center", "scale"])
-        loc[n] = gl.getUniformLocation(program, n);
-      for (const n of ["position", "color"])
-        loc[n] = gl.getAttribLocation(program, n);
-      loc.buffer = gl.createBuffer();
-      gl.enable(gl.DEPTH_TEST);
-      gl.depthFunc(gl.LEQUAL);
-      gl.enable(gl.BLEND);
-      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-      glReady = true;
-    } catch {
-      glReady = false;
-    }
+    gl.useProgram(program);
+    for (const n of ["right", "up", "forward", "center", "scale"])
+      loc[n] = gl.getUniformLocation(program, n);
+    for (const n of ["position", "color"])
+      loc[n] = gl.getAttribLocation(program, n);
+    loc.buffer = gl.createBuffer();
+    if (!loc.buffer) throw Error("3D buffer allocation failed");
+    gl.enable(gl.DEPTH_TEST);
+    gl.depthFunc(gl.LEQUAL);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    glReady = true;
+  } catch (error) {
+    glError = String(error.message || error).slice(0, 240);
+    glReady = false;
+    if (program && gl) gl.deleteProgram(program);
+    if (loc.buffer && gl) gl.deleteBuffer(loc.buffer);
+    program = null;
+    loc = {};
+  } finally {
+    for (const shader of shaders) gl.deleteShader(shader);
   }
   ready = glReady || !!ctx2d;
 }
+glCanvas.addEventListener("webglcontextcreationerror", (event) => {
+  glError = (event.statusMessage || "WebGL context creation failed").slice(
+    0,
+    240,
+  );
+});
+glCanvas.addEventListener("webglcontextlost", (event) => {
+  event.preventDefault();
+  glReady = false;
+  glError = "Graphics context was lost";
+  gpuGeometryCache.clear();
+  program = null;
+  loc = {};
+  if (view === "3d") {
+    setView("plan");
+    toast(
+      "3D graphics connection lost. Using 2D; switch on 3D to retry after recovery.",
+    );
+  }
+});
+glCanvas.addEventListener("webglcontextrestored", () => {
+  glReady = false;
+  glError = "";
+  gpuGeometryCache.clear();
+});
 if (!ctx2d) init3d();
 if (!ready) {
   $("#webgl-error").hidden = false;
@@ -1422,14 +1479,29 @@ function architecturalMesh() {
 }
 
 // Coalesce pointer events; reuse desk markers until scene data changes.
+let lastDrawTime = -Infinity;
 let pendingDraw = 0,
   deskSceneKey = "",
   deskSceneRecords = null,
   deskVertices = [];
+window.addEventListener("atlas-display-change", () => {
+  lastDrawTime = -Infinity;
+  draw();
+});
 function draw() {
-  if (!ready || pendingDraw) return;
+  if (!ready || pendingDraw || document.hidden) return;
   pendingDraw = requestAnimationFrame((time) => {
     pendingDraw = 0;
+    if (document.hidden) return;
+    // Coalesce changes into at most 30 rendered frames/s in remote mode.
+    if (
+      AtlasUI.performance.isCitrix() &&
+      time - lastDrawTime < 1000 / 30 - 0.01
+    ) {
+      draw();
+      return;
+    }
+    lastDrawTime = time;
     cameraMotion.step(time);
     renderFrame();
     positionLocator();
@@ -1446,7 +1518,7 @@ function renderFrame() {
     finishFrame(started);
     return;
   }
-  const dpr = 1,
+  const dpr = AtlasUI.performance.isCitrix() && moving ? 0.75 : 1,
     w = canvas.clientWidth,
     h = canvas.clientHeight;
   if (!w || !h) return;
@@ -1581,6 +1653,7 @@ function renderNames() {
     cam,
     selected?.id,
     moving,
+    AtlasUI.performance.isCitrix(),
     $("#search").value,
     lastMatches.map((r) => r.id),
     canvas.clientWidth,
@@ -1613,13 +1686,14 @@ function renderNames() {
   const candidates = screenRecords
     .filter(
       ({ r }) =>
-        r.id === selected?.id ||
-        r.kind === "area" ||
-        (r.occupancy !== "vacant" &&
-          r.name?.trim() &&
-          !/^(unconfirmed desk|vacant desk|unnamed(?: desk)?|unassigned|open|new location)$/i.test(
-            r.name.trim(),
-          )),
+        (!AtlasUI.performance.isCitrix() || !moving || r.id === selected?.id) &&
+        (r.id === selected?.id ||
+          r.kind === "area" ||
+          (r.occupancy !== "vacant" &&
+            r.name?.trim() &&
+            !/^(unconfirmed desk|vacant desk|unnamed(?: desk)?|unassigned|open|new location)$/i.test(
+              r.name.trim(),
+            ))),
     )
     .sort(
       (a, b) =>

@@ -2,6 +2,31 @@
 (() => {
   const motionMedia = window.matchMedia("(prefers-reduced-motion: reduce)");
   const motionKey = "atlas-motion";
+  const displayKey = "atlas-display-mode";
+  let displayChoice = "standard";
+  try {
+    displayChoice =
+      localStorage.getItem(displayKey) === "citrix" ? "citrix" : "standard";
+  } catch {}
+  const isCitrix = () => displayChoice === "citrix";
+  function applyDisplay() {
+    document.documentElement.dataset.atlasDisplay = displayChoice;
+    document
+      .querySelectorAll(".atlas-display-mode select")
+      .forEach((select) => {
+        select.value = displayChoice;
+      });
+    window.dispatchEvent(new Event("atlas-display-change"));
+    window.dispatchEvent(new Event("atlas-motion-change"));
+  }
+  function setDisplay(value) {
+    displayChoice = value === "citrix" ? "citrix" : "standard";
+    try {
+      localStorage.setItem(displayKey, displayChoice);
+    } catch {}
+    applyDisplay();
+  }
+  document.documentElement.dataset.atlasDisplay = displayChoice;
   let motionChoice = "system";
   try {
     motionChoice = localStorage.getItem(motionKey) || "system";
@@ -23,6 +48,13 @@
   }
   motionMedia.addEventListener?.("change", applyMotion);
   window.addEventListener("storage", (event) => {
+    if (event.key === displayKey || event.key === null) {
+      try {
+        displayChoice =
+          localStorage.getItem(displayKey) === "citrix" ? "citrix" : "standard";
+      } catch {}
+      applyDisplay();
+    }
     if (event.key === motionKey || event.key === null) {
       try {
         motionChoice = localStorage.getItem(motionKey) || "system";
@@ -41,7 +73,8 @@
   const activeReveals = new Map();
   function reveal(element) {
     activeReveals.get(element)?.cancel();
-    if (isReduced() || !element?.animate || document.hidden) return;
+    if (isReduced() || isCitrix() || !element?.animate || document.hidden)
+      return;
     const animation = element.animate(
       [
         { opacity: 0.45, transform: "translateY(8px)" },
@@ -62,7 +95,7 @@
     activeReveals.clear();
   };
   window.addEventListener("atlas-motion-change", () => {
-    if (isReduced()) clearReveals();
+    if (isReduced() || isCitrix()) clearReveals();
   });
   window.addEventListener("pagehide", clearReveals);
   function installScrollReveals() {
@@ -115,7 +148,7 @@
     };
     const sync = () => {
       stop();
-      if (isReduced()) return;
+      if (isReduced() || isCitrix()) return;
       scan(document.body);
       changes.observe(document.body, { childList: true, subtree: true });
     };
@@ -132,6 +165,29 @@
   function installShell() {
     const header = document.querySelector("body > .atlas-app-header");
     if (!header) return;
+    const actions = header.querySelector(".atlas-header-actions");
+    if (actions && !actions.querySelector(".atlas-display-mode")) {
+      const label = document.createElement("label");
+      label.className = "atlas-display-mode";
+      label.textContent = "Display ";
+      const select = document.createElement("select");
+      select.setAttribute("aria-label", "Display mode");
+      select.title =
+        "Citrix / remote: lighter 3D movement and fewer interface effects. Does not change permissions or start scans.";
+      for (const [value, text] of [
+        ["standard", "Standard"],
+        ["citrix", "Citrix / remote"],
+      ]) {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = text;
+        select.append(option);
+      }
+      select.value = displayChoice;
+      select.onchange = () => setDisplay(select.value);
+      label.append(select);
+      actions.append(label);
+    }
     const more = header.querySelector(".atlas-header-more");
     if (more) {
       document.addEventListener("click", (event) => {
@@ -516,6 +572,7 @@
     machineDetails,
     machineReport,
     dialog,
+    performance: { isCitrix, setDisplay },
     motion: {
       isReduced,
       reveal,

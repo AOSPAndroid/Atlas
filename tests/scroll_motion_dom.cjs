@@ -104,6 +104,17 @@ const settle = () => new Promise((resolve) => setImmediate(resolve));
   assert.equal(watched.size, 0);
   w.dispatchEvent(new w.Event("pagehide"));
   assert(effects.every((effect) => effect.cancelled));
+  w.AtlasUI.performance.setDisplay('citrix');
+  const remoteCard=w.document.createElement('div');remoteCard.className='machine';
+  w.document.body.append(remoteCard);await settle();
+  assert.equal(watched.size,0,'Citrix mode disconnects scroll observation');
+  const remoteCount=effects.length;
+  w.AtlasUI.motion.reveal(remoteCard);
+  assert.equal(effects.length,remoteCount,'Citrix mode skips decorative Web Animations');
+  assert.equal(w.AtlasUI.motion.isReduced(),false,'Display profile preserves the separate animation preference');
+  w.AtlasUI.performance.setDisplay('standard');
+  assert(watched.has(remoteCard),'Standard mode restores scroll observation');
+  w.dispatchEvent(new w.Event('pagehide'));
   w.close();
   console.log(
     "PASS: shared scroll reveals, readable fallback, reduced motion, single entry, removed-card cleanup and bounded batches",
