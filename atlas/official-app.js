@@ -1775,8 +1775,8 @@ function labelPolicy(w, h) {
   const area = Math.max(0.4, Math.min(1.5, w * h / 650000));
   return {
     level: labelZoomLevel,
-    names: Math.round([0, 6, 14, 24, 40][labelZoomLevel] * area),
-    amenities: Math.max(1, Math.round([2, 4, 6, 10, 14][labelZoomLevel] * area)),
+    names: Math.round([8, 12, 20, 30, 40][labelZoomLevel] * area),
+    amenities: Math.max(1, Math.round([4, 6, 8, 12, 14][labelZoomLevel] * area)),
   };
 }
 function labelBounds(w, h) {
@@ -1811,10 +1811,12 @@ function renderAmenities(occupied, policy, bounds) {
     .sort((a, b) => amenityPriority(a.room) - amenityPriority(b.room));
   const retained = new Set(amenities.map(item => item.id));
   let count = 0;
+  const kindsShown = new Set();
   for (const {room, id} of amenities) {
     if (!room.points?.length) continue;
-    const minimum = /seating/.test(room.id) ? 3 : amenityPriority(room) <= 1 ? 0 : 1;
+    const minimum = /seating/.test(room.id) ? 3 : room.kind === "room" && amenityPriority(room) > 1 ? 1 : 0;
     if (policy.level < minimum || count >= policy.amenities) continue;
+    if (policy.level === 0 && kindsShown.has(room.kind)) continue;
     const title = room.kind === "lift" ? `↕ ${room.name || "Elevators"}` : room.name || "Room";
     const center = room.anchor || room.points.reduce((a, p) => [a[0] + p[0] / room.points.length, a[1] + p[1] / room.points.length], [0, 0]);
     const pt = projected(modelPoint(center[0], center[1], floor, 0));
@@ -1834,6 +1836,7 @@ function renderAmenities(occupied, policy, bounds) {
     el.hidden = false;
     el.style.cssText = `left:${rect.x}px;top:${rect.y}px;width:${width}px;height:${height}px`;
     occupied.push(rect);
+    kindsShown.add(room.kind);
     count++;
   }
   for (const [id, el] of amenityNodes) if (!retained.has(id)) { el.remove(); amenityNodes.delete(id); }

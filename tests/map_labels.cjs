@@ -86,15 +86,16 @@ function assertNoOverlap(w) {
     for (const mode of ['plan', '3d']) {
       t.installLabelScenario(mode);
       t.labelPose(1);
-      assert.equal(visible(w, '.map-name').length, 0, `${mode}: whole-floor view leaves desks visible without person tags`);
+      const overviewNames = visible(w, '.map-name').length;
+      assert(overviewNames > 0 && overviewNames <= 8, `${mode}: overview includes a restrained set of names`);
       const overviewAmenities = visible(w, '.amenity-tag');
-      assert(overviewAmenities.length <= 2, `${mode}: overview shows at most two landmark tags`);
+      assert(overviewAmenities.length <= 4, `${mode}: overview keeps a small selection of landmark tags`);
       assert(overviewAmenities.some(el => el.textContent.includes('Elevators')), `${mode}: elevators take priority over lower-value amenities`);
       assertNoOverlap(w);
 
       t.labelPose(2);
       const middleNames = visible(w, '.map-name').length;
-      assert(middleNames > 0 && middleNames <= 14, `${mode}: names appear gradually at intermediate zoom`);
+      assert(middleNames > overviewNames && middleNames <= 20, `${mode}: names appear gradually at intermediate zoom`);
       const middleAmenities = visible(w, '.amenity-tag').length;
       assertNoOverlap(w);
       t.labelPose(4.2);
@@ -104,12 +105,11 @@ function assertNoOverlap(w) {
       assertNoOverlap(w);
 
       t.labelPose(1);
-      assert.equal(visible(w, '.map-name').length, 0, `${mode}: zooming out hides already-created name tags`);
-      assert([...w.document.querySelectorAll('#label-lines line, #label-lines circle')]
-        .every(el => el.style.display === 'none'), `${mode}: zooming out also hides their connectors`);
+      assert.equal(visible(w, '.map-name').length, overviewNames, `${mode}: zooming out restores the smaller overview`);
+      assert.equal([...w.document.querySelectorAll('#label-lines line')].filter(el => el.style.display !== 'none').length, overviewNames, `${mode}: connectors only remain for visible names`);
 
       t.labelPose(1, 'test-desk-31');
-      const chosen = visible(w, '.map-name');
+      const chosen = visible(w, '.map-name.chosen');
       assert.equal(chosen.length, 1, `${mode}: overview retains the selected person`);
       assert.equal(chosen[0].dataset.person, 'test-desk-31');
       assert(chosen[0].classList.contains('chosen'));
@@ -135,7 +135,7 @@ function assertNoOverlap(w) {
 
       t.labelPose(1);
       t.labelPose(1.37);
-      assert.equal(visible(w, '.map-name').length, 0, `${mode}: small movement around the first threshold does not flash tags`);
+      assert(visible(w, '.map-name').length <= 8, `${mode}: small movement retains the overview budget`);
       t.labelPose(1.43);
       assert(visible(w, '.map-name').length > 0, `${mode}: a deliberate zoom reveals names`);
       for (const zoom of [1.33, 1.37, 1.33]) {
@@ -143,7 +143,7 @@ function assertNoOverlap(w) {
         assert(visible(w, '.map-name').length > 0, `${mode}: small zoom reversals retain the current label level`);
       }
       t.labelPose(1.27);
-      assert.equal(visible(w, '.map-name').length, 0, `${mode}: zooming clearly out hides names again`);
+      assert(visible(w, '.map-name').length > 0 && visible(w, '.map-name').length <= 8, `${mode}: zooming out retains a few useful names`);
 
       t.searchLabelScenario(); t.labelPose(1);
       assert(visible(w, '.map-name').length > 0 && visible(w, '.map-name').length <= 3,
@@ -153,7 +153,7 @@ function assertNoOverlap(w) {
     // Fit-relative behavior should remain quiet on a phone-sized viewport.
     viewport.width = 420; viewport.height = 600;
     t.installLabelScenario('plan'); t.labelPose(1);
-    assert.equal(visible(w, '.map-name').length, 0);
+    assert(visible(w, '.map-name').length > 0 && visible(w, '.map-name').length <= 4);
     assert(visible(w, '.amenity-tag').length <= 2);
     assertNoOverlap(w);
     assert.equal(f.errors.length, 0, f.errors.join('\n'));
