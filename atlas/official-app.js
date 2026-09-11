@@ -1827,7 +1827,10 @@ function labelPolicy(w, h) {
   const area = Math.max(0.4, Math.min(1.5, (w * h) / 650000));
   return {
     level: labelZoomLevel,
-    names: 2 * Math.round([8, 12, 20, 30, 40][labelZoomLevel] * area),
+    names: Math.max(
+      16,
+      Math.round([32, 44, 60, 84, 112][labelZoomLevel] * area),
+    ),
     amenities: Math.max(
       1,
       Math.round([4, 6, 8, 12, 14][labelZoomLevel] * area),
@@ -1850,13 +1853,13 @@ function labelsOverlap(a, b, gap = 8) {
     a.y + a.h + gap > b.y
   );
 }
-function labelFits(rect, bounds, occupied) {
+function labelFits(rect, bounds, occupied, gap = 8) {
   return (
     rect.x >= bounds.left &&
     rect.x + rect.w <= bounds.right &&
     rect.y >= bounds.top &&
     rect.y + rect.h <= bounds.bottom &&
-    !occupied.some((other) => labelsOverlap(rect, other))
+    !occupied.some((other) => labelsOverlap(rect, other, gap))
   );
 }
 function selectedLabelSpot(p, w, h) {
@@ -2034,28 +2037,62 @@ function renderNames() {
     }
     const wide = Math.min(
         bounds.right - bounds.left,
-        active ? 210 : Math.min(160, Math.max(100, r.name.length * 6.1)),
+        active
+          ? 210
+          : Math.min(
+              w < 640 ? 112 : 128,
+              Math.max(80, r.name.length * 6.4 + 16),
+            ),
       ),
-      height = active ? 54 : 34;
+      height = active ? 54 : r.name.length <= 14 ? 26 : 34;
+    const columns = Math.max(
+      1,
+      Math.floor((bounds.right - bounds.left + 4) / (wide + 4)),
+    );
+    const horizontalOffsets =
+      w < 640
+        ? Array.from(
+            { length: columns },
+            (_, i) =>
+              bounds.left +
+              (columns > 1
+                ? (i * (bounds.right - bounds.left - wide)) / (columns - 1)
+                : 0) -
+              (p[0] - wide / 2),
+          ).sort((a, b) => Math.abs(a) - Math.abs(b))
+        : [0, -wide * 0.55, wide * 0.55, -wide * 1.05, wide * 1.05];
     let spot = null;
     if (active) spot = activeSpot || selectedLabelSpot(p, w, h);
     else if (moving && labelNodes.get(r.id)?.offset) {
       const offset = labelNodes.get(r.id).offset;
       spot = { x: p[0] + offset.x, y: p[1] + offset.y, w: wide, h: height };
-      if (!labelFits(spot, bounds, occupied)) spot = null;
+      if (!labelFits(spot, bounds, occupied, 4)) spot = null;
     } else
-      for (const dy of [-height - 14, 14, -height - 54, 54]) {
-        for (const dx of [0, -wide * 0.6, wide * 0.6]) {
+      // Try nearby free space before omitting a name in a crowded desk bank.
+      for (const dy of [
+        -height - 8,
+        8,
+        -height - 40,
+        40,
+        -height - 72,
+        72,
+        -height - 104,
+        104,
+      ]) {
+        for (const dx of horizontalOffsets) {
           const rect = {
             x: Math.max(
               bounds.left,
               Math.min(bounds.right - wide, p[0] - wide / 2 + dx),
             ),
-            y: p[1] + dy,
+            y: Math.max(
+              bounds.top,
+              Math.min(bounds.bottom - height, p[1] + dy),
+            ),
             w: wide,
             h: height,
           };
-          if (labelFits(rect, bounds, occupied)) {
+          if (labelFits(rect, bounds, occupied, 4)) {
             spot = rect;
             break;
           }

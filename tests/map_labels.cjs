@@ -79,6 +79,11 @@ function assertNoOverlap(w) {
         screenRecords = records.map(r => ({r, p:projected(world(r))}));
         renderNames();
       }
+      export function realFloorScenario(mode) {
+        setView(mode); floor = 3; selected = null; moving = false;
+        records = data.records.filter(r => r.floor === floor).map((r,i) => ({...r, name:'Colleague Example ' + i, occupancy:'assigned'}));
+        document.querySelector('#search').value = ''; lastMatches = [];
+      }
       export function searchLabelScenario() {
         document.querySelector('#search').value = 'Person'; lastMatches = records.slice(0,3);
       }
@@ -87,7 +92,7 @@ function assertNoOverlap(w) {
       t.installLabelScenario(mode);
       t.labelPose(1);
       const overviewNames = visible(w, '.map-name').length;
-      assert(overviewNames > 0 && overviewNames <= 16, `${mode}: overview shows more names within the doubled allowance`);
+      assert(overviewNames >= 12 && overviewNames <= 32, `${mode}: crowded overview makes room for more names`);
       const overviewAmenities = visible(w, '.amenity-tag');
       assert(overviewAmenities.length <= 4, `${mode}: overview keeps a small selection of landmark tags`);
       assert(overviewAmenities.some(el => el.textContent.includes('Elevators')), `${mode}: elevators take priority over lower-value amenities`);
@@ -95,7 +100,7 @@ function assertNoOverlap(w) {
 
       t.labelPose(2);
       const middleNames = visible(w, '.map-name').length;
-      assert(middleNames > overviewNames && middleNames <= 40, `${mode}: names appear gradually at intermediate zoom`);
+      assert(middleNames > overviewNames && middleNames <= 60, `${mode}: names appear gradually at intermediate zoom`);
       const middleAmenities = visible(w, '.amenity-tag').length;
       assertNoOverlap(w);
       t.labelPose(4.2);
@@ -135,7 +140,7 @@ function assertNoOverlap(w) {
 
       t.labelPose(1);
       t.labelPose(1.37);
-      assert(visible(w, '.map-name').length <= 16, `${mode}: small movement retains the overview budget`);
+      assert(visible(w, '.map-name').length <= 32, `${mode}: small movement retains the overview budget`);
       t.labelPose(1.43);
       assert(visible(w, '.map-name').length > 0, `${mode}: a deliberate zoom reveals names`);
       for (const zoom of [1.33, 1.37, 1.33]) {
@@ -143,7 +148,7 @@ function assertNoOverlap(w) {
         assert(visible(w, '.map-name').length > 0, `${mode}: small zoom reversals retain the current label level`);
       }
       t.labelPose(1.27);
-      assert(visible(w, '.map-name').length > 0 && visible(w, '.map-name').length <= 16, `${mode}: zooming out retains a few useful names`);
+      assert(visible(w, '.map-name').length > 0 && visible(w, '.map-name').length <= 32, `${mode}: zooming out retains a few useful names`);
 
       t.searchLabelScenario(); t.labelPose(1);
       assert(visible(w, '.map-name').length > 0 && visible(w, '.map-name').length <= 3,
@@ -152,15 +157,25 @@ function assertNoOverlap(w) {
 
     // A spread-out floor can use the larger allowance; dense clusters still avoid collisions.
     t.installLabelScenario('plan', 4); t.labelPose(1);
-    assert(visible(w, '.map-name').length > 8 && visible(w, '.map-name').length <= 16);
+    assert(visible(w, '.map-name').length >= 20 && visible(w, '.map-name').length <= 32);
     assertNoOverlap(w);
 
     // Fit-relative behavior should remain quiet on a phone-sized viewport.
     viewport.width = 420; viewport.height = 600;
     t.installLabelScenario('plan'); t.labelPose(1);
-    assert(visible(w, '.map-name').length > 0 && visible(w, '.map-name').length <= 8);
+    assert(visible(w, '.map-name').length >= 8 && visible(w, '.map-name').length <= 16);
     assert(visible(w, '.amenity-tag').length <= 2);
     assertNoOverlap(w);
+    for (const [width, height] of [[420, 340], [420, 600], [900, 650]]) {
+      viewport.width = width; viewport.height = height;
+      for (const mode of ['plan','3d']) {
+        t.realFloorScenario(mode); t.labelPose(1);
+        const count = visible(w, '.map-name').length;
+        console.log('Full-floor names', width + 'x' + height, mode, count);
+        assert(count >= (width < 500 ? (height < 400 ? 8 : 14) : 24), `${mode}: real floor remains populated at ${width}px`);
+        assertNoOverlap(w);
+      }
+    }
     assert.equal(f.errors.length, 0, f.errors.join('\n'));
     w.close();
   }
