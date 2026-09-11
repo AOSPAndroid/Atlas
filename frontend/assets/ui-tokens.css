@@ -297,6 +297,9 @@ html[data-atlas-display="citrix"] {
   --atlas-motion-enter: 0ms;
   --atlas-palette-backdrop: none;
 }
+html[data-atlas-surface="workspace"] {
+  --atlas-motion-enter: 240ms;
+}
 html[data-atlas-motion="reduce"] *,
 html[data-atlas-motion="reduce"] *::before,
 html[data-atlas-motion="reduce"] *::after {

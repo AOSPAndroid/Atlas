@@ -70,6 +70,19 @@
     } catch {}
     applyMotion();
   }
+  const isWorkspace = () =>
+    document.documentElement.dataset.atlasSurface === "workspace" ||
+    !!document.getElementById("deploymentPanel");
+  const applySurfaceProfile = () => {
+    document.documentElement.dataset.atlasSurface = isWorkspace()
+      ? "workspace"
+      : "map";
+  };
+  if (document.readyState === "loading")
+    document.addEventListener("DOMContentLoaded", applySurfaceProfile, {
+      once: true,
+    });
+  else applySurfaceProfile();
   const activeReveals = new Map();
   function reveal(
     element,
@@ -84,6 +97,12 @@
       document.hidden
     )
       return;
+    const workspace = isWorkspace();
+    if (workspace) {
+      distance = Math.min(distance, settle ? 32 : 8);
+      duration = Math.min(duration, settle ? 280 : 180);
+      delay = 0;
+    }
     // A panel entrance already moves its cards; don't stack scroll effects inside it.
     for (
       let parent = element.parentElement;
@@ -97,27 +116,30 @@
     const frames = settle
       ? [
           {
-            opacity: 0.2,
-            transform: `translateY(${distance}px) scale(0.985)`,
+            opacity: workspace ? 0.55 : 0.2,
+            transform: `translateY(${distance}px) scale(${workspace ? 0.995 : 0.985})`,
             offset: 0,
             easing: "cubic-bezier(0.16, 1, 0.3, 1)",
           },
           {
             opacity: 1,
-            transform: "translateY(-2px) scale(1)",
+            transform: `translateY(${workspace ? -1 : -2}px) scale(1)`,
             offset: 0.78,
             easing: "ease-in-out",
           },
           { opacity: 1, transform: "translateY(0) scale(1)", offset: 1 },
         ]
       : [
-          { opacity: 0.3, transform: `translateY(${distance}px)` },
+          {
+            opacity: workspace ? 0.65 : 0.3,
+            transform: `translateY(${distance}px)`,
+          },
           { opacity: 1, transform: "translateY(0)" },
         ];
     const animation = element.animate(frames, {
       duration,
       delay,
-      fill: "backwards",
+      fill: workspace ? "none" : "backwards",
       easing: settle ? "linear" : "cubic-bezier(0.22, 1, 0.36, 1)",
     });
     activeReveals.set(element, animation);

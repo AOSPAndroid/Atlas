@@ -76,8 +76,8 @@ const settle = () => new Promise((r) => setTimeout(r, 30));
     await settle();
     const kyc = effects.find((e) => e.element.id === "kyc");
     assert(kyc);
-    assert.equal(kyc.frames[0].transform, "translateY(58px) scale(0.985)");
-    assert.equal(kyc.options.duration, 440);
+    assert.equal(kyc.frames[0].transform, "translateY(32px) scale(0.995)");
+    assert.equal(kyc.options.duration, 280);
     assert.equal(
       kyc.frames.at(-1).transform,
       "translateY(0) scale(1)",
@@ -85,8 +85,13 @@ const settle = () => new Promise((r) => setTimeout(r, 30));
     );
     assert.equal(
       kyc.options.fill,
-      "backwards",
+      "none",
       "No persistent transform remains after the entrance",
+    );
+    assert.equal(
+      d.documentElement.dataset.atlasSurface,
+      "workspace",
+      "The console receives the lightweight workspace motion profile",
     );
     d.querySelector('[data-machine="0"]').click();
     const panel = d.querySelector("#deploymentPanel"),
