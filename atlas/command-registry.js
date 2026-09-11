@@ -88,6 +88,12 @@ export const COMMANDS = [
     "history results",
   ],
   [
+    "psexec",
+    "PsExec",
+    "Open the remote command workbench and terminal",
+    "psexec ps exec terminal commands workbench",
+  ],
+  [
     "active",
     "Ongoing deployments",
     "View live deployment progress",

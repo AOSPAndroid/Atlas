@@ -622,6 +622,7 @@ async function runSharedCommand(id) {
     admin: () => page("admin"),
     bulk: () => page("bulk"),
     history: () => page("history"),
+    psexec: () => page("psexec"),
     active: () => openDeploymentMonitor("active"),
     recent: () => openDeploymentMonitor("recent"),
     queue: () => document.querySelector("#queueDrawer").classList.add("open"),
