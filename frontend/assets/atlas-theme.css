@@ -934,10 +934,111 @@ tbody tr:hover {
 .admin-tools input {
   flex: 1 1 200px;
 }
-.admin-tools [aria-pressed="true"] {
+.performance-views [aria-pressed="true"] {
   background: var(--accent);
   color: white;
   border-color: var(--accent);
+}
+.performance-views {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #f2f8fc;
+  width: fit-content;
+  margin-bottom: 20px;
+}
+.performance-views button {
+  min-width: 95px;
+}
+.performance-view-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.performance-view-heading h3 {
+  margin: 0;
+  font-size: 20px;
+}
+.performance-view-heading p {
+  margin: 8px 0;
+  max-width: 680px;
+}
+.performance-view-heading .row {
+  margin: 0;
+}
+.perf-empty {
+  padding: 28px;
+  border: 1px dashed #bfd3e5;
+  border-radius: 14px;
+  background: #f8fbfe;
+  margin: 16px 0;
+}
+.perf-empty b {
+  font-size: 18px;
+}
+.perf-empty small,
+.perf-comparison small {
+  color: var(--muted);
+}
+.perf-summary.perf-focused {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+}
+.perf-resource-detail {
+  margin: 18px 0;
+}
+.perf-resource-detail h3 {
+  margin-bottom: 8px;
+}
+.perf-engine-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 12px;
+}
+.perf-engine {
+  padding: 16px;
+  border: 1px solid #d4e0eb;
+  border-radius: 12px;
+}
+.perf-engine > span {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.perf-engine small {
+  color: var(--muted);
+}
+.perf-unavailable {
+  padding: 16px;
+  border-radius: 12px;
+  background: #f2f8fc;
+}
+.perf-comparison {
+  border-left: 3px solid var(--accent);
+  padding-left: 14px;
+  margin: 18px 0;
+}
+.perf-comparison .perf-facts {
+  margin: 6px 0 0;
+}
+.performance-filter input {
+  flex: 1;
+}
+#adminUtility {
+  margin: 16px 0;
+  padding: 14px;
+  border: 1px solid #d4e0eb;
+  border-radius: 12px;
+}
+#adminUtility pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 .perf-summary {
   display: grid;

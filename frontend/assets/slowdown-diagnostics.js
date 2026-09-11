@@ -237,6 +237,7 @@
     clearTimeout(capture.deadlineTimer);
     capture.controller?.abort();
     render();
+    updatePerformanceControls();
   }
   function clear() {
     stop();
@@ -249,6 +250,7 @@
     const pc = adminComputer();
     if (!pc) return toast("Enter a computer first");
     invalidateProcesses();
+    selectPerformanceView("overview");
     const run = (capture = {
       computer: pc,
       active: true,
@@ -257,6 +259,7 @@
       samples: [],
       errors: [],
     });
+    updatePerformanceControls();
     run.deadlineTimer = setTimeout(() => {
       if (capture === run) stop("Capture complete");
     }, duration);
@@ -285,19 +288,10 @@
         throw Error("Invalid diagnostic sample; refresh and try again.");
       run.samples.push(compact(data, (performance.now() - run.started) / 1000));
       run.policy = probePolicy(data);
-      processSnapshot = Object.freeze({
-        computer: run.computer,
-        kind: "cpu",
-        checked: new Date().toLocaleTimeString(),
-        data,
-      });
-      S.processes = data.items;
-      $("#refreshProcesses").disabled = false;
-      $("#copyPerformance").disabled = false;
       const expanded = [...$("#adminOverview").querySelectorAll("details")].map(
         (detail) => detail.open,
       );
-      renderPerformance();
+      acceptPerformanceSnapshot(run.computer, "overview", data);
       [...$("#adminOverview").querySelectorAll("details")].forEach(
         (detail, index) => {
           detail.open = !!expanded[index];
@@ -397,6 +391,7 @@
     ].join("\n");
   }
   window.AtlasDiagnostics = {
+    isRunning: () => !!capture?.active,
     start,
     stop,
     clear,

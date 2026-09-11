@@ -9,6 +9,7 @@ const {snapshot} = require('./performance_sample.cjs');
   const clone = value => JSON.parse(JSON.stringify(value));
   function sample(cpu = 88, elapsed = 0) {
     const s = clone(snapshot);
+    s.kind = 'diagnose';
     s.elapsed = elapsed;
     s.collection={profile:'light',duration_ms:1500,query_count:12};
     Object.assign(s.summary, {cpu_percent: cpu, memory_percent: 50, page_reads_sec: 0, commit_percent: 50, gpu_percent: null, disks: []});

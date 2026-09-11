@@ -73,7 +73,7 @@ function bind() {
     (x) => (x.onclick = () => copy(S.target, "Hostname")),
   );
   $$("[data-admin-target]").forEach((x) => (x.onclick = () => page("admin")));
-  ["overview", "ping", "access", "disk", "cpu", "gpu", "memory"].forEach(
+  ["ping", "access", "disk"].forEach(
     (k) =>
       ($(`[data-${k}]`).onclick = () =>
         admin(k).catch((x) => toast(x.message))),

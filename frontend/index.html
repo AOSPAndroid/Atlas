@@ -294,11 +294,9 @@
               class="primary"
             >
               Scan for slowness</button
-            ><button data-overview>Performance overview</button
             ><button id="adminSoftware">Installed software</button
             ><button data-ping>Ping</button><button data-access>C$</button
-            ><button data-disk>Disk</button><button data-cpu>CPU</button
-            ><button data-gpu>GPU</button><button data-memory>Memory</button
+            ><button data-disk>Disk</button
             ><button class="danger" data-reboot>Reboot</button>
           </div>
           <section
@@ -320,22 +318,56 @@
             </div>
             <div id="slowdownFindings"></div>
           </section>
+          <div id="adminUtility" hidden></div>
+          <div
+            class="performance-views"
+            role="group"
+            aria-label="Performance view"
+          >
+            <button
+              data-performance="overview"
+              data-overview
+              aria-pressed="true"
+            >
+              Overview
+            </button>
+            <button data-performance="cpu" data-cpu aria-pressed="false">
+              CPU
+            </button>
+            <button data-performance="gpu" data-gpu aria-pressed="false">
+              GPU
+            </button>
+            <button data-performance="memory" data-memory aria-pressed="false">
+              Memory
+            </button>
+          </div>
+          <div class="performance-view-heading">
+            <div>
+              <h3 id="performanceTitle">Performance overview</h3>
+              <p id="performanceDescription" class="muted">
+                CPU, GPU, RAM and disk pressure in one manual scan.
+              </p>
+            </div>
+            <div class="row">
+              <button id="refreshProcesses" class="primary" disabled>
+                Scan Overview
+              </button>
+              <button id="copyPerformance" disabled>Copy report</button>
+            </div>
+          </div>
+          <p id="processStatus" role="status">
+            Enter a machine, then click Scan Overview. Changing views never
+            starts a scan.
+          </p>
           <div id="adminOverview"></div>
-          <div class="row">
+          <div class="row performance-filter">
             <input
               id="processFilter"
               placeholder="Filter by process, PID or session"
               aria-label="Filter processes"
             />
-            <button id="refreshProcesses" disabled>Refresh processes</button>
-            <button id="copyPerformance" disabled>
-              Copy diagnostic report
-            </button>
           </div>
-          <p id="processStatus" role="status">
-            Choose CPU, GPU or Memory to load processes.
-          </p>
-          <p class="muted">
+          <p id="processHint" class="muted">
             Right-click a process for actions, or click its thread count to
             inspect CPU usage.
           </p>

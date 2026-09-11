@@ -13,4 +13,24 @@ const threads={ok:true,computer:'TESTPC',pid:42,name:'Renderer.exe',logical_proc
   {TID:423,CoreCPU:0,CPU:0,State:'Waiting',WaitReason:'User request',ContextSwitches:2,Priority:8},
   {TID:424,CoreCPU:null,CPU:null,State:'Waiting',WaitReason:'Page in',ContextSwitches:null,Priority:8}
 ]};
-module.exports={snapshot,threads};
+snapshot.summary.committed_bytes=34.48*GiB;
+snapshot.summary.commit_limit_bytes=40*GiB;
+snapshot.summary.gpu_engine_count=3;
+snapshot.summary.gpu_process_count=4;
+snapshot.summary.gpu_engines=[['3D',0,76],['VideoDecode',1,36],['Copy',2,8]].map(([engine,index,percent])=>({engine,name:`luid_a_phys_0_eng_${index}_engtype_${engine}`,adapter:'luid_a_phys_0',percent}));
+function profileSnapshot(kind) {
+  const data=JSON.parse(JSON.stringify(snapshot));
+  data.kind=kind; data.collection={profile:kind,query_count:{overview:14,cpu:8,gpu:3,memory:6}[kind]};
+  const common=['PID','Process','CreatedAt','CanTerminate','BlockReason','SessionId','CommandLine'];
+  const summaryFields={cpu:['cpu_percent','logical_processors','cores','processor_queue','context_switches_sec','thread_count'],gpu:['gpu_percent','gpu_engine','gpu_engine_count','gpu_engines','gpu_process_count'],memory:['total_memory_bytes','available_memory_bytes','memory_percent','committed_bytes','commit_limit_bytes','commit_percent','page_reads_sec']};
+  const rowFields={cpu:['CPU','Threads'],gpu:['GPU','Engine'],memory:['MemoryBytes','MemoryPercent','MemoryMB','PrivateBytes','Handles','PageFaultsPerSec']};
+  if(kind!=='overview') {
+    data.summary=Object.fromEntries(summaryFields[kind].map(key=>[key,data.summary[key]]));
+    data.items=data.items.map(row=>Object.fromEntries([...common,...rowFields[kind]].map(key=>[key,row[key]])));
+  }
+  const sort=kind==='gpu'?'GPU':kind==='memory'?'MemoryBytes':'CPU';
+  if(kind==='gpu')data.items=data.items.filter(row=>row.GPU!=null);
+  data.items.sort((a,b)=>(b[sort]??-1)-(a[sort]??-1));
+  return data;
+}
+module.exports={snapshot,threads,profileSnapshot};

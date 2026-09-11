@@ -20,8 +20,8 @@ PROTECTED = {'system', 'idle', 'registry', 'secure system', 'smss.exe', 'csrss.e
 
 def collect(wmi, pc, kind='cpu', *, pid=None, created=None, name=None):
     pc = wmi.validate_pc(pc)
-    if kind not in ('cpu', 'gpu', 'memory', 'threads', 'diagnose'):
-        raise HTTPException(400, 'Choose CPU, GPU, Memory or process threads')
+    if kind not in ('overview', 'cpu', 'gpu', 'memory', 'threads', 'diagnose'):
+        raise HTTPException(400, 'Choose Overview, CPU, GPU, Memory or process threads')
     args = ['powershell.exe', '-NoProfile', '-NonInteractive', '-ExecutionPolicy',
             'Bypass', '-File', str(SCRIPT), '-Computer', pc, '-Kind', kind]
     if kind == 'threads':
