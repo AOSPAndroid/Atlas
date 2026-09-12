@@ -20,8 +20,8 @@ and the private preview.
 
 ## Verification
 
-- `tools/audit_plan_sources.py` independently matches all 25,762 remaining wall
-  segments and 650 door curves to the original PDFs within 0.04 units on the
+- `tools/audit_plan_sources.py` independently matches all 25,758 remaining wall
+  segments and 648 door curves to the original PDFs within 0.04 units on the
   1,800-unit map canvas. Large curved walls use the extractor's 16-segment cubic
   approximation. There are no unmatched coordinates. This verifies coordinate
   provenance, not the physical meaning of every CAD symbol.
@@ -31,6 +31,12 @@ and the private preview.
 - `tests/map_furniture.cjs` checks all 127 recovered curved furniture surfaces
   and kitchen surfaces triangulate completely for 3D, and protects the confirmed
   B1/00 changes and actual passage doors.
+- Owner follow-up: the two units beside the floor-2 Credit Sales desks are
+  cupboards, with a printer alongside. Their source footprints are retained,
+  but the two cupboard swings and open leaves are removed from both 2D and 3D.
+  The printer's four edges are furniture, not walls. The actual room doorway
+  above the units is preserved. A Printer & cupboards amenity label identifies
+  the spot. The original PDFs remain unchanged.
 - Map movement, label placement, render caching and read-only viewer regressions
   are checked separately. No PDF parsing or extra scans run in the browser.
 

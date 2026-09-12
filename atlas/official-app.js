@@ -1,5 +1,5 @@
 import { applyFurnitureCorrections } from "./map-furniture.js?v=6";
-import { applyMapAmenities } from "./map-amenities.js?v=9";
+import { applyMapAmenities } from "./map-amenities.js?v=10";
 import { createCameraMotion } from "./camera-motion.js";
 import { installMapCursor } from "./map-cursor.js?v=5";
 import { openSiteInfo } from "./site-info.js?v=1";
@@ -151,6 +151,8 @@ function paintArchitecture(c) {
     ],
     [g.kitchenSeats || [], "#d9e8ef", "#7396aa"],
     [g.kitchenSinks || [], "#f8fcfe", "#007eae"],
+    [g.cupboards || [], "#d9e5eb", "#7396aa"],
+    [g.printers || [], "#f1f5f7", "#527080"],
   ])
     for (const points of items) {
       c.beginPath();
@@ -1708,9 +1710,26 @@ function architecturalMesh() {
       height: 1,
       solid: true,
     })),
+    ...(g.cupboards || []).map((points) => ({
+      points,
+      height: 1.35,
+      solid: true,
+      color: [0.79, 0.85, 0.89, 1],
+    })),
+    ...(g.printers || []).map((points) => ({
+      points,
+      height: 1.0,
+      solid: true,
+      color: [0.88, 0.92, 0.94, 1],
+    })),
   ];
-  for (const { points, height, solid } of furniture) {
-    polygonMesh(arr, points, height, [0.67, 0.82, 0.89, 1]);
+  for (const {
+    points,
+    height,
+    solid,
+    color = [0.67, 0.82, 0.89, 1],
+  } of furniture) {
+    polygonMesh(arr, points, height, color);
     for (let i = 0; i < points.length; i++)
       beam(
         arr,
@@ -1737,6 +1756,17 @@ function architecturalMesh() {
       0.12,
       [0.34, 0.45, 0.52, 1],
     );
+  }
+  // A dark scanner lid distinguishes the printer from the taller cupboards.
+  for (const points of g.printers || []) {
+    const center = points.reduce(
+      (a, p) => [a[0] + p[0] / points.length, a[1] + p[1] / points.length],
+      [0, 0],
+    );
+    const lid = points.map((p) =>
+      p.map((v, i) => center[i] + (v - center[i]) * 0.76),
+    );
+    polygonMesh(arr, lid, 1.04, [0.28, 0.39, 0.45, 1]);
   }
   for (const points of g.kitchenSinks || [])
     polygonMesh(arr, points, 1.015, [0.93, 0.98, 1, 1]);
@@ -2674,7 +2704,7 @@ function officialImage(level) {
       draw();
     };
     img.onerror = () => toast("Plan image could not load.");
-    img.src = `studio-floor-${level}.svg?v=2`;
+    img.src = `studio-floor-${level}.svg?v=3`;
     officialImages.set(level, img);
     if (officialImages.size > 2)
       officialImages.delete(officialImages.keys().next().value);

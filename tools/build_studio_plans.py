@@ -4,6 +4,7 @@ import xml.etree.ElementTree as ET
 import fitz
 import copy
 from build_curved_tables import correct_b1_plan
+from plan_fixture_corrections import correct_floor2_cupboards
 ROOT=Path(__file__).resolve().parents[1]/'atlas'
 NS='http://www.w3.org/2000/svg'
 ET.register_namespace('',NS)
@@ -62,5 +63,6 @@ for floor in range(-1,9):
   ET.SubElement(g,tag('rect'),{'x':'8','y':'3','width':'826','height':'550','rx':'6','fill':'#edf3f6'})
  for x in children:g.append(x)
  if floor == -1: correct_b1_plan(root)
+ if floor == 2: correct_floor2_cupboards(root)
  (ROOT/f'studio-floor-{floor}.svg').write_text(ET.tostring(root,encoding='unicode'))
  print(floor,len(furniture))

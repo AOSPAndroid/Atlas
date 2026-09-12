@@ -4,13 +4,18 @@ export function applySourcePlanDetails(data) {
     const detail = sourcePlanDetails[floor.level];
     if (!detail) continue;
     const g = floor.geometry;
-    for (const key of ["kitchenCounters", "kitchenTables", "kitchenSeats", "kitchenSinks", "stairTreads"])
+    for (const key of ["kitchenCounters", "kitchenTables", "kitchenSeats", "kitchenSinks", "stairTreads", "cupboards", "printers"])
       g[key] = detail[key];
     const walls = new Set([...detail.excludedWalls, ...detail.stairTreads].map(e => JSON.stringify(e)));
     const doors = new Set(detail.excludedDoors.map(e => JSON.stringify(e)));
     g.walls = (g.walls || []).filter(e => !walls.has(JSON.stringify(e)));
     g.doorSwings = (g.doorSwings || []).filter(e => !doors.has(JSON.stringify(e)));
-    const places = (g.wayfinding || []).filter(p => !p.id?.startsWith("source-"));
+    const removedPlan = new Set(detail.excludedPlanSegments.map(e => JSON.stringify(e)));
+    g.planLinework = (g.planLinework || []).filter(e => !removedPlan.has(JSON.stringify(e)));
+    const confirmedIds = new Set(detail.confirmedAmenities.map(p => p.id));
+    const places = (g.wayfinding || []).filter(p => !p.id?.startsWith("source-") && !confirmedIds.has(p.id));
+    for (const place of detail.confirmedAmenities)
+      if (!places.some(p => p.id === place.id)) places.push(place);
     // Keep owner-confirmed names, use the separate floor-7 break-area position.
     if (floor.level === 7) {
       const kitchen = places.find(p => p.id === "kitchen-coffee");

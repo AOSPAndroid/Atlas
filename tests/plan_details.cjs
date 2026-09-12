@@ -39,9 +39,19 @@ const root = path.resolve(__dirname, '..');
       const radius = label.kind === 'lift' ? 125 : label.kind === 'wc' ? 90 : 55;
       assert(g.wayfinding.some(p => p.kind === label.kind && Math.hypot(p.anchor[0]-label.anchor[0],p.anchor[1]-label.anchor[1]) < radius), `${floor.level}: source location ${label.text} has a nearby marker`);
     }
-    assert.equal(g.planLinework.length, before.planLinework.length - (floor.level === -1 ? 1 : 0), 'Retain the source underlay except the owner-confirmed demolished partition');
+    assert.equal(g.planLinework.length, before.planLinework.length - (floor.level === -1 ? 1 : floor.level === 2 ? 34 : 0), 'Only confirmed demolition and cupboard swing details leave the source underlay');
   }
   const fifth = data.floors.find(f => f.level === 5).geometry;
+  const second = data.floors.find(f => f.level === 2).geometry;
+  assert.equal(second.cupboards.length, 2, 'Two closed cupboards beside Credit Sales');
+  assert.equal(second.printers.length, 1, 'One printer beside the cupboards');
+  assert.equal(second.doorSwings.length, original.floors.find(f => f.level === 2).geometry.doorSwings.length - 2, 'Only the two confirmed cupboard swings leave the door layer');
+  assert(second.doorSwings.some(c => c[0][0] === 620.359 && c[0][1] === 1058.28), 'Keep the real room doorway above the cupboards');
+  assert(!second.walls.some(e => JSON.stringify(e) === JSON.stringify([[595.41,1093.81],[595.41,1134.02]])), 'Printer edges are not walls');
+  assert(second.wayfinding.some(p => p.id === 'credit-sales-printer' && p.kind === 'print'), 'Printer appears with the amenity labels');
+  const artwork = fs.readFileSync(path.join(root,'atlas/studio-floor-2.svg'),'utf8');
+  assert(!artwork.includes('M9082 3206C8865.991') && !artwork.includes('M9082 3671C8865.991'), 'The styled 2D plan does not retain the cupboard swing arcs');
+  assert(artwork.includes('M9082 2778V3242H9545V2778Z'), 'The lower cupboard is closed in the styled plan');
   assert(fifth.tables.some(p => p.some(([x,y]) => 375 < x && x < 417 && 680 < y && y < 750)), 'Keep the real MEET 01 furniture elsewhere on floor 5');
   const eighth = data.floors.find(f => f.level === 8).geometry;
   assert.equal(eighth.doorSwings.length, original.floors.find(f => f.level === 8).geometry.doorSwings.length - 36, 'Remove furniture curves and inner table surround, retaining passage doors');

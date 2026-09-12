@@ -93,6 +93,9 @@ const root = path.resolve(__dirname, '..');
         `Floor ${level} kitchen fixture renders in 3D`);
   }
   const places = new Map(ground.wayfinding.map(p => [p.id,p]));
+  for (const f of data.floors)
+    for (const points of [...f.geometry.cupboards, ...f.geometry.printers])
+      assert.equal(triangulate(points).length, points.length-2, 'Cupboard and printer surfaces render completely in 3D');
   for (const id of ['coffee','coffee-seating','lobby-seating','reception','build-room','main-entrance','secondary-entrance']) {
     assert(places.has(id), `Annotated ground-floor location ${id} is labelled`);
   }
