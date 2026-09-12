@@ -1,7 +1,7 @@
 import { applyFurnitureCorrections } from "./map-furniture.js?v=5";
 import { applyMapAmenities } from "./map-amenities.js?v=6";
 import { createCameraMotion } from "./camera-motion.js";
-import { installMapCursor } from "./map-cursor.js?v=4";
+import { installMapCursor } from "./map-cursor.js?v=5";
 import { openSiteInfo } from "./site-info.js?v=1";
 const readOnly =
   document.querySelector('meta[name="atlas-mode"]')?.content === "viewer";
