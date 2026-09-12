@@ -79,6 +79,17 @@ const root = path.resolve(__dirname, '..');
   const amenitiesOnce = JSON.stringify(data);
   applyMapAmenities(data);
   assert.equal(JSON.stringify(data), amenitiesOnce, 'Reloading must not duplicate amenity labels');
+  for (const level of [2, 3, 4, 5, 6, 7]) {
+    const geometry = data.floors.find(f => f.level === level).geometry;
+    assert.equal(geometry.kitchenCounters.length, 2, `Floor ${level} kitchen has cupboard and counter runs`);
+    assert.equal(geometry.kitchenSinks.length, 1, `Floor ${level} kitchen has a sink`);
+    assert.equal(geometry.kitchenTables.length, 1, `Floor ${level} kitchen has a table`);
+    assert.equal(geometry.kitchenSeats.length, 6, `Floor ${level} kitchen has six seats`);
+    for (const points of [...geometry.kitchenCounters, ...geometry.kitchenSinks,
+      ...geometry.kitchenTables, ...geometry.kitchenSeats])
+      assert.equal(triangulate(points).length, points.length - 2,
+        `Floor ${level} kitchen fixture renders in 3D`);
+  }
   const places = new Map(ground.wayfinding.map(p => [p.id,p]));
   for (const id of ['coffee','coffee-seating','lobby-seating','reception','build-room','main-entrance','secondary-entrance']) {
     assert(places.has(id), `Annotated ground-floor location ${id} is labelled`);

@@ -1,5 +1,5 @@
 import { applyFurnitureCorrections } from "./map-furniture.js?v=5";
-import { applyMapAmenities } from "./map-amenities.js?v=6";
+import { applyMapAmenities } from "./map-amenities.js?v=7";
 import { createCameraMotion } from "./camera-motion.js";
 import { installMapCursor } from "./map-cursor.js?v=5";
 import { openSiteInfo } from "./site-info.js?v=1";
@@ -143,6 +143,24 @@ function paintArchitecture(c) {
     c.lineWidth = 0.08;
     c.stroke();
   }
+  for (const [items, fill, stroke] of [
+    [[...(g.kitchenCounters || []), ...(g.kitchenTables || [])], "#b8d7e5", "#527f96"],
+    [g.kitchenSeats || [], "#d9e8ef", "#7396aa"],
+    [g.kitchenSinks || [], "#f8fcfe", "#007eae"],
+  ])
+    for (const points of items) {
+      c.beginPath();
+      points.forEach((point, i) => {
+        const p = modelPoint(...point);
+        i ? c.lineTo(p[0], p[2]) : c.moveTo(p[0], p[2]);
+      });
+      c.closePath();
+      c.fillStyle = fill;
+      c.fill();
+      c.strokeStyle = stroke;
+      c.lineWidth = 0.08;
+      c.stroke();
+    }
   if (mapLayers.doors) {
     c.beginPath();
     for (const curve of g.doorSwings || []) {
@@ -1673,6 +1691,9 @@ function architecturalMesh() {
     })),
     ...(g.chairSeats || []).map((points) => ({ points, height: 0.44 })),
     ...(g.counters || []).map((points) => ({ points, height: 1, solid: true })),
+    ...(g.kitchenTables || []).map((points) => ({ points, height: 0.84 })),
+    ...(g.kitchenSeats || []).map((points) => ({ points, height: 0.44 })),
+    ...(g.kitchenCounters || []).map((points) => ({ points, height: 1, solid: true })),
   ];
   for (const { points, height, solid } of furniture) {
     polygonMesh(arr, points, height, [0.67, 0.82, 0.89, 1]);
@@ -1703,6 +1724,8 @@ function architecturalMesh() {
       [0.34, 0.45, 0.52, 1],
     );
   }
+  for (const points of g.kitchenSinks || [])
+    polygonMesh(arr, points, 1.015, [0.93, 0.98, 1, 1]);
   geometryCache.set(key, arr);
   if (geometryCache.size > 3)
     geometryCache.delete(geometryCache.keys().next().value);
