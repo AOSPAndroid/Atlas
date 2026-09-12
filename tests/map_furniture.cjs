@@ -83,8 +83,10 @@ const root = path.resolve(__dirname, '..');
     const geometry = data.floors.find(f => f.level === level).geometry;
     assert.equal(geometry.kitchenCounters.length, 2, `Floor ${level} kitchen has cupboard and counter runs`);
     assert.equal(geometry.kitchenSinks.length, 1, `Floor ${level} kitchen has a sink`);
-    assert.equal(geometry.kitchenTables.length, 1, `Floor ${level} kitchen has a table`);
-    assert.equal(geometry.kitchenSeats.length, 6, `Floor ${level} kitchen has six seats`);
+    assert.equal(geometry.kitchenTables.length, level === 5 ? 0 : 1,
+      `Floor ${level} follows its source plan for kitchen tables`);
+    assert.equal(geometry.kitchenSeats.length, level === 5 ? 0 : 6,
+      `Floor ${level} follows its source plan for kitchen seating`);
     for (const points of [...geometry.kitchenCounters, ...geometry.kitchenSinks,
       ...geometry.kitchenTables, ...geometry.kitchenSeats])
       assert.equal(triangulate(points).length, points.length - 2,

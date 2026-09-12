@@ -858,7 +858,7 @@ function rectangle([cx, cy], width, depth, degrees) {
     [-width / 2, depth / 2],
   ].map(([x, y]) => [cx + x * cosine - y * sine, cy + x * sine + y * cosine]);
 }
-function kitchenFixtures(anchor) {
+function kitchenFixtures(anchor, includeTable = true) {
   const angle = -43,
     table = [anchor[0] + 72, anchor[1] + 86],
     seat = (along, across) => {
@@ -874,11 +874,13 @@ function kitchenFixtures(anchor) {
       rectangle([anchor[0] + 27, anchor[1] + 25], 64, 16, angle),
     ],
     kitchenSinks: [rectangle([anchor[0] - 43, anchor[1] - 36], 20, 10, angle)],
-    kitchenTables: [rectangle(table, 70, 25, angle)],
-    kitchenSeats: [-23, 0, 23].flatMap((along) => [
-      rectangle(seat(along, -25), 12, 11, angle),
-      rectangle(seat(along, 25), 12, 11, angle),
-    ]),
+    kitchenTables: includeTable ? [rectangle(table, 70, 25, angle)] : [],
+    kitchenSeats: includeTable
+      ? [-23, 0, 23].flatMap((along) => [
+          rectangle(seat(along, -25), 12, 11, angle),
+          rectangle(seat(along, 25), 12, 11, angle),
+        ])
+      : [],
   };
 }
 // Lower floors use their own source-plan labels; their layout differs from office floors.
@@ -923,6 +925,8 @@ export function applyMapAmenities(data) {
     const ids = new Set(additions.map(item => item.id));
     floor.geometry.wayfinding = [...(floor.geometry.wayfinding || []).filter(item => item.kind !== "lift" && !ids.has(item.id)), ...additions];
     const kitchen = locations.find(item => item.id === "kitchen-coffee");
-    if (kitchen) Object.assign(floor.geometry, kitchenFixtures(kitchen.anchor));
+    // Floor 5 has an open break area in the source plan, not the repeated café table.
+    if (kitchen)
+      Object.assign(floor.geometry, kitchenFixtures(kitchen.anchor, floor.level !== 5));
   }
 }
