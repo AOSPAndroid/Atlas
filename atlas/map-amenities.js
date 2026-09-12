@@ -858,7 +858,7 @@ const groundFloorPlaces = [
   ["lobby-seating", "Tables & seating", "room", [1143, 818]],
   ["reception", "Reception", "room", [1107, 999]],
   ["build-room", "Build room", "room", [1007, 1131]],
-  ["main-entrance", "Main entrance", "room", [1213, 1159]],
+  ["main-entrance", "Main entrance", "room", [1263, 1128]],
   ["secondary-entrance", "Secondary entrance", "room", [649, 1137]],
 ].map(([id, name, kind, anchor]) => ({
   id, name, kind, anchor,
