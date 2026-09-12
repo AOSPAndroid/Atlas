@@ -541,8 +541,8 @@ const { fixture, root } = require("./ui_fixture.cjs");
     t.setFloor(2); t.setView("plan"); step(600);
     viewport.clientWidth = 600; resize(); step(600);
     close(t.state(), t.fitTarget());
-    assert.equal(t.focusTarget(people[0]).scale, Math.min(2.5, t.fitTarget().scale * 1.85),
-      "Desk focus uses the closer Atlas 7 zoom");
+    assert.equal(t.focusTarget(people[0]).scale, Math.min(2.75, t.fitTarget().scale * 2.035),
+      "Desk focus uses the additional ten-percent zoom");
     t.selectRecord(people[0].id); step(430);
     assert(!t.cameraMotion.active, "Gentle focus completes within 420 ms");
     assert(t.state().scale < 3, "Search never forces the old 3x minimum zoom");

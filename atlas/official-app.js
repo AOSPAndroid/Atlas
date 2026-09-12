@@ -617,7 +617,7 @@ function focusTarget(r) {
   // Bring the selected desk closer while retaining enough surrounding desks for context.
   const goal = {
     ...fit,
-    scale: Math.min(2.5, fit.scale * 1.85),
+    scale: Math.min(2.75, fit.scale * 2.035),
     cx: world(r)[0],
     cz: world(r)[2],
   };
