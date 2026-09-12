@@ -614,10 +614,10 @@ function focusTarget(r) {
   const saved = cam,
     area = mapArea(),
     fit = fitTarget();
-  // Keep the surrounding desk bank visible, even on smaller Citrix windows.
+  // Bring the selected desk closer while retaining enough surrounding desks for context.
   const goal = {
     ...fit,
-    scale: Math.min(2.2, fit.scale * 1.65),
+    scale: Math.min(2.5, fit.scale * 1.85),
     cx: world(r)[0],
     cz: world(r)[2],
   };
