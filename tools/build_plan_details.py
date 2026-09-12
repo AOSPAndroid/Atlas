@@ -173,7 +173,7 @@ def credit_sales_fixtures(level, geometry, drawings, factor):
         [[582.46,1064.05],[612.15,1064.05],[612.15,1093.81],[582.46,1093.81]]]
     printer = [[595.41,1093.81],[611.64,1093.81],[611.64,1134.02],[595.41,1134.02]]
     detail['printers'] = [printer]
-    detail['confirmedAmenities'] = [dict(id='credit-sales-printer',kind='print',name='Printer & cupboards',
+    detail['confirmedAmenities'] = [dict(id='credit-sales-printer',kind='print',name='Printer',
         anchor=[603.53,1113.92],points=printer)]
     doors = [c for c in geometry['doorSwings'] if all(557<p[0]<583 and 1036<p[1]<1092 for p in c)]
     # Remove only the two open leaves and their sampled swing arcs from the

@@ -35,7 +35,7 @@ and the private preview.
   cupboards, with a printer alongside. Their source footprints are retained,
   but the two cupboard swings and open leaves are removed from both 2D and 3D.
   The printer's four edges are furniture, not walls. The actual room doorway
-  above the units is preserved. A Printer & cupboards amenity label identifies
+  above the units is preserved. A Printer amenity label identifies
   the spot. The original PDFs remain unchanged.
 - Map movement, label placement, render caching and read-only viewer regressions
   are checked separately. No PDF parsing or extra scans run in the browser.
