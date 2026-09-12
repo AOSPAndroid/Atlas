@@ -1206,6 +1206,40 @@ function sourcePoint(p, level = floor) {
 function world(r) {
   return modelPoint(r.x * 1800, r.y * 1800, r.floor, 1.1);
 }
+let deskAngleRecords = null,
+  inferredDeskAngles = new Map();
+function deskLayoutAngle(r) {
+  const saved = Number(r.angle) || 0;
+  if (saved) return saved;
+  if (deskAngleRecords !== records) {
+    deskAngleRecords = records;
+    inferredDeskAngles = new Map();
+    const floors = new Map();
+    for (const desk of records)
+      if (desk.kind === "desk") {
+        if (!floors.has(desk.floor)) floors.set(desk.floor, []);
+        floors.get(desk.floor).push({ desk, point: world(desk) });
+      }
+    for (const desks of floors.values())
+      for (const current of desks) {
+        let nearest = null;
+        for (const candidate of desks) {
+          if (candidate === current) continue;
+          const dx = candidate.point[0] - current.point[0],
+            dz = candidate.point[2] - current.point[2],
+            distance = Math.hypot(dx, dz);
+          if (distance > 0.1 && distance <= 4.5 && (!nearest || distance < nearest.distance))
+            nearest = { dx, dz, distance };
+        }
+        if (nearest)
+          inferredDeskAngles.set(
+            current.desk.id,
+            ((Math.atan2(nearest.dz, nearest.dx) * 180) / Math.PI + 180) % 180,
+          );
+      }
+  }
+  return inferredDeskAngles.get(r.id) || 0;
+}
 function init3d() {
   if (glReady) return;
   glError = "";
@@ -1396,6 +1430,31 @@ function box(arr, x, y, z, w, h, d, c) {
     ],
     c.map((v, i) => (i < 3 ? v * 0.72 : v)),
   );
+}
+function orientedBox(arr, x, y, z, w, h, d, c, degrees = 0) {
+  if (!degrees) return box(arr, x, y, z, w, h, d, c);
+  const angle = (degrees * Math.PI) / 180,
+    cosine = Math.cos(angle),
+    sine = Math.sin(angle),
+    point = (dx, height, dz) => [
+      x + dx * cosine - dz * sine,
+      height,
+      z + dx * sine + dz * cosine,
+    ],
+    bottom = [
+      point(-w / 2, y, -d / 2),
+      point(w / 2, y, -d / 2),
+      point(w / 2, y, d / 2),
+      point(-w / 2, y, d / 2),
+    ],
+    top = bottom.map(([px, , pz]) => [px, y + h, pz]);
+  quad(arr, top, c);
+  for (let i = 0; i < 4; i++)
+    quad(
+      arr,
+      [bottom[i], bottom[(i + 1) % 4], top[(i + 1) % 4], top[i]],
+      c.map((value, channel) => (channel < 3 ? value * (i % 2 ? 0.83 : 0.72) : value)),
+    );
 }
 const geometryCache = new Map();
 function triangulate(points) {
@@ -1748,7 +1807,17 @@ function renderFrame() {
           isSelected ? [1, 0.55, 0.15, 1] : [0, 0.48, 0.65, 1],
         );
       if (isSelected) {
-        box(verts, p[0], 0.03, p[2], 3.0, 0.05, 2.1, [1, 0.56, 0.12, 1]);
+        orientedBox(
+          verts,
+          p[0],
+          0.03,
+          p[2],
+          3.0,
+          0.05,
+          2.1,
+          [1, 0.56, 0.12, 1],
+          deskLayoutAngle(r),
+        );
         box(verts, p[0], 0.1, p[2], 0.1, 3.3, 0.1, [1, 0.5, 0.08, 1]);
       }
     }
@@ -2417,7 +2486,7 @@ function hit(e) {
   return screenRecords
     .map((o) => {
       const p = world(o.r),
-        a = ((o.r.angle || 0) * Math.PI) / 180,
+        a = (deskLayoutAngle(o.r) * Math.PI) / 180,
         c = Math.cos(a),
         sn = Math.sin(a);
       const corners = [
@@ -2637,7 +2706,7 @@ function renderPlan() {
       continue;
     c.save();
     c.translate(p[0], p[2]);
-    c.rotate(((r.angle || 0) * Math.PI) / 180);
+    c.rotate((deskLayoutAngle(r) * Math.PI) / 180);
     c.globalAlpha = dim ? 0.25 : 1;
     if (active || r.occupancy === "assigned") {
       c.beginPath();

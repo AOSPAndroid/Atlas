@@ -133,7 +133,7 @@ const { fixture, root } = require("./ui_fixture.cjs");
         get: () => viewport[key],
       });
     const t = await f.map(`
-    export {fitTarget, mapArea, modelPoint, resetCam, selectRecord, renderDetail, setFloor, setView, focusTarget, cameraMotion, inversePoint, projected, world, settleMotion, draw};
+    export {fitTarget, mapArea, modelPoint, resetCam, selectRecord, renderDetail, setFloor, setView, focusTarget, cameraMotion, inversePoint, projected, world, deskLayoutAngle, settleMotion, draw};
     export function graphicsState(){return {ready:glReady,error:glError,view}}
     export function state(){return {...cam}}
     export function currentCanvas(){return canvas}
@@ -149,6 +149,10 @@ const { fixture, root } = require("./ui_fixture.cjs");
       (r) => r.floor === 2 && r.kind === "desk",
     );
     assert(people.length > 1);
+    const angledDesk = data.records.find((r) => r.id === "03R023070");
+    assert(angledDesk);
+    assert(t.deskLayoutAngle(angledDesk) > 25 && t.deskLayoutAngle(angledDesk) < 70,
+      "An angled desk bank produces an angled selection footprint");
     const initial = t.state();
     t.selectRecord(people[0].id);
     const inspector = w.document.querySelector("#detail");
