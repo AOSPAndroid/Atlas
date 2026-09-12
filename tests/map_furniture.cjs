@@ -17,7 +17,7 @@ const root = path.resolve(__dirname, '..');
   const once = JSON.stringify(data);
   applyFurnitureCorrections(data);
   assert.equal(JSON.stringify(data), once, 'Repeated loading must not duplicate tables');
-  const exclusions = {'-1': 36, 0: 0, 2: 0, 3: 1, 4: 1, 5: 0, 6: 1, 7: 2};
+  const exclusions = {'-1': 36, 0: 0, 1: 0, 2: 0, 3: 1, 4: 1, 5: 0, 6: 1, 7: 2, 8: 32};
   let count = 0;
   for (const floor of data.floors) {
     if (!(floor.level in exclusions)) continue;
@@ -81,11 +81,11 @@ const root = path.resolve(__dirname, '..');
   assert.equal(JSON.stringify(data), amenitiesOnce, 'Reloading must not duplicate amenity labels');
   for (const level of [2, 3, 4, 5, 6, 7]) {
     const geometry = data.floors.find(f => f.level === level).geometry;
-    assert.equal(geometry.kitchenCounters.length, 2, `Floor ${level} kitchen has cupboard and counter runs`);
-    assert.equal(geometry.kitchenSinks.length, 1, `Floor ${level} kitchen has a sink`);
-    assert.equal(geometry.kitchenTables.length, level === 5 ? 0 : 1,
-      `Floor ${level} follows its source plan for kitchen tables`);
-    assert.equal(geometry.kitchenSeats.length, level === 5 ? 0 : 6,
+    assert.equal(geometry.kitchenCounters.length, level === 7 ? 0 : 3, `Floor ${level} uses its reviewed source counter outlines`);
+    assert.equal(geometry.kitchenSinks.length, 0, `Floor ${level} does not guess a sink location`);
+    assert.equal(geometry.kitchenTables.length, 0,
+      `Floor ${level} does not add an invented meeting table beside the kitchen`);
+    assert.equal(geometry.kitchenSeats.length, level === 7 ? 6 : 4,
       `Floor ${level} follows its source plan for kitchen seating`);
     for (const points of [...geometry.kitchenCounters, ...geometry.kitchenSinks,
       ...geometry.kitchenTables, ...geometry.kitchenSeats])

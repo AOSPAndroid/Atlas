@@ -179,6 +179,7 @@ The source tree also retains inputs and maintenance tools that are needed to rep
 - `directory_workbook.py` provides the workbook parser and schema used by directory imports, seating sync and desk moves.
 - `database040926.xlsx`, `atlas/data.json` and `atlas/visual-seating-matches.json` support the initial directory and previous-seating migration. The Excel templates remain available from Manage Database.
 - `tools/build_official_3d.py` extracts geometry into `atlas/official-data.json`; `tools/build_studio_plans.py` generates the current `atlas/studio-floor-*.svg` backgrounds from the retained official PDFs. These optional build tools require PyMuPDF and rewrite their outputs; normal startup does not run them.
+- The [floor-plan review](FLOOR_PLAN_AUDIT.md) covers all ten original plans, the reviewed furniture/stair/amenity corrections, source-coordinate checks and remaining physical-layout uncertainties. Run the correction generators after rebuilding the base geometry; normal startup loads their checked-in results without parsing PDFs.
 - `scripts/serve_documentation_preview.py` generates the fictional map used for the [documentation screenshots](docs/images/README.md).
 
 ## Optimization changes

@@ -33,7 +33,7 @@ class MergedAtlas(unittest.TestCase):
   r=self.client.get('/api/state');self.assertEqual(len(r.json()['records']),524)
   with m.db() as c:
    for t,n in [('users',18739),('machines',69289),('assignments',31557),('deployments',22)]:self.assertEqual(c.execute('select count(*) from '+t).fetchone()[0],n)
-  for url in ['/','/official-app.js','/camera-motion.js','/operations.js','/operations.css','/installer','/assets/atlas-theme.css','/api/history','/api/ops/settings']:
+  for url in ['/','/official-app.js','/map-plan-details.js','/camera-motion.js','/operations.js','/operations.css','/installer','/assets/atlas-theme.css','/api/history','/api/ops/settings']:
    self.assertEqual(self.client.get(url).status_code,200)
   self.assertEqual(self.client.get('/office_atlas.db').status_code,404)
  def test_02_all_assigned_desks_resolve(self):

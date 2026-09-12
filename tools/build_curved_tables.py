@@ -159,8 +159,6 @@ if __name__ == '__main__':
     corrections = {}
     for floor in data['floors']:
         level = floor['level']
-        if level not in (-1, 0) and not 2 <= level <= 7:
-            continue
         def ground_floor_round_furniture(points):
             xs, ys = zip(*points)
             cx, cy = (min(xs)+max(xs))/2, (min(ys)+max(ys))/2
@@ -169,10 +167,27 @@ if __name__ == '__main__':
             in_cafe = 660 < cx < 830 and 700 < cy < 975
             in_lobby = 1060 < cx < 1210 and 765 < cy < 875
             return (in_cafe or in_lobby) and 8 < width < 18 and abs(width-height) < .2
+        def other_floor_furniture(points):
+            xs, ys = zip(*points)
+            area = abs(sum(a[0]*b[1]-b[0]*a[1]
+                for a,b in zip(points, points[1:]+points[:1])))/2
+            # These floors were omitted from the original correction pass.
+            # Include small round furniture and the large conference table;
+            # the path must still be a closed, blue furniture contour.
+            return area > 100 and min(max(xs)-min(xs), max(ys)-min(ys)) > 10 and max(max(xs)-min(xs), max(ys)-min(ys)) < 400
         corrections[level] = recover(
             floor['geometry'], furniture_edges(ROOT/f'atlas/studio-floor-{level}.svg'),
-            dining=level == -1, accept=ground_floor_round_furniture if level == 0 else None)
+            dining=level == -1, accept=ground_floor_round_furniture if level == 0 else other_floor_furniture if level in (1,8) else None)
         item = corrections[level]
+        if level == 8:
+            # MEET 06 contains overlapping rounded and tapered blue outlines.
+            # Follow the tapered contour's actual source edges; the graph's
+            # shortest route otherwise switches outlines at their crossings.
+            for i, points in enumerate(item['tables']):
+                if points[0] == [412.44,543.74]:
+                    if len(points) != 72 or points[38] != [415.45,505.71] or points[54] != [412.44,508.53]:
+                        raise ValueError('Floor 8 MEET 06 contour changed; review the source')
+                    item['tables'][i] = points[:28] + points[38:55]
         if level == 0:
             # The cafe symbols have concentric inner/outer paths. Keep one
             # surface per physical circle, using the outer outline.

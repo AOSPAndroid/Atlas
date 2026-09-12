@@ -1,5 +1,5 @@
-import { applyFurnitureCorrections } from "./map-furniture.js?v=5";
-import { applyMapAmenities } from "./map-amenities.js?v=8";
+import { applyFurnitureCorrections } from "./map-furniture.js?v=6";
+import { applyMapAmenities } from "./map-amenities.js?v=9";
 import { createCameraMotion } from "./camera-motion.js";
 import { installMapCursor } from "./map-cursor.js?v=5";
 import { openSiteInfo } from "./site-info.js?v=1";
@@ -144,7 +144,11 @@ function paintArchitecture(c) {
     c.stroke();
   }
   for (const [items, fill, stroke] of [
-    [[...(g.kitchenCounters || []), ...(g.kitchenTables || [])], "#b8d7e5", "#527f96"],
+    [
+      [...(g.kitchenCounters || []), ...(g.kitchenTables || [])],
+      "#b8d7e5",
+      "#527f96",
+    ],
     [g.kitchenSeats || [], "#d9e8ef", "#7396aa"],
     [g.kitchenSinks || [], "#f8fcfe", "#007eae"],
   ])
@@ -1246,7 +1250,11 @@ function deskLayoutAngle(r) {
           const dx = candidate.point[0] - current.point[0],
             dz = candidate.point[2] - current.point[2],
             distance = Math.hypot(dx, dz);
-          if (distance > 0.1 && distance <= 4.5 && (!nearest || distance < nearest.distance))
+          if (
+            distance > 0.1 &&
+            distance <= 4.5 &&
+            (!nearest || distance < nearest.distance)
+          )
             nearest = { dx, dz, distance };
         }
         if (nearest)
@@ -1471,7 +1479,9 @@ function orientedBox(arr, x, y, z, w, h, d, c, degrees = 0) {
     quad(
       arr,
       [bottom[i], bottom[(i + 1) % 4], top[(i + 1) % 4], top[i]],
-      c.map((value, channel) => (channel < 3 ? value * (i % 2 ? 0.83 : 0.72) : value)),
+      c.map((value, channel) =>
+        channel < 3 ? value * (i % 2 ? 0.83 : 0.72) : value,
+      ),
     );
 }
 const geometryCache = new Map();
@@ -1693,7 +1703,11 @@ function architecturalMesh() {
     ...(g.counters || []).map((points) => ({ points, height: 1, solid: true })),
     ...(g.kitchenTables || []).map((points) => ({ points, height: 0.84 })),
     ...(g.kitchenSeats || []).map((points) => ({ points, height: 0.44 })),
-    ...(g.kitchenCounters || []).map((points) => ({ points, height: 1, solid: true })),
+    ...(g.kitchenCounters || []).map((points) => ({
+      points,
+      height: 1,
+      solid: true,
+    })),
   ];
   for (const { points, height, solid } of furniture) {
     polygonMesh(arr, points, height, [0.67, 0.82, 0.89, 1]);
