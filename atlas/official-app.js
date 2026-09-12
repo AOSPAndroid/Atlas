@@ -1875,6 +1875,18 @@ function selectedLabelSpot(p, w, h) {
     h: 54,
   };
 }
+function nameLabelSize(name, viewportWidth, boundsWidth, active = false) {
+  if (active) return { width: Math.min(210, boundsWidth), height: 54 };
+  // Leave enough room for real glyph widths. The earlier character-count shortcut
+  // could make a two-word name wrap while still assigning it a one-line box.
+  const textWidth = name.length * 7.2,
+    width = Math.min(
+      boundsWidth,
+      Math.min(viewportWidth < 640 ? 112 : 128, Math.max(80, textWidth + 20)),
+    ),
+    wraps = textWidth > width - 16;
+  return { width, height: wraps ? 38 : 28 };
+}
 function amenityPriority(room) {
   if (["elevator-bank", "lift-main", "main-entrance"].includes(room.id))
     return 0;
@@ -2038,16 +2050,9 @@ function renderNames() {
       hidden++;
       continue;
     }
-    const wide = Math.min(
-        bounds.right - bounds.left,
-        active
-          ? 210
-          : Math.min(
-              w < 640 ? 112 : 128,
-              Math.max(80, r.name.length * 6.4 + 16),
-            ),
-      ),
-      height = active ? 54 : r.name.length <= 14 ? 26 : 34;
+    const size = nameLabelSize(r.name, w, bounds.right - bounds.left, active),
+      wide = size.width,
+      height = size.height;
     const columns = Math.max(
       1,
       Math.floor((bounds.right - bounds.left + 4) / (wide + 4)),
