@@ -26,7 +26,7 @@ const assert=require('node:assert/strict');const {fixture}=require('./ui_fixture
  menu.getBoundingClientRect=()=>({width:260,height:680});
  const openMenu=()=>card.dispatchEvent(new w.MouseEvent('contextmenu',{bubbles:true,cancelable:true,clientX:1023,clientY:767}));
  const beforeMenu=calls.length;openMenu();assert.equal(calls.length,beforeMenu);assert.equal(run('S.target'),'PC-B');
- assert.equal(menu.style.left,'756px');assert.equal(menu.style.top,'80px');assert.equal(menu.querySelectorAll('[role="menuitem"]').length,17);
+ assert.equal(menu.style.left,'756px');assert.equal(menu.style.top,'80px');assert.equal(menu.querySelectorAll('[role="menuitem"]').length,18);
  for(const label of ['Refresh health','Remote Desktop','Computer Management','Event Viewer','Copy complete machine report'])assert([...menu.querySelectorAll('button')].some(b=>b.textContent===label));
  const key=value=>menu.dispatchEvent(new w.KeyboardEvent('keydown',{key:value,bubbles:true,cancelable:true}));
  key('End');assert.equal(w.document.activeElement.dataset.cmd,'report');key('Home');assert.equal(w.document.activeElement.dataset.cmd,'target');key('ArrowUp');assert.equal(w.document.activeElement.dataset.cmd,'report');key('Escape');assert(menu.classList.contains('hidden'));assert.equal(w.document.activeElement,card.querySelector('.copyhost'));

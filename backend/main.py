@@ -330,6 +330,13 @@ def performance_snapshot(pc:str,kind:str='cpu'):
 def kill(p:Kill):
  import remote_processes,sys
  return remote_processes.terminate(sys.modules[__name__],p)
+@app.post('/api/remote-registry/enable')
+def enable_remote_registry(p:Machine):
+ import service_actions,sys
+ result=service_actions.enable_remote_registry(sys.modules[__name__],p.computer)
+ logging.info('Enabled RemoteRegistry target=%s operator=%s previous_state=%s startup=%s',result['computer'],identity(),result['previous_state'],result['start_mode'])
+ return result
+
 @app.post('/api/reboot')
 def reboot(p:Machine):return {'result':ps(f'$o=Get-WmiObject -ComputerName {quote(validate_pc(p.computer))} Win32_OperatingSystem -EnableAllPrivileges;$o.Reboot().ReturnValue')}
 

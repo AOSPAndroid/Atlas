@@ -625,6 +625,8 @@ async function runSharedCommand(id) {
     }
   };
   const actions = {
+    "remote-registry": async () =>
+      (await import("/service-actions.js")).openRemoteRegistry(S.target),
     lookup: () => focus("#search"),
     recovery: recover,
     workspace: () => page("workspace"),

@@ -1,3 +1,4 @@
+import { openRemoteRegistry } from "./service-actions.js";
 import { openCatalogue } from "./catalogue.js";
 const esc = (s) =>
   String(s ?? "").replace(
@@ -145,7 +146,19 @@ export function createOperations({
             e.preventDefault();
             const input = card.querySelector("input");
             const m = current.machines[+input.value];
-            window.AtlasHealth.specs(m.name);
+            const { element, body } = AtlasUI.dialog("Actions for " + m.name);
+            for (const [label, action] of [
+              ["View specifications", () => window.AtlasHealth.specs(m.name)],
+              ["Enable Remote Registry", () => openRemoteRegistry(m.name)],
+            ]) {
+              const button = document.createElement("button");
+              button.textContent = label;
+              button.onclick = () => {
+                element.close();
+                action();
+              };
+              body.append(button);
+            }
           }),
       );
     let filterTimer;

@@ -345,6 +345,15 @@ function machineContext(event, index) {
     ["packages", "Open Packages"],
   ])
     add(tool, label, () => openTargetTool(tool));
+  add(
+    "remote-registry",
+    "Enable Remote Registry",
+    async () =>
+      (await import("/service-actions.js")).openRemoteRegistry(m.name),
+    false,
+  );
+  menu.querySelector('[data-cmd="remote-registry"]').disabled =
+    !!window.AtlasReadOnly;
   add("admin", "Remote Admin", () => page("admin"));
   add("queue", "Add deployment to queue", () => addQueue());
   add("clean", "Clean package folder", () => cleanPackages());

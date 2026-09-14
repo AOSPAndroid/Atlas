@@ -16,6 +16,7 @@ const shortcuts = {
   shortcuts: "?",
 };
 const targeted = new Set([
+  "remote-registry",
   "deploy",
   "copy",
   "queue-add",
@@ -52,6 +53,12 @@ const viewerCommands = new Set([
 ]);
 // The single command catalogue used by the map and IT console.
 export const COMMANDS = [
+  [
+    "remote-registry",
+    "Enable Remote Registry",
+    "Start Remote Registry on the selected machine; enable Manual startup if disabled",
+    "remote registry remoteregistry enable service start",
+  ],
   [
     "vlans",
     "VLANs",

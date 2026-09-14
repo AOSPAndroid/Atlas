@@ -7,7 +7,7 @@ const readOnly =
   document.querySelector('meta[name="atlas-mode"]')?.content === "viewer";
 const { createOperations } = readOnly
   ? { createOperations: (await import("./viewer.js")).createViewerOperations }
-  : await import("./operations.js?v=2");
+  : await import("./operations.js?v=3");
 const $ = (s) => document.querySelector(s),
   $$ = (s) => [...document.querySelectorAll(s)],
   esc = (s) =>
@@ -2812,6 +2812,10 @@ setView(view);
       "<p><kbd>Ctrl+K</kbd> / <kbd>Cmd+K</kbd> — Search Atlas</p><p><kbd>/</kbd> — Focus map search</p><p><kbd>Enter</kbd> — Locate a search result</p><p><kbd>↑</kbd> <kbd>↓</kbd> — Navigate palette results</p><p><kbd>Esc</kbd> — Close a dialog</p><p>Use person:, machine:, desk: or &gt; to narrow palette results.</p>";
   };
   const handlers = {
+    "remote-registry": async () =>
+      (await import("./service-actions.js")).openRemoteRegistry(
+        operations.getTarget(),
+      ),
     vlans: () => openSiteInfo("vlans"),
     contacts: () => openSiteInfo("contacts"),
     atlas: () =>

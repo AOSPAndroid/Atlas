@@ -260,3 +260,7 @@ The map fits the complete current floor into its available canvas on opening, fl
 Linked-machine lists in the map, IT Console and demo offer **All**, **Dedicated desktops**, **VDI**, **Kiosks** and **Other** filters with counts. Select several types to combine them, or choose All to clear the filters. Assigned machines stay first and filtering never changes the selected deployment target or starts a scan. Kiosks follow the `PWMK` naming pattern after any three-letter region prefix (including `GBR`, `PAR` and `NYK`); `PWMF` identifies dedicated desktops, and hostnames containing `VDI` identify VDI machines. Other names stay accessible under Other rather than being guessed from the country code.
 
 The map uses a compact white arrow with a rounded dark outline, changing to Barclays blue over interactive items. Both admin and demo use native browser cursor images with standard fallbacks, a grabbing hand while dragging and a crosshair for desk placement. There is no cursor animation loop or extra remote traffic.
+
+### Enable Remote Registry
+
+Search **Enable Remote Registry** in the palette or right-click a machine in the map or IT console. The action shows the hostname before you click **Enable Remote Registry**. Atlas starts the fixed `RemoteRegistry` service over WMI, changes Disabled startup to Manual only when necessary, verifies Running, and reports failures. It requires remote administrator rights and runs only on explicit request. No reboot or automatic startup is added. Demo and hosted preview disable the action.
