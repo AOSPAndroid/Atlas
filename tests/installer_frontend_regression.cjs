@@ -5,8 +5,10 @@ const assert=require('node:assert/strict');const {fixture}=require('./ui_fixture
  await f.console();await sleep();await sleep();const {w,run}=f;
  const remoteScans=()=>calls.filter(url=>/^\/api\/(machine-health|performance)\//.test(url)).length;
  assert.equal(remoteScans(),0,'opening the console does not start remote checks');
- run("setTarget('IDLE-PC');page('admin');page('workspace')");await sleep();await sleep();
- assert.equal(remoteScans(),0,'selecting a target and opening Remote Admin must remain idle');
+ run("setTarget('IDLE-PC');page('admin');page('workspace')");await new Promise(r=>setTimeout(r,300));
+ assert.equal(remoteScans(),2,'selecting a target runs only the quick check');
+ assert.deepEqual(calls.filter(url=>url.includes('/api/machine-health/IDLE-PC/')).map(url=>url.split('/').pop()).sort(),['storage','system']);
+ assert(!calls.some(url=>url.startsWith('/api/performance/')),'performance stays manual');
  assert.equal(w.document.querySelector('[data-health-refresh]').textContent,'Scan health');
  run('clearLookup()');
  // Export fields use their real names; inspecting inventory must not select or contact a target.
@@ -33,7 +35,7 @@ const assert=require('node:assert/strict');const {fixture}=require('./ui_fixture
  for(const tool of ['rdp','compmgmt','eventvwr']){run("S.target='PC-B'");openMenu();const count=calls.length;menu.querySelector(`[data-cmd="${tool}"]`).click();await sleep();await sleep();assert.equal(run('S.target'),'PC-A');assert.deepEqual(calls.slice(count).filter(url=>url.startsWith('/api/open-tool/')),[`/api/open-tool/${tool}/PC-A`]);assert(menu.classList.contains('hidden'))}
  // Deployment follows the target, retains form state and floats only in Workspace.
  run('installDeploymentPanel()');const deployment=w.document.querySelector('#deploymentPanel'),deploymentToggle=w.document.querySelector('#deploymentToggle');
- assert(deployment.hidden);assert(!deploymentToggle.hidden);const beforeExpand=calls.length;deploymentToggle.click();assert(!deployment.hidden);assert.equal(calls.length,beforeExpand);
+ assert(!deployment.hidden,'machine selection reveals deployment');w.document.querySelector('#closeDeploymentPanel').click();assert(deployment.hidden);assert(!deploymentToggle.hidden);const beforeExpand=calls.length;deploymentToggle.click();assert(!deployment.hidden);assert.equal(calls.length,beforeExpand);
  w.document.querySelector('#pkgSearch').value='Retain this package filter';run("S.target='PC-B';syncDeploymentPanel()");assert(deploymentToggle.textContent.includes('PC-B'));assert.equal(w.document.querySelector('#pkgSearch').value,'Retain this package filter');
  w.document.querySelector('#closeDeploymentPanel').click();assert(deployment.hidden);assert.equal(w.document.activeElement,deploymentToggle);
  run("page('admin')");assert(deployment.hidden);assert(deploymentToggle.hidden);run("page('workspace')");assert(!deploymentToggle.hidden);

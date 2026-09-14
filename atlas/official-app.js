@@ -7,7 +7,7 @@ const readOnly =
   document.querySelector('meta[name="atlas-mode"]')?.content === "viewer";
 const { createOperations } = readOnly
   ? { createOperations: (await import("./viewer.js")).createViewerOperations }
-  : await import("./operations.js");
+  : await import("./operations.js?v=2");
 const $ = (s) => document.querySelector(s),
   $$ = (s) => [...document.querySelectorAll(s)],
   esc = (s) =>

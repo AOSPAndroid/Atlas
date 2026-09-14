@@ -85,6 +85,58 @@ const settle = () => new Promise((resolve) => setImmediate(resolve));
   );
   w.document.querySelector(".atlas-spec-dialog").close();
 
+  const delay = () => new Promise((resolve) => setTimeout(resolve, 300));
+  A.quick(host, "QUICK-A");
+  A.quick(host, "QUICK-B");
+  await delay();
+  assert.equal(
+    requests.length,
+    18,
+    "rapid selection skips the previous machine",
+  );
+  assert.deepEqual(
+    requests
+      .slice(16)
+      .map((r) => r.url.split("/").pop())
+      .sort(),
+    ["storage", "system"],
+  );
+  assert(requests.slice(16).every((r) => r.url.includes("/QUICK-B/")));
+  assert.equal(metric("cpu").textContent, "Not scanned");
+  requests.slice(16).forEach((r) => reply(r, "QUICK-B"));
+  await settle();
+  A.quick(host, "QUICK-B");
+  await delay();
+  assert.equal(
+    requests.length,
+    18,
+    "same target reuses the completed quick check",
+  );
+  button().click();
+  assert.equal(
+    requests.length,
+    26,
+    "full health remains a separate explicit action",
+  );
+  requests.slice(18).forEach((r) => reply(r, "QUICK-B"));
+  await settle();
+  A.quick(host, "CANCELLED");
+  A.cancel(host);
+  await delay();
+  assert.equal(
+    requests.length,
+    26,
+    "leaving before the delay makes no request",
+  );
+  w.AtlasReadOnly = { reason: "Read-only" };
+  A.quick(host, "VIEWER");
+  await delay();
+  assert.equal(
+    requests.length,
+    26,
+    "viewer never performs automatic health checks",
+  );
+
   assert(
     A.badges({ assigned_relationship: 1, logon_relationship: 1 }).includes(
       "Last logged-on",

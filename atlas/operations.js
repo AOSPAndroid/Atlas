@@ -244,7 +244,7 @@ export function createOperations({
     }
   }
   async function health(g, pc) {
-    return window.AtlasHealth.mount(
+    return window.AtlasHealth.quick(
       host().querySelector("#ops-target-health"),
       pc,
       () => valid(g) && target === pc,

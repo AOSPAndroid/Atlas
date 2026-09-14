@@ -577,7 +577,7 @@ function refreshTargetHealth(scan = true) {
   }
   const pc = S.target;
   return pc
-    ? AtlasHealth[scan ? "scan" : "mount"](
+    ? AtlasHealth[scan === "quick" ? "quick" : scan ? "scan" : "mount"](
         $("#healthLine"),
         pc,
         () => S.target === pc,

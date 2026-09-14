@@ -10,7 +10,7 @@ async function until(fn){for(let i=0;i<100;i++){if(fn())return;await sleep(30)}t
  w.fetch=(url,o)=>fetch(new URL(url,base),o);w.confirm=()=>false;w.matchMedia=()=>({matches:false,addEventListener(){}});
  w.HTMLElement.prototype.scrollIntoView=function(){};
  w.HTMLDialogElement.prototype.showModal=function(){this.open=true};w.HTMLDialogElement.prototype.close=function(){this.open=false;this.dispatchEvent(new w.Event('close'))};
- w.AtlasHealth={cancel(){},badges(){return ''},mount(){return Promise.resolve()},report(){return []}};
+ w.AtlasHealth={cancel(){},badges(){return ''},mount(){return Promise.resolve()},quick(){return Promise.resolve()},report(){return []}};
  const context=dom.getInternalVMContext(),modules=new Map();
  async function moduleFor(spec){
   const file=path.join(root,'atlas',path.basename(spec.split(/[?#]/,1)[0]));

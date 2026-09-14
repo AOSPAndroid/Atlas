@@ -1,4 +1,4 @@
-/* Shared health widget. Rendering never starts remote checks; Scan is explicit. */
+/* Quick selection checks fetch disk and uptime only; full health stays explicit. */
 (() => {
   "use strict";
   const esc = (v) =>
@@ -105,12 +105,12 @@
   function render(host, pc, isCurrent, scanning) {
     host.classList.remove("hidden");
     host.classList.add("atlas-health");
-    host.innerHTML = `<div class="atlas-health-heading"><b>${esc(pc)} · Machine health</b><button type="button" data-health-refresh ${scanning ? "disabled" : ""}>${scanning ? "Checking…" : "Scan health"}</button></div><p>Manual scans only. Click Scan health or Refresh health to collect readings. No automatic refresh.</p><div class="atlas-health-grid">${Object.entries(
+    host.innerHTML = `<div class="atlas-health-heading"><b>${esc(pc)} · Machine health</b><button type="button" data-health-refresh ${scanning ? "disabled" : ""}>${scanning ? "Checking…" : "Scan health"}</button></div><p>Selecting a machine checks C: free space and uptime once. Scan health collects all readings. No automatic refresh.</p><div class="atlas-health-grid">${Object.entries(
       labels,
     )
       .map(
         ([key, label]) =>
-          `<div class="atlas-health-item"><b>${label}</b><div data-metric="${key}">${scanning ? "Loading…" : "Not scanned"}</div><small data-time="${key}"></small></div>`,
+          `<div class="atlas-health-item"><b>${label}</b><div data-metric="${key}">${scanning && scanning.includes(key) ? "Loading…" : "Not scanned"}</div><small data-time="${key}"></small></div>`,
       )
       .join("")}</div>`;
     const button = host.querySelector("[data-health-refresh]");
@@ -123,17 +123,47 @@
     snapshots.set(host, { pc, metrics: {}, state: "idle" });
     render(host, pc, isCurrent, false);
   }
-  async function scan(host, pc, isCurrent = () => true) {
+  function quick(host, pc, isCurrent = () => true) {
+    if (!host?.isConnected || !isCurrent() || window.AtlasReadOnly) return;
+    const previous = snapshots.get(host);
+    if (
+      previous?.pc === pc &&
+      (active.has(host) ||
+        (previous.metrics.storage && previous.metrics.system))
+    )
+      return;
+    mount(host, pc, isCurrent);
+    const controller = new AbortController();
+    active.set(host, controller);
+    const timer = setTimeout(() => {
+      if (!controller.signal.aborted && host.isConnected && isCurrent())
+        scan(host, pc, isCurrent, ["storage", "system"]);
+    }, 250);
+    controller.signal.addEventListener("abort", () => clearTimeout(timer), {
+      once: true,
+    });
+  }
+  async function scan(
+    host,
+    pc,
+    isCurrent = () => true,
+    keys = Object.keys(labels),
+  ) {
     if (!host?.isConnected || !isCurrent()) return;
     cancel(host);
     const controller = new AbortController();
     active.set(host, controller);
     const current = () =>
       active.get(host) === controller && host.isConnected && isCurrent();
-    snapshots.set(host, { pc, metrics: {}, state: "checking" });
-    const button = render(host, pc, isCurrent, true);
+    snapshots.set(host, {
+      pc,
+      metrics: {},
+      state: "checking",
+      checkingKeys: keys,
+    });
+    const button = render(host, pc, isCurrent, keys);
     await Promise.allSettled(
-      Object.keys(labels).map(async (key) => {
+      keys.map(async (key) => {
         const timed = new AbortController();
         const stop = () => timed.abort();
         controller.signal.addEventListener("abort", stop, { once: true });
@@ -185,7 +215,10 @@
     if (current()) {
       snapshots.get(host).state = "complete";
       button.disabled = false;
-      button.textContent = "Refresh health";
+      button.textContent =
+        keys.length === Object.keys(labels).length
+          ? "Refresh health"
+          : "Scan health";
     }
   }
   function specs(pc) {
@@ -231,7 +264,9 @@
       const metric = snapshot?.pc === pc ? snapshot.metrics[key] : null;
       const d = metric?.data || {};
       let text = !metric
-        ? snapshot?.pc === pc && snapshot.state === "checking"
+        ? snapshot?.pc === pc &&
+          snapshot.state === "checking" &&
+          snapshot.checkingKeys.includes(key)
           ? "Checking…"
           : "Not scanned"
         : metric.state !== "ready"
@@ -286,6 +321,7 @@
   }
   window.AtlasHealth = {
     mount,
+    quick,
     scan,
     cancel,
     specs,

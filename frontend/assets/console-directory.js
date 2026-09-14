@@ -1,8 +1,12 @@
-function setTarget(pc, status = "") {
+function setTarget(pc, status = "", quick = true) {
   pc = String(pc || "")
     .trim()
     .toUpperCase();
-  if (!pc || pc === S.target) return;
+  if (!pc) return;
+  if (pc === S.target) {
+    if (quick) refreshTargetHealth("quick");
+    return;
+  }
   S.target = pc;
   window.AtlasPsExec?.syncTarget(pc);
   syncDeploymentPanel({ selection: true });
@@ -16,7 +20,7 @@ function setTarget(pc, status = "") {
     x.classList.toggle("selected", S.machines[+x.dataset.machine]?.name === pc),
   );
   rememberTarget(pc);
-  refreshTargetHealth(false);
+  refreshTargetHealth(quick ? "quick" : false);
   refreshConsoleSummary();
   updatePackagePresence();
 }
@@ -137,7 +141,7 @@ function renderMachines() {
   );
   if (S.machines.length === 1) {
     let m = S.machines[0];
-    setTarget(m.name, m.operational_status);
+    setTarget(m.name, m.operational_status, false);
   }
   AtlasUI.machineFilters($("#machines"));
   bindMachineContext();

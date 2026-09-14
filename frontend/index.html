@@ -14,7 +14,7 @@
     <link rel="stylesheet" href="/assets/atlas-shell.css" />
     <link rel="stylesheet" href="/assets/catalogue.css" />
     <link rel="stylesheet" href="/assets/console-psexec.css" />
-    <script src="/assets/machine-health.js"></script>
+    <script src="/assets/machine-health.js?v=2"></script>
   </head>
   <body class="atlas-console">
     <header class="atlas-app-header">
@@ -298,12 +298,13 @@
               <small>REMOTE ADMIN</small>
               <h2>What is slowing this machine down?</h2>
               <p class="muted">
-                Scans run only when you click a scan or refresh button. Opening
-                Atlas or selecting a machine never starts a scan. Scan for
-                slowness runs for up to 60 seconds; you can stop it at any time.
+                Performance scans run only when you click a scan or refresh
+                button. Selecting a machine checks disk space and uptime only.
+                Scan for slowness runs for up to 60 seconds; you can stop it at
+                any time.
               </p>
             </div>
-            <span class="pill">Manual scans only</span>
+            <span class="pill">Manual performance scans</span>
           </div>
           <div class="row admin-tools">
             <input id="adminPc" placeholder="Computer" /><button
@@ -842,8 +843,8 @@ Ready. Choose a command and click Run.</pre>
     </dialog>
     <div id="toast"></div>
     <script src="/assets/app.js"></script>
-    <script src="/assets/console-directory.js"></script>
-    <script src="/assets/console-deployment.js"></script>
+    <script src="/assets/console-directory.js?v=2"></script>
+    <script src="/assets/console-deployment.js?v=2"></script>
     <script src="/assets/console-processes.js"></script>
     <script src="/assets/slowdown-diagnostics.js"></script>
     <script src="/assets/psexec-catalogue.js"></script>
