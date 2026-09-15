@@ -40,6 +40,7 @@
   }
   const watchers = new Map();
   const terminal = new Set([
+    "launched",
     "complete",
     "failed",
     "cancelled",

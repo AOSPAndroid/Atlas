@@ -136,10 +136,9 @@ def target_lock(pc):
  with lock:return target_locks.setdefault(pc,threading.Lock())
 
 def outcome(ec):
- code=str(ec).strip()
- if code=='0':return 'complete','Installer reported exit code 0'
- if code in ('3010','1641'):return 'complete','Installer reported success; reboot required or initiated ('+code+')'
- return 'failed','Installer failed or outcome unavailable: '+code
+ # Deployment status confirms launch, never installation success.
+ return 'launched','Launched'
+
 
 def deploy_worker(j,p):
  with job_service.execution:
@@ -159,14 +158,14 @@ def _deploy_worker(j,p):
    emit(j,f'Copy complete. Robocopy: {rc}');history_update(j,robocopy_code=str(rc))
   if p.mode=='copy':
    emit(j,'Copy-only completed','complete');history_update(j,state='complete',finished=time.strftime('%Y-%m-%d %H:%M:%S'));return
-  pid,log,ex=launch(pc,remote,pkg);launched=True;emit(j,f'Started PID {pid}',pid=pid);history_update(j,pid=str(pid))
+  pid,log,ex=launch(pc,remote,pkg);launched=True;emit(j,'Launched',pid=pid);history_update(j,pid=str(pid))
   ec,lines=monitor(pc,pid,log,ex);state,message=outcome(ec)
   emit(j,message,state,log=lines,exit_code=ec)
   history_update(j,state=state,exit_code=str(ec),finished=time.strftime('%Y-%m-%d %H:%M:%S'),details=message+'\n'+'\n'.join(lines[-20:]))
  except Exception as e:
-  state='unknown' if launched else 'failed'
+  state='launched' if launched else 'failed'
   if launched:job_service.unresolved.add(pc)
-  emit(j,str(e),state)
+  emit(j,'Launched' if launched else str(e),state,log=[str(e)] if launched else [])
   try:history_update(j,state=state,finished=time.strftime('%Y-%m-%d %H:%M:%S'),details=str(e))
   except Exception:logging.exception('Could not persist failed deployment')
   logging.exception('deployment failed')
@@ -184,7 +183,7 @@ def bulk_worker(j,p):
    history_create(child,item.computer,Path(item.folder).name,item.action,item.script,item.mode)
    deploy_worker(child,item)
    events=jobs[child]['events'];end=events[-1] if events else {}
-   row.update(copy='Complete' if any('Copy complete' in e['message'] for e in events) else 'Failed',launch='Started' if any('pid' in e for e in events) else 'Not started',pid=next((e['pid'] for e in events if 'pid' in e),''),completion='Complete' if jobs[child]['state']=='complete' else 'Failed',exit_code=end.get('exit_code',''),details=end.get('message',''))
+   row.update(copy='Complete' if any('Copy complete' in e['message'] for e in events) else 'Failed',launch='Started' if any('pid' in e for e in events) else 'Not started',pid=next((e['pid'] for e in events if 'pid' in e),''),completion='Launched' if jobs[child]['state']=='launched' else ('Complete' if jobs[child]['state']=='complete' else 'Failed'),exit_code=end.get('exit_code',''),details=end.get('message',''))
   except Exception as exc:row.update(copy='Failed',launch='Not started',completion='Failed',details=str(exc));jobs[child]['state']='failed'
  try:
   with ThreadPoolExecutor(max_workers=p.concurrency) as pool:list(pool.map(work,rows))
@@ -517,7 +516,7 @@ def database_freshness():
 
 @app.get('/api/deployments/active')
 def active_deployments():
-    active_states={'queued','running','launched','monitoring','paused'}
+    active_states={'queued','running','monitoring','paused'}
     deployments=[]
     for job_id,job_data in [(k,job_service.snapshot(jobs,k)) for k in list(jobs)]:
         state=job_data.get('state','unknown')

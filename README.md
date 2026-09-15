@@ -264,3 +264,7 @@ The map uses a compact white arrow with a rounded dark outline, changing to Barc
 ### Enable Remote Registry
 
 Search **Enable Remote Registry** in the palette or right-click a machine in the map or IT console. The action shows the hostname before you click **Enable Remote Registry**. Atlas starts the fixed `RemoteRegistry` service over WMI, changes Disabled startup to Manual only when necessary, verifies Running, and reports failures. It requires remote administrator rights and runs only on explicit request. No reboot or automatic startup is added. Demo and hosted preview disable the action.
+
+### Deployment launch status
+
+Copy & execute shows **Launched** as soon as Windows confirms the remote process started. Script exit codes do not turn that status into Failed or imply installation success. Output and exit codes remain in the log/history; copy or process-start errors still fail. Background log collection retains the target lock while the process runs. Demo and hosted Preview remain read-only.

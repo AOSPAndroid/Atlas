@@ -443,8 +443,8 @@ export function createOperations({
       const d = await api("/api/job/" + id);
       if (!valid(g) || job !== id) return;
       const box = host().querySelector("#ops-job");
-      box.innerHTML = `<b class="${d.state === "failed" ? "ops-error" : ""}">${esc(d.state)}</b><pre>${esc(d.events.map((x) => `[${x.time || ""}] ${x.message}${x.log ? "\n" + x.log.join("\n") : ""}`).join("\n"))}</pre>`;
-      if (!["complete", "failed"].includes(d.state))
+      box.innerHTML = `<b class="${d.state === "failed" ? "ops-error" : ""}">${esc(d.events.some((x) => x.pid) ? "Launched" : d.state)}</b><pre>${esc(d.events.map((x) => `[${x.time || ""}] ${x.message}${x.log ? "\n" + x.log.join("\n") : ""}`).join("\n"))}</pre>`;
+      if (!["complete", "launched", "failed"].includes(d.state))
         timer = setTimeout(() => poll(g, id), 1500);
       else {
         submitting = false;

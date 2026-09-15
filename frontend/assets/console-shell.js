@@ -154,6 +154,7 @@ function statusAccent(value) {
       "successful",
       "ready",
       "started",
+      "launched",
       "running",
       "current",
       "true",

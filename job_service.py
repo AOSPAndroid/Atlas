@@ -8,7 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from fastapi import HTTPException
 
-TERMINAL = {'complete', 'failed', 'cancelled', 'interrupted', 'unknown'}
+TERMINAL = {'launched', 'complete', 'failed', 'cancelled', 'interrupted', 'unknown'}
 
 
 class JobService:

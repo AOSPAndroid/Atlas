@@ -307,7 +307,7 @@ function poll(id, target = S.target) {
     (data) => {
       const failure = ["failed", "interrupted", "unknown"].includes(data.state);
       $("#deploymentState").textContent = String(
-        data.state || "running",
+        data.events.some((e) => e.pid) ? "launched" : (data.state || "running"),
       ).replace(/^./, (letter) => letter.toUpperCase());
       $("#deploymentState").className = statusAccent(data.state);
       $("#deploymentMessage").textContent = data.events.at(-1)?.message || "";
@@ -465,7 +465,7 @@ function bulkPoll(id) {
 function renderBulk(j) {
   let r = S.rows;
   $("#bulkSummary").innerHTML =
-    `<div class=summary><div>Phase<b>${esc(j.phase)}</b></div><div>Total<b>${r.length}</b></div><div>Failed<b>${r.filter((x) => x.copy === "Failed" || x.completion === "Failed").length}</b></div><div>Complete<b>${r.filter((x) => String(x.completion).startsWith("Complete")).length}</b></div></div>`;
+    `<div class=summary><div>Phase<b>${esc(j.phase)}</b></div><div>Total<b>${r.length}</b></div><div>Failed<b>${r.filter((x) => x.copy === "Failed" || x.completion === "Failed").length}</b></div><div>Complete<b>${r.filter((x) => ["Complete", "Launched"].includes(x.completion)).length}</b></div></div>`;
   $("#bulkBody").innerHTML = r
     .map(
       (x) =>
@@ -706,7 +706,7 @@ function renderDeploymentMonitor(data) {
   const count =
     data.count ??
     (data.deployments || []).filter((x) =>
-      ["queued", "running", "launched", "monitoring", "paused"].includes(
+      ["queued", "running", "monitoring", "paused"].includes(
         x.state,
       ),
     ).length;

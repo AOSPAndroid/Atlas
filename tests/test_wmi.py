@@ -122,12 +122,24 @@ class Regression(unittest.TestCase):
     app.os.utime(script,ns=(stat.st_atime_ns,stat.st_mtime_ns+1000000))
     self.assertNotEqual(self.client.get('/installer').text,old)
  def test_outcomes_and_remote_failure(self):
-  for code,expected in [('0','complete'),('3010','complete'),('1641','complete'),('1603','failed'),('not written','failed')]:
+  for code,expected in [(code,'launched') for code in ('0','3010','1641','1','1603','not written')]:
    j=uuid.uuid4().hex;app.jobs[j]={'state':'queued','events':[]};app.history_create(j,'TESTPC','Example','Install','setup_i.ps1','full')
    p=app.Deploy(computer='TESTPC',folder='Example',script='setup_i.ps1')
    with patch.object(app.os.path,'isdir',return_value=True),patch.object(app,'copy_pkg',return_value=1),patch.object(app,'launch',return_value=(123,'log','exit')),patch.object(app,'monitor',return_value=(code,[])):
     app.deploy_worker(j,p)
    self.assertEqual(app.jobs[j]['state'],expected)
+ def test_launch_status_survives_log_failure_but_not_start_failure(self):
+  for started in (True,False):
+   j=uuid.uuid4().hex;app.jobs[j]={'state':'queued','events':[]};app.history_create(j,'TESTPC','Example','Install','setup_i.ps1','full')
+   p=app.Deploy(computer='TESTPC',folder='Example',script='setup_i.ps1')
+   def collect(*args):
+    self.assertEqual(app.jobs[j]['events'][-1]['message'],'Launched')
+    self.assertEqual(app.jobs[j]['events'][-1]['pid'],123)
+    raise RuntimeError('Log unavailable')
+   with patch.object(app.os.path,'isdir',return_value=True),patch.object(app,'copy_pkg',return_value=1),patch.object(app,'launch',side_effect=None if started else RuntimeError('Cannot start'),return_value=(123,'log','exit')),patch.object(app,'monitor',side_effect=collect):
+    app.deploy_worker(j,p)
+   self.assertEqual(app.jobs[j]['state'],'launched' if started else 'failed')
+   app.job_service.unresolved.discard('TESTPC')
  def test_wmi_error_not_process_exit(self):
   with patch.object(app,'ps',side_effect=RuntimeError('WMI unreachable')):
    with self.assertRaises(RuntimeError):app.wmi_running('TESTPC',123)
@@ -161,8 +173,8 @@ class Regression(unittest.TestCase):
  def test_bulk_and_queue_terminal_states(self):
   with patch.object(app.os.path,'isdir',return_value=True),patch.object(app,'copy_pkg',return_value=1),patch.object(app,'launch',return_value=(123,'log','exit')),patch.object(app,'monitor',return_value=('1603',[])):
    j=uuid.uuid4().hex;app.jobs[j]={'state':'queued','events':[]};app.bulk_worker(j,app.Bulk(computers=['TESTPC'],folder='Example',script='setup_i.ps1'))
-   self.assertEqual(app.jobs[j]['state'],'complete');self.assertEqual(app.jobs[j]['results'][0]['completion'],'Failed')
-   q=uuid.uuid4().hex;app.queue_jobs[q]={'items':[{'state':'waiting'}]};app._queue_worker(q,[app.QueueItem(computer='TESTPC',folder='Example',script='setup_i.ps1')]);self.assertEqual(app.queue_jobs[q]['state'],'complete');self.assertEqual(app.queue_jobs[q]['items'][0]['state'],'failed')
+   self.assertEqual(app.jobs[j]['state'],'complete');self.assertEqual(app.jobs[j]['results'][0]['completion'],'Launched')
+   q=uuid.uuid4().hex;app.queue_jobs[q]={'items':[{'state':'waiting'}]};app._queue_worker(q,[app.QueueItem(computer='TESTPC',folder='Example',script='setup_i.ps1')]);self.assertEqual(app.queue_jobs[q]['state'],'complete');self.assertEqual(app.queue_jobs[q]['items'][0]['state'],'launched')
  def test_databases_integrity(self):
   for path in [app.MASTER_DB,self.original_history]:
    c=sqlite3.connect(path.resolve().as_uri()+'?mode=ro',uri=True)
