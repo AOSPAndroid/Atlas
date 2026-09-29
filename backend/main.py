@@ -52,7 +52,7 @@ def hist_db():
  c=sqlite3.connect(HISTORY_DB,timeout=20,factory=ClosingConnection);c.row_factory=sqlite3.Row
  c.execute('''create table if not exists deployments(id text primary key,started text,finished text,operator text,target text,package text,action text,script text,mode text,state text,robocopy_code text,pid text,exit_code text,details text)''');c.commit();return c
 def history_create(j,target,package,action,script,mode):
- if j in jobs:jobs[j].update(target=target,action_title=action+' · '+package,started_at=time.time());job_service.save(j)
+ if j in jobs:jobs[j].update(target=target,package=package,action=action,script=script,action_title=action+' · '+package,started_at=time.time());job_service.save(j)
  with hist_db() as c:c.execute('insert into deployments(id,started,operator,target,package,action,script,mode,state) values(?,datetime("now","localtime"),?,?,?,?,?,?,?)',(j,identity(),target,package,action,script,mode,'queued'));c.commit()
 def history_update(j,**fields):
  if not fields:return
@@ -173,6 +173,7 @@ def _deploy_worker(j,p):
   if acquired:guard.release()
 
 def bulk_worker(j,p):
+ jobs[j].update(package=Path(p.folder).name,action=p.action,script=p.script,targets=list(p.computers))
  rows=[{'machine':pc,'copy':'Waiting','launch':'Waiting','pid':'','completion':'','exit_code':'','details':''} for pc in p.computers]
  jobs[j].update(state='running',phase='deploy',results=rows)
  def work(row):
@@ -533,6 +534,17 @@ def database_freshness():
     db=DB
     return {'database_exists':db.exists(),'excel_exists':excel.exists(),'database_modified':datetime.fromtimestamp(db.stat().st_mtime).isoformat(sep=' ',timespec='seconds') if db.exists() else '', 'excel_modified':datetime.fromtimestamp(excel.stat().st_mtime).isoformat(sep=' ',timespec='seconds') if excel.exists() else '', 'excel_newer':bool(excel.exists() and db.exists() and excel.stat().st_mtime>db.stat().st_mtime), 'database_size':db.stat().st_size if db.exists() else 0}
 
+def deployment_details(job_id,job):
+    targets=job.get('targets') or [r.get('machine','') for r in job.get('results',[]) if r.get('machine')]
+    details={'target':job.get('target',''),'package':job.get('package',''),'action':job.get('action',''),'script':job.get('script','')}
+    if targets:details['target']=', '.join(targets)
+    # Older persisted jobs retain their original selection in deployment history.
+    if not details['package']:
+        with hist_db() as c:
+            row=c.execute('select target,package,action,script from deployments where id=?',(job_id,)).fetchone()
+            if row:details.update(dict(row))
+    return details
+
 @app.get('/api/deployments/active')
 def active_deployments():
     active_states={'queued','running','monitoring','paused'}
@@ -543,6 +555,7 @@ def active_deployments():
         events=job_data.get('events',[])
         deployments.append({
             'id':job_id,
+            **deployment_details(job_id,job_data),
             'kind':'single',
             'state':state,
             'events':events[-200:],
@@ -570,6 +583,7 @@ def recent_deployments():
         events=job_data.get('events',[])
         result.append({
             'id':job_id,'kind':'single','state':job_data.get('state','unknown'),
+            **deployment_details(job_id,job_data),
             'events':events[-200:],
             'last_message':events[-1].get('message','') if events else ''
         })

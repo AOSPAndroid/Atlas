@@ -702,7 +702,7 @@ function deploymentCard(item) {
       .join("");
     return `<article class="deployment-monitor-card"><header><b>Queue</b><span class="${statusAccent(item.state)}">${esc(item.state)}</span></header>${rows || '<p class="empty">Queue has no items</p>'}</article>`;
   }
-  return `<article class="deployment-monitor-card"><header><b>Deployment ${esc(item.id.slice(0, 8))}</b><span class="${statusAccent(item.state)}">${esc(item.state)}</span></header><p>${esc(item.last_message || "")}</p><pre>${esc(terminalLines(item.events))}</pre></article>`;
+  return `<article class="deployment-monitor-card"><header><b>${esc(item.target || "Machine not recorded")}</b><span class="${statusAccent(item.state)}">${esc(item.state)}</span></header><p class="deployment-package"><strong>${esc(item.package || "Package not recorded")}</strong>${item.action ? " · " + esc(item.action) : ""}</p>${item.script ? `<small class="deployment-script">${esc(item.script)}</small>` : ""}<p>${esc(item.last_message || "")}</p><pre>${esc(terminalLines(item.events))}</pre></article>`;
 }
 function renderDeploymentMonitor(data) {
   const list = document.querySelector("#deploymentsList");

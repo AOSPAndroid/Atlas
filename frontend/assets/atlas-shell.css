@@ -650,3 +650,7 @@ body.atlas-console > main {
 .action-widget small {color:#537086;margin-top:4px}
 .action-widget footer {display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
 .action-widget pre {white-space:pre-wrap;overflow-wrap:anywhere;max-height:180px;overflow:auto;background:#102b3b;color:#d3f3e9;border-radius:8px;padding:10px;font:11px/1.5 Consolas,monospace}
+
+.deployment-monitor-card header b,.deployment-package,.deployment-script {overflow-wrap:anywhere;min-width:0}
+.deployment-package {margin:8px 0 4px}
+.deployment-script {display:block;color:#537086}
