@@ -74,7 +74,9 @@ def prepare(p):
         remote = [fill(a) for a in item['args']]
         readable = ' '.join(remote)
     args = [executable, '\\\\' + target, '-n', '10', '-nobanner']
-    if p.elevated:
+    if item.get('system'):
+        args.append('-s')
+    elif p.elevated:
         args.append('-h')
     if item.get('interactive'):
         args += ['-i', values['session']]
@@ -175,7 +177,7 @@ class Runner:
                     pass
             reader = threading.Thread(target=read, daemon=True, name='atlas-psexec-output')
             reader.start()
-            deadline = time.monotonic() + (self.shell_timeout if j['interactive'] else self.timeout)
+            deadline = time.monotonic() + (self.shell_timeout if j['interactive'] else CATALOGUE[j['template']].get('timeout_seconds',self.timeout))
             while process.poll() is None:
                 if j['_stop'].wait(.1):
                     state = 'stopped'
@@ -184,7 +186,7 @@ class Runner:
                     state = 'timed_out'
                     break
             else:
-                state = 'complete' if process.returncode == 0 else 'failed'
+                state = 'complete' if process.returncode in CATALOGUE[j['template']].get('success_exit_codes',[0]) else 'failed'
             if state in ('stopped', 'timed_out'):
                 if process.poll() is None:
                     process.kill()
@@ -194,6 +196,8 @@ class Runner:
             with self.lock:
                 self.jobs[key]['exit_code'] = process.returncode
             self.append(key, f'\nAtlas > {state} · exit code {process.returncode}\n')
+            if state == 'complete' and process.returncode == 3010:
+                self.append(key, 'Atlas > Restart required. No automatic restart was requested.\n')
         except Exception as error:
             self.append(key, '\nAtlas > ' + str(error) + '\n')
             if process and process.poll() is None:

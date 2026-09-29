@@ -35,7 +35,7 @@ class PsExecTests(unittest.TestCase):
         self.fail('Session did not reach expected state')
 
     def test_server_validation_and_shared_catalogue(self):
-        self.assertEqual(len(px.CATALOGUE),30)
+        self.assertEqual(len(px.CATALOGUE),39)
         js=(px.ROOT/'frontend/assets/psexec-catalogue.js').read_text()
         self.assertEqual(json.loads(js.split(' = ',1)[1].removesuffix(';\n')),list(px.CATALOGUE.values()))
         for target in ['*','HOST1,HOST2','@file','-s','HOST&calc','HOST\nCMD']:
@@ -48,6 +48,16 @@ class PsExecTests(unittest.TestCase):
         self.assertIn("'Name=''MSSQL$INSTANCE'''",text)
         self.assertEqual(base64.b64decode(args[-1]).decode('utf-16le'),text)
         self.assertNotIn('-s',args);self.assertNotIn('-accepteula',args)
+
+    def test_dism_system_context_and_restart_policy(self):
+        for key in ('netfx3-enable','print-pdf-enable','dism-restorehealth'):
+            with self.assertRaises(HTTPException):px.prepare(payload(template=key))
+            item,target,args,text=px.prepare(payload(template=key,confirmation='TESTPC',elevated=True))
+            self.assertIn('-s',args);self.assertNotIn('-h',args)
+            self.assertIn('/NoRestart',args);self.assertIn(3010,item['success_exit_codes'])
+            self.assertEqual(item['timeout_seconds'],3600)
+        _,_,args,_=px.prepare(payload(template='netfx3-enable',confirmation='TESTPC'))
+        self.assertEqual(args[-6:],['dism.exe','/Online','/Enable-Feature','/FeatureName:NetFx3','/All','/NoRestart'])
 
     def test_output_is_live_and_duplicate_start_is_idempotent(self):
         r,calls=self.runner("import time; print('FIRST',flush=True); time.sleep(.5); print('LAST',flush=True)")

@@ -71,7 +71,7 @@
       "-n",
       "10",
       "-nobanner",
-      ...(elevated ? ["-h"] : []),
+      ...(item.system ? ["-s"] : elevated ? ["-h"] : []),
       ...(item.interactive ? ["-i", clean.session] : []),
       ...remote,
     ];

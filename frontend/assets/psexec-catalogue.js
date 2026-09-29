@@ -376,5 +376,193 @@ window.AtlasPsExecCatalogue = [
     "script": "Stop-Service -Name '{service}' -ErrorAction Stop; Get-Service -Name '{service}' | Format-Table Status,Name,DisplayName -AutoSize",
     "change": true,
     "insight": "Interrupts users of the service. Does not force dependent services to stop."
+  },
+  {
+    "id": "netfx3-enable",
+    "category": "Windows features & DISM",
+    "title": "Enable .NET Framework 3.5",
+    "description": "Enable the NetFx3 Windows feature and its dependencies.",
+    "args": [
+      "dism.exe",
+      "/Online",
+      "/Enable-Feature",
+      "/FeatureName:NetFx3",
+      "/All",
+      "/NoRestart"
+    ],
+    "system": true,
+    "change": true,
+    "timeout_seconds": 3600,
+    "success_exit_codes": [
+      0,
+      3010
+    ],
+    "insight": "Runs as SYSTEM (-s). Uses the target Windows repair source or Windows Update as permitted by policy. For Windows 10 and Windows 11 through 25H2; Windows 11 26H1 and later require the standalone installer. A restart may still be required.",
+    "fields": []
+  },
+  {
+    "id": "netfx3-status",
+    "category": "Windows features & DISM",
+    "title": "Check .NET Framework 3.5 status",
+    "description": "Show whether the NetFx3 optional feature is enabled.",
+    "args": [
+      "dism.exe",
+      "/Online",
+      "/Get-FeatureInfo",
+      "/FeatureName:NetFx3"
+    ],
+    "system": true,
+    "change": false,
+    "timeout_seconds": 180,
+    "success_exit_codes": [
+      0
+    ],
+    "insight": "Runs as SYSTEM (-s). NetFx3 is not a Windows feature on Windows 11 26H1 and later; check its standalone installation there.",
+    "fields": []
+  },
+  {
+    "id": "dism-features",
+    "category": "Windows features & DISM",
+    "title": "List Windows optional features",
+    "description": "List feature names and their enabled or disabled state.",
+    "args": [
+      "dism.exe",
+      "/Online",
+      "/Get-Features",
+      "/Format:Table"
+    ],
+    "system": true,
+    "change": false,
+    "timeout_seconds": 180,
+    "success_exit_codes": [
+      0
+    ],
+    "insight": "Runs as SYSTEM (-s). Available features vary by Windows version and edition. Use this list before planning a feature change.",
+    "fields": []
+  },
+  {
+    "id": "print-pdf-enable",
+    "category": "Windows features & DISM",
+    "title": "Enable Microsoft Print to PDF",
+    "description": "Enable the built-in PDF printing feature where available.",
+    "args": [
+      "dism.exe",
+      "/Online",
+      "/Enable-Feature",
+      "/FeatureName:Printing-PrintToPDFServices-Features",
+      "/All",
+      "/NoRestart"
+    ],
+    "system": true,
+    "change": true,
+    "timeout_seconds": 3600,
+    "success_exit_codes": [
+      0,
+      3010
+    ],
+    "insight": "Runs as SYSTEM (-s). Availability depends on the target Windows edition and component source. No automatic restart is requested.",
+    "fields": []
+  },
+  {
+    "id": "dism-checkhealth",
+    "category": "Windows features & DISM",
+    "title": "DISM: quick health status",
+    "description": "Check whether component-store corruption has already been flagged.",
+    "args": [
+      "dism.exe",
+      "/Online",
+      "/Cleanup-Image",
+      "/CheckHealth"
+    ],
+    "system": true,
+    "change": false,
+    "timeout_seconds": 180,
+    "success_exit_codes": [
+      0
+    ],
+    "insight": "Runs as SYSTEM (-s). This reads the recorded corruption status; it does not perform a fresh full scan or repair.",
+    "fields": []
+  },
+  {
+    "id": "dism-scanhealth",
+    "category": "Windows features & DISM",
+    "title": "DISM: scan Windows image",
+    "description": "Run a fresh component-store corruption scan.",
+    "args": [
+      "dism.exe",
+      "/Online",
+      "/Cleanup-Image",
+      "/ScanHealth"
+    ],
+    "system": true,
+    "change": false,
+    "timeout_seconds": 3600,
+    "success_exit_codes": [
+      0
+    ],
+    "insight": "Runs as SYSTEM (-s). This can take several minutes and use CPU and disk. It diagnoses corruption without repairing it.",
+    "fields": []
+  },
+  {
+    "id": "dism-restorehealth",
+    "category": "Windows features & DISM",
+    "title": "DISM: repair Windows image",
+    "description": "Scan and repair the running Windows component store.",
+    "args": [
+      "dism.exe",
+      "/Online",
+      "/Cleanup-Image",
+      "/RestoreHealth",
+      "/NoRestart"
+    ],
+    "system": true,
+    "change": true,
+    "timeout_seconds": 3600,
+    "success_exit_codes": [
+      0,
+      3010
+    ],
+    "insight": "Runs as SYSTEM (-s). Uses the target repair source or Windows Update as permitted by policy. Can take a long time; stopping local PsExec does not guarantee the remote repair stops.",
+    "fields": []
+  },
+  {
+    "id": "dism-analyze-store",
+    "category": "Windows features & DISM",
+    "title": "DISM: analyse component store",
+    "description": "Report component-store usage and whether cleanup is recommended.",
+    "args": [
+      "dism.exe",
+      "/Online",
+      "/Cleanup-Image",
+      "/AnalyzeComponentStore"
+    ],
+    "system": true,
+    "change": false,
+    "timeout_seconds": 3600,
+    "success_exit_codes": [
+      0
+    ],
+    "insight": "Runs as SYSTEM (-s). Analysis only: this command does not delete packages or perform component cleanup.",
+    "fields": []
+  },
+  {
+    "id": "dism-packages",
+    "category": "Windows features & DISM",
+    "title": "List installed Windows packages",
+    "description": "Show Windows servicing packages and their state.",
+    "args": [
+      "dism.exe",
+      "/Online",
+      "/Get-Packages",
+      "/Format:Table"
+    ],
+    "system": true,
+    "change": false,
+    "timeout_seconds": 180,
+    "success_exit_codes": [
+      0
+    ],
+    "insight": "Runs as SYSTEM (-s). These are Windows servicing packages, not the full installed-applications inventory.",
+    "fields": []
   }
 ];
