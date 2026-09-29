@@ -337,7 +337,26 @@ def enable_remote_registry(p:Machine):
  return result
 
 @app.post('/api/reboot')
-def reboot(p:Machine):return {'result':ps(f'$o=Get-WmiObject -ComputerName {quote(validate_pc(p.computer))} Win32_OperatingSystem -EnableAllPrivileges;$o.Reboot().ReturnValue')}
+def reboot(p:Machine):
+ pc=validate_pc(p.computer)
+ job_service.target_ready(pc)
+ return reboot_monitor.start(pc)
+
+def request_reboot(pc):
+ result=ps(f'$ErrorActionPreference="Stop";$o=Get-WmiObject -ComputerName {quote(pc)} Win32_OperatingSystem -EnableAllPrivileges -EA Stop;$o.Reboot().ReturnValue',timeout=30)
+ if result.strip()!='0':raise RuntimeError('Windows rejected the reboot request (return '+result.strip()+')')
+
+from reboot_monitor import RebootMonitor
+reboot_monitor=RebootMonitor(request_reboot)
+
+@app.get('/api/reboots')
+def reboots():return reboot_monitor.snapshot()
+
+@app.post('/api/reboots/{job_id}/stop')
+def stop_reboot_monitor(job_id:str):return reboot_monitor.stop(job_id)
+
+@app.on_event('shutdown')
+def stop_reboot_monitors():reboot_monitor.shutdown()
 
 
 def _start_local(args):

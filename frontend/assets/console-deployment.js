@@ -585,7 +585,9 @@ function refreshTargetHealth(scan = true) {
     : Promise.resolve();
 }
 function renderQueue() {
+  document.querySelector("#queueCount").dataset.deployments = deploymentQueue.length;
   document.querySelector("#queueCount").textContent = deploymentQueue.length;
+  window.AtlasReboots?.updateCount();
   document.querySelector("#queueItems").innerHTML = deploymentQueue.length
     ? deploymentQueue
         .map(

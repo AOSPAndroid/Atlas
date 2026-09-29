@@ -143,6 +143,19 @@ class Regression(unittest.TestCase):
  def test_wmi_error_not_process_exit(self):
   with patch.object(app,'ps',side_effect=RuntimeError('WMI unreachable')):
    with self.assertRaises(RuntimeError):app.wmi_running('TESTPC',123)
+ def test_reboot_routes_are_monitored_and_validate_target(self):
+  with patch.object(app.reboot_monitor,'start',return_value={'job':'test-watch','target':'TESTPC'}) as start:
+   response=self.client.post('/api/reboot',json={'computer':'testpc'})
+   self.assertEqual(response.status_code,200);self.assertEqual(response.json()['job'],'test-watch')
+   start.assert_called_once_with('TESTPC')
+   self.assertEqual(self.client.post('/api/reboot',json={'computer':'bad;name'}).status_code,400)
+  with patch.object(app,'ps',return_value='5'):
+   with self.assertRaisesRegex(RuntimeError,'rejected'):app.request_reboot('TESTPC')
+  with patch.object(app,'ps',return_value='0') as command:
+   app.request_reboot('TESTPC');self.assertEqual(command.call_args.kwargs['timeout'],30)
+  with patch.object(app.reboot_monitor,'stop',return_value={'ok':True}) as stop:
+   self.assertEqual(self.client.post('/api/reboots/test-watch/stop').status_code,200)
+   stop.assert_called_once_with('test-watch')
  def test_remote_process_routes_validate_and_report_windows_outcomes(self):
   item={'PID':42,'Process':'sample.exe','CreatedAt':'20260910100000.000000+000','CanTerminate':True,'GPU':40}
   with patch.object(app,'ps',return_value=json.dumps({'ok':True,'items':[item]})) as remote:

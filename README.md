@@ -268,3 +268,9 @@ Search **Enable Remote Registry** in the palette or right-click a machine in the
 ### Deployment launch status
 
 Copy & execute shows **Launched** as soon as Windows confirms the remote process started. Script exit codes do not turn that status into Failed or imply installation success. Output and exit codes remain in the log/history; copy or process-start errors still fail. Background log collection retains the target lock while the process runs. Demo and hosted Preview remain read-only.
+
+### Reboot checks in Queue
+
+The Reboot button captures the selected hostname, requests the reboot once, then opens a live ping terminal in the floating Queue drawer. Windows must accept the request. Two consecutive missed IPv4 echo replies followed by two consecutive replies mark the check complete; replies before the offline transition never count as a completed reboot. This confirms network reachability, not that sign-in or applications are ready.
+
+Ping checks run about every two seconds, stop immediately on confirmed return, and completed cards disappear after ten seconds. Stop monitoring ends only the ping checks, not a reboot already requested. A fifteen-minute timeout leaves a visible unconfirmed result for dismissal. At most eight machines can be watched simultaneously; duplicate watches are rejected. Closing the drawer or refreshing the browser leaves the server watch running; stopping Atlas ends it. Demo and Preview display the shared interface but cannot reboot or ping machines.

@@ -80,17 +80,13 @@ function bind() {
         admin(k).catch((x) => toast(x.message))),
   );
   $("[data-reboot]").onclick = async () => {
-    if (confirm("Reboot " + $("#adminPc").value + "?"))
-      toast(
-        "Return " +
-          (
-            await api("/api/reboot", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ computer: $("#adminPc").value }),
-            })
-          ).result,
-      );
+    const computer = $("#adminPc").value.trim();
+    if (!computer || !confirm("Reboot " + computer + "?")) return;
+    const button = $("[data-reboot]");
+    button.disabled = true;
+    try { await window.AtlasReboots.start(computer); }
+    catch (error) { toast(error.message); }
+    finally { button.disabled = !!window.AtlasReadOnly; }
   };
 }
 function bindRemoteTools() {
