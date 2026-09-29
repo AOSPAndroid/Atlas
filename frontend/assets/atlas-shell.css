@@ -637,3 +637,16 @@ body.atlas-console > main {
 .reboot-state,.reboot-card p {font-size:12px}
 .reboot-card pre {background:#102b3b;color:#d3f3e9;border-radius:8px;padding:10px;max-height:180px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font:11px/1.5 Consolas,monospace}
 .queue-toggle.has-active {box-shadow:0 0 0 2px #00a9ce}
+
+.action-widgets-section {margin-bottom:16px}
+.action-widgets-section h3 {font-size:14px;margin:8px 0}
+#actionWidgetsStatus {font-size:12px;color:#537086}
+.action-widget {border:1px solid #d5e5ee;background:#f7fbfd;border-radius:12px;margin:10px 0;padding:12px}
+.action-widget.is-active {border-left:3px solid #008db4}
+.action-widget header {display:flex;justify-content:space-between;gap:10px}
+.action-widget header div {min-width:0}
+.action-widget strong,.action-widget small {display:block;overflow-wrap:anywhere}
+.action-widget small,.action-widget header span,.action-widget p {font-size:12px;line-height:1.5}
+.action-widget small {color:#537086;margin-top:4px}
+.action-widget footer {display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.action-widget pre {white-space:pre-wrap;overflow-wrap:anywhere;max-height:180px;overflow:auto;background:#102b3b;color:#d3f3e9;border-radius:8px;padding:10px;font:11px/1.5 Consolas,monospace}

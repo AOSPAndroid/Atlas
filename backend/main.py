@@ -52,7 +52,7 @@ def hist_db():
  c=sqlite3.connect(HISTORY_DB,timeout=20,factory=ClosingConnection);c.row_factory=sqlite3.Row
  c.execute('''create table if not exists deployments(id text primary key,started text,finished text,operator text,target text,package text,action text,script text,mode text,state text,robocopy_code text,pid text,exit_code text,details text)''');c.commit();return c
 def history_create(j,target,package,action,script,mode):
- if j in jobs:jobs[j]['target']=target;job_service.save(j)
+ if j in jobs:jobs[j].update(target=target,action_title=action+' · '+package,started_at=time.time());job_service.save(j)
  with hist_db() as c:c.execute('insert into deployments(id,started,operator,target,package,action,script,mode,state) values(?,datetime("now","localtime"),?,?,?,?,?,?,?)',(j,identity(),target,package,action,script,mode,'queued'));c.commit()
 def history_update(j,**fields):
  if not fields:return
@@ -622,3 +622,8 @@ register_psexec(app)
 from machine_health import register_machine_health
 import sys as _health_sys
 machine_health_checks=register_machine_health(app,_health_sys.modules[__name__])
+
+# Queue reads existing activity; it never initiates remote scans.
+from action_activity import register as register_activity
+import sys
+register_activity(app,sys.modules[__name__])

@@ -665,8 +665,9 @@ Ready. Choose a command and click Run.</pre>
     </main>
     <aside id="queueDrawer" class="queue-drawer">
       <div class="queue-head">
-        <b>Queue &amp; reboot checks</b><button id="closeQueue">×</button>
+        <b>Activity queue</b><button id="closeQueue">×</button>
       </div>
+      <section class="action-widgets-section"><h3>Ongoing actions</h3><p id="actionWidgetsStatus" role="status">Live activity</p><div id="actionWidgets"></div></section>
       <section class="reboot-monitors"><h3>Reboot checks</h3><p id="rebootMonitorStatus" role="status">Live ping starts after you request a reboot. Completed checks disappear automatically.</p><div id="rebootMonitors"></div></section>
       <h3>Deployment queue</h3>
       <div id="queueItems"></div>
@@ -853,6 +854,7 @@ Ready. Choose a command and click Run.</pre>
     <script src="/assets/psexec-commands.js"></script>
     <script src="/assets/console-psexec.js"></script>
     <script src="/assets/psexec-terminal.js"></script>
+    <script src="/assets/action-widgets.js"></script>
     <script src="/assets/reboot-monitor.js"></script>
     <script src="/assets/console-shell.js"></script>
     <script src="/assets/remote-software.js"></script>

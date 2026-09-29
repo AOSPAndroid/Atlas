@@ -12,6 +12,8 @@
     const badge = document.querySelector('#queueCount');
     if (!badge) return;
     const n = rows.filter(r => active.has(r.state)).length;
+    badge.dataset.reboots = n;
+    if (window.AtlasActions) return window.AtlasActions.updateCount();
     badge.textContent = Number(badge.dataset.deployments || 0) + n;
     document.querySelector('#queueToggle')?.classList.toggle('has-active', n > 0);
   }

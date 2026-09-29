@@ -169,6 +169,7 @@
         controller.signal.addEventListener("abort", stop, { once: true });
         const timer = setTimeout(stop, 24000);
         try {
+          window.dispatchEvent(new CustomEvent("atlas:activity"));
           const r = await fetch(
             "/api/machine-health/" + encodeURIComponent(pc) + "/" + key,
             { signal: timed.signal },

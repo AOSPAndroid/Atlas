@@ -233,6 +233,7 @@
     if (!capture?.active) return;
     capture.active = false;
     capture.reason = reason;
+    window.AtlasActions?.put({id:"diagnostics",title:"Slowness capture",target:capture.computer,state:reason === "Capture complete" ? "complete" : "cancelled",message:reason,view:"admin",expires:Date.now()+10000});
     clearTimeout(capture.nextTimer);
     clearTimeout(capture.deadlineTimer);
     capture.controller?.abort();
@@ -259,6 +260,7 @@
       samples: [],
       errors: [],
     });
+    window.AtlasActions?.put({id:"diagnostics",title:"Slowness capture",target:pc,state:"running",message:"Collecting samples for up to 60 seconds",view:"admin",controls:[{label:"Stop capture",run:()=>{if(capture===run)stop("Stopped by operator");}}]});
     updatePerformanceControls();
     run.deadlineTimer = setTimeout(() => {
       if (capture === run) stop("Capture complete");
@@ -288,6 +290,7 @@
         throw Error("Invalid diagnostic sample; refresh and try again.");
       run.samples.push(compact(data, (performance.now() - run.started) / 1000));
       run.policy = probePolicy(data);
+      window.AtlasActions?.put({id:"diagnostics",title:"Slowness capture",target:run.computer,state:"running",message:run.samples.length+" samples collected",view:"admin",controls:[{label:"Stop capture",run:()=>{if(capture===run)stop("Stopped by operator");}}]});
       const expanded = [...$("#adminOverview").querySelectorAll("details")].map(
         (detail) => detail.open,
       );

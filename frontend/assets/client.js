@@ -14,7 +14,7 @@
         });
     return session;
   }
-  async function request(url, options = {}) {
+  async function rawRequest(url, options = {}) {
     const local = window.AtlasReadOnly?.read(url, options);
     if (local) return local.data;
     const headers = new Headers(options.headers || {});
@@ -37,6 +37,12 @@
       );
     }
     return data;
+  }
+  async function request(url, options = {}) {
+    const tracked=/^\/api\/(deploy$|bulk\/deploy$|queue$|psexec\/run$|software-tools\/(inventory|uninstall)$|performance\/|processes\/|remote-registry\/enable$|kill$|cleanup-packages\/|ping\/|disk\/|overview\/|access\/|preflight\/|open-tool\/)/.test(url);
+    if(tracked)window.dispatchEvent(new CustomEvent('atlas:activity',{detail:{open:false}}));
+    try{return await rawRequest(url,options);}
+    finally{if(tracked)window.dispatchEvent(new CustomEvent('atlas:activity',{detail:{open:options.method==='POST' && /^\/api\/(deploy$|bulk\/deploy$|queue$|psexec\/run$|software-tools\/uninstall$)/.test(url)}}));}
   }
   const watchers = new Map();
   const terminal = new Set([
