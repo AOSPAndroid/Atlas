@@ -10,3 +10,7 @@ User requirement: always update Admin, Demo (read-only LAN viewer), and the owne
 # UI density
 
 Keep all Atlas surfaces dense by default, including new features. Use compact cards, short toolbars, 4-8 px gaps/padding, and readable 11-13 px operational text. Process tables use compact rows; avoid large metric cards or charts that push the primary list below the fold. Keep secondary detail expandable, all records accessible, and touch targets usable. Apply changes to Classic/Desktop and Admin/Demo/Preview together.
+
+# Shared design contract
+
+`frontend/assets/design-system.css` is the final shared styling layer for all first-party HTML entry points (map, console, database manager, desktop and utility windows). Keep it last among first-party stylesheets. Reuse its font, spacing, control, radius, focus and semantic colour tokens; add component-specific rules there rather than appending competing density patches to older stylesheets. The command palette has a shadow root and uses matching inherited tokens in `atlas/command-palette.css`. Preserve map label geometry, Draw.io editor internals, and desktop window/dock interactions.
