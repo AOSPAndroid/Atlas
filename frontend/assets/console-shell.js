@@ -1,3 +1,4 @@
+function atlasConsoleNavigate(url){if(!window.AtlasDesktop?.navigate(url))location.assign(url);}
 function toast(m) {
   let x = document.createElement("div");
   x.className = "toast";
@@ -11,6 +12,10 @@ async function copy(v, n = "Value") {
   toast(`${n} copied`);
 }
 function page(id) {
+  const desktopApp=window.AtlasDesktop?.app;
+  if(desktopApp==='workspace'&&id==='knowledge'){window.AtlasDesktop.navigate('/installer?command=knowledge');return;}
+  if(desktopApp==='knowledge'&&id!=='knowledge'){window.AtlasDesktop.navigate('/installer?command='+id);return;}
+
   document.body.classList.toggle("knowledge-open",id === "knowledge");
   if(id === "knowledge" || location.hash === "#knowledge") {
     const url=new URL(location.href);url.hash=id === "knowledge" ? "knowledge" : "";
@@ -541,6 +546,8 @@ async function runInitialSharedCommand(params) {
   await runSharedCommand(id);
 }
 async function runSharedCommand(id) {
+  if(window.AtlasDesktop?.app==='workspace'&&(id==='knowledge'||id.startsWith('kb-'))){window.AtlasDesktop.navigate('/installer?command='+encodeURIComponent(id));return;}
+
   if (window.AtlasReadOnly) {
     const { COMMANDS } = await import("/command-registry.js");
     if (!COMMANDS.some((c) => c.id === id && c.viewer))
@@ -559,7 +566,7 @@ async function runSharedCommand(id) {
   if (id === "catalogue") return openConsoleCatalogue();
   const { MAP_COMMANDS, commandUrl } = await import("/command-registry.js");
   if (MAP_COMMANDS.has(id)) {
-    location.assign(commandUrl(id, S.target));
+    atlasConsoleNavigate(commandUrl(id, S.target));
     return;
   }
   const focus = (selector, needsTarget = false) => {
@@ -690,7 +697,7 @@ sharedPaletteReady = import("/command-palette.js").then(
       replaceTrigger: document.querySelector("#openCommands"),
       preferPersonDetails: true,
       onSelect: (id) =>
-        location.assign("/?" + new URLSearchParams({ desk: id })),
+        atlasConsoleNavigate("/?" + new URLSearchParams({ desk: id })),
       openPerson: async (id) => {
         page("workspace");
         clearLookup();

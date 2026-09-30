@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Atlas Desktop</title>
+    <link rel="stylesheet" href="/assets/desktop.css" />
+    <script src="/assets/shared-ui.js"></script>
+    <script defer src="/assets/desktop.js"></script>
+  </head>
+  <body class="atlas-desktop">
+    <header class="desktop-menu">
+      <button id="home" title="Show desktop" aria-label="Show desktop">
+        <img src="/assets/barclays-eagle.svg" alt="" /><b>Atlas</b></button
+      ><span id="activeApp">Desktop</span
+      ><button
+        id="windowMenu"
+        aria-expanded="false"
+        aria-controls="desktopSettings"
+      >
+        Window
+      </button>
+      <div class="menu-spacer"></div>
+      <span id="desktopMode">Desktop edition</span
+      ><button id="search" title="Search in the active app">
+        ⌕ <span>Search</span></button
+      ><time id="clock"></time>
+    </header>
+    <main id="desktopArea" aria-label="Atlas desktop">
+      <div class="desktop-welcome">
+        <span class="desktop-eyebrow">YOUR WORKSPACE, REIMAGINED</span>
+        <h1>A little more<br />room to think.</h1>
+        <p>Find your people. Get things done.<br />Keep what you know.</p>
+        <div class="welcome-line"></div>
+        <small>Open an app from the dock.</small>
+      </div>
+      <div id="windows"></div>
+      <div id="dragShield" hidden></div>
+    </main>
+    <aside id="desktopSettings" hidden aria-label="Desktop settings">
+      <h2>Your desktop</h2>
+      <label class="desktop-switch"
+        ><span
+          ><strong>Window multitasking</strong
+          ><small>Move and resize multiple apps</small></span
+        ><input id="multitask" type="checkbox" role="switch" checked
+      /></label>
+      <p id="modeHint">Drag a title bar. Double-click to maximize.</p>
+      <label class="desktop-switch"
+        ><span>Animations</span
+        ><input id="desktopMotion" type="checkbox" role="switch" checked
+      /></label>
+      <hr />
+      <button id="resetWindows">Reset window positions</button
+      ><button id="showDesktop">Minimize all windows</button
+      ><button id="classic">Switch to Classic Atlas ↗</button>
+      <p class="desktop-footnote">
+        Atlas Desktop is a browser workspace.<br />Your apps and permissions
+        stay the same.
+      </p>
+    </aside>
+    <nav id="dock" aria-label="Application dock"></nav>
+    <div id="desktopStatus" role="status" aria-live="polite"></div>
+  </body>
+</html>

@@ -305,3 +305,13 @@ Use Map / Workspace / Knowledge Base in the header. Atlas embeds the actual open
 - Search `drawio` in the palette for documents, notes conversion, shapes, connecting two selected shapes, layers, formatting, duplicate/delete, undo/redo, zoom, save, import/export and templates. Ctrl K works inside the editor.
 
 Restart Atlas after updating to register editor and document routes. Remote-administration permissions remain unchanged.
+
+### Optional Atlas Desktop
+
+Choose **Desktop** beside the Map / Workspace / Knowledge Base links, or open `/assets/desktop.html`. Classic remains the initial layout; this browser remembers the chosen layout. Use **Window > Switch to Classic Atlas** to return.
+
+The desktop dock opens Map, Workspace and Knowledge Base on demand. App windows can be dragged, resized on all edges, minimized, maximized by the green control or title-bar double-click, or snapped left/right. Red hides the window without closing its work. Dock indicators identify open and active apps. Mail and Music are explicitly decorative.
+
+**Window multitasking** switches between floating windows and one active app filling the desktop. App frames stay alive so selection, unsaved notes and operation monitoring survive dock switching. Minimized maps stop drawing. Compact screens automatically use one active app without changing the saved multitasking preference. Animations respect Atlas and system motion preferences. Window positions are stored locally; **Reset window positions** brings them back into view. Focus a title bar and use arrows to move, or Shift+arrows to resize.
+
+Admin, Demo and Preview use the same shell, with existing remote-administration restrictions. Layout changes or browser reloads reload apps; save/download diagrams first. This is a browser desktop theme, not an operating system or virtual machine.

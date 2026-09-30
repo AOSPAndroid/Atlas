@@ -1,3 +1,4 @@
+function atlasMapNavigate(url){if(!window.AtlasDesktop?.navigate(url))location.assign(url);}
 import { applyFurnitureCorrections } from "./map-furniture.js?v=6";
 import { applyMapAmenities } from "./map-amenities.js?v=12";
 import { createCameraMotion } from "./camera-motion.js";
@@ -1787,10 +1788,10 @@ window.addEventListener("atlas-display-change", () => {
   draw();
 });
 function draw() {
-  if (!ready || pendingDraw || document.hidden) return;
+  if (!ready || pendingDraw || document.hidden || window.AtlasDesktopHidden) return;
   pendingDraw = requestAnimationFrame((time) => {
     pendingDraw = 0;
-    if (document.hidden) return;
+    if (document.hidden || window.AtlasDesktopHidden) return;
     // Coalesce changes into at most 30 rendered frames/s in remote mode.
     if (
       AtlasUI.performance.isCitrix() &&
@@ -2823,13 +2824,13 @@ setView(view);
     lookup: () =>
       readOnly
         ? operations.openLookup()
-        : location.assign(commandUrl("lookup")),
+        : atlasMapNavigate(commandUrl("lookup")),
     catalogue: () =>
       readOnly
-        ? location.assign("/installer?command=catalogue")
+        ? atlasMapNavigate("/installer?command=catalogue")
         : $("#ops-catalog").click(),
     settings: () => $("#ops-settings").click(),
-    database: () => location.assign("/manage-database"),
+    database: () => atlasMapNavigate("/manage-database"),
     view: () => $("#three-d-toggle").click(),
     reset: () => $("#reset").click(),
     refresh: () => location.reload(),
@@ -2845,7 +2846,7 @@ setView(view);
     )
       return;
     if (handlers[id]) return handlers[id]();
-    location.assign(
+    atlasMapNavigate(
       commandUrl(
         id,
         operations.getTarget() ||
@@ -2871,15 +2872,20 @@ setView(view);
     openPerson: (value) =>
       readOnly
         ? operations.openPerson(value)
-        : location.assign(
+        : atlasMapNavigate(
             "/installer?" + new URLSearchParams({ person: value }),
           ),
     openMachine: (value) =>
       readOnly
         ? operations.openMachine(value)
-        : location.assign(
+        : atlasMapNavigate(
             "/installer?" + new URLSearchParams({ machine: value }),
           ),
+  });
+  window.addEventListener('atlas-desktop-route',event=>{
+    const params=new URLSearchParams(event.detail),desk=params.get('desk'),command=params.get('command');
+    if(desk&&records.some(r=>r.id===desk))selectRecord(desk);
+    if(command)runCommand(command);
   });
   const params = new URLSearchParams(location.search),
     desk = params.get("desk"),
