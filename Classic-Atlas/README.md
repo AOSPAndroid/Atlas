@@ -11,3 +11,9 @@ The familiar Atlas navigation and page layout.
 Download or clone the **whole repository** before running Admin or Demo. Run the root `Install_Dependencies.bat` once. Both editions share the root application, assets and database; these folders are explicit launch profiles, not independent copies. Starting one local mode ensures both existing local services are available, then opens only the mode chosen. The root `Stop-Office-Atlas.bat` stops both services.
 
 Classic launches explicitly select the Classic layout; Desktop launches open the desktop directly. The browser remembers subsequent layout choices. Admin remains bound to localhost; Demo keeps its existing read-only restrictions. A Desktop appearance never grants administration permissions.
+
+## Start, stop and database updates
+
+[Start Classic](../Start-Classic-Atlas.bat) opens Admin and Demo together. [Stop Classic](../Stop-Classic-Atlas.bat) stops the shared local services for both editions. Finish ongoing jobs first. Hosted Preview stays online.
+
+Read the [database update guide](../docs/database-update-guide.md).

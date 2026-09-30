@@ -1,3 +1,14 @@
+## Quick start and stop
+
+| Edition | Start Admin + Demo | Stop local services |
+| --- | --- | --- |
+| Classic Atlas | [Start-Classic-Atlas.bat](Start-Classic-Atlas.bat) | [Stop-Classic-Atlas.bat](Stop-Classic-Atlas.bat) |
+| Desktop Atlas | [Start-Desktop-Atlas.bat](Start-Desktop-Atlas.bat) | [Stop-Desktop-Atlas.bat](Stop-Desktop-Atlas.bat) |
+
+Start opens Admin and Demo in the selected layout. Both editions share local services, so **either Stop script stops both editions' Admin and Demo**; finish queue jobs first. Hosted Preview stays online. To open only one mode, use its edition subfolder launcher.
+
+**[Database update guide](docs/database-update-guide.md)** covers imports, backups, recovery, seating and hosted Preview updates.
+
 ## Choose your Atlas edition
 
 - **[Classic Atlas](Classic-Atlas/README.md)** — normal Atlas layout, with Admin, Demo and Preview folders.
