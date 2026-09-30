@@ -1,4 +1,4 @@
-/* Quick selection checks fetch disk and uptime only; full health stays explicit. */
+/* Quick selection checks fetch connectivity, disk and uptime only; full health stays explicit. */
 (() => {
   "use strict";
   const esc = (v) =>
@@ -105,7 +105,7 @@
   function render(host, pc, isCurrent, scanning) {
     host.classList.remove("hidden");
     host.classList.add("atlas-health");
-    host.innerHTML = `<div class="atlas-health-heading"><b>${esc(pc)} · Machine health</b><button type="button" data-health-refresh ${scanning ? "disabled" : ""}>${scanning ? "Checking…" : "Scan health"}</button></div><p>Selecting a machine checks C: free space and uptime once. Scan health collects all readings. No automatic refresh.</p><div class="atlas-health-grid">${Object.entries(
+    host.innerHTML = `<div class="atlas-health-heading"><b>${esc(pc)} · Machine health</b><button type="button" data-health-refresh ${scanning ? "disabled" : ""}>${scanning ? "Checking…" : "Scan health"}</button></div><p>Selecting a machine refreshes ping, C$ access, C: storage/free space and last boot/uptime. Scan health checks the other readings manually. No background polling.</p><div class="atlas-health-grid">${Object.entries(
       labels,
     )
       .map(
@@ -128,8 +128,7 @@
     const previous = snapshots.get(host);
     if (
       previous?.pc === pc &&
-      (active.has(host) ||
-        (previous.metrics.storage && previous.metrics.system))
+      active.has(host) && previous.state !== "complete"
     )
       return;
     mount(host, pc, isCurrent);
@@ -137,7 +136,7 @@
     active.set(host, controller);
     const timer = setTimeout(() => {
       if (!controller.signal.aborted && host.isConnected && isCurrent())
-        scan(host, pc, isCurrent, ["storage", "system"]);
+        scan(host, pc, isCurrent, ["ping", "cshare", "storage", "system"]);
     }, 250);
     controller.signal.addEventListener("abort", () => clearTimeout(timer), {
       once: true,

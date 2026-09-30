@@ -91,7 +91,7 @@ const settle = () => new Promise((resolve) => setImmediate(resolve));
   await delay();
   assert.equal(
     requests.length,
-    18,
+    20,
     "rapid selection skips the previous machine",
   );
   assert.deepEqual(
@@ -99,7 +99,7 @@ const settle = () => new Promise((resolve) => setImmediate(resolve));
       .slice(16)
       .map((r) => r.url.split("/").pop())
       .sort(),
-    ["storage", "system"],
+    ["cshare", "ping", "storage", "system"],
   );
   assert(requests.slice(16).every((r) => r.url.includes("/QUICK-B/")));
   assert.equal(metric("cpu").textContent, "Not scanned");
@@ -109,23 +109,25 @@ const settle = () => new Promise((resolve) => setImmediate(resolve));
   await delay();
   assert.equal(
     requests.length,
-    18,
-    "same target reuses the completed quick check",
+    24,
+    "clicking the same target refreshes the quick checks",
   );
+  requests.slice(20).forEach((r) => reply(r, "QUICK-B"));
+  await settle();
   button().click();
   assert.equal(
     requests.length,
-    26,
+    32,
     "full health remains a separate explicit action",
   );
-  requests.slice(18).forEach((r) => reply(r, "QUICK-B"));
+  requests.slice(24).forEach((r) => reply(r, "QUICK-B"));
   await settle();
   A.quick(host, "CANCELLED");
   A.cancel(host);
   await delay();
   assert.equal(
     requests.length,
-    26,
+    32,
     "leaving before the delay makes no request",
   );
   w.AtlasReadOnly = { reason: "Read-only" };
@@ -133,7 +135,7 @@ const settle = () => new Promise((resolve) => setImmediate(resolve));
   await delay();
   assert.equal(
     requests.length,
-    26,
+    32,
     "viewer never performs automatic health checks",
   );
 

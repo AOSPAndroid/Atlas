@@ -6,8 +6,8 @@ const assert=require('node:assert/strict');const {fixture}=require('./ui_fixture
  const remoteScans=()=>calls.filter(url=>/^\/api\/(machine-health|performance)\//.test(url)).length;
  assert.equal(remoteScans(),0,'opening the console does not start remote checks');
  run("setTarget('IDLE-PC');page('admin');page('workspace')");await new Promise(r=>setTimeout(r,300));
- assert.equal(remoteScans(),2,'selecting a target runs only the quick check');
- assert.deepEqual(calls.filter(url=>url.includes('/api/machine-health/IDLE-PC/')).map(url=>url.split('/').pop()).sort(),['storage','system']);
+ assert.equal(remoteScans(),4,'selecting a target runs only the quick check');
+ assert.deepEqual(calls.filter(url=>url.includes('/api/machine-health/IDLE-PC/')).map(url=>url.split('/').pop()).sort(),['cshare','ping','storage','system']);
  assert(!calls.some(url=>url.startsWith('/api/performance/')),'performance stays manual');
  assert.equal(w.document.querySelector('[data-health-refresh]').textContent,'Scan health');
  run('clearLookup()');
