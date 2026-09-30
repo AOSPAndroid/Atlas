@@ -79,23 +79,7 @@
       location.assign(next.pathname + next.search + next.hash);
     }, true);
 
-    if (!embedded) {
-      const header = document.querySelector('.atlas-header-actions');
-      if(header){
-        const button=document.createElement('button');button.type='button';button.textContent='Settings';button.id='atlasAppearanceSettings';button.title='Atlas appearance settings';
-        button.onclick=()=>{
-          const {element,body}=AtlasUI.dialog('Settings');
-          const label=document.createElement('label');label.className='atlas-layout-setting';
-          const text=document.createElement('span');const title=document.createElement('strong');title.textContent='Desktop mode';
-          const help=document.createElement('small');help.textContent='Show Atlas with a dock and app windows. Off uses the standard layout. Remembered in this browser.';text.append(title,help);
-          const toggle=document.createElement('input');toggle.type='checkbox';toggle.setAttribute('role','switch');toggle.setAttribute('aria-label','Desktop mode');
-          toggle.onchange=()=>{if(toggle.checked){element.close();window.AtlasDesktop.open();}};
-          label.append(text,toggle);body.append(label);
-        };
-        const menu=document.querySelector('.atlas-header-menu');(menu||header).append(button);
-      }
-      return;
-    }
+    if (!embedded) return;
     document.documentElement.classList.add("atlas-in-window");
     const id = url.searchParams.get("atlasWindow");
     document.addEventListener(

@@ -497,9 +497,6 @@
   $("#showDesktop").onclick = desktop;
   $("#windowMenu").onclick = toggleSettings;
   $("#dockSettings").onclick = toggleSettings;
-  $('#desktopEnabled').onchange=()=>{
-    if(!$('#desktopEnabled').checked){classic();$('#desktopEnabled').checked=true;}
-  };
   $("#multitask").onchange = () => {
     endDrag();
     settings.multi = $("#multitask").checked;

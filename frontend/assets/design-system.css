@@ -971,3 +971,34 @@ body .atlas-unified-header .atlas-header-actions { display:flex; flex-wrap:nowra
   .atlas-unified-header .atlas-brand { grid-column:1 / -1; }
   body .atlas-unified-header .atlas-primary-nav a { padding:5px 6px; font-size:11px; }
 }
+
+/* Header audit: neutralize legacy console-only border, scrolling and row order. */
+body > .atlas-app-header.atlas-unified-header {
+  min-height:48px; height:auto; align-content:center; row-gap:4px;
+  grid-template-rows:auto; box-sizing:border-box; width:100%;
+}
+body .atlas-unified-header > .atlas-brand { grid-column:1; grid-row:1; }
+body .atlas-unified-header > .atlas-primary-nav { grid-column:2; grid-row:1; order:0; min-width:0; }
+body .atlas-unified-header > .atlas-header-actions {
+  grid-column:3; grid-row:1; order:0; overflow:visible; box-shadow:none; border-radius:0;
+}
+body > .atlas-app-header.atlas-unified-header > .preview-notice {
+  grid-column:1 / -1; grid-row:2; order:0; width:auto; min-width:0;
+  padding:0; margin:0; border:0; font:11px/1.4 var(--atlas-font); color:var(--atlas-muted);
+}
+.atlas-in-window body > .atlas-unified-header > .atlas-primary-nav { grid-column:1; }
+.atlas-in-window body > .atlas-unified-header > .atlas-header-actions { grid-column:2; }
+@media(max-width:700px) {
+  body > .atlas-app-header.atlas-unified-header { grid-template-columns:minmax(0,1fr) auto; }
+  body .atlas-unified-header > .atlas-brand { grid-column:1; grid-row:1; }
+  body .atlas-unified-header > .atlas-header-actions { grid-column:2; grid-row:1; }
+  body .atlas-unified-header > .atlas-primary-nav { grid-column:1 / -1; grid-row:2; }
+  body > .atlas-app-header.atlas-unified-header > .preview-notice { grid-row:3; }
+  .atlas-in-window body > .atlas-unified-header > .atlas-primary-nav { grid-column:1; grid-row:1; }
+  .atlas-in-window body > .atlas-unified-header > .preview-notice { grid-row:2; }
+}
+
+body .atlas-unified-header .atlas-primary-nav a { font-weight:600; white-space:nowrap; }
+
+body .atlas-unified-header .atlas-header-actions > .atlas-header-more > summary { box-sizing:border-box; height:28px; min-height:28px; display:flex; align-items:center; padding:4px 7px; }
+@media(pointer:coarse) { body .atlas-unified-header .atlas-header-actions > .atlas-header-more > summary { height:42px; min-height:42px; } }

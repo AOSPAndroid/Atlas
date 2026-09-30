@@ -393,4 +393,7 @@ Performance and machine views use dense layouts: compact process rows with inlin
 
 
 ### One Atlas, two layouts
-Use **Settings > Desktop mode** to turn the dock/window layout on or off. On the map, Settings is in **More**; in the console it is on the header. In Desktop mode, use the dock Settings button (or Window menu) and turn Desktop mode off. The browser remembers this choice separately for each Admin, Demo or Preview origin. Apps, data and permissions are unchanged. Existing Classic/Desktop launcher folders and direct links remain compatible; separate downloads are not needed. Save diagrams before switching layouts, since app windows reload.
+Use **Ctrl+K > DESKTOP MODE (beta)** to switch between Classic Atlas and the dock/window layout. The command works in Map, Workspace and Knowledge Base, including Demo and Preview. The browser remembers the choice per origin. Save diagrams before switching layouts, since app windows reload.
+
+
+Desktop layout: open Search Atlas (Ctrl+K), search DESKTOP MODE (beta), then run the command to switch between Classic and Desktop. The choice is remembered in this browser. Save unsaved diagrams before leaving Desktop.

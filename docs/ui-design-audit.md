@@ -44,3 +44,15 @@
 ## Intentional exceptions
 
 Map labels and drawing surfaces retain their own geometry to avoid clipping or changing picking. Draw.io owns its embedded editor internals. Desktop dock/window chrome retains its desktop appearance. Calculator keys and calendar cells remain larger than ordinary controls. Long records wrap and long lists scroll rather than being truncated or hidden.
+
+
+## Navigation and layout follow-up (2026-09-30)
+
+- Removed the console-only divider and extra padding above the Preview notice. Map and console now use the same two-row header contract.
+- Explicit grid placement prevents old mobile flex-order rules from relocating the app tabs. Equal tab font weight prevents small shifts when the active tab changes.
+- Removed toolbar overflow clipping so the More menu can extend below the header.
+- Desktop switching is only the shared `DESKTOP MODE (beta)` palette command, available in Admin, Demo and Preview. In an embedded app it requests Classic mode through the origin-checked desktop bridge; at top level it opens Desktop mode.
+- Reviewed all seven console pages in the browser: shared 48px local header, no horizontal document overflow at the tested desktop width. Knowledge Base intentionally expands the editor and hides the operations sidebar; app navigation stays visible.
+- Map, console and utility visual density continues to use the shared design contract. Long data lists remain scrollable; no data was hidden to force it onto one screen.
+
+- Narrow 600px check exposed a Map-only content-box height on More (38px versus 28px). Applied border-box sizing to the shared control; mobile app links keep the same row and column positions.

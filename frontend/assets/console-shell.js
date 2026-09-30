@@ -567,6 +567,7 @@ async function runSharedCommand(id) {
     const { openSiteInfo } = await import("/site-info.js?v=1");
     return openSiteInfo(id);
   }
+  if (id === "desktop-mode") return window.AtlasDesktop?.open();
   if (id === "animations") return AtlasUI.motion.toggle();
   if (id === "catalogue") return openConsoleCatalogue();
   const { MAP_COMMANDS, commandUrl } = await import("/command-registry.js");

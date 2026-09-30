@@ -28,7 +28,7 @@ const targeted = new Set([
   "software",
   "report",
 ]);
-const viewerCommands = new Set(["ad-open","ad-user-groups","ad-machine-groups","ad-compare","ad-filter-groups","ad-export-groups",
+const viewerCommands = new Set(["desktop-mode","ad-open","ad-user-groups","ad-machine-groups","ad-compare","ad-filter-groups","ad-export-groups",
 "kb-layers","kb-format","kb-duplicate","kb-delete","kb-zoom-in","kb-zoom-out","kb-png","knowledge","kb-new","kb-notes","kb-convert","kb-process","kb-decision","kb-database","kb-note","kb-connect","kb-fit","kb-undo","kb-redo","kb-save","kb-export","kb-drawio","kb-svg","kb-import","kb-template-flow","kb-template-network",
   "workspace",
   "admin",
@@ -118,6 +118,12 @@ export const COMMANDS = [
     "Export records",
     "Download the map records",
     "export download seating json",
+  ],
+  [
+    "desktop-mode",
+    "DESKTOP MODE (beta)",
+    "Switch between Classic Atlas and the desktop layout",
+    "desktop classic normal layout beta dock windows",
   ],
   [
     "animations",
