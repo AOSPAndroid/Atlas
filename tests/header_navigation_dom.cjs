@@ -2,6 +2,7 @@ const fs=require('fs'),assert=require('assert/strict'),{JSDOM}=require('jsdom');
 (async()=>{
 for(const file of ['frontend/index.html','atlas/official-index.html']){
  const w=new JSDOM(fs.readFileSync(file,'utf8'),{url:'http://localhost/',runScripts:'outside-only'}).window;
+ w.matchMedia=()=>({matches:false,addEventListener(){}});
  w.eval(fs.readFileSync('frontend/assets/shared-ui.js','utf8'));
  await new Promise(r=>w.document.addEventListener('DOMContentLoaded',r));
  await new Promise(r=>setTimeout(r,0));
@@ -15,3 +16,4 @@ for(const file of ['frontend/index.html','atlas/official-index.html']){
 }
 console.log('PASS: identical app navigation, shared More menu, display preference and late actions');
 })().catch(e=>{console.error(e);process.exit(1)});
+
