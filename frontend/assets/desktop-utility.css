@@ -250,3 +250,7 @@ body.dark .selected {
 
 /* Match the compact Atlas workspace. */
 main#utility{padding:18px}.card{padding:12px}.row{gap:8px}button,input,select{min-height:32px;padding:6px 9px}@media(pointer:coarse){button,input,select{min-height:42px}}
+
+/* Match the dense Atlas workspace. */
+main#utility{padding:10px;font-size:13px}.card{padding:8px;border-radius:10px}.row{gap:6px}h1{font-size:21px;margin:6px 0}h2{font-size:16px;margin:6px 0}button,input,select{min-height:28px;padding:4px 7px;font-size:12px}p{margin:6px 0}
+@media(pointer:coarse){button,input,select{min-height:42px}}

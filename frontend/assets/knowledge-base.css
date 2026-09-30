@@ -18,3 +18,20 @@ body.atlas-console.knowledge-open{grid-template-columns:minmax(0,1fr)}body.knowl
 #knowledge #kbDrawio{min-height:440px;height:calc(100dvh - 210px)}
 @media(min-width:1401px){#knowledge .kb-layout{grid-template-columns:160px minmax(0,1fr) 220px}}
 @media(max-width:760px){#knowledge #kbDrawio{min-height:420px;height:65dvh}}
+
+/* Dense tool chrome leaves the canvas as the main surface. */
+body #knowledge button{min-height:28px;padding:4px 7px;font-size:12px}
+#knowledge .kb-heading{margin-bottom:6px;gap:6px}#knowledge .kb-heading h2{font-size:18px}
+#knowledge .kb-layout,#knowledge .kb-details{gap:6px}
+#knowledge :is(.kb-library,.kb-notes,.kb-details>section){padding:7px;border-radius:9px}
+#knowledge .kb-document-bar{padding:5px;gap:4px}
+#knowledge .kb-editor-bar{padding:4px 6px;gap:5px}
+#knowledge .kb-status{min-height:24px;padding:4px 6px}
+#knowledge h3{margin-bottom:6px}
+#knowledge .kb-templates{padding-top:7px}
+#knowledge #kbDocuments{margin:6px 0}
+#knowledge #kbDocuments button{padding:5px;margin:3px 0}
+#knowledge .kb-templates button{margin:4px 0}
+#knowledge .kb-notes button{margin:6px 0}
+#knowledge #kbDrawio{height:calc(100dvh - 175px)}
+@media(pointer:coarse){body #knowledge button{min-height:42px}}
