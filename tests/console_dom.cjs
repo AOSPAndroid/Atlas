@@ -32,7 +32,9 @@ async function until(fn){for(let i=0;i<100;i++){if(fn())return;await sleep(30)}t
  assert.equal(w.location.pathname,'/installer');
  w.document.querySelector('.atlas-site-info').close();
  for(const page of ['admin','bulk','history','psexec','workspace']){w.document.querySelector(`[data-page="${page}"]`).click();assert(w.document.querySelector('#'+page).classList.contains('active'));assert(w.document.querySelector('#pageTitle').textContent.trim().length>0)}
- assert.equal(w.document.querySelectorAll('nav .nav-label').length,5);
+ assert.equal(w.document.querySelectorAll('nav .nav-label').length,7);
+ assert(w.document.querySelector('[data-page="knowledge"] svg'));
+ assert(w.document.querySelector('[data-page="active-directory"] svg'));
  for(const [toggle,drawer,close] of [['queueToggle','queueDrawer','closeQueue'],['deploymentsToggle','deploymentsDrawer','closeDeployments']]){w.document.querySelector('#'+toggle).click();assert(w.document.querySelector('#'+drawer).classList.contains('open'));w.document.querySelector('#'+close).click();assert(!w.document.querySelector('#'+drawer).classList.contains('open'))}
  // Disclosure clicks, panel exclusivity, Escape, and focus restoration.
  const q=w.document.querySelector('#queueToggle'),live=w.document.querySelector('#deploymentsToggle');

@@ -431,3 +431,11 @@ html[data-atlas-display="citrix"] dialog::backdrop {
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
+
+/* On-demand feedback only: no idle animation, no simulated progress. */
+.atlas-request-loading{position:fixed;right:16px;bottom:64px;z-index:20000;display:flex;align-items:center;gap:8px;background:#fff;color:#006f94;border:1px solid #b8dce9;border-radius:9px;padding:7px 11px;font:12px/1.4 system-ui,sans-serif;box-shadow:0 3px 12px #17334616;pointer-events:none}
+.atlas-request-loading[hidden]{display:none!important}
+.atlas-loading-inline::before{content:"";display:inline-block;width:12px;height:12px;box-sizing:border-box;border:2px solid #b8dce9;border-top-color:#007eae;border-radius:50%;animation:atlas-load-spin .8s linear infinite;vertical-align:-2px;margin-right:6px}
+@keyframes atlas-load-spin{to{transform:rotate(360deg)}}
+html[data-atlas-motion=reduce] .atlas-loading-inline::before,html[data-atlas-display=citrix] .atlas-loading-inline::before{animation:none}
+@media(prefers-reduced-motion:reduce){.atlas-loading-inline::before{animation:none}}

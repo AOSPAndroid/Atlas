@@ -377,3 +377,7 @@ Results show OU/parent container, full distinguished and canonical names, SID, e
 Install the RSAT **Active Directory PowerShell** module on the Atlas host using your approved software process. Domain connectivity and permission to read the objects are required. The optional server field selects a domain/controller. Failures report missing RSAT, lookup errors or the 35-second timeout. Atlas does not install RSAT or enable services automatically. Demo and hosted Preview show the page with lookups disabled; live AD results are not added to the hosted snapshot. Classic and Desktop share the feature.
 
 Microsoft references: [Get-ADUser](https://learn.microsoft.com/en-us/powershell/module/activedirectory/get-aduser), [Get-ADComputer](https://learn.microsoft.com/en-us/powershell/module/activedirectory/get-adcomputer), [Get-ADGroup](https://learn.microsoft.com/en-us/powershell/module/activedirectory/get-adgroup).
+
+### Compact interface and loading feedback
+
+Classic and Desktop use tighter shared spacing: smaller desktop controls, 12px console panels, narrower sidebars and compact headers. Touchscreen controls keep larger targets. Knowledge Base navigation and tools have SVG icons, and the editor uses the available window height. Slow foreground requests show a small loading indicator after 180ms; it clears on success or error, including concurrent requests. Background watcher polls stay silent. Draw.io has its own loading indicator and timeout message. Indicators respect Animations Off, reduced motion and Citrix mode; they never show invented percentages.

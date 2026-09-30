@@ -31,8 +31,8 @@
     for(const p of pending.values()){clearTimeout(p.timeout);p.reject(Error('Document changed.'));}pending.clear();
     const next=document.createElement('iframe');next.id='kbDrawio';next.title='Draw.io diagram editor';next.setAttribute('referrerpolicy','no-referrer');next.setAttribute('sandbox','allow-scripts allow-same-origin allow-downloads allow-modals');
     next.src='/drawio/index.html?embed=1&proto=json&configure=1&libraries=1&noExitBtn=1&noSaveBtn=1&saveAndExit=0&spin=1&ui=kennedy&lang=en&format=0&v=31.5.3-atlas1';
-    frame=next;q('#kbEditorHost').replaceChildren(frame);q('#kbEditorStatus').textContent='Loading bundled Draw.io…';
-    loadTimer=setTimeout(()=>{if(!ready)q('#kbEditorStatus').textContent='Editor is taking longer to load. Reload editor, or download your existing draft from File.';},20000);
+    frame=next;q('#kbEditorHost').replaceChildren(frame);q('#kbEditorStatus').textContent='Loading bundled Draw.io…';q('#kbEditorStatus').classList.add('atlas-loading-inline');q('#kbEditorHost').setAttribute('aria-busy','true');
+    loadTimer=setTimeout(()=>{if(!ready){q('#kbEditorStatus').classList.remove('atlas-loading-inline');q('#kbEditorHost').setAttribute('aria-busy','false');q('#kbEditorStatus').textContent='Editor is taking longer to load. Reload editor, or download your existing draft from File.';}},20000);
   }
   async function receive(event){
     if(!frame||event.source!==frame.contentWindow||event.origin!==location.origin||typeof event.data!=='string')return;
@@ -42,7 +42,7 @@
       post({action:'configure',config:{enableAi:false,defaultFonts:['Arial','Helvetica','Verdana','Times New Roman'],passThroughKeys:[{key:'k',ctrl:true,command:'atlas-palette'}],suppressNewWindows:true}});return;
     }
     if(message.event==='init'){post({action:'load',xml:doc.xml,title:doc.title,autosave:1,fit:1});return;}
-    if(message.event==='load'){clearTimeout(loadTimer);ready=true;q('#kbEditorStatus').textContent='Draw.io 31.5.3 · bundled locally';return;}
+    if(message.event==='load'){clearTimeout(loadTimer);ready=true;q('#kbEditorStatus').classList.remove('atlas-loading-inline');q('#kbEditorHost').setAttribute('aria-busy','false');q('#kbEditorStatus').textContent='Draw.io 31.5.3 · bundled locally';return;}
     if(message.event==='shortcut'&&message.command==='atlas-palette'){window.openPalette?.();return;}
     const id=message.message?.atlasRequest;
     if(id&&pending.has(id)){const p=pending.get(id);clearTimeout(p.timeout);pending.delete(id);if(message.error)p.reject(Error(message.error));else p.resolve(message);return;}
@@ -121,6 +121,8 @@
     <aside class="kb-details"><section class="kb-notes"><h3>Notes & runbook</h3><textarea id="kbNotes" aria-label="Knowledge notes" maxlength="100000" placeholder="Write your notes here…&#10;&#10;User reports issue → Check ping?&#10;Check ping? → [Yes] Check application&#10;Check ping? → [No] Check network"></textarea><button data-kb="convert" class="primary">Notes → diagram</button><small>Local conversion: steps, indented bullets, or A → B connections. End a decision with ?. Add → [Yes] for connector labels. Creates editable Draw.io shapes; existing diagrams are kept separate.</small></section><section><h3>Quick actions</h3><button data-kb="layers">Layers</button> <button data-kb="format">Format panel</button><p>Use Ctrl K for Draw.io commands, including adding shapes, connecting two selected shapes, undo, redo and export.</p><p>Files stay in Atlas. Open existing .drawio files here; use Atlas JSON to include your notes.</p></section></aside></div><input id="kbImport" type="file" accept=".json,.drawio,.xml" hidden>`;
     window.addEventListener('message',event=>receive(event).catch(e=>status(e.message)));
     root.addEventListener('click',e=>{const button=e.target.closest('[data-kb]');if(button){action(button.dataset.kb).catch(e=>status(e.message));button.closest('details')?.removeAttribute('open');}const row=e.target.closest('[data-doc]');if(row)(async()=>{if(!await leaveDraft())return;const data=await AtlasClient.request('/api/knowledge/'+row.dataset.doc);setDocument({...validate(data),id:data.id,revision:data.revision});})().catch(e=>status(e.message));});
+    const paths={new:'M12 4v16M4 12h16',save:'M4 3h13l3 3v15H4zM7 3v6h9V3M7 21v-8h10v8',import:'M12 16V3m-4 4 4-4 4 4M4 14v7h16v-7',fit:'M9 3H3v6m12-6h6v6M3 15v6h6m12-6v6h-6',reload:'M20 8a8 8 0 1 0 0 8M20 2v6h-6',focus:'M3 9V3h6m6 0h6v6M3 15v6h6m6 0h6v-6',export:'M12 3v13m-4-4 4 4 4-4M4 17v4h16v-4',notes:'M5 3h14v18H5zM8 8h8M8 12h8M8 16h5'};
+    root.querySelectorAll('button[data-kb]').forEach(button=>{const name=button.dataset.kb;const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('aria-hidden','true');svg.classList.add('kb-icon');const path=document.createElementNS(svg.namespaceURI,'path');path.setAttribute('d',paths[name] || (name.includes('export')||name==='drawio'||name==='svg'||name==='png'?paths.export:paths.notes));svg.append(path);button.prepend(svg);});
     q('#kbSearch').oninput=renderLibrary;
     for(const [id,key] of [['kbTitle','title'],['kbNotes','notes']])q('#'+id).oninput=()=>{doc[key]=q('#'+id).value||(key==='title'?'Untitled diagram':'');changed();};
     q('#kbImport').onchange=async()=>{try{const file=q('#kbImport').files[0];if(!file)return;if(file.size>6500000)throw Error('Maximum file size: 6.5 MB.');const text=await file.text(),next=file.name.toLowerCase().endsWith('.json')?validate(JSON.parse(text)):{...blank(),title:file.name.replace(/\.(drawio|xml)$/i,'').slice(0,180)||'Imported diagram',xml:validateXML(text)};if(!await leaveDraft())return;setDocument(next);changed();}catch(e){status('Cannot open file · '+e.message);}finally{q('#kbImport').value='';}};

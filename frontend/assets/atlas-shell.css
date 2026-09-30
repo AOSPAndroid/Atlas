@@ -664,3 +664,30 @@ body.atlas-console > main {
 #bulkSelectionStatus { overflow-wrap: anywhere; }
 #bulkStart { min-width: 190px; }
 .deployment-action-switch button:focus-visible { outline: 2px solid #007fa3; outline-offset: 3px; }
+
+/* Compact Atlas spacing, shared by Classic and embedded Desktop apps. */
+:root{--atlas-sidebar-width:240px;--atlas-header-height:60px}
+body > .atlas-app-header{min-height:60px;padding:8px 14px;gap:6px 12px}
+body .atlas-app-header .atlas-brand{font-size:24px;gap:7px}
+body .atlas-brand img{width:25px;height:27px}
+body.atlas-console > main{padding:12px 14px 68px}
+body.atlas-console > .console-sidebar{padding:10px 8px;gap:9px}
+body.atlas-console .console-sidebar nav button{min-height:33px;padding:6px 9px}
+body.atlas-console .console-page-heading{padding-bottom:10px;margin-bottom:10px;gap:10px}
+body.atlas-console .console-page-heading h1{font-size:21px;margin-bottom:3px}
+body.atlas-console :is(.panel,.card){padding:12px;margin:8px 0}
+body.atlas-console #workspace.active{gap:12px}
+body.atlas-console :is(button,input:not([type=checkbox]):not([type=radio]),select){min-height:32px;padding:6px 9px}
+body .atlas-app-header .atlas-header-actions > :is(button,a),body .atlas-header-more > summary{min-height:32px;padding:6px 9px}
+body .atlas-primary-nav a{padding:6px 8px}
+body.atlas-console .px-settings.panel{padding:12px;margin:12px 0;gap:9px}
+body.atlas-console .px-layout{gap:12px}
+body.atlas-console .px-card{padding:11px;gap:5px}
+body.atlas-console .px-intro{gap:12px}
+body.atlas-console .px-intro h2{font-size:21px;margin:4px 0}
+body .atlas-person{padding:11px;gap:9px}
+body .workspace .side-head,body .workspace .directory-foot{padding:12px}
+body .workspace .map-heading{padding:10px 14px}
+body .workspace .side-head h1{font-size:23px;margin:8px 0}
+@media(max-width:760px){body.atlas-console > main{padding:10px 8px 68px}body > .atlas-app-header{padding:8px;gap:6px}}
+@media(pointer:coarse){body.atlas-console :is(button,input:not([type=checkbox]):not([type=radio]),select),body .atlas-app-header .atlas-header-actions > :is(button,a){min-height:42px}}

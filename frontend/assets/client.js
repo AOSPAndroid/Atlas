@@ -1,6 +1,34 @@
 /* Shared transport, immutable selections, and one polling owner per resource. */
 (() => {
   let session;
+  let loadingCount = 0,
+    loadingTimer,
+    loadingBadge;
+  function beginLoading() {
+    loadingCount++;
+    if (loadingCount === 1)
+      loadingTimer = setTimeout(() => {
+        if (!loadingCount || !document.body) return;
+        if (!loadingBadge) {
+          loadingBadge = document.createElement("div");
+          loadingBadge.className = "atlas-request-loading atlas-loading-inline";
+          loadingBadge.setAttribute("role", "status");
+          loadingBadge.textContent = "Loading…";
+          document.body.append(loadingBadge);
+        }
+        loadingBadge.hidden = false;
+      }, 180);
+    let ended = false;
+    return () => {
+      if (ended) return;
+      ended = true;
+      loadingCount = Math.max(0, loadingCount - 1);
+      if (!loadingCount) {
+        clearTimeout(loadingTimer);
+        if (loadingBadge) loadingBadge.hidden = true;
+      }
+    };
+  }
   async function sessionToken() {
     if (!session)
       session = fetch("/api/session", { cache: "no-store" })
@@ -39,10 +67,33 @@
     return data;
   }
   async function request(url, options = {}) {
-    const tracked=/^\/api\/(deploy$|bulk\/deploy$|queue$|psexec\/run$|software-tools\/(inventory|uninstall)$|performance\/|processes\/|remote-registry\/enable$|kill$|cleanup-packages\/|ping\/|disk\/|overview\/|access\/|preflight\/|open-tool\/)/.test(url);
-    if(tracked)window.dispatchEvent(new CustomEvent('atlas:activity',{detail:{open:false}}));
-    try{return await rawRequest(url,options);}
-    finally{if(tracked)window.dispatchEvent(new CustomEvent('atlas:activity',{detail:{open:options.method==='POST' && /^\/api\/(deploy$|bulk\/deploy$|queue$|psexec\/run$|software-tools\/uninstall$)/.test(url)}}));}
+    const { atlasSilent = false, ...transport } = options;
+    const endLoading = atlasSilent ? () => {} : beginLoading();
+    const tracked =
+      /^\/api\/(deploy$|bulk\/deploy$|queue$|psexec\/run$|software-tools\/(inventory|uninstall)$|performance\/|processes\/|remote-registry\/enable$|kill$|cleanup-packages\/|ping\/|disk\/|overview\/|access\/|preflight\/|open-tool\/)/.test(
+        url,
+      );
+    if (tracked)
+      window.dispatchEvent(
+        new CustomEvent("atlas:activity", { detail: { open: false } }),
+      );
+    try {
+      return await rawRequest(url, transport);
+    } finally {
+      endLoading();
+      if (tracked)
+        window.dispatchEvent(
+          new CustomEvent("atlas:activity", {
+            detail: {
+              open:
+                options.method === "POST" &&
+                /^\/api\/(deploy$|bulk\/deploy$|queue$|psexec\/run$|software-tools\/uninstall$)/.test(
+                  url,
+                ),
+            },
+          }),
+        );
+    }
   }
   const watchers = new Map();
   const terminal = new Set([
@@ -77,7 +128,10 @@
     async function tick() {
       controller = new AbortController();
       try {
-        const data = await request(url, { signal: controller.signal });
+        const data = await request(url, {
+          signal: controller.signal,
+          atlasSilent: true,
+        });
         if (stopped) return;
         failures = 0;
         await onData(data);

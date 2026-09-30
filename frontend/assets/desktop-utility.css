@@ -247,3 +247,6 @@ body.dark .selected {
     padding: 14px;
   }
 }
+
+/* Match the compact Atlas workspace. */
+main#utility{padding:18px}.card{padding:12px}.row{gap:8px}button,input,select{min-height:32px;padding:6px 9px}@media(pointer:coarse){button,input,select{min-height:42px}}

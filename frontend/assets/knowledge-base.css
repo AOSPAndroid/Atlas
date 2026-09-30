@@ -11,3 +11,10 @@ body.atlas-console.knowledge-open{grid-template-columns:minmax(0,1fr)}body.knowl
 @media(max-width:1400px){#knowledge .kb-layout{grid-template-columns:170px minmax(0,1fr)}#knowledge .kb-details{grid-column:1/-1;grid-template-columns:2fr 1fr}#knowledge #kbNotes{height:180px}}
 @media(max-width:1000px){#knowledge .kb-layout{grid-template-columns:minmax(0,1fr)}#knowledge .kb-details{grid-column:auto}#kbDrawio{min-height:620px;height:75vh}}
 @media(max-width:760px){#knowledge .kb-details{grid-template-columns:minmax(0,1fr)}}
+
+#knowledge .kb-heading{gap:10px;margin-bottom:10px}#knowledge .kb-heading h2{font-size:21px;margin:3px 0}#knowledge .kb-heading p{margin:3px 0;font-size:12px}
+#knowledge .kb-layout{gap:10px}#knowledge :is(.kb-library,.kb-notes,.kb-details>section){padding:10px}#knowledge .kb-document-bar{padding:7px;gap:6px}#knowledge .kb-status{padding:6px 9px;min-height:28px}#knowledge .kb-details{gap:9px}
+#knowledge button{display:inline-flex;align-items:center;gap:6px}#knowledge .kb-icon{width:15px;height:15px;flex:none;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+#knowledge #kbDrawio{min-height:440px;height:calc(100dvh - 210px)}
+@media(min-width:1401px){#knowledge .kb-layout{grid-template-columns:160px minmax(0,1fr) 220px}}
+@media(max-width:760px){#knowledge #kbDrawio{min-height:420px;height:65dvh}}
