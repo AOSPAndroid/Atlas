@@ -648,3 +648,6 @@ register_knowledge(app, DATA/'knowledge.sqlite3')
 
 # Bundled open-source Draw.io static editor (no server-side editor endpoints).
 app.mount('/drawio', StaticFiles(directory=ROOT/'frontend/drawio', html=True), name='drawio')
+
+from active_directory import register as register_active_directory
+register_active_directory(app, ps)

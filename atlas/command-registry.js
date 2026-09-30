@@ -34,6 +34,7 @@ const viewerCommands = new Set([
   "admin",
   "bulk",
   "history",
+  "active-directory",
   "psexec",
   "catalogue",
   "active",
@@ -54,6 +55,7 @@ const viewerCommands = new Set([
 ]);
 // The single command catalogue used by the map and IT console.
 export const COMMANDS = [
+  ["active-directory", "Active Directory", "Look up user/computer groups, OU and account details", "ad active directory ou organizational unit groups user computer rsat"],
   ["knowledge", "Knowledge Base", "Open diagrams, notes and runbooks", "knowledge base drawio draw.io diagrams notes"],
   ["kb-layers", "Show diagram layers", "Open the Draw.io layers panel", "drawio layers"],
   ["kb-format", "Show format panel", "Open shape styling and formatting", "drawio format"],

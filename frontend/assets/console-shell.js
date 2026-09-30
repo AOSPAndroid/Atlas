@@ -37,6 +37,7 @@ function page(id) {
   if (id === "knowledge") window.AtlasKnowledge?.open();
   if (id === "history") loadDeploymentHistory();
   if (id === "psexec") window.AtlasPsExec?.open();
+  if (id === "active-directory") window.AtlasAD?.open();
   syncDeploymentPanel();
 }
 async function init() {
@@ -510,6 +511,7 @@ function bindCommandDiscovery() {
     .setAttribute("aria-label", "Close keyboard shortcuts");
 }
 async function openPaletteTarget() {
+  if (location.hash === "#active-directory") page("active-directory");
   if (location.hash === "#psexec") page("psexec");
   if (location.hash === "#knowledge") page("knowledge");
   const params = new URLSearchParams(location.search),
@@ -558,6 +560,7 @@ async function runSharedCommand(id) {
     if(id !== "knowledge") return AtlasKnowledge.command(id);
     return;
   }
+  if (id === "active-directory") { page("active-directory"); return; }
   if (id === "vlans" || id === "contacts") {
     const { openSiteInfo } = await import("/site-info.js?v=1");
     return openSiteInfo(id);

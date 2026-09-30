@@ -311,3 +311,5 @@
     padding: 16px;
   }
 }
+
+.ad-details{width:100%;border-collapse:collapse;margin:18px 0}.ad-details th,.ad-details td{text-align:left;padding:9px;border-bottom:1px solid #dce6eb;overflow-wrap:anywhere}.ad-details th{width:30%}.ad-groups{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px;margin-top:14px}.ad-groups article{padding:14px;border:1px solid #dce6eb;border-radius:12px;overflow-wrap:anywhere}.ad-groups p{margin:6px 0}

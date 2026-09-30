@@ -66,6 +66,7 @@
             ><span class="nav-label">History</span>
           </button>
           <button data-page="knowledge"><span class="nav-icon">◇</span><span class="nav-label">Knowledge Base</span></button>
+          <button data-page="active-directory"><span class="nav-icon">AD</span><span class="nav-label">Active Directory</span></button>
           <button data-page="psexec">
             <span class="nav-icon" aria-hidden="true">&gt;_</span
             ><span class="nav-label">PsTools</span>
@@ -502,7 +503,8 @@
           </div>
         </div>
       </section>
-      <section id="psexec" class="page" aria-label="PsTools command workbench">
+      <section id="active-directory" class="page" aria-label="Active Directory"><div class="panel"><h2>Active Directory</h2><p>Read user and computer accounts using the Windows account running Atlas. No directory changes.</p><form id="adForm" class="px-settings"><label>Object type<select id="adKind"><option value="computer">Computer</option><option value="user">User</option></select></label><label>Account or machine<input id="adIdentity" maxlength="128" required placeholder="Exact account, UPN or machine name"></label><label>Domain / controller (optional)<input id="adServer" maxlength="128" placeholder="Default domain discovery"></label><button id="adSelected" type="button">Use selected machine</button><button id="adLookup" class="primary">Look up AD</button></form><p id="adStatus" role="status">Manual lookup. Requires RSAT Active Directory PowerShell and domain connectivity.</p><div id="adResults"></div></div></section>
+<section id="psexec" class="page" aria-label="PsTools command workbench">
         <div class="px-intro">
           <div>
             <small>REMOTE COMMAND WORKBENCH</small>
@@ -860,6 +862,7 @@ Ready. Choose a command and click Run.</pre>
     <script src="/assets/psexec-catalogue.js"></script>
     <script src="/assets/psexec-commands.js"></script>
     <script src="/assets/console-psexec.js"></script>
+<script src="/assets/active-directory.js"></script>
     <script src="/assets/psexec-terminal.js"></script>
     <script src="/assets/action-widgets.js"></script>
     <script src="/assets/reboot-monitor.js"></script>
