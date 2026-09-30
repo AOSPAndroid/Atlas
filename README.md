@@ -1,3 +1,10 @@
+## Choose your Atlas edition
+
+- **[Classic Atlas](Classic-Atlas/README.md)** — normal Atlas layout, with Admin, Demo and Preview folders.
+- **[Desktop Atlas](Desktop-Atlas/README.md)** — desktop layout, with Admin, Demo and Preview folders.
+
+Both editions use the shared application below, keeping fixes, data and permissions consistent. Clone/download the complete repository; the edition folders contain launch profiles rather than duplicated application code. Existing root launchers still work.
+
 # Atlas 7.0.0
 
 **One workspace to find people, locate equipment and get IT work done.**
