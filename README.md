@@ -390,3 +390,7 @@ Queries use the Windows account running Atlas and require RSAT/domain connectivi
 
 
 Performance and machine views use dense layouts: compact process rows with inline PID/session, small metric charts, expandable logical-processor detail, and compact machine facts. Long process lists scroll inside the list with sticky column headings; full records remain available. Touch devices retain larger action targets.
+
+
+### One Atlas, two layouts
+Use **Settings > Desktop mode** to turn the dock/window layout on or off. On the map, Settings is in **More**; in the console it is on the header. In Desktop mode, use the dock Settings button (or Window menu) and turn Desktop mode off. The browser remembers this choice separately for each Admin, Demo or Preview origin. Apps, data and permissions are unchanged. Existing Classic/Desktop launcher folders and direct links remain compatible; separate downloads are not needed. Save diagrams before switching layouts, since app windows reload.

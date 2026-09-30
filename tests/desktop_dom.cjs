@@ -124,6 +124,12 @@ assert.equal(
   JSON.parse(w.localStorage.getItem("atlas-desktop-settings")).rects.map.x,
   35,
 );
+const layoutSwitch=d.querySelector('#desktopEnabled');
+w.confirm=()=>false;layoutSwitch.checked=false;layoutSwitch.dispatchEvent(new w.Event('change'));
+assert.equal(layoutSwitch.checked,true,'cancel preserves desktop mode');
+assert.equal(w.localStorage.getItem('atlas-layout'),'desktop');
+w.confirm=()=>true;layoutSwitch.checked=false;layoutSwitch.dispatchEvent(new w.Event('change'));
+assert.equal(w.localStorage.getItem('atlas-layout'),'classic','off remembers standard layout');
 w.close();
 console.log(
   "PASS: lazy apps, retained frames, drag/resize, saved geometry, minimize, snap/reset, single-window and compact modes, rejected foreign messages",

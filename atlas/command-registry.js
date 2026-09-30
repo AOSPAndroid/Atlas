@@ -187,7 +187,7 @@ export const COMMANDS = [
   ],
   [
     "settings",
-    "Settings",
+    "Package settings",
     "Configure the package repository",
     "settings configuration repository",
   ],

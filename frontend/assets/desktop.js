@@ -399,7 +399,7 @@
     if (
       windows.size &&
       !confirm(
-        "Return to Classic Atlas? Open windows will reload. Save or download any unsaved diagram first.",
+        "Turn off Desktop mode? Open windows will reload. Save or download any unsaved diagram first.",
       )
     )
       return;
@@ -487,7 +487,9 @@
   $("#showDesktop").onclick = desktop;
   $("#windowMenu").onclick = toggleSettings;
   $("#dockSettings").onclick = toggleSettings;
-  $("#classic").onclick = classic;
+  $('#desktopEnabled').onchange=()=>{
+    if(!$('#desktopEnabled').checked){classic();$('#desktopEnabled').checked=true;}
+  };
   $("#multitask").onchange = () => {
     endDrag();
     settings.multi = $("#multitask").checked;

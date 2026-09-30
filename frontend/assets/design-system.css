@@ -954,3 +954,5 @@ body.atlas-database button {
 body.atlas-database li {
   margin: 4px 0;
 }
+
+.atlas-layout-setting{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0}.atlas-layout-setting strong,.atlas-layout-setting small{display:block}.atlas-layout-setting small{margin-top:4px;color:var(--atlas-muted);max-width:380px;font-size:12px}.atlas-layout-setting input{flex:none;accent-color:var(--atlas-accent);width:18px;height:18px}

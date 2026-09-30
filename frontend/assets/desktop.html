@@ -22,7 +22,7 @@
         Window
       </button>
       <div class="menu-spacer"></div>
-      <span id="desktopMode">Desktop edition</span
+      <span id="desktopMode">Desktop mode</span
       ><button id="search" title="Search in the active app">
         ⌕ <span>Search</span></button
       ><time id="clock"></time>
@@ -36,7 +36,8 @@
       <div id="dragShield" hidden></div>
     </main>
     <aside id="desktopSettings" hidden aria-label="Desktop settings">
-      <h2>Your desktop</h2>
+      <h2>Settings</h2>
+      <label class="desktop-switch"><span><strong>Desktop mode</strong><small>Dock and app windows. Turn off for the standard Atlas layout.</small></span><input id="desktopEnabled" type="checkbox" role="switch" aria-label="Desktop mode" checked /></label>
       <label class="desktop-switch"
         ><span
           ><strong>Window multitasking</strong
@@ -50,8 +51,7 @@
       /></label>
       <hr />
       <button id="resetWindows">Reset window positions</button
-      ><button id="showDesktop">Minimize all windows</button
-      ><button id="classic">Switch to Classic Atlas ↗</button>
+      ><button id="showDesktop">Minimize all windows</button>
       <p class="desktop-footnote">
         Atlas Desktop is a browser workspace.<br />Your apps and permissions
         stay the same.
