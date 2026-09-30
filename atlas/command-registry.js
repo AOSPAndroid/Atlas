@@ -28,7 +28,7 @@ const targeted = new Set([
   "software",
   "report",
 ]);
-const viewerCommands = new Set([
+const viewerCommands = new Set(["ad-open","ad-user-groups","ad-machine-groups","ad-compare","ad-filter-groups","ad-export-groups",
 "kb-layers","kb-format","kb-duplicate","kb-delete","kb-zoom-in","kb-zoom-out","kb-png","knowledge","kb-new","kb-notes","kb-convert","kb-process","kb-decision","kb-database","kb-note","kb-connect","kb-fit","kb-undo","kb-redo","kb-save","kb-export","kb-drawio","kb-svg","kb-import","kb-template-flow","kb-template-network",
   "workspace",
   "admin",
@@ -55,6 +55,13 @@ const viewerCommands = new Set([
 ]);
 // The single command catalogue used by the map and IT console.
 export const COMMANDS = [
+  ['ad-open','See AD groups','Open an exact directory account','ad membership groups'],
+  ['ad-user-groups','See user groups','Look up the selected user in AD','ad user groups membership'],
+  ['ad-machine-groups','See machine groups','Look up the selected machine in AD','ad computer machine groups membership'],
+  ['ad-compare','Compare AD groups','Compare two user or computer memberships','ad compare difference common shared groups'],
+  ['ad-filter-groups','Filter AD group names','Contains, starts with, ends with or equals','ad groups filter contains ending starts equals excludes'],
+  ['ad-export-groups','Export AD groups to CSV','Download the current filtered memberships or comparison','ad csv extract export download groups'],
+
   ["active-directory", "Active Directory", "Look up user/computer groups, OU and account details", "ad active directory ou organizational unit groups user computer rsat"],
   ["knowledge", "Knowledge Base", "Open diagrams, notes and runbooks", "knowledge base drawio draw.io diagrams notes"],
   ["kb-layers", "Show diagram layers", "Open the Draw.io layers panel", "drawio layers"],

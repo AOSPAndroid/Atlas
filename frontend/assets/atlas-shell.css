@@ -709,3 +709,5 @@ body .atlas-person{padding:8px;gap:6px}
 body .directory .list-title{padding:6px 10px}
 body .workspace .map-heading h2{font-size:18px;margin:3px 0}
 body .workspace .map-heading p{margin:3px 0;font-size:12px}
+
+.ad-group-tools{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}.ad-group-tools input{min-width:140px;flex:1}.ad-group-tools select{max-width:100%}.ad-groups{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px}.ad-groups article{border:1px solid #d7e4ec;padding:8px;border-radius:7px;overflow-wrap:anywhere}.ad-groups p{margin:4px 0}.ad-groups small{font-size:11px}.atlas-ad-context{position:fixed;z-index:10000;background:white;border:1px solid #c9dce8;border-radius:8px;padding:4px;box-shadow:0 5px 20px #17334626}.atlas-ad-context button{padding:6px 12px;border:0;background:transparent;color:#17435b;font-size:12px;min-height:30px}.atlas-ad-context button:focus{outline:2px solid #0089b0}

@@ -73,7 +73,7 @@ async function search() {
 function renderUsers() {
   if (!S.users.length) return ($("#users").innerHTML = "");
   $("#users").innerHTML =
-    `<div class=panel><small>MATCHING USERS</small><div class=row>${S.users.map((u, i) => `<button data-user="${i}">${esc(u.name)} · ${esc(u.user_name)} · ${esc(u.location)}</button><button data-email="${i}">Copy email</button>`).join("")}</div></div>`;
+    `<div class=panel><small>MATCHING USERS</small><div class=row>${S.users.map((u, i) => `<button data-ad-kind="user" data-ad-identity="${esc(u.user_name || u.email || "")}" data-user="${i}">${esc(u.name)} · ${esc(u.user_name)} · ${esc(u.location)}</button><button data-email="${i}">Copy email</button>`).join("")}</div></div>`;
   $$("[data-user]").forEach(
     (b) =>
       (b.onclick = () =>
@@ -329,6 +329,7 @@ function machineContext(event, index) {
     };
     menu.append(button);
   };
+  add("ad-groups", "See groups", () => AtlasGroups.open("computer",m.name), false);
   add("target", "Set as target", () => {});
   add("health", "Refresh health", () => refreshTargetHealth());
   add("copy", "Copy hostname", () => copy(m.name, "Hostname"));

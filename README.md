@@ -381,3 +381,9 @@ Microsoft references: [Get-ADUser](https://learn.microsoft.com/en-us/powershell/
 ### Compact interface and loading feedback
 
 Classic and Desktop use tighter shared spacing: smaller desktop controls, 12px console panels, narrower sidebars and compact headers. Touchscreen controls keep larger targets. Knowledge Base navigation and tools have SVG icons, and the editor uses the available window height. Slow foreground requests show a small loading indicator after 180ms; it clears on success or error, including concurrent requests. Background watcher polls stay silent. Draw.io has its own loading indicator and timeout message. Indicators respect Animations Off, reduced motion and Citrix mode; they never show invented percentages.
+
+
+### AD group inspection and comparison
+Right-click a user or machine and choose **See groups** to query its exact account in local Admin. The AD screen supports user/computer comparisons, groups in both objects or only one, and case-insensitive name filters: contains, starts with, ends with, equals and excludes. **Export CSV** downloads the filtered rows, object identities and each object's membership type; spreadsheet formula-like values are escaped. Command palette: See user groups, See machine groups, Compare AD groups, Filter AD group names, Export AD groups to CSV.
+
+Queries use the Windows account running Atlas and require RSAT/domain connectivity. Results cover direct membership plus primary group, not nested/effective permissions. Any lookup warnings or membership limits still apply to comparisons. Demo and Preview expose navigation but never run live AD queries.

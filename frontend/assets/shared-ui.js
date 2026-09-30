@@ -410,7 +410,7 @@
           `<button type="button" data-person-search="${esc(prefix + ":" + value)}" title="${esc(value)}">${esc(label)}</button>`,
       )
       .join("");
-    return `<div class="card usercard atlas-person"><div class="avatar">${esc(
+    return `<div class="card usercard atlas-person" data-ad-kind="user" data-ad-identity="${esc(user.user_name || user.email || "")}"><div class="avatar">${esc(
       name
         .split(/\s+/)
         .slice(0, 2)
@@ -732,4 +732,27 @@
       toggle: () => setMotion(isReduced()),
     },
   };
+})();
+
+// Shared directory context action for person cards and viewer machine records.
+window.AtlasGroups = {
+  open(kind, identity) {
+    if(window.AtlasAD) return AtlasAD.show(kind,identity);
+    const url='/installer?'+new URLSearchParams({command:'ad-open',adkind:kind,adidentity:identity||''});
+    if(!window.AtlasDesktop?.navigate(url)) location.assign(url);
+  }
+};
+(()=>{
+ let menu;
+ const close=()=>{menu?.remove();menu=null;};
+ document.addEventListener('contextmenu',e=>{
+  const item=e.target.closest('[data-ad-identity]');if(!item)return;
+  e.preventDefault();e.stopPropagation();close();
+  menu=document.createElement('div');menu.className='atlas-ad-context';menu.setAttribute('role','menu');
+  const button=document.createElement('button');button.type='button';button.textContent='See groups';button.setAttribute('role','menuitem');
+  button.onclick=()=>{close();AtlasGroups.open(item.dataset.adKind,item.dataset.adIdentity);};menu.append(button);document.body.append(menu);
+  const box=menu.getBoundingClientRect();menu.style.left=Math.max(8,Math.min(e.clientX,innerWidth-box.width-8))+'px';menu.style.top=Math.max(8,Math.min(e.clientY,innerHeight-box.height-8))+'px';button.focus();
+ });
+ document.addEventListener('pointerdown',e=>{if(menu&&!menu.contains(e.target))close();});
+ document.addEventListener('keydown',e=>{if(e.key==='Escape'||e.key==='Tab')close();});
 })();

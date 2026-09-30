@@ -148,6 +148,7 @@ export function createOperations({
             const m = current.machines[+input.value];
             const { element, body } = AtlasUI.dialog("Actions for " + m.name);
             for (const [label, action] of [
+              ["See groups", () => AtlasGroups.open("computer",m.name)],
               ["View specifications", () => window.AtlasHealth.specs(m.name)],
               ["Enable Remote Registry", () => openRemoteRegistry(m.name)],
             ]) {
@@ -195,7 +196,7 @@ export function createOperations({
           .slice(0, 30)
           .map(
             (u, i) =>
-              `<button class="ops-user-result" data-link-user="${i}"><b>${esc(u.full_name || u.name)}</b><span>${esc(u.user_name || u.user_id)} · ${esc(u.email)}</span><span>${esc(u.department || u.business_unit || "Team not recorded")} · ${esc(u.location || "Office not recorded")}</span><small>${current.desk.kind === "desk" ? "Use this name and account" : "Confirm as desk & use this account"}</small></button>`,
+              `<button class="ops-user-result" data-ad-kind="user" data-ad-identity="${esc(u.user_name || u.email || "")}" data-link-user="${i}"><b>${esc(u.full_name || u.name)}</b><span>${esc(u.user_name || u.user_id)} · ${esc(u.email)}</span><span>${esc(u.department || u.business_unit || "Team not recorded")} · ${esc(u.location || "Office not recorded")}</span><small>${current.desk.kind === "desk" ? "Use this name and account" : "Confirm as desk & use this account"}</small></button>`,
           )
           .join("")
       : '<p class="ops-muted">No exact match. Search the directory above.</p>';

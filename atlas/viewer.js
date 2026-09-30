@@ -24,7 +24,7 @@ function machinesCard(machines, inspect = true) {
     (machines
       .map((m) => {
         const name = m.name || m.machine_name;
-        return `<article class="viewer-machine" data-machine-kind="${AtlasUI.machineKind(m)}"><b>${esc(name)}</b><p class="ops-muted">${esc(relationship(m))}</p><p>${esc(m.model_id || "Model not supplied")} · ${esc(m.operational_status || "Status not supplied")} (inventory)</p>${AtlasUI.machineDetails(m, { open: !inspect })}${inspect ? `<button type="button" data-machine="${esc(name)}">Inspect machine</button>` : ""}</article>`;
+        return `<article class="viewer-machine" data-ad-kind="computer" data-ad-identity="${esc(name)}" data-machine-kind="${AtlasUI.machineKind(m)}"><b>${esc(name)}</b><p class="ops-muted">${esc(relationship(m))}</p><p>${esc(m.model_id || "Model not supplied")} · ${esc(m.operational_status || "Status not supplied")} (inventory)</p>${AtlasUI.machineDetails(m, { open: !inspect })}${inspect ? `<button type="button" data-machine="${esc(name)}">Inspect machine</button>` : ""}</article>`;
       })
       .join("") || "<p>No linked machines recorded.</p>") +
     "</div>"
@@ -46,7 +46,7 @@ function userButtons(users) {
   return users
     .map(
       (u) =>
-        `<button type="button" class="ops-user-result" data-person="id:${u.id}"><b>${esc(u.full_name || u.name)}</b><span>${esc(u.user_name)} · ${esc(u.email)}</span>${u.assigned_relationship || u.logon_relationship ? `<small>${esc(relationship(u))}</small>` : ""}</button>`,
+        `<button type="button" class="ops-user-result" data-ad-kind="user" data-ad-identity="${esc(u.user_name || u.email || "")}" data-person="id:${u.id}"><b>${esc(u.full_name || u.name)}</b><span>${esc(u.user_name)} · ${esc(u.email)}</span>${u.assigned_relationship || u.logon_relationship ? `<small>${esc(relationship(u))}</small>` : ""}</button>`,
     )
     .join("");
 }

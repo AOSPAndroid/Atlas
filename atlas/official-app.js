@@ -2583,11 +2583,7 @@ function hit(e) {
 
 let contextMenu = null;
 function deskMenu(e, r) {
-  if (readOnly) {
-    e.preventDefault();
-    if (r) selectRecord(r.id);
-    return;
-  }
+  if(!r) return;
   e.preventDefault();
   contextMenu?.remove();
   stopFocus();
@@ -2598,6 +2594,18 @@ function deskMenu(e, r) {
   menu.className = "desk-menu";
   menu.setAttribute("role", "menu");
   menu.innerHTML = `<strong>${esc(r.id)} · ${esc(r.name === "Unconfirmed desk" ? r.id : r.name)}</strong><button data-action="edit" role="menuitem">Edit desk / joiner</button><button data-action="move" role="menuitem">Move occupant…</button><button data-action="vacate" role="menuitem">Leaver / mark vacant…</button><button data-action="rotate" role="menuitem">Rotate desk 90°</button><button data-action="history" role="menuitem">View history</button>`;
+  if(readOnly) menu.replaceChildren();
+  const groupsButton=document.createElement('button');groupsButton.type='button';groupsButton.textContent='See groups';groupsButton.setAttribute('role','menuitem');
+  groupsButton.onclick=async()=>{
+    groupsButton.disabled=true;groupsButton.textContent='Finding account…';
+    try{
+      const response=await fetch('/api/desks/'+encodeURIComponent(r.id)+'/context');
+      if(!response.ok)throw Error('Could not resolve the directory account.');
+      const data=await response.json();const user=data.user;
+      if(!user || data.match_method==='ambiguous')throw Error('Open this desk and choose the correct directory account first.');
+      menu.remove();AtlasGroups.open('user',user.user_name||user.email||'');
+    }catch(error){groupsButton.textContent=error.message;groupsButton.disabled=false;}
+  };menu.prepend(groupsButton);
   menu.style.left =
     Math.max(8, Math.min(e.clientX, window.innerWidth - 270)) + "px";
   menu.style.top =

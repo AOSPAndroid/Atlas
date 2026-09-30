@@ -86,13 +86,14 @@ export function installCommandPalette({
       list.children[active]?.scrollIntoView({ block: "nearest" });
     } else input.removeAttribute("aria-activedescendant");
   }
+  list.addEventListener("contextmenu",e=>{if(e.target.closest("[data-ad-identity]"))dialog.close();});
   function render(items, message) {
     rows = items;
     active = 0;
     list.innerHTML = rows
       .map(
         (r, i) =>
-          `<div id="atlas-command-${i}" class="palette-result" role="option" aria-disabled="${!!r.disabled}" aria-selected="false" data-index="${i}"><span class="palette-kind">${esc(r.kind)}</span><span><strong>${esc(r.title)}</strong><small>${esc(r.detail)}</small></span><span aria-hidden="true">${esc(r.disabled ? "Unavailable" : r.shortcut || "↵")}</span></div>`,
+          `<div id="atlas-command-${i}" class="palette-result" role="option" aria-disabled="${!!r.disabled}" aria-selected="false" data-index="${i}" ${r.adIdentity ? `data-ad-kind="${esc(r.adKind)}" data-ad-identity="${esc(r.adIdentity)}"` : ""}><span class="palette-kind">${esc(r.kind)}</span><span><strong>${esc(r.title)}</strong><small>${esc(r.detail)}</small></span><span aria-hidden="true">${esc(r.disabled ? "Unavailable" : r.shortcut || "↵")}</span></div>`,
       )
       .join("");
     status.textContent =
@@ -158,6 +159,7 @@ export function installCommandPalette({
             }))
             .concat({
               kind: "Person",
+            adKind:"user",adIdentity:u.user_name||u.email||"",
               title: "Open person details",
               detail: row.title,
               run: () => openConsole("person", row.person),
@@ -265,6 +267,7 @@ export function installCommandPalette({
                 : "Find mapped location or open details";
           return {
             kind: "Person",
+            adKind:"user",adIdentity:u.user_name||u.email||"",
             title: u.full_name || u.name,
             detail: [
               action,
@@ -309,6 +312,7 @@ export function installCommandPalette({
         });
         const machines = data.machines.slice(0, 10).map((m) => ({
           kind: "Machine",
+          adKind:"computer",adIdentity:m.name,
           title: m.name,
           detail: [m.model_id, m.operational_status]
             .filter(Boolean)
