@@ -387,3 +387,6 @@ Classic and Desktop use tighter shared spacing: smaller desktop controls, 12px c
 Right-click a user or machine and choose **See groups** to query its exact account in local Admin. The AD screen supports user/computer comparisons, groups in both objects or only one, and case-insensitive name filters: contains, starts with, ends with, equals and excludes. **Export CSV** downloads the filtered rows, object identities and each object's membership type; spreadsheet formula-like values are escaped. Command palette: See user groups, See machine groups, Compare AD groups, Filter AD group names, Export AD groups to CSV.
 
 Queries use the Windows account running Atlas and require RSAT/domain connectivity. Results cover direct membership plus primary group, not nested/effective permissions. Any lookup warnings or membership limits still apply to comparisons. Demo and Preview expose navigation but never run live AD queries.
+
+
+Performance and machine views use dense layouts: compact process rows with inline PID/session, small metric charts, expandable logical-processor detail, and compact machine facts. Long process lists scroll inside the list with sticky column headings; full records remain available. Touch devices retain larger action targets.

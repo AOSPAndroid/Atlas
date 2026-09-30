@@ -488,7 +488,7 @@ function renderPerformance() {
         perfValue(s.thread_count),
         `${perfValue(s.context_switches_sec, "/s")} context switches. A high thread count alone does not mean overload.`,
       );
-    detail = `<section class="perf-resource-detail"><h3>Logical processor activity</h3><p class="muted">One busy logical processor can limit an application even when total CPU looks low. Click a process's thread count below to investigate.</p>${coreGrid}</section>`;
+    detail = `<details class="perf-details perf-resource-detail"><summary>Logical processor activity (${cores.length} processors)</summary><p class="muted">One busy logical processor can limit an application even when total CPU looks low. Click a process's thread count below to investigate.</p>${coreGrid}</details>`;
   } else if (kind === "gpu") {
     const engines = s.gpu_engines || [],
       adapters = [...new Set(engines.map((e) => e.adapter))].sort();
