@@ -956,3 +956,18 @@ body.atlas-database li {
 }
 
 .atlas-layout-setting{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0}.atlas-layout-setting strong,.atlas-layout-setting small{display:block}.atlas-layout-setting small{margin-top:4px;color:var(--atlas-muted);max-width:380px;font-size:12px}.atlas-layout-setting input{flex:none;accent-color:var(--atlas-accent);width:18px;height:18px}
+
+/* Shared header positions across Map, Workspace and Knowledge Base. */
+body > .atlas-app-header.atlas-unified-header { display:grid; grid-template-columns:150px minmax(250px,1fr) auto; align-items:center; gap:6px; padding:6px 12px; }
+body .atlas-unified-header .atlas-primary-nav { display:flex; gap:4px; margin:0; }
+body .atlas-unified-header .atlas-header-actions { display:flex; flex-wrap:nowrap; margin:0; padding:0; background:none; border:0; gap:4px; }
+.atlas-unified-header .preview-notice { grid-column:1 / -1; margin:0; }
+.atlas-unified-header .atlas-header-menu { max-height:min(70vh,500px); overflow:auto; }
+.atlas-unified-header .atlas-header-menu .atlas-display-mode { display:flex; padding:6px; gap:6px; }
+.atlas-unified-header .atlas-header-menu :is(.ops-header-link,a[href="/"]) { display:none; }
+.atlas-in-window body > .atlas-unified-header { grid-template-columns:minmax(250px,1fr) auto; }
+@media(max-width:700px) {
+  body > .atlas-app-header.atlas-unified-header { grid-template-columns:1fr auto; }
+  .atlas-unified-header .atlas-brand { grid-column:1 / -1; }
+  body .atlas-unified-header .atlas-primary-nav a { padding:5px 6px; font-size:11px; }
+}

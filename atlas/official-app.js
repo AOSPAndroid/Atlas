@@ -72,7 +72,7 @@ const settingsBody = mapPanel.querySelector(".map-settings-body");
 const settingsView = mapPanel.querySelector(".map-settings-view");
 settingsView.append($(".view-switch"), $("#name-tags").closest("label"));
 const displayControl = document.querySelector(".atlas-display-mode");
-if (displayControl) settingsBody.append(displayControl);
+// Display stays in the shared More menu.
 settingsBody.append($(".map-tools"));
 for (const [layer, title] of [
   ["walls", "Walls"],

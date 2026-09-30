@@ -406,11 +406,21 @@
     try {
       localStorage.setItem("atlas-layout", "classic");
     } catch {}
-    location.assign(
-      (active && !apps[active].utility ? apps[active].url : "/") +
-        (active === "knowledge" ? "&" : "?") +
-        "layout=classic",
-    );
+    const next = new URL(active && !apps[active].utility ? apps[active].url : '/', location.origin);
+    const frame = windows.get(active)?.frame;
+    try {
+      const current = new URL(frame.contentWindow.location.href);
+      if (current.origin === location.origin && ['/', '/installer', '/installer/'].includes(current.pathname)) {
+        next.pathname = current.pathname;
+        next.search = current.search;
+        next.hash = current.hash;
+        const page = frame.contentDocument.querySelector('.page.active')?.id;
+        if (page) next.searchParams.set('command', page);
+      }
+    } catch {}
+    next.searchParams.delete('atlasWindow');
+    next.searchParams.set('layout', 'classic');
+    location.assign(next.pathname + next.search + next.hash);
   }
   function desktop() {
     for (const w of windows.values()) w.minimized = true;

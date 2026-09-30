@@ -12,7 +12,6 @@
 .atlas-primary-nav .atlas-desktop-launch:hover {
   background: #dceffc;
 }
-.atlas-in-window .atlas-primary-nav,
 .atlas-in-window .atlas-brand,
 .atlas-in-window .atlas-return {
   display: none !important;
@@ -34,11 +33,9 @@
   padding: 4px 7px !important;
   gap: 3px !important;
 }
-.atlas-in-window body.knowledge-open > .atlas-app-header {
-  display: none;
-}
+
 .atlas-in-window body.knowledge-open {
-  --atlas-header-height: 0px;
+  --atlas-header-height: 55px;
 }
 .atlas-in-window #knowledge .kb-heading p {
   display: none;

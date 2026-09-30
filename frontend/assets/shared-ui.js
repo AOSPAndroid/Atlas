@@ -231,6 +231,27 @@
     const header = document.querySelector("body > .atlas-app-header");
     if (!header) return;
     const actions = header.querySelector(".atlas-header-actions");
+    // One stable toolbar on Map, Workspace and Knowledge Base.
+    if (actions && header.querySelector('.atlas-primary-nav')) {
+      header.classList.add('atlas-unified-header');
+      let more = actions.querySelector('.atlas-header-more');
+      if (!more) {
+        more = document.createElement('details');
+        more.className = 'atlas-header-more';
+        more.innerHTML = '<summary aria-label="More actions">More</summary><div class="atlas-header-menu"></div>';
+        actions.append(more);
+      }
+      const menu = more.querySelector('.atlas-header-menu');
+      const organize = () => {
+        for (const item of [...actions.children]) {
+          if (item === more || item.matches('.atlas-palette-mount,#openCommands')) continue;
+          menu.append(item);
+        }
+      };
+      organize();
+      new MutationObserver(organize).observe(actions, {childList:true});
+    }
+
     if (actions && !actions.querySelector(".atlas-display-mode")) {
       const label = document.createElement("label");
       label.className = "atlas-display-mode";

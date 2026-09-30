@@ -67,6 +67,18 @@
     },
   };
   function boot() {
+    if (!embedded) document.addEventListener('click', (event) => {
+      const link = event.target.closest('.atlas-primary-nav a');
+      if (!link || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+      const next = new URL(link.href, location.href);
+      if (next.origin !== location.origin || next.pathname !== '/') return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      next.searchParams.delete('atlasWindow');
+      next.searchParams.set('layout', 'classic');
+      location.assign(next.pathname + next.search + next.hash);
+    }, true);
+
     if (!embedded) {
       const header = document.querySelector('.atlas-header-actions');
       if(header){
