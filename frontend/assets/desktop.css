@@ -111,37 +111,23 @@ body.atlas-desktop:after {
 }
 .desktop-welcome {
   position: absolute;
-  top: 22%;
-  left: 9%;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
   pointer-events: none;
-  text-shadow: 0 2px 30px #07142544;
+  user-select: none;
 }
-.desktop-eyebrow {
-  font-size: 10px;
-  letter-spacing: 3px;
-  color: #cedde9;
-}
+.desktop-wallpaper-logo { width: 48px; height: 52px; opacity: .85; }
 .desktop-welcome h1 {
+  margin: 0;
+  font-size: clamp(52px, 7vw, 90px);
   font-weight: 500;
-  font-size: clamp(38px, 5.2vw, 76px);
   letter-spacing: -3px;
-  line-height: 1.08;
-  margin: 22px 0;
-}
-.desktop-welcome p {
-  font-size: 16px;
-  line-height: 1.8;
-  color: #d9e4ee;
-}
-.welcome-line {
-  width: 42px;
-  height: 2px;
-  background: #b7e5f0;
-  margin: 28px 0 20px;
-}
-.desktop-welcome small {
-  color: #d2dce9;
-  font-size: 12px;
+  line-height: 1;
+  color: #f1f6fb;
 }
 #dock {
   position: absolute;
@@ -586,10 +572,7 @@ body.desktop-reduce * {
   .dock-decoration {
     display: none;
   }
-  .desktop-welcome {
-    left: 9%;
-    top: 25%;
-  }
+
   .desktop-welcome h1 {
     letter-spacing: -2px;
   }
