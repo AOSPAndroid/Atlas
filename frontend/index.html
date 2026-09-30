@@ -116,9 +116,7 @@
               ></div>
               <select id="pkg" size="5" aria-label="Package results"></select>
               <p id="packageSearchStatus" class="muted" role="status"></p>
-              <button id="choosePackage" type="button">
-                Use selected package
-              </button>
+              <small class="muted">Select a package to use it immediately.</small>
             </div>
           </details>
           <div
@@ -416,12 +414,14 @@
             <div class="grid2">
               <label>Package search<input id="bulkSearch" /></label
               ><label>Package<select id="bulkPkg"></select></label
-              ><label
-                >Action<select id="bulkAction">
-                  <option>Install</option>
-                  <option>Uninstall</option>
-                  <option>Repair</option>
-                </select></label
+              ><div class="bulk-action-field"><span>Action</span>
+                <div class="deployment-action-switch" role="group" aria-label="Bulk deployment action">
+                  <button type="button" data-bulk-action="Install" aria-pressed="true">Install</button>
+                  <button type="button" data-bulk-action="Repair" aria-pressed="false">Repair</button>
+                  <button type="button" data-bulk-action="Uninstall" aria-pressed="false">Uninstall</button>
+                </div>
+                <select id="bulkAction" aria-label="Bulk action" hidden><option>Install</option><option>Repair</option><option>Uninstall</option></select>
+              </div
               ><label>Action script<select id="bulkScript"></select></label
               ><label
                 >Concurrent deployments<input
@@ -449,6 +449,7 @@
             ><button id="copyFailed">Copy failed</button
             ><button id="exportCsv">Export CSV</button>
           </div>
+          <p id="bulkSelectionStatus" class="muted" role="status"></p>
           <div id="bulkSummary"></div>
           <div class="tablewrap">
             <table>

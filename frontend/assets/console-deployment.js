@@ -72,13 +72,8 @@ function commitPackageChoice() {
   updatePackageSelection();
 }
 function cancelPackageChoice() {
-  if (!packageChoice) return;
-  const previous = packageChoice;
+  // Closing the picker never rolls back a selected package.
   commitPackageChoice();
-  $("#pkg").innerHTML = previous.options;
-  $("#pkg").value = previous.folder;
-  $("#pkgSearch").value = previous.search;
-  $("#pkg").dispatchEvent(new Event("change", { bubbles: true }));
 }
 function installPackagePicker() {
   const picker = $("#packagePicker"),
@@ -98,10 +93,9 @@ function installPackagePicker() {
   const choose = () => {
     if (packageBusy || !select.value) return;
     commitPackageChoice();
-    select.dispatchEvent(new Event("change", { bubbles: true }));
     $("#packagePickerButton").focus({ preventScroll: true });
   };
-  $("#choosePackage").onclick = choose;
+  select.addEventListener("change", choose);
   select.ondblclick = choose;
   picker.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && picker.open) {
@@ -161,6 +155,7 @@ async function packages() {
     );
     if (!request.current()) return;
     const previous = $("#pkg").value;
+    const previousLabel = $("#pkg").selectedOptions[0]?.textContent;
     for (const item of d.items)
       packageLabels.set(
         item.folder,
@@ -172,9 +167,9 @@ async function packages() {
           `<option value="${esc(x.folder)}">${esc(x.display_name)}${x.version ? " · " + esc(x.version) : ""}</option>`,
       )
       .join("");
-    $("#pkg").value = d.items.some((item) => item.folder === previous)
-      ? previous
-      : d.items[0]?.folder || "";
+    if (previous && !d.items.some(item => item.folder === previous))
+      $("#pkg").add(new Option(previousLabel || previous, previous));
+    $("#pkg").value = previous || d.items[0]?.folder || "";
     $("#packageSearchStatus").textContent =
       d.available === false
         ? d.error || "Package repository unavailable. Check Settings."
@@ -387,68 +382,81 @@ function bulkTargets() {
     ),
   ];
 }
+let bulkBusy = false, bulkSubmitting = false;
 async function bulkPackages() {
   const request = bulkPackageRequest();
+  bulkBusy = true;
+  $("#bulkPkg").disabled = true;
+  refreshBulkSelection();
   try {
     const d = await api(
       "/api/catalog?term=" + encodeURIComponent($("#bulkSearch").value),
       { signal: request.signal },
     );
     if (!request.current()) return;
+    const previous = $("#bulkPkg").value, label = $("#bulkPkg").selectedOptions[0]?.textContent;
     $("#bulkPkg").innerHTML = d.items
       .map(
         (x) =>
           `<option value="${esc(x.folder)}">${esc(x.display_name)}${x.version ? " · " + esc(x.version) : ""}</option>`,
       )
       .join("");
+    if (previous && !d.items.some(item => item.folder === previous))
+      $("#bulkPkg").add(new Option(label || previous, previous));
+    $("#bulkPkg").value = previous || d.items[0]?.folder || "";
     await bulkScripts();
   } catch (e) {
     if (e.name !== "AbortError" && request.current()) toast(e.message);
+  } finally {
+    if (request.current()) { bulkBusy = false; $("#bulkPkg").disabled = false; refreshBulkSelection(); }
   }
 }
+function refreshBulkSelection() {
+  const action = $("#bulkAction").value, count = bulkTargets().length;
+  document.querySelectorAll("[data-bulk-action]").forEach(button =>
+    button.setAttribute("aria-pressed", String(button.dataset.bulkAction === action)));
+  $("#targetCount").textContent = `${count} targets`;
+  $("#bulkStart").textContent = bulkSubmitting ? "Starting…" : `${action} on ${count} machine${count === 1 ? "" : "s"}`;
+  $("#bulkStart").disabled = !!window.AtlasReadOnly || bulkBusy || bulkSubmitting || !count || !$("#bulkPkg").value || $("#bulkScript").disabled || !$("#bulkScript").value;
+  $("#bulkSelectionStatus").textContent = bulkBusy ? "Loading packages…" : $("#bulkScript").disabled ? "Loading scripts…" : !$("#bulkScript").value ? "No script available for this action." : `${$("#bulkPkg").selectedOptions[0]?.textContent || ""} · ${action}`;
+}
 async function bulkScripts() {
-  const request = bulkScriptRequest(),
-    folder = $("#bulkPkg").value,
-    action = $("#bulkAction").value,
-    control = $("#bulkScript");
+  const request = bulkScriptRequest(), folder = $("#bulkPkg").value,
+    action = $("#bulkAction").value, control = $("#bulkScript");
   control.innerHTML = "";
   control.disabled = true;
+  refreshBulkSelection();
   try {
     if (folder) {
-      const d = await api(
-        `/api/scripts?package=${encodeURIComponent(folder)}&action=${encodeURIComponent(action)}`,
-        { signal: request.signal },
-      );
-      if (!request.current()) return;
-      control.innerHTML = d.scripts
-        .map((x) => `<option>${esc(x)}</option>`)
-        .join("");
+      const d = await api(`/api/scripts?package=${encodeURIComponent(folder)}&action=${encodeURIComponent(action)}`, { signal: request.signal });
+      if (!request.current() || folder !== $("#bulkPkg").value || action !== $("#bulkAction").value) return;
+      control.innerHTML = d.scripts.map(x => `<option>${esc(x)}</option>`).join("");
     }
   } catch (e) {
     if (e.name !== "AbortError" && request.current()) toast(e.message);
   } finally {
-    if (request.current()) control.disabled = false;
+    if (request.current()) { control.disabled = false; refreshBulkSelection(); }
   }
 }
 async function startBulk() {
-  let pcs = bulkTargets();
+  if (bulkSubmitting || bulkBusy) return;
+  const pcs = bulkTargets();
   if (!pcs.length) return toast("Enter targets");
-  let pkg = $("#bulkPkg").value,
-    d = await api("/api/bulk/deploy", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        computers: pcs,
-        folder: packageFolder(pkg),
-        script: $("#bulkScript").value,
-        action: $("#bulkAction").value,
-        fresh: $("#bulkFresh").checked,
-        threads: +$("#bulkThreads").value,
-        concurrency: +$("#concurrency").value,
-      }),
-    });
-  S.bulk = d.job;
-  bulkPoll(d.job);
+  if (!$("#bulkPkg").value || $("#bulkScript").disabled || !$("#bulkScript").value)
+    return toast("Choose a package with an available action script");
+  const payload = { computers: pcs, folder: packageFolder($("#bulkPkg").value),
+    script: $("#bulkScript").value, action: $("#bulkAction").value,
+    fresh: $("#bulkFresh").checked, threads: +$("#bulkThreads").value,
+    concurrency: +$("#concurrency").value };
+  bulkSubmitting = true;
+  refreshBulkSelection();
+  try {
+    const d = await api("/api/bulk/deploy", { method: "POST",
+      headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+    S.bulk = d.job;
+    bulkPoll(d.job);
+  } catch (e) { toast(e.message); }
+  finally { bulkSubmitting = false; refreshBulkSelection(); }
 }
 function bulkPoll(id) {
   return AtlasClient.watch(
@@ -879,8 +887,8 @@ function refreshConsoleSummary() {
       deploySubmitting;
   for (const button of [$("#deploy"), $("#copyOnly"), $("#execOnly")])
     button.disabled = unavailable;
-  $("#choosePackage").disabled = packageBusy || !$("#pkg").value;
-  $("#deploy").textContent = deploySubmitting ? "Starting…" : "Copy & execute";
+
+  $("#deploy").textContent = deploySubmitting ? "Starting…" : $("#action").value + " on " + (S.target || "machine");
   for (const button of document.querySelectorAll("[data-deploy-action]"))
     button.setAttribute(
       "aria-pressed",

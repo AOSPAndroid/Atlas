@@ -6,7 +6,8 @@ const { fixture, root } = require("./ui_fixture.cjs");
 const settle = () => new Promise((resolve) => setTimeout(resolve, 15));
 (async () => {
   const writes = [];
-  let slowSearch, submit, job;
+  let slowSearch, submit, job, bulkSubmit;
+  const bulkWrites = [];
   const row = (folder) => ({
     folder,
     display_name: "Application " + folder,
@@ -39,6 +40,11 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 15));
           scripts: [query.get("package") + "_" + query.get("action") + ".ps1"],
         });
       }
+      if (url === "/api/bulk/deploy") {
+        bulkWrites.push(JSON.parse(options.body));
+        return new Promise(resolve => { bulkSubmit = () => resolve(reply({job:"bulk-test"})); });
+      }
+      if (url === "/api/bulk/job/bulk-test") return reply({state:"complete",results:[]});
       if (url === "/api/deploy") {
         writes.push(JSON.parse(options.body));
         return new Promise((resolve) => {
@@ -115,28 +121,15 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 15));
   await settle();
   doc.querySelector("#pkgSearch").value = "B";
   await run("packages()");
-  assert.equal(select.value, "B");
+  assert.equal(select.value, "A", "filtering retains the current package");
+  select.value = "B";
   select.dispatchEvent(new w.Event("change", { bubbles: true }));
   await settle();
-  assert(picker.open, "keyboard selection stays open until committed");
-  assert(
-    doc.querySelector("#deploy").disabled,
-    "browsing packages is not a deployment selection",
-  );
-  await run("deploy()");
-  assert.equal(writes.length, 0);
-  picker.dispatchEvent(
-    new w.KeyboardEvent("keydown", {
-      key: "Escape",
-      bubbles: true,
-      cancelable: true,
-    }),
-  );
-  await settle();
-  assert(!picker.open);
-  assert.equal(select.value, "A", "Escape restores the committed package");
-  assert.equal(doc.querySelector("#script").value, "A_Install.ps1");
-
+  assert(!picker.open, "selection commits immediately");
+  doc.body.dispatchEvent(new w.Event("pointerdown", { bubbles: true }));
+  assert.equal(select.value, "B", "outside click never restores the old package");
+  assert.equal(doc.querySelector("#script").value, "B_Install.ps1");
+  assert(!doc.querySelector("#choosePackage"));
   picker.open = true;
   await settle();
   doc.querySelector("#pkgSearch").value = "slow";
@@ -147,7 +140,7 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 15));
   await pendingSearch;
   assert.equal(
     select.value,
-    "A",
+    "B",
     "a cancelled search cannot replace the package",
   );
 
@@ -155,7 +148,8 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 15));
   await settle();
   doc.querySelector("#pkgSearch").value = "B";
   await run("packages()");
-  doc.querySelector("#choosePackage").click();
+  select.value = "B";
+  select.dispatchEvent(new w.Event("change", { bubbles: true }));
   await settle();
   assert(!picker.open);
   assert.equal(select.value, "B");
@@ -190,6 +184,32 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 15));
     "true",
   );
 
+  const bulk = doc.querySelector("#bulkPkg");
+  bulk.value = "B";
+  bulk.dispatchEvent(new w.Event("change", { bubbles: true }));
+  await settle();
+  doc.querySelector("#bulkSearch").value = "A";
+  await run("bulkPackages()");
+  assert.equal(bulk.value, "B", "bulk filtering retains selection");
+  doc.querySelector('[data-bulk-action="Uninstall"]').click();
+  await settle();
+  assert.equal(doc.querySelector("#bulkScript").value, "B_Uninstall.ps1");
+  assert.equal(doc.querySelector('[data-bulk-action="Uninstall"]').getAttribute("aria-pressed"), "true");
+  assert(doc.querySelector("#bulkStart").disabled, "no targets cannot launch");
+  doc.querySelector("#bulkTargets").value = "PC-A PC-A PC-B";
+  run("refreshBulkSelection()");
+  assert.equal(doc.querySelector("#bulkStart").textContent, "Uninstall on 2 machines");
+  assert(!doc.querySelector("#bulkStart").disabled);
+  const bulkRun = run("startBulk()");
+  await settle();
+  await run("startBulk()");
+  assert.equal(bulkWrites.length, 1, "double submit starts only one bulk job");
+  bulk.value = "A";
+  assert.equal(bulkWrites[0].folder, "B", "submitted package is immutable");
+  assert.equal(bulkWrites[0].action, "Uninstall");
+  assert.deepEqual(bulkWrites[0].computers, ["PC-A", "PC-B"]);
+  bulkSubmit();
+  await bulkRun;
   doc.querySelector("#fresh").click();
   const deployment = run("deploy()");
   await settle();

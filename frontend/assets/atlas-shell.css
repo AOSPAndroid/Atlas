@@ -393,12 +393,16 @@ body.atlas-console > main {
 .deployment-action-switch button {
   background: transparent;
   border-color: transparent;
-  padding: 5px 2px;
+  padding: 9px 4px;
+  min-height: 38px;
+  font-weight: 600;
+  border-radius: 7px;
 }
 .deployment-action-switch button[aria-pressed="true"] {
-  background: white;
-  color: #006f9b;
-  border-color: #c8dce7;
+  background: #007fa3;
+  color: #fff;
+  border-color: #007fa3;
+  box-shadow: 0 2px 5px #004d6b20;
 }
 .deployment-script select {
   width: 100%;
@@ -654,3 +658,9 @@ body.atlas-console > main {
 .deployment-monitor-card header b,.deployment-package,.deployment-script {overflow-wrap:anywhere;min-width:0}
 .deployment-package {margin:8px 0 4px}
 .deployment-script {display:block;color:#537086}
+
+.bulk-action-field { grid-column: 1 / -1; }
+.bulk-action-field .deployment-action-switch { margin: 6px 0 0; max-width: 440px; }
+#bulkSelectionStatus { overflow-wrap: anywhere; }
+#bulkStart { min-width: 190px; }
+.deployment-action-switch button:focus-visible { outline: 2px solid #007fa3; outline-offset: 3px; }

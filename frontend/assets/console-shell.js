@@ -41,7 +41,7 @@ function bind() {
     window.pt = setTimeout(packages, 250);
   };
   $("#pkg").onchange = () => {
-    if (!$("#packagePicker").open) commitPackageChoice();
+    commitPackageChoice();
     scripts();
   };
   $("#action").onchange = scripts;
@@ -49,14 +49,23 @@ function bind() {
   $("#copyOnly").onclick = () => deploy("copy");
   $("#execOnly").onclick = () => deploy("execute");
   $("#favBtn").onclick = toggleFav;
-  $("#bulkTargets").oninput = () =>
-    ($("#targetCount").textContent = `${bulkTargets().length} targets`);
+  $("#bulkTargets").oninput = refreshBulkSelection;
   $("#bulkSearch").oninput = () => {
     clearTimeout(window.bt);
+    bulkPackageRequest();
+    bulkBusy = true;
+    refreshBulkSelection();
     window.bt = setTimeout(bulkPackages, 250);
   };
   $("#bulkPkg").onchange = bulkScripts;
   $("#bulkAction").onchange = bulkScripts;
+  $("#bulkScript").onchange = refreshBulkSelection;
+  document.querySelectorAll("[data-bulk-action]").forEach(button => {
+    button.onclick = () => {
+      $("#bulkAction").value = button.dataset.bulkAction;
+      $("#bulkAction").dispatchEvent(new Event("change", { bubbles: true }));
+    };
+  });
   $("#bulkStart").onclick = startBulk;
   $("#copyFailed").onclick = () =>
     copy(
