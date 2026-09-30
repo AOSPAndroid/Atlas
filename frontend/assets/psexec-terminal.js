@@ -29,7 +29,9 @@
       ? "Starting…"
       : active
         ? "Session running"
-        : "Run on " + (review?.target || "target");
+        : item?.id === "pst-password-help"
+          ? "Show local PsPasswd help"
+          : "Run on " + (review?.target || "target");
     get("Stop").disabled = !active || submitting;
     get("InputForm").hidden = !(
       current?.interactive && current.state === "running"

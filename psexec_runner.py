@@ -5,7 +5,7 @@ import ctypes
 import getpass
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 import re
 import secrets
 import subprocess
@@ -20,6 +20,8 @@ ROOT = Path(__file__).resolve().parent
 CATALOGUE = {c['id']: c for c in json.loads((ROOT / 'psexec_catalogue.json').read_text(encoding='utf-8'))}
 HOST = r'(?![-.])(?!.*\.\.)[A-Za-z0-9_.-]{1,64}'
 EXE = r'[A-Za-z]:\\(?:[A-Za-z0-9 _.-]+\\)*PsExec(?:64)?\.exe'
+TOOLS = {'PsExec', 'PsFile', 'PsGetSid', 'PsInfo', 'PsPing', 'PsKill', 'PsList', 'PsLoggedOn', 'PsLogList', 'PsPasswd', 'PsService', 'PsShutdown', 'PsSuspend'}
+TOOL_EXE = r'[A-Za-z]:\\(?:[A-Za-z0-9 _.-]+\\)*(?:' + '|'.join(TOOLS) + r')(?:64)?\.exe'
 TERMINAL = {'complete', 'failed', 'stopped', 'timed_out'}
 
 
@@ -63,6 +65,18 @@ def prepare(p):
         raise HTTPException(400, 'Invalid Windows session ID')
     if item.get('change') and p.confirmation.strip().upper() != target:
         raise HTTPException(400, 'Confirm the target hostname for this change')
+    if item.get('direct'):
+        tool = item['tool']
+        if tool not in TOOLS:
+            raise HTTPException(400, 'Unknown PsTools executable')
+        original = PureWindowsPath(executable)
+        suffix = '64' if original.stem.lower().endswith('64') else ''
+        executable = str(original.with_name(tool + suffix + '.exe'))
+        if 'pid' in values and int(values['pid']) <= 4 and item.get('change'):
+            raise HTTPException(400, 'System process IDs cannot be changed')
+        substitutions = {**values, 'target': target, 'unc': '\\\\' + target}
+        args = [executable] + [re.sub(r'\{([a-z]+)\}', lambda m: substitutions[m[1]], a) for a in item['args']]
+        return item, target, args, subprocess.list2cmdline(args)
     def fill(text):
         return re.sub(r'\{(service|destination|port|pid)\}', lambda m: values[m[1]], text)
     script = item.get('script')
@@ -84,14 +98,15 @@ def prepare(p):
 
 
 def host_status(path):
-    exists = bool(re.fullmatch(EXE, path, re.I) and Path(path).is_file())
+    exists = bool(re.fullmatch(TOOL_EXE, path, re.I) and Path(path).is_file())
     accepted = False
     elevated = False
     if os.name == 'nt':
         import winreg
         elevated = bool(ctypes.windll.shell32.IsUserAnAdmin())
         try:
-            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r'Software\Sysinternals\PsExec') as key:
+            tool = re.sub(r'64$', '', PureWindowsPath(path).stem, flags=re.I)
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, 'Software\\Sysinternals\\' + tool) as key:
                 accepted = winreg.QueryValueEx(key, 'EulaAccepted')[0] == 1
         except OSError:
             pass
@@ -132,10 +147,12 @@ class Runner:
             if any(j['state'] not in TERMINAL for j in self.jobs.values()):
                 raise HTTPException(409, 'A PsExec session is already running. Finish or stop it first.')
             status = self.preflight(args[0])
+            if not status.get('elevated', False):
+                raise HTTPException(403, 'Run Atlas from an elevated Windows account to use PsTools.')
             if not status['exists']:
-                raise HTTPException(400, 'PsExec was not found. Check C:\\Data\\PsExec.exe or PsExec64.exe on the Atlas host.')
+                raise HTTPException(400, 'Tool not found on the Atlas host: ' + args[0])
             if not status['eula_accepted']:
-                raise HTTPException(400, 'First run: open PsExec on the Atlas host and review its Microsoft licence prompt using the same Windows account. Then retry here.')
+                raise HTTPException(400, 'First run: open ' + PureWindowsPath(args[0]).name + ' on the Atlas host and review its Microsoft licence prompt using the same Windows account. Then retry here.')
             # Expire completed transcripts only; never lose an active handle.
             while len(self.jobs) >= 20:
                 del self.jobs[next(iter(self.jobs))]

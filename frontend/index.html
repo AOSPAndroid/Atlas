@@ -68,7 +68,7 @@
           <button data-page="knowledge"><span class="nav-icon">◇</span><span class="nav-label">Knowledge Base</span></button>
           <button data-page="psexec">
             <span class="nav-icon" aria-hidden="true">&gt;_</span
-            ><span class="nav-label">PsExec</span>
+            ><span class="nav-label">PsTools</span>
           </button>
         </nav>
       </div>
@@ -502,7 +502,7 @@
           </div>
         </div>
       </section>
-      <section id="psexec" class="page" aria-label="PsExec command workbench">
+      <section id="psexec" class="page" aria-label="PsTools command workbench">
         <div class="px-intro">
           <div>
             <small>REMOTE COMMAND WORKBENCH</small>
@@ -513,10 +513,10 @@
             </p>
           </div>
           <a
-            href="https://learn.microsoft.com/en-us/sysinternals/downloads/psexec"
+            href="https://learn.microsoft.com/en-us/sysinternals/downloads/pstools"
             target="_blank"
             rel="noopener noreferrer"
-            >PsExec reference ↗</a
+            >PsTools reference ↗</a
           >
         </div>
         <div class="px-settings panel">
@@ -529,7 +529,7 @@
               maxlength="64"
           /></label>
           <label
-            >PsExec executable<input
+            >PsExec path (other tools use the same folder)<input
               id="pxPath"
               value="C:\Data\PsExec.exe"
               autocomplete="off"
@@ -549,7 +549,7 @@
         <div class="px-layout">
           <div class="px-library">
             <label class="px-search"
-              >Find a command<input
+              >Tool<select id="pxTool"></select></label><label class="px-search">Find a command<input
                 id="pxSearch"
                 type="search"
                 placeholder="Try Excel, sessions, DNS, service…"
@@ -585,7 +585,7 @@
             <small>COMMAND ON TARGET</small>
             <pre id="pxReadable" tabindex="0"></pre>
             <details class="px-full">
-              <summary>Full PsExec command</summary>
+              <summary>Full PsTools command</summary>
               <pre id="pxCommand" tabindex="0"></pre>
             </details>
             <p id="pxError" class="px-error" role="status"></p>
@@ -596,7 +596,7 @@
               Copy PowerShell command
             </button>
             <p class="px-footnote" id="pxEncoding"></p>
-            <section class="px-terminal" aria-label="PsExec terminal">
+            <section class="px-terminal" aria-label="PsTools terminal">
               <div class="px-terminal-toolbar">
                 <b>Terminal</b
                 ><button id="pxStop" type="button" disabled>Stop session</button

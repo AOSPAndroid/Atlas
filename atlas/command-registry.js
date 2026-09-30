@@ -148,9 +148,9 @@ export const COMMANDS = [
   ],
   [
     "psexec",
-    "PsExec",
+    "PsTools / PsExec",
     "Open the remote command workbench and terminal",
-    "psexec ps exec terminal commands workbench",
+    "pstools psfile psgetsid psinfo psping pskill pslist psloggedon psloglist pspasswd psservice psshutdown pssuspend uptime psexec ps exec terminal commands workbench",
   ],
   [
     "active",

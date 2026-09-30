@@ -50,12 +50,23 @@
       .filter(Boolean);
     const visible = commands.filter(
       (c) =>
+        (!get("Tool")?.value || (c.tool || "PsExec") === get("Tool").value) &&
         (category === "All" ||
           (category === "Favourites"
             ? favourites.has(c.id)
             : c.category === category)) &&
         words.every((word) =>
-          (c.title + " " + c.description + " " + c.category + " " + c.insight)
+          (
+            (c.tool || "PsExec") +
+            " " +
+            c.title +
+            " " +
+            c.description +
+            " " +
+            c.category +
+            " " +
+            c.insight
+          )
             .toLowerCase()
             .includes(word),
         ),
@@ -111,6 +122,8 @@
     get("Fields").replaceChildren();
     // Each template starts without escalation or a prior action's parameters.
     get("Elevated").checked = false;
+    get("Elevated").disabled = !!item.direct;
+    get("Elevated").closest("label").hidden = !!item.direct;
     get("Title").textContent = item.title;
     get("Category").textContent = item.category;
     get("Description").textContent = item.description;
@@ -196,6 +209,18 @@
       get("Target").value = target || "";
       preview();
     }
+  }
+  if (get("Tool")) {
+    get("Tool").replaceChildren(
+      new Option("All PsTools", ""),
+      ...[...new Set(commands.map((c) => c.tool || "PsExec"))].map(
+        (t) => new Option(t, t),
+      ),
+    );
+    get("Tool").onchange = () => {
+      category = "All";
+      filter();
+    };
   }
   get("Search").oninput = filter;
   get("Target").oninput = () => {

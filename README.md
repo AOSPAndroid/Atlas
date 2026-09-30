@@ -335,3 +335,29 @@ The desktop dock opens Map, Workspace and Knowledge Base on demand. App windows 
 Admin, Demo and Preview use the same shell, with existing remote-administration restrictions. Layout changes or browser reloads reload apps; save/download diagrams first. This is a browser desktop theme, not an operating system or virtual machine.
 
 Desktop settings include utility light/dark appearance, four minimal Atlas wallpapers, accent colour, dock size, magnification, auto-hide, transparency, and clock format/seconds. Preferences stay in this browser. Utilities load only when opened; hidden clocks skip rendering.
+
+### PsTools suite in Classic and Desktop
+
+The **PsTools** page (formerly PsExec) now includes a tool selector, searchable templates, command previews and the existing embedded terminal. Search Ctrl+K for PsTools or a utility name. Extract Microsoft's PsTools into `C:\Data` on the **Atlas host**, then start Atlas from an elevated account. The PsExec path determines the folder: `C:\Data\PsExec.exe` selects the adjacent tool executables; a PsExec64 path selects their 64-bit names. Each tool must be present and its Microsoft licence reviewed under the same account before running it here. Atlas does not download tools or accept licences automatically.
+
+| Tool | Included functions |
+| --- | --- |
+| PsExec | Existing remote commands, interactive command prompt and DISM templates |
+| PsFile | List shared open files; close one file ID with confirmation |
+| PsGetSid | Computer SID; account/SID lookup |
+| PsInfo | System information/uptime, volumes/free space, software, hotfixes |
+| PsPing | Ten ICMP pings or TCP connection attempts from the Atlas host |
+| PsList | Process snapshot/tree; PID memory and thread details |
+| PsKill | Terminate a confirmed PID |
+| PsLoggedOn | Profile/share logons or local logons only |
+| PsLogList | Recent System/Application events; seven days of restart evidence |
+| PsService | Query/configuration/dependencies; start/stop/restart/pause/resume |
+| PsShutdown | Restart/shutdown countdown; cancel pending shutdown |
+| PsSuspend | Suspend/resume one confirmed PID |
+| PsPasswd | Local help only; password changes are deliberately not sent through Atlas's recorded terminal |
+
+PsUptime is incorporated into PsInfo. No alternate credentials are collected by these templates. Review current process/file IDs immediately before a change; they can be reused. Changes require typing the target hostname. Direct tools run with argument arrays without a command shell; they do not inherit PsExec's flags. Terminal completion describes the command process, not proof a reboot or application operation has finished. Some tools have nonstandard exit codes (PsInfo can return the service-pack number); inspect their output. Stopping a local session does not undo a remote operation.
+
+Admin is required for execution; Demo and hosted Preview show the same catalogue with execution blocked. PsInfo and some logon queries require permitted Remote Registry access; Atlas does not enable it implicitly. PsPing tests the path **from the Atlas host**, not the target's historical or outbound internet connectivity. PsPasswd passwords can appear in process arguments, and omitting its new-password argument applies a NULL password, so use your approved password-management workflow.
+
+Sources: [Microsoft PsTools](https://learn.microsoft.com/en-us/sysinternals/downloads/pstools), [PsPasswd](https://learn.microsoft.com/en-us/sysinternals/downloads/pspasswd), [PsPing](https://learn.microsoft.com/en-us/sysinternals/downloads/psping), [PsInfo](https://learn.microsoft.com/en-us/sysinternals/downloads/psinfo). Other utility references are available from the Microsoft suite page.

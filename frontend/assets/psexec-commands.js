@@ -37,14 +37,18 @@
       throw Error("Enter a valid Windows process ID.");
     if (clean.session && Number(clean.session) > 65535)
       throw Error("Enter a valid Windows session ID.");
+    clean.target = target;
+    clean.unc = "\\\\" + target;
+    if (item.direct && item.change && clean.pid && Number(clean.pid) <= 4)
+      throw Error("System process IDs cannot be changed.");
     let script = item.script?.replace(
-      /\{(service|destination|port|pid)\}/g,
+      /\{(service|destination|port|pid|account|fileid|target|unc)\}/g,
       (_, key) => clean[key],
     );
     if (script) script = "$ErrorActionPreference='Stop'; " + script;
     const args = item.args?.map((arg) =>
       arg.replace(
-        /\{(service|destination|port|pid)\}/g,
+        /\{(service|destination|port|pid|account|fileid|target|unc)\}/g,
         (_, key) => clean[key],
       ),
     );
@@ -65,16 +69,24 @@
           encoded,
         ]
       : args;
-    const tokens = [
-      path,
-      "\\\\" + target,
-      "-n",
-      "10",
-      "-nobanner",
-      ...(item.system ? ["-s"] : elevated ? ["-h"] : []),
-      ...(item.interactive ? ["-i", clean.session] : []),
-      ...remote,
-    ];
+    const executable = item.direct
+      ? path.replace(
+          /PsExec(64)?\.exe$/i,
+          (_, arch) => item.tool + (arch || "") + ".exe",
+        )
+      : path;
+    const tokens = item.direct
+      ? [executable, ...args]
+      : [
+          path,
+          "\\\\" + target,
+          "-n",
+          "10",
+          "-nobanner",
+          ...(item.system ? ["-s"] : elevated ? ["-h"] : []),
+          ...(item.interactive ? ["-i", clean.session] : []),
+          ...remote,
+        ];
     const quote = (s) =>
       shell === "powershell"
         ? "'" + s.replace(/'/g, "''") + "'"
@@ -82,7 +94,9 @@
     return {
       command:
         (shell === "powershell" ? "& " : "") + tokens.map(quote).join(" "),
-      readable: script || args.join(" "),
+      readable: item.direct
+        ? [executable, ...args].join(" ")
+        : script || args.join(" "),
       encoded: !!script,
       target,
     };

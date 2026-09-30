@@ -35,7 +35,7 @@ class PsExecTests(unittest.TestCase):
         self.fail('Session did not reach expected state')
 
     def test_server_validation_and_shared_catalogue(self):
-        self.assertEqual(len(px.CATALOGUE),39)
+        self.assertEqual(len(px.CATALOGUE),72)
         js=(px.ROOT/'frontend/assets/psexec-catalogue.js').read_text()
         self.assertEqual(json.loads(js.split(' = ',1)[1].removesuffix(';\n')),list(px.CATALOGUE.values()))
         for target in ['*','HOST1,HOST2','@file','-s','HOST&calc','HOST\nCMD']:
@@ -48,6 +48,25 @@ class PsExecTests(unittest.TestCase):
         self.assertIn("'Name=''MSSQL$INSTANCE'''",text)
         self.assertEqual(base64.b64decode(args[-1]).decode('utf-16le'),text)
         self.assertNotIn('-s',args);self.assertNotIn('-accepteula',args)
+
+    def test_direct_tools_are_allowlisted_and_do_not_use_psexec_flags(self):
+        for item in px.CATALOGUE.values():
+            if not item.get('direct'):continue
+            defaults={'pid':'1234','fileid':'123','service':'Spooler','port':'443','account':r'DOMAIN\user'}
+            values={f['key']:defaults[f['key']] for f in item['fields']}
+            _,_,args,_=px.prepare(payload(template=item['id'],values=values,confirmation='TESTPC',elevated=True))
+            self.assertEqual(args[0], 'C:\\Data\\'+item['tool']+'.exe')
+            self.assertNotIn('-nobanner',args)
+            self.assertNotIn('-accepteula',args)
+            if item.get('change'):
+                with self.assertRaises(HTTPException):px.prepare(payload(template=item['id'],values=values))
+        _,_,args,_=px.prepare(payload(template='pst-tcp',values={'port':'443'}))
+        self.assertEqual(args[1:],['-n','10','TESTPC:443'])
+        _,_,args,_=px.prepare(payload(template='pst-password-help'))
+        self.assertEqual(args[1:],['-?'])
+        for bad in ['1','4','123 & calc']:
+            with self.assertRaises(HTTPException):px.prepare(payload(template='pst-kill',values={'pid':bad},confirmation='TESTPC'))
+        with self.assertRaises(HTTPException):px.prepare(payload(template='pst-tcp',values={'port':'65536'}))
 
     def test_dism_system_context_and_restart_policy(self):
         for key in ('netfx3-enable','print-pdf-enable','dism-restorehealth'):
