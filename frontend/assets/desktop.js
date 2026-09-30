@@ -21,6 +21,58 @@
         icon: '<rect x="11" y="2" width="10" height="8" rx="2"/><rect x="1" y="23" width="10" height="7" rx="2"/><rect x="21" y="23" width="10" height="7" rx="2"/><path d="M16 10v7 M6 23v-6h20v6"/>',
       },
     };
+  const utilities = {
+    calendar: [
+      "Calendar",
+      "#ff747b",
+      "#d33c4a",
+      '<rect x="3" y="5" width="26" height="24" rx="4"/><path d="M3 12h26 M10 2v7 M22 2v7 M10 19h4 M19 19h4 M10 24h4"/>',
+    ],
+    notes: [
+      "Notes",
+      "#ffe184",
+      "#d5a72b",
+      '<rect x="4" y="3" width="24" height="26" rx="3"/><path d="M4 11h24 M10 17h12 M10 22h9"/>',
+    ],
+    reminders: [
+      "Reminders",
+      "#c3b2f6",
+      "#7763b4",
+      '<rect x="4" y="3" width="24" height="26" rx="4"/><path d="m8 11 2 2 3-4 M16 11h7 m-15 9 2 2 3-4 M16 20h7"/>',
+    ],
+    calculator: [
+      "Calculator",
+      "#ffbb66",
+      "#c87725",
+      '<rect x="6" y="2" width="20" height="28" rx="4"/><path d="M10 7h12 M10 15h3 M19 15h3 M10 22h3 M19 22h3"/>',
+    ],
+    clock: [
+      "Clock",
+      "#65798f",
+      "#243346",
+      '<circle cx="16" cy="16" r="13"/><path d="M16 7v10l6 3"/>',
+    ],
+    files: [
+      "Files",
+      "#77cffa",
+      "#347cad",
+      '<path d="M3 9V5h10l4 4h12v18H3Z"/>',
+    ],
+    music: [
+      "Music",
+      "#fa88af",
+      "#b54676",
+      '<path d="M12 25V8l14-3v17 M12 12l14-3"/><ellipse cx="8" cy="25" rx="4" ry="3"/><ellipse cx="22" cy="22" rx="4" ry="3"/>',
+    ],
+  };
+  for (const [id, [title, a, b, icon]] of Object.entries(utilities))
+    apps[id] = {
+      title,
+      colors: [a, b],
+      icon,
+      utility: true,
+      url: "/assets/desktop-utility.html?app=" + id,
+    };
   const windows = new Map();
   let active = null,
     z = 10,
@@ -215,7 +267,9 @@
     windows.set(id, win);
     $("#windows").append(el);
     win.frame.dataset.atlasApp = id;
-    win.frame.src = safeRoute(route || apps[id].url).url;
+    win.frame.src = apps[id].utility
+      ? apps[id].url
+      : safeRoute(route || apps[id].url).url;
     win.frame.addEventListener("load", () => {
       el.querySelector(".window-loading").hidden = true;
       paint(win);
@@ -353,7 +407,7 @@
       localStorage.setItem("atlas-layout", "classic");
     } catch {}
     location.assign(
-      (active ? apps[active].url : "/") +
+      (active && !apps[active].utility ? apps[active].url : "/") +
         (active === "knowledge" ? "&" : "?") +
         "layout=classic",
     );
@@ -370,34 +424,59 @@
   }
   const svg = (path) =>
     `<svg viewBox="0 0 32 32" aria-hidden="true">${path}</svg>`;
+  const iconButton = (id, a) =>
+    `<button class="dock-item" data-app="${id}" aria-label="Open ${a.title}" aria-pressed="false"><span class="dock-icon" style="--icon-light:${a.colors[0]};--icon-dark:${a.colors[1]}">${svg(a.icon)}</span><span class="dock-tip">${a.title}</span></button>`;
   $("#dock").innerHTML =
     Object.entries(apps)
+      .filter(([id]) =>
+        [
+          "map",
+          "workspace",
+          "knowledge",
+          "calendar",
+          "notes",
+          "calculator",
+        ].includes(id),
+      )
+      .map(([id, a]) => iconButton(id, a))
+      .join("") +
+    `<span class="dock-divider"></span><button class="dock-item" id="launcherButton" aria-label="All apps"><span class="dock-icon" style="--icon-light:#b9b9d6;--icon-dark:#676789">${svg('<rect x="4" y="4" width="8" height="8" rx="2"/><rect x="20" y="4" width="8" height="8" rx="2"/><rect x="4" y="20" width="8" height="8" rx="2"/><rect x="20" y="20" width="8" height="8" rx="2"/>')}</span><span class="dock-tip">All apps</span></button><button class="dock-item" id="dockSettings" aria-label="Desktop settings"><span class="dock-icon" style="--icon-light:#a8b8c8;--icon-dark:#566a82">${svg('<path d="M5 8h22 M5 16h22 M5 24h22"/><circle cx="12" cy="8" r="3"/><circle cx="22" cy="16" r="3"/><circle cx="10" cy="24" r="3"/>')}</span><span class="dock-tip">Settings</span></button>`;
+  const launcher = document.createElement("section");
+  launcher.id = "appLauncher";
+  launcher.hidden = true;
+  launcher.setAttribute("aria-label", "All apps");
+  launcher.innerHTML =
+    '<header><h2>All apps</h2><button id="closeLauncher" aria-label="Close app launcher">×</button></header><input id="appSearch" placeholder="Find an app…" aria-label="Find an app"><div class="launcher-grid"></div><p>Atlas utilities stay in this browser. No corporate accounts are connected.</p>';
+  document.body.append(launcher);
+  function renderLauncher() {
+    const term = $("#appSearch").value.toLowerCase();
+    launcher.querySelector(".launcher-grid").innerHTML = Object.entries(apps)
+      .filter(([id, a]) => a.title.toLowerCase().includes(term))
       .map(
         ([id, a]) =>
-          `<button class="dock-item" data-app="${id}" aria-label="Open ${a.title}" aria-pressed="false"><span class="dock-icon" style="--icon-light:${a.colors[0]};--icon-dark:${a.colors[1]}">${svg(a.icon)}</span><span class="dock-tip">${a.title}</span></button>`,
+          `<button data-app="${id}"><span class="dock-icon" style="--icon-light:${a.colors[0]};--icon-dark:${a.colors[1]}">${svg(a.icon)}</span><span>${a.title}</span></button>`,
       )
-      .join("") +
-    '<span class="dock-divider"></span>' +
-    [
-      [
-        "Mail",
-        "#72bdf9",
-        "#286dda",
-        '<rect x="3" y="6" width="26" height="20" rx="3"/><path d="m3 7 13 11L29 7"/>',
-      ],
-      [
-        "Music",
-        "#ed809e",
-        "#c4456e",
-        '<path d="M12 25V8l14-3v17 M12 12l14-3"/><ellipse cx="8" cy="25" rx="4" ry="3"/><ellipse cx="22" cy="22" rx="4" ry="3"/>',
-      ],
-    ]
-      .map(
-        ([name, a, b, path]) =>
-          `<button class="dock-item dock-decoration" aria-disabled="true" aria-label="${name} · decorative icon"><span class="dock-icon" style="--icon-light:${a};--icon-dark:${b}">${svg(path)}</span><span class="dock-tip">${name} · decorative</span></button>`,
-      )
-      .join("") +
-    `<span class="dock-divider dock-decoration"></span><button class="dock-item" id="dockSettings" aria-label="Desktop settings"><span class="dock-icon" style="--icon-light:#a8b8c8;--icon-dark:#566a82">${svg('<path d="M5 8h22 M5 16h22 M5 24h22"/><circle cx="12" cy="8" r="3" fill="#71869c"/><circle cx="22" cy="16" r="3" fill="#71869c"/><circle cx="10" cy="24" r="3" fill="#71869c"/>')}</span><span class="dock-tip">Desktop settings</span></button>`;
+      .join("");
+  }
+  $("#launcherButton").onclick = () => {
+    launcher.hidden = !launcher.hidden;
+    if (!launcher.hidden) {
+      renderLauncher();
+      $("#appSearch").focus();
+    }
+  };
+  $("#closeLauncher").onclick = () => (launcher.hidden = true);
+  $("#appSearch").oninput = renderLauncher;
+  launcher.onclick = (e) => {
+    const id = e.target.closest("[data-app]")?.dataset.app;
+    if (id) {
+      open(id);
+      launcher.hidden = true;
+    }
+  };
+  document.querySelector("#clock").style.cursor = "pointer";
+  document.querySelector("#clock").title = "Open Calendar";
+  document.querySelector("#clock").onclick = () => open("calendar");
   $("#dock").addEventListener("click", (e) => {
     const id = e.target.closest("[data-app]")?.dataset.app;
     if (id) open(id);
@@ -440,10 +519,15 @@
     if (!active) {
       open("workspace");
       notice("Workspace opened. Use Search Atlas when it is ready.");
+    } else if (apps[active].utility) {
+      launcher.hidden = false;
+      renderLauncher();
+      $("#appSearch").focus();
     } else post(windows.get(active), { type: "search" });
   };
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
+      launcher.hidden = true;
       $("#desktopSettings").hidden = true;
       $("#windowMenu").setAttribute("aria-expanded", "false");
     }
@@ -457,10 +541,102 @@
       weekday: "short",
       hour: "2-digit",
       minute: "2-digit",
+      hour12: !personal.hour24,
+      ...(personal.seconds ? { second: "2-digit" } : {}),
     });
   }
-  clock();
-  setInterval(clock, 30000);
+  const personalDefaults = {
+    appearance: "light",
+    wallpaper: "aurora",
+    accent: "#007fa3",
+    dockSize: "medium",
+    magnify: true,
+    autohide: false,
+    transparency: true,
+    hour24: true,
+    seconds: false,
+  };
+  let personal = { ...personalDefaults };
+  try {
+    const saved = JSON.parse(
+      localStorage.getItem("atlas-desktop-personalization") || "{}",
+    );
+    for (const key of Object.keys(personalDefaults)) {
+      if (typeof saved[key] === typeof personalDefaults[key])
+        personal[key] = saved[key];
+    }
+  } catch {}
+  const controls = document.createElement("div");
+  controls.className = "personal-settings";
+  controls.innerHTML =
+    "<h3>Appearance & dock</h3>" +
+    [
+      ["appearance", "Utility appearance", ["light", "dark"]],
+      ["wallpaper", "Wallpaper", ["aurora", "midnight", "ocean", "graphite"]],
+      ["accent", "Accent", ["#007fa3", "#7358bd", "#b85878", "#3c866d"]],
+      ["dockSize", "Dock size", ["small", "medium", "large"]],
+    ]
+      .map(
+        ([key, label, values]) =>
+          `<label>${label}<select data-setting="${key}" aria-label="${label}">${values.map((v) => `<option value="${v}">${{ "#007fa3": "Blue", "#7358bd": "Purple", "#b85878": "Rose", "#3c866d": "Green" }[v] || v}</option>`).join("")}</select></label>`,
+      )
+      .join("") +
+    [
+      ["magnify", "Dock magnification"],
+      ["autohide", "Auto-hide dock"],
+      ["transparency", "Translucent dock"],
+      ["hour24", "24-hour clock"],
+      ["seconds", "Show seconds"],
+    ]
+      .map(
+        ([key, label]) =>
+          `<label class="desktop-switch">${label}<input type="checkbox" role="switch" data-setting="${key}" aria-label="${label}"></label>`,
+      )
+      .join("") +
+    '<button id="resetAppearance">Reset appearance</button>';
+  $("#desktopSettings").insertBefore(controls, $("#resetWindows"));
+  function applyPersonal() {
+    for (const key of ["appearance", "wallpaper", "dockSize"])
+      document.body.dataset[key] = personal[key];
+    document.body.classList.toggle("dock-no-magnify", !personal.magnify);
+    document.body.classList.toggle("dock-autohide", personal.autohide);
+    document.body.classList.toggle("dock-solid", !personal.transparency);
+    document.documentElement.style.setProperty(
+      "--desktop-accent",
+      personal.accent,
+    );
+    controls.querySelectorAll("[data-setting]").forEach((c) => {
+      if (c.type === "checkbox") c.checked = personal[c.dataset.setting];
+      else c.value = personal[c.dataset.setting];
+    });
+    clock();
+  }
+  controls.onchange = (e) => {
+    const key = e.target.dataset.setting;
+    if (!key) return;
+    personal[key] =
+      e.target.type === "checkbox" ? e.target.checked : e.target.value;
+    try {
+      localStorage.setItem(
+        "atlas-desktop-personalization",
+        JSON.stringify(personal),
+      );
+    } catch {}
+    applyPersonal();
+  };
+  $("#resetAppearance").onclick = () => {
+    personal = { ...personalDefaults };
+    localStorage.setItem(
+      "atlas-desktop-personalization",
+      JSON.stringify(personal),
+    );
+    applyPersonal();
+  };
+  applyPersonal();
+  setInterval(() => {
+    if (personal.seconds || new Date().getSeconds() === 0) clock();
+  }, 1000);
+
   try {
     localStorage.setItem("atlas-layout", "desktop");
   } catch {}

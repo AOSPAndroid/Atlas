@@ -1,0 +1,249 @@
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: #f5f6f8;
+  color: #263345;
+  font:
+    14px/1.5 -apple-system,
+    BlinkMacSystemFont,
+    Segoe UI,
+    sans-serif;
+}
+main {
+  max-width: 1000px;
+  margin: auto;
+  padding: 28px;
+}
+h1 {
+  font-size: 28px;
+  letter-spacing: -1px;
+  margin: 0;
+}
+h2 {
+  font-size: 17px;
+}
+p,
+small {
+  color: #6c7a8d;
+}
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+button {
+  cursor: pointer;
+  border: 1px solid #d9e0e9;
+  background: white;
+  border-radius: 9px;
+  padding: 9px 14px;
+  color: inherit;
+}
+button:hover {
+  background: #e8eef7;
+}
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid #55badf;
+}
+input,
+textarea,
+select {
+  border: 1px solid #d9e0e9;
+  background: white;
+  color: inherit;
+  border-radius: 8px;
+  padding: 9px;
+  min-width: 0;
+}
+textarea {
+  width: 100%;
+  min-height: 380px;
+  resize: vertical;
+  line-height: 1.7;
+  background: #fffdf4;
+}
+header,
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+header {
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+.primary {
+  background: var(--accent, #007fa3);
+  border-color: transparent;
+  color: white;
+}
+.card {
+  background: white;
+  border: 1px solid #e0e5ed;
+  border-radius: 16px;
+  padding: 20px;
+  margin: 16px 0;
+}
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 5px;
+}
+.calendar-grid button {
+  height: 55px;
+  padding: 4px;
+  border: 0;
+  background: transparent;
+  position: relative;
+}
+.calendar-grid button.selected {
+  background: var(--accent, #007fa3);
+  color: white;
+}
+.calendar-grid button.today {
+  box-shadow: inset 0 0 0 2px var(--accent, #007fa3);
+}
+.calendar-grid button.has-event:after {
+  content: "";
+  position: absolute;
+  bottom: 5px;
+  left: 48%;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.calendar-grid small {
+  text-align: center;
+}
+.muted {
+  opacity: 0.45;
+}
+.entry {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid #e8edf3;
+}
+.entry span {
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+.entry small {
+  display: block;
+}
+.entry.done span {
+  text-decoration: line-through;
+  opacity: 0.5;
+}
+form {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 15px 0;
+}
+form input[type="text"] {
+  flex: 1;
+}
+.calc {
+  max-width: 340px;
+  margin: 30px auto;
+  background: #26313c;
+  border-radius: 22px;
+  padding: 18px;
+  color: white;
+}
+.calc output {
+  display: block;
+  text-align: right;
+  font-size: 38px;
+  padding: 20px 6px;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+.calc-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 9px;
+}
+.calc button {
+  background: #56616c;
+  border: 0;
+  color: white;
+  font-size: 21px;
+  height: 54px;
+}
+.calc button.operator {
+  background: #e99838;
+}
+.time-display {
+  font-size: clamp(34px, 7vw, 68px);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -2px;
+}
+.world-clocks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
+  gap: 12px;
+}
+.world-clocks .card {
+  margin: 0;
+}
+.file-preview {
+  white-space: pre-wrap;
+  overflow: auto;
+  max-height: 420px;
+  overflow-wrap: anywhere;
+}
+img.preview {
+  max-width: 100%;
+  max-height: 450px;
+}
+audio {
+  width: 100%;
+  margin-top: 25px;
+}
+#utilityStatus {
+  padding: 10px 28px;
+  color: #63798d;
+  font-size: 12px;
+}
+body.dark {
+  background: #202a36;
+  color: #e9eef5;
+}
+body.dark .card,
+body.dark button,
+body.dark input,
+body.dark textarea,
+body.dark select {
+  background: #2c3847;
+  color: #e9eef5;
+  border-color: #425066;
+}
+body.dark p,
+body.dark small {
+  color: #a6b6c9;
+}
+body.dark .primary,
+body.dark .selected {
+  background: var(--accent, #007fa3);
+}
+@media (max-width: 500px) {
+  main {
+    padding: 18px;
+  }
+  .calendar-grid button {
+    height: 42px;
+  }
+  .card {
+    padding: 14px;
+  }
+}
