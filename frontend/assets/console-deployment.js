@@ -485,7 +485,7 @@ function renderBulk(j) {
     )
     .join("");
 }
-async function history() {
+async function loadDeploymentHistory() {
   let d = await api("/api/history");
   $("#historyBody").innerHTML = d
     .map(

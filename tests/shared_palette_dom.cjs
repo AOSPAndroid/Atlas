@@ -76,7 +76,7 @@ async function loadModule(file,context,cache=new Map()){
   assert(allRequests.every(url=>/^\/api\/(search\?|palette\/person\/)/.test(url)),'search only requests directory data; no AI or machine scans');
   assert.throws(()=>registry.namespace.commandUrl('assistant'));
   assert.throws(()=>registry.namespace.commandUrl('reboot-now'));
-  for(const command of registry.namespace.COMMANDS){const url=registry.namespace.commandUrl(command.id,'PC & 1');assert.equal(new URL(url,w.location.href).searchParams.get('machine'),'PC & 1');}
+  for(const command of registry.namespace.COMMANDS){const url=registry.namespace.commandUrl(command.id,'PC & 1');assert.equal(new URL(url,w.location.href).searchParams.get('machine'),command.id==='knowledge'||command.id.startsWith('kb-')?null:'PC & 1');}
   w.close();
  }
  assert.deepEqual(results[0],results[1]);assert.equal(styles[0],styles[1]);await checkCombinedResults();console.log('PASS: identical search-only commands/styles, no AI UI or requests, keyboard selection, focus, identity-safe merged people/desks, fresh map resolution, console person routing, ambiguous/unlinked fallback, explicit desk navigation, stale response protection, shortcut isolation and URL allowlist.');

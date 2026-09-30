@@ -29,6 +29,7 @@ const targeted = new Set([
   "report",
 ]);
 const viewerCommands = new Set([
+"kb-layers","kb-format","kb-duplicate","kb-delete","kb-zoom-in","kb-zoom-out","kb-png","knowledge","kb-new","kb-notes","kb-convert","kb-process","kb-decision","kb-database","kb-note","kb-connect","kb-fit","kb-undo","kb-redo","kb-save","kb-export","kb-drawio","kb-svg","kb-import","kb-template-flow","kb-template-network",
   "workspace",
   "admin",
   "bulk",
@@ -53,6 +54,32 @@ const viewerCommands = new Set([
 ]);
 // The single command catalogue used by the map and IT console.
 export const COMMANDS = [
+  ["knowledge", "Knowledge Base", "Open diagrams, notes and runbooks", "knowledge base drawio draw.io diagrams notes"],
+  ["kb-layers", "Show diagram layers", "Open the Draw.io layers panel", "drawio layers"],
+  ["kb-format", "Show format panel", "Open shape styling and formatting", "drawio format"],
+  ["kb-duplicate", "Duplicate selected shapes", "Duplicate the diagram selection", "drawio duplicate"],
+  ["kb-delete", "Delete selected shapes", "Remove the diagram selection", "drawio delete"],
+  ["kb-zoom-in", "Zoom into diagram", "Increase diagram zoom", "drawio zoom-in"],
+  ["kb-zoom-out", "Zoom out of diagram", "Decrease diagram zoom", "drawio zoom-out"],
+  ["kb-png", "Export PNG image", "Download a PNG diagram image", "drawio png"],
+  ["kb-new", "New diagram", "Create a blank knowledge document", "drawio diagram new canvas"],
+  ["kb-notes", "Write notes", "Focus the knowledge notes panel", "drawio knowledge notes write"],
+  ["kb-convert", "Notes to diagram", "Convert structured notes locally into editable shapes", "drawio notes convert flowchart generate"],
+  ["kb-process", "Add process shape", "Insert a process rectangle", "drawio shape rectangle process"],
+  ["kb-decision", "Add decision shape", "Insert a decision diamond", "drawio diamond decision"],
+  ["kb-database", "Add database shape", "Insert a database cylinder", "drawio database cylinder"],
+  ["kb-note", "Add diagram note", "Insert a sticky note shape", "drawio sticky note annotation"],
+  ["kb-connect", "Connect diagram shapes", "Connect two selected shapes", "drawio edge connector arrow link"],
+  ["kb-fit", "Fit diagram", "Fit the knowledge diagram to the canvas", "drawio zoom fit diagram"],
+  ["kb-undo", "Undo diagram edit", "Undo the latest knowledge document change", "drawio undo diagram"],
+  ["kb-redo", "Redo diagram edit", "Redo a knowledge document change", "drawio redo diagram"],
+  ["kb-save", "Save knowledge document", "Save in Admin or download the preview draft", "drawio save knowledge"],
+  ["kb-export", "Export Atlas diagram", "Download a diagram and notes for backup or sharing", "drawio export json backup"],
+  ["kb-drawio", "Export Draw.io file", "Download an editable .drawio diagram", "drawio export xml diagrams.net"],
+  ["kb-svg", "Export diagram image", "Download the current canvas as SVG", "drawio svg image export"],
+  ["kb-import", "Open Atlas diagram file", "Open an Atlas JSON or Draw.io XML file", "drawio import open file"],
+  ["kb-template-flow", "Incident triage diagram", "Start a troubleshooting flowchart", "drawio template flowchart triage"],
+  ["kb-template-network", "Office network diagram", "Start an editable network diagram", "drawio template network"],
   [
     "remote-registry",
     "Enable Remote Registry",
@@ -268,6 +295,6 @@ export const MAP_COMMANDS = new Set([
 export function commandUrl(id, target = "") {
   if (!COMMANDS.some((c) => c.id === id)) throw Error("Unknown Atlas command");
   const query = new URLSearchParams({ command: id });
-  if (target) query.set("machine", target);
+  if (target && id !== "knowledge" && !id.startsWith("kb-")) query.set("machine", target);
   return (MAP_COMMANDS.has(id) ? "/" : "/installer") + "?" + query;
 }

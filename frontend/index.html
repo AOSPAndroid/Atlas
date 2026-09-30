@@ -15,6 +15,7 @@
     <link rel="stylesheet" href="/assets/catalogue.css" />
     <link rel="stylesheet" href="/assets/console-psexec.css" />
     <script src="/assets/machine-health.js?v=2"></script>
+    <link rel="stylesheet" href="/assets/knowledge-base.css" />
   </head>
   <body class="atlas-console">
     <header class="atlas-app-header">
@@ -26,6 +27,7 @@
           height="32"
         /><span>Atlas</span><span class="atlas-admin-badge">Admin</span></a
       >
+      <div class="atlas-primary-nav" aria-label="Atlas sections"><a href="/">Map</a><a href="/installer" data-section="workspace" aria-current="page">Workspace</a><a href="/installer?command=knowledge" data-section="knowledge">Knowledge Base</a></div>
       <div class="header-actions atlas-header-actions">
         <a
           class="atlas-return"
@@ -61,6 +63,7 @@
             <span class="nav-icon">◷</span
             ><span class="nav-label">History</span>
           </button>
+          <button data-page="knowledge"><span class="nav-icon">◇</span><span class="nav-label">Knowledge Base</span></button>
           <button data-page="psexec">
             <span class="nav-icon" aria-hidden="true">&gt;_</span
             ><span class="nav-label">PsExec</span>
@@ -400,6 +403,7 @@
           </details>
         </div>
       </section>
+      <section id="knowledge" class="page" aria-label="Knowledge Base"></section>
       <section id="bulk" class="page">
         <div class="panel">
           <small>BULK DEPLOYMENT</small>
@@ -857,6 +861,8 @@ Ready. Choose a command and click Run.</pre>
     <script src="/assets/psexec-terminal.js"></script>
     <script src="/assets/action-widgets.js"></script>
     <script src="/assets/reboot-monitor.js"></script>
+    <script src="/assets/knowledge-converter.js"></script>
+    <script src="/assets/knowledge-base.js"></script>
     <script src="/assets/console-shell.js"></script>
     <script src="/assets/remote-software.js"></script>
   </body>

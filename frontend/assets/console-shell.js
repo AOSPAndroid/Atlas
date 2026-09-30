@@ -11,6 +11,11 @@ async function copy(v, n = "Value") {
   toast(`${n} copied`);
 }
 function page(id) {
+  document.body.classList.toggle("knowledge-open",id === "knowledge");
+  if(id === "knowledge" || location.hash === "#knowledge") {
+    const url=new URL(location.href);url.hash=id === "knowledge" ? "knowledge" : "";
+    window.history.replaceState(null,"",url);
+  }
   if (id !== "admin")
     window.AtlasDiagnostics?.stop("Stopped — left Remote Admin");
   $$(".page,nav button").forEach((x) => x.classList.remove("active"));
@@ -21,7 +26,11 @@ function page(id) {
     if (b.dataset.page === id) b.setAttribute("aria-current", "page");
     else b.removeAttribute("aria-current");
   });
-  if (id === "history") history();
+  document.querySelectorAll('[data-section]').forEach(link => {
+    if(link.dataset.section === (id === 'knowledge' ? 'knowledge' : 'workspace'))link.setAttribute('aria-current','page');else link.removeAttribute('aria-current');
+  });
+  if (id === "knowledge") window.AtlasKnowledge?.open();
+  if (id === "history") loadDeploymentHistory();
   if (id === "psexec") window.AtlasPsExec?.open();
   syncDeploymentPanel();
 }
@@ -77,7 +86,7 @@ function bind() {
     );
   $("#exportCsv").onclick = exportCsv;
   bindProcessControls();
-  $("#refreshHistory").onclick = history;
+  $("#refreshHistory").onclick = loadDeploymentHistory;
   $$("[data-preflight]").forEach((x) => (x.onclick = preflight));
   $$("[data-copy-target]").forEach(
     (x) => (x.onclick = () => copy(S.target, "Hostname")),
@@ -310,6 +319,7 @@ function bindPaletteShortcuts() {
         closeAllOverlays();
         return;
       }
+      if(document.querySelector('#knowledge')?.classList.contains('active') && document.activeElement?.closest('#knowledge') && !(event.ctrlKey && event.key.toLowerCase()==='k')) return;
       const active = document.activeElement;
       const isTyping =
         active && ["INPUT", "TEXTAREA", "SELECT"].includes(active.tagName);
@@ -496,6 +506,7 @@ function bindCommandDiscovery() {
 }
 async function openPaletteTarget() {
   if (location.hash === "#psexec") page("psexec");
+  if (location.hash === "#knowledge") page("knowledge");
   const params = new URLSearchParams(location.search),
     person = params.get("person"),
     machine = params.get("machine");
@@ -534,6 +545,11 @@ async function runSharedCommand(id) {
     const { COMMANDS } = await import("/command-registry.js");
     if (!COMMANDS.some((c) => c.id === id && c.viewer))
       return toast(AtlasReadOnly.reason);
+  }
+  if (id === "knowledge" || id.startsWith("kb-")) {
+    page("knowledge");
+    if(id !== "knowledge") return AtlasKnowledge.command(id);
+    return;
   }
   if (id === "vlans" || id === "contacts") {
     const { openSiteInfo } = await import("/site-info.js?v=1");
@@ -692,6 +708,7 @@ sharedPaletteReady = import("/command-palette.js").then(
   },
 );
 document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll('[data-section]').forEach(link => link.addEventListener('click',event => {event.preventDefault();page(link.dataset.section);}));
   installSupportDock();
   installDeploymentPanel();
   $("#openCatalogue").onclick = () =>

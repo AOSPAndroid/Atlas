@@ -641,3 +641,10 @@ machine_health_checks=register_machine_health(app,_health_sys.modules[__name__])
 from action_activity import register as register_activity
 import sys
 register_activity(app,sys.modules[__name__])
+
+# Knowledge documents stay in the local Admin runtime, never in published assets.
+from knowledge_base import register as register_knowledge
+register_knowledge(app, DATA/'knowledge.sqlite3')
+
+# Bundled open-source Draw.io static editor (no server-side editor endpoints).
+app.mount('/drawio', StaticFiles(directory=ROOT/'frontend/drawio', html=True), name='drawio')

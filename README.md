@@ -292,3 +292,16 @@ NetFx3 enable applies to Windows 10 and Windows 11 through 25H2. Windows 11 26H1
 ### Package deployment flow
 
 Workspace package selection applies immediately: clicking elsewhere, switching machines or refreshing filtered results keeps the chosen package. Workspace and Bulk deploy use the same Install / Repair / Uninstall switch and load the corresponding scripts. The launch button names the action and target (or bulk machine count). Bulk submissions are blocked while scripts load or a request is being submitted, and each request captures its package, action and targets. Demo and hosted preview show the controls with execution disabled.
+
+### Knowledge Base: Draw.io diagrams and notes
+
+Use Map / Workspace / Knowledge Base in the header. Atlas embeds the actual open-source Draw.io 31.5.3 editor, bundled under `frontend/drawio` with licenses and provenance. It loads only when opened. No external diagram or AI service is used; the editor blocks external network connections.
+
+- Native Draw.io shapes, connectors, pages, layers, formatting, undo/redo and zoom, with incident-triage and network templates.
+- Notes to diagram converts steps, indented bullets and `A -> B` connections into editable shapes. `Check ping? -> [Yes] Check application` creates a decision and labelled connection. Conversion is deterministic and local, not AI interpretation. Review the result. Existing diagrams are kept separately.
+- Admin auto-saves to `data/knowledge.sqlite3`. Revision checks prevent silent overwrites between windows. Back up this database, or export documents.
+- Demo and Preview provide the same editor with downloadable drafts. Download Atlas JSON to retain notes and diagrams before closing. Admin documents are never included in preview builds or exposed through the LAN viewer.
+- Open `.drawio`, `.xml` and Atlas JSON. Export Atlas JSON, Draw.io XML, SVG or PNG. Only Atlas JSON includes accompanying notes.
+- Search `drawio` in the palette for documents, notes conversion, shapes, connecting two selected shapes, layers, formatting, duplicate/delete, undo/redo, zoom, save, import/export and templates. Ctrl K works inside the editor.
+
+Restart Atlas after updating to register editor and document routes. Remote-administration permissions remain unchanged.

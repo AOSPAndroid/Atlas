@@ -190,3 +190,7 @@ def asset(filename: str):
     if filename not in allowed and not re.fullmatch(r'(official-floor-(-1|[0-8])\.(jpg|pdf)|studio-floor-(-1|[0-8])\.svg)', filename):
         raise HTTPException(404, 'Not available in the shared viewer')
     return FileResponse(ATLAS / filename)
+
+# Bundled open-source Draw.io static editor (no server-side editor endpoints).
+from fastapi.staticfiles import StaticFiles
+app.mount('/drawio', StaticFiles(directory=ROOT/'frontend/drawio', html=True), name='drawio')
