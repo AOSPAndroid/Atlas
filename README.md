@@ -1,3 +1,9 @@
+## Launch all six views
+
+Double-click **[Start-All-Atlas.bat](Start-All-Atlas.bat)** to start the shared local services once and open six browser tabs: Classic Admin, Demo and hosted Preview, then Desktop Admin, Demo and hosted Preview. The Preview tabs require internet access. These are six views backed by two local services and the existing hosted site, not six separate installations.
+
+**[Stop-All-Atlas.bat](Stop-All-Atlas.bat)** stops both local servers for every edition. Finish active jobs first. It leaves browser tabs open and does not unpublish hosted Preview. Existing per-edition launchers still work.
+
 ## Quick start and stop
 
 | Edition | Start Admin + Demo | Stop local services |
