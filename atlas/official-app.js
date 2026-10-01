@@ -2843,6 +2843,8 @@ setView(view);
     reset: () => $("#reset").click(),
     refresh: () => location.reload(),
     export: () => $("#export").click(),
+    daas: () => openSiteInfo("daas"),
+    vdi: () => openSiteInfo("vdi"),
     "desktop-mode": () => window.AtlasDesktop?.open(),
     animations: () =>
       document.querySelector(".atlas-motion-toggle input").click(),

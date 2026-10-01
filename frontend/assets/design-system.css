@@ -1002,3 +1002,18 @@ body .atlas-unified-header .atlas-primary-nav a { font-weight:600; white-space:n
 
 body .atlas-unified-header .atlas-header-actions > .atlas-header-more > summary { box-sizing:border-box; height:28px; min-height:28px; display:flex; align-items:center; padding:4px 7px; }
 @media(pointer:coarse) { body .atlas-unified-header .atlas-header-actions > .atlas-header-more > summary { height:42px; min-height:42px; } }
+
+/* Useful Info: compact references, readable long AD identifiers. */
+body .atlas-site-info { width:min(960px,94vw); }
+body .atlas-site-info .site-tabs { margin-bottom:8px; padding:3px; gap:4px; }
+body .atlas-site-info .site-tabs button { padding:4px 8px; min-height:28px; font-size:12px; }
+body .atlas-site-info .site-intro,body .atlas-site-info .site-reference-note { margin:4px 0 8px; font-size:11px; color:var(--atlas-muted); }
+body .atlas-site-info :is(th,td) { padding:5px 6px; font-size:12px; vertical-align:top; }
+body .atlas-site-info h3 { font-size:13px; margin:10px 0 4px; }
+body .atlas-site-info .site-group-value { display:flex; align-items:flex-start; gap:4px; margin:2px 0; }
+body .atlas-site-info .site-group-value code { flex:1; min-width:0; overflow-wrap:anywhere; font-size:11px; user-select:text; }
+body .atlas-site-info .site-copy { padding:2px 5px; min-height:24px; font-size:11px; flex:none; }
+body .atlas-site-info .site-tenant-links { display:flex; flex-wrap:wrap; gap:5px 12px; font-size:12px; }
+body .atlas-site-info details { margin-top:8px; }
+body .atlas-site-info details summary { cursor:pointer; font-size:12px; padding:5px 0; }
+@media(pointer:coarse) { body .atlas-site-info :is(.site-copy,.site-tabs button) { min-height:42px; } }

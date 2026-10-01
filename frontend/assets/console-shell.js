@@ -563,7 +563,7 @@ async function runSharedCommand(id) {
   if(id==='ad-open'){const p=new URLSearchParams(location.search);return AtlasAD.show(p.get('adkind')==='user'?'user':'computer',p.get('adidentity')||S.target||'');}
   if(id.startsWith('ad-'))return AtlasAD.command(id);
   if (id === "active-directory") { page("active-directory"); return; }
-  if (id === "vlans" || id === "contacts") {
+  if (["vlans","contacts","daas","vdi"].includes(id)) {
     const { openSiteInfo } = await import("/site-info.js?v=1");
     return openSiteInfo(id);
   }

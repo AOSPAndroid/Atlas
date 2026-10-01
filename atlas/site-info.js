@@ -18,6 +18,34 @@ export const CONTACTS = [
   ["Print room", "+33 1 44 58 31 14", "+33144583114"],
   ["AV/VC", "+44 20 7773 5553", "+442077735553"],
 ];
+// Transcribed from the owner's reference photos, 1 October 2026.
+export const TENANTS = [
+  ['Preprod Tenant','https://citrix.cloud.com/go/preprodtenant'],
+  ['Global Tenant (RPC)','https://citrix.cloud.com/go/globaltenant'],
+  ['DaaS · Prod Tenant','https://citrix.cloud.com/go/prodtenant'],
+];
+export const DAAS = [
+  ['Gloucester','fGLB-DAAS-PRD-RPC-GLO','fGLBGLOPRODRPCRL'],
+  ['Northolt','fGLB-DAAS-PRD-RPC-NHT','fGLBNHTPRODRPCRL'],
+  ['Slough','fGLB-DAAS-PRD-RPC-SLO','fGLBSLOPRODRPCRL'],
+];
+export const CLOUD_GROUPS = ['EMEA','AMER','APAC'].flatMap(region => [
+  [region,'Client',`CLIENT\\GLO-CLI-SEC-${region}_DAAS_Global-RPC`,
+    [1,...(region==='EMEA'?[2]:[])].map(n=>`GLO-CLI-SEC-${region}_DAAS_Client_Global_RL${n}`)],
+  [region,'Intranet',`INTRANET\\fGLB-${region}_DAAS_Global-RPC`,
+    [1,...(region==='EMEA'?[2]:[])].map(n=>`fGLB_${region}_DAAS_Intranet_Global_RL${n}`)],
+]);
+export const VDI = [
+  ['Gloucester','GBRGLOIBV*','GLO'],['Northolt','GBRNHTIBV*','NHT'],
+  ['PSC','NYKPSCIBV*','PSC'],['CRN','NYKCRNIBV*','CRN'],
+].map(([place,host,dc])=>[place,host,`fGLB-${dc}_DaaS_Trader_Prod_VDI`,`fGLB-${dc}_DaaS_TVDI_Prod_VDI`]);
+export const VDI_MACHINES = [
+  ['EMEA (GLO/NHT)','fGLB_EMEA_DaaS_Trader_Intranet_Prod_RL',['Fglbglopreprodrpcrl','Fglbnhtpreprodrpcrl']],
+  ['AMER (PSC/CRN)','fGLB_AMER_DaaS_Trader_Intranet_Prod_RL',['fGLB_PSC_DaaS_Trader_Intranet_PreProd_RL']],
+];
+export const MFA = [
+  ['INTRANET','fGLBAZADCTXUsers'],['CLIENT','GLO-CLI-SEC-LAM-AZAD-Citrix-Users'],
+];
 let current;
 const node = (tag, text, className) => {
   const element = document.createElement(tag);
@@ -26,7 +54,7 @@ const node = (tag, text, className) => {
   return element;
 };
 export function openSiteInfo(section = "vlans") {
-  section = section === "contacts" ? "contacts" : "vlans";
+  section = ["vlans","contacts","daas","vdi"].includes(section) ? section : "vlans";
   if (current?.element.isConnected) {
     current.select(section);
     return current.element;
@@ -58,7 +86,7 @@ export function openSiteInfo(section = "vlans") {
   `;
   body.append(
     style,
-    node("p", "VLAN reference and useful phone numbers", "site-intro"),
+    node("p", "Network, contacts and virtual desktop references", "site-intro"),
   );
   const tabs = node("div", null, "site-tabs");
   tabs.setAttribute("role", "tablist");
@@ -68,6 +96,8 @@ export function openSiteInfo(section = "vlans") {
   for (const [id, title] of [
     ["vlans", "VLANs"],
     ["contacts", "Contacts"],
+    ["daas", "DaaS"],
+    ["vdi", "VDI"],
   ]) {
     const button = node("button", title);
     button.id = "site-info-tab-" + id;
@@ -83,21 +113,15 @@ export function openSiteInfo(section = "vlans") {
       if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key))
         return;
       event.preventDefault();
-      select(
-        event.key === "Home"
-          ? "vlans"
-          : event.key === "End"
-            ? "contacts"
-            : id === "vlans"
-              ? "contacts"
-              : "vlans",
-      );
+      const ids=['vlans','contacts','daas','vdi'];
+      const index=ids.indexOf(id);
+      select(event.key==='Home'?ids[0]:event.key==='End'?ids.at(-1):ids[(index+(event.key==='ArrowRight'?1:3))%4]);
     };
     tabs.append(button);
     buttons[id] = button;
     panes[id] = pane;
   }
-  body.append(tabs, panes.vlans, panes.contacts);
+  body.append(tabs, ...Object.values(panes));
   const wrap = node("div", null, "site-table-wrap"),
     table = node("table"),
     head = node("thead"),
@@ -146,6 +170,39 @@ export function openSiteInfo(section = "vlans") {
     panes.contacts.append(card);
   }
   panes.contacts.append(status);
+
+  const referenceStatus=node('p','','site-status');
+  referenceStatus.setAttribute('role','status');body.append(referenceStatus);
+  function copyValue(value) {
+    const row=node('div',null,'site-group-value');
+    const code=node('code',value),copy=node('button','Copy','site-copy');
+    copy.type='button';copy.setAttribute('aria-label','Copy '+value);
+    copy.onclick=async()=>{try{await navigator.clipboard.writeText(value);referenceStatus.textContent='Copied '+value;}catch{referenceStatus.textContent='Clipboard unavailable. Select the group name to copy it.';}};
+    row.append(code,copy);return row;
+  }
+  function referenceTable(pane,title,headers,records,groupColumns) {
+    pane.append(node('h3',title));const wrap=node('div',null,'site-table-wrap'),table=node('table'),head=node('thead'),row=node('tr'),body=node('tbody');
+    for(const text of headers){const th=node('th',text);th.scope='col';row.append(th);}head.append(row);table.append(head,body);
+    for(const record of records){const tr=node('tr');record.forEach((value,i)=>{const td=node('td');for(const text of Array.isArray(value)?value:[value])td.append(groupColumns.includes(i)?copyValue(text):node('span',text));tr.append(td);});body.append(tr);}
+    wrap.append(table);pane.append(wrap);
+  }
+  for(const id of ['daas','vdi']) {
+    const pane=panes[id];pane.append(node('p','Reference transcribed from supplied screenshots · 1 October 2026. Group membership is not checked or changed here.','site-reference-note'));
+    const links=node('div',null,'site-tenant-links');
+    for(const [title,url] of TENANTS){const a=node('a',title+' ↗');a.href=url;a.target='_blank';a.rel='noopener noreferrer';links.append(a);}pane.append(links);
+    referenceTable(pane,'MFA · cloud.com portal (barclayspvdi)',['Domain','User group'],MFA,[1]);
+  }
+  panes.daas.append(node('p','User visibility: the reference specifies a data-centre broker group plus MFA. The device also needs its matching DDC registration group.','site-reference-note'));
+  referenceTable(panes.daas,'DaaS · INTRANET',['Data centre','User visibility group','Device registration (DDC)'],DAAS,[1,2]);
+  const cloud=node('details');cloud.append(node('summary','Citrix Cloud · Global tenant groups by region'));
+  referenceTable(cloud,'Global tenant (RPC)',['Region','Domain','User AD group','Machine GPO details'],CLOUD_GROUPS,[2,3]);panes.daas.append(cloud);
+  referenceTable(panes.vdi,'Trader VDI · Current Prod tenant',['Location','Machine prefix','User group'],VDI.map(r=>r.slice(0,3)),[2]);
+  referenceTable(panes.vdi,'VDI · Machine groups',['Region','Current Prod group'],VDI_MACHINES.map(r=>r.slice(0,2)),[1]);
+  panes.vdi.append(node('p','Paris reference: fGLB-GLO_DaaS_Trader_Prod_VDI. Match the user group to the desktop location.','site-reference-note'));
+  const legacy=node('details');legacy.append(node('summary','Legacy / Pre-Prod reference'));
+  referenceTable(legacy,'Legacy user groups',['Location','Group'],VDI.map(r=>[r[0],r[3]]),[1]);
+  referenceTable(legacy,'Legacy machine groups',['Region','Group'],VDI_MACHINES.map(r=>[r[0],r[2]]),[1]);
+  legacy.append(node('p','The supplied notes identify the old fGLB-DAAS-PRD-TVDI-NHT/SLO groups as legacy from the 2025 pilot.','site-reference-note'));panes.vdi.append(legacy);
   function select(id) {
     for (const key of Object.keys(panes)) {
       panes[key].hidden = key !== id;
