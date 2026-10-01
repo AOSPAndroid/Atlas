@@ -55,15 +55,15 @@ $visited=@{}
 $nestedComplete=$true
 foreach($dn in $membership) {
  if($clock.Elapsed.TotalSeconds -ge 20){$groups+=@{name=$dn;dn=$dn;scope='Unavailable';category='Unavailable';membership='Direct'};$warnings+='Some direct group details were not resolved within the time limit.';continue}
- try { $g=Get-ADGroup -Identity $dn -Properties MemberOf @opts; $resolved[$g.DistinguishedName]=$g; $groups+=@{name=$g.Name;dn=$g.DistinguishedName;scope=[string]$g.GroupScope;category=[string]$g.GroupCategory;membership='Direct'} }
+ try { $g=Get-ADGroup -Identity $dn -Properties MemberOf,Description @opts; $resolved[$g.DistinguishedName]=$g; $groups+=@{name=$g.Name;description=[string]$g.Description;dn=$g.DistinguishedName;scope=[string]$g.GroupScope;category=[string]$g.GroupCategory;membership='Direct'} }
  catch { $groups+=@{name=$dn;dn=$dn;scope='Unavailable';category='Unavailable';membership='Direct'};$warnings+='Some group details could not be resolved; membership DNs are still shown.' }
 }
 
 try {
  $sid=$o.SID.AccountDomainSid.Value+'-'+$o.PrimaryGroupID
- $g=Get-ADGroup -Identity $sid -Properties MemberOf @opts
+ $g=Get-ADGroup -Identity $sid -Properties MemberOf,Description @opts
  $resolved[$g.DistinguishedName]=$g
- $groups+=@{name=$g.Name;dn=$g.DistinguishedName;scope=[string]$g.GroupScope;category=[string]$g.GroupCategory;membership='Primary'}
+ $groups+=@{name=$g.Name;description=[string]$g.Description;dn=$g.DistinguishedName;scope=[string]$g.GroupScope;category=[string]$g.GroupCategory;membership='Primary'}
 } catch {$warnings+='Primary group could not be resolved.'}
 
 # Traverse upward from direct AND primary groups. Bound work and report partial evidence.
@@ -77,8 +77,8 @@ while($pending.Count -gt 0) {
  if($visited.ContainsKey($dn)){continue}
  $visited[$dn]=$true
  try {
-  $g=Get-ADGroup -Identity $dn -Properties MemberOf @opts
-  $groups+=@{name=$g.Name;dn=$g.DistinguishedName;scope=[string]$g.GroupScope;category=[string]$g.GroupCategory;membership='Nested';via=$item.via}
+  $g=Get-ADGroup -Identity $dn -Properties MemberOf,Description @opts
+  $groups+=@{name=$g.Name;description=[string]$g.Description;dn=$g.DistinguishedName;scope=[string]$g.GroupScope;category=[string]$g.GroupCategory;membership='Nested';via=$item.via}
   foreach($parentDN in @($g.MemberOf)){$pending.Enqueue(@{dn=$parentDN;via=$g.DistinguishedName})}
  } catch {$nestedComplete=$false;$warnings+='Some nested groups could not be resolved in the queried directory scope.'}
 }

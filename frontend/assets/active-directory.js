@@ -71,7 +71,7 @@
       for(const [key,value] of Object.entries(data.details))lines.push(key+': '+valueText(value));
       lines.push('Membership scope: '+(data.membership_note||'Not supplied'));
       for(const warning of data.warnings||[])lines.push('Warning: '+warning);
-      for(const group of data.groups)lines.push(`[${group.membership||'Unknown'}] ${group.name} | ${group.dn||''}`);
+      for(const group of data.groups)lines.push(`[${group.membership||'Unknown'}] ${group.name} | ${group.description??'Description unavailable'} | ${group.dn||''}`);
     }
     if(secondary){const key=g=>String(g.dn||g.name).toLowerCase(),a=new Set(primary.groups.map(key)),b=new Set(secondary.groups.map(key));lines.push('','Only first object: '+primary.groups.filter(g=>!b.has(key(g))).map(g=>g.name).join(', '),'Only second object: '+secondary.groups.filter(g=>!a.has(key(g))).map(g=>g.name).join(', '));}
     const access=document.querySelector('.ad-access-check');if(access)lines.push('','Access reference: '+(access.querySelector('select')?.selectedOptions[0]?.textContent||''),access.querySelector('.ad-access-results')?.textContent||'Not checked');
@@ -157,7 +157,7 @@
     result.append(compare, status);
     const count = el("p");
     const list = el("div");
-    list.className = "ad-groups";
+    list.className = "ad-groups ad-group-list";
     result.append(count, list);
     let rows = [];
     const key = (g) => String(g.dn || g.name).toLowerCase();
@@ -205,25 +205,22 @@
             " with " +
             (secondary.details.Account || secondary.details.Name)
           : "");
+      const table = el('table');
+      table.setAttribute('aria-label','AD group memberships');
+      const head=el('thead'), header=el('tr');
+      for(const text of ['Group','Description',secondary?'First / second membership':'Membership', ...(secondary?['Comparison']:[])]){const th=el('th',text);th.scope='col';header.append(th);}
+      head.append(header);table.append(head);const body=el('tbody');table.append(body);
       for (const g of rows) {
-        const card = el("article");
-        card.append(
-          el("strong", g.name),
-          el(
-            "p",
-            secondary
-              ? {
-                  both: "In both",
-                  first: "Only first object",
-                  second: "Only second object",
-                }[g.presence]
-              : g.membership,
-          ),
-          el("small", g.dn),
-        );
-        list.append(card);
+        const row=el('tr'),name=el('td'),description=el('td');
+        name.append(el('strong',g.name));
+        const detail=el('details');detail.append(el('summary','Directory path'),el('small',g.dn));name.append(detail);
+        description.className='ad-group-description';
+        description.textContent=g.description==null?'Description unavailable':g.description||'No description recorded';
+        row.append(name,description,el('td',secondary?`${g.firstMembership||'—'} / ${g.secondMembership||'—'}`:g.membership));
+        if(secondary)row.append(el('td',{both:'In both',first:'Only first object',second:'Only second object'}[g.presence]));
+        body.append(row);
       }
-      if (!rows.length) list.append(el("p", "No matching groups."));
+      if(rows.length)list.append(table);else list.append(el('p','No matching groups.'));
       download.disabled = !rows.length;
     };
     search.oninput = filter;
@@ -235,6 +232,7 @@
         "Second object",
         "Comparison",
         "Group name",
+        "Description",
         "Distinguished name",
         "Scope",
         "Category",
@@ -246,6 +244,7 @@
         secondary?.details.Account || secondary?.details.Name || "",
         secondary ? g.presence : "Not compared",
         g.name,
+        g.description,
         g.dn,
         g.scope,
         g.category,
@@ -442,14 +441,14 @@
    if(remember&&old)history.push(old);
    current={...payload,base:data.base};parent=data.parent||'';path.textContent=data.base;
    if(data.details){const dl=make('dl');dl.className='ad-browser-properties';for(const [k,v] of Object.entries(data.details)){dl.append(make('dt',k),make('dd',v||'—'));}results.append(dl);}
-   const table=make('table');table.innerHTML='<thead><tr><th>Name / account</th><th>Type</th><th>Directory path</th><th>Actions</th></tr></thead>';const body=make('tbody');table.append(body);
+   const table=make('table');table.innerHTML='<thead><tr><th>Name / account</th><th>Type</th><th>Description</th><th>Directory path</th><th>Actions</th></tr></thead>';const body=make('tbody');table.append(body);
    for(const item of data.items){
     const row=make('tr'),name=make('td',item.name+(item.account?' · '+item.account:'')),kind=make('td',item.kind),dn=make('td',item.dn),actions=make('td');
     if(['organizationalUnit','container','domainDNS'].includes(item.kind))actions.append(control('Open',()=>load({base:item.dn,operation:'children',server:payload.server})));
     if(['user','computer'].includes(item.kind))actions.append(control('See groups',()=>{document.getElementById('adServer').value=payload.server;AtlasAD.show(item.kind,item.guid||item.account||item.name);document.getElementById('adForm').scrollIntoView({block:'start'});}));
     if(item.kind==='group')actions.append(control('Members',()=>load({operation:'members',base:item.dn,server:payload.server})));
     actions.append(control('Properties',()=>load({operation:'details',base:item.dn,server:payload.server})));
-    row.append(name,kind,dn,actions);body.append(row);
+    row.append(name,kind,make('td',item.description||'—'),dn,actions);body.append(row);
    }
    const wrap=make('div');wrap.className='tablewrap';wrap.append(table);results.append(wrap);
    status.textContent=`${data.items.length} ${payload.operation==='details'?'parent groups':'objects'}${data.more?' · More available; load more or narrow the search.': ''} · ${data.note||''}`;

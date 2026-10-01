@@ -15,7 +15,7 @@ function Get-ADComputer { Get-ADUser }
 function Get-ADGroup {
  param($Identity,$Properties,$Server)
  switch($Identity){
- 'CN=A,DC=test' { [pscustomobject]@{Name='A';DistinguishedName=$Identity;GroupScope='Global';GroupCategory='Security';MemberOf=@('CN=B,DC=test')} }
+ 'CN=A,DC=test' { [pscustomobject]@{Name='A';Description='Trading application access';DistinguishedName=$Identity;GroupScope='Global';GroupCategory='Security';MemberOf=@('CN=B,DC=test')} }
  'CN=B,DC=test' { if($broken){throw 'fixture failure'};[pscustomobject]@{Name='B';DistinguishedName=$Identity;GroupScope='Global';GroupCategory='Security';MemberOf=@('CN=A,DC=test')} }
  'S-1-5-21-1-513' { [pscustomobject]@{Name='Primary';DistinguishedName='CN=Primary,DC=test';GroupScope='Global';GroupCategory='Security';MemberOf=@('CN=C,DC=test')} }
  'CN=C,DC=test' { [pscustomobject]@{Name='C';DistinguishedName=$Identity;GroupScope='Global';GroupCategory='Security';MemberOf=@()} }
@@ -29,6 +29,7 @@ function Get-ADGroup {
  def test_nested_cycle_and_primary_parent(self):
   data=self.run_fixture();groups={g['name']:g['membership'] for g in data['groups']}
   self.assertEqual(groups,{'A':'Direct','B':'Nested','C':'Nested','Primary':'Primary'})
+  self.assertEqual(next(g for g in data['groups'] if g['name']=='A')['description'],'Trading application access')
   self.assertTrue(data['nested_complete']);self.assertEqual(data['details']['Password expiry status'],'Computed')
  def test_windows_powershell_preserves_all_groups(self):
   for kind in ('user','computer'):
