@@ -777,3 +777,70 @@ window.AtlasGroups = {
  document.addEventListener('pointerdown',e=>{if(menu&&!menu.contains(e.target))close();});
  document.addEventListener('keydown',e=>{if(e.key==='Escape'||e.key==='Tab')close();});
 })();
+
+/* An on-demand index of original controls: no background scans or cloned handlers. */
+(() => {
+  function install() {
+    if (document.querySelector('.atlas-reachable-toggle') || !document.querySelector('main')) return;
+    const toggle = document.createElement('button');
+    toggle.className = 'atlas-reachable-toggle'; toggle.type = 'button';
+    toggle.textContent = 'Actions'; toggle.setAttribute('aria-expanded', 'false');
+    toggle.setAttribute('aria-controls', 'atlasReachableActions');
+    const panel = document.createElement('section');
+    panel.id = 'atlasReachableActions'; panel.className = 'atlas-reachable-panel'; panel.hidden = true;
+    panel.setAttribute('aria-label', 'Actions on this page');
+    panel.innerHTML = '<div class="atlas-reachable-heading"><strong>Actions on this page</strong><button type="button" aria-label="Close actions">×</button></div><input type="search" aria-label="Find a button or field" placeholder="Find a button or field…"><p role="status"></p><div class="atlas-reachable-list"></div>';
+    const search = panel.querySelector('input'), list = panel.querySelector('.atlas-reachable-list'), status = panel.querySelector('[role="status"]');
+    const visible = node => node.isConnected && !node.closest('[hidden], [inert]') && node.getClientRects().length > 0;
+    let entries = [];
+    function close(restore = true) {
+      panel.hidden = true; toggle.setAttribute('aria-expanded', 'false');
+      if (restore) toggle.focus();
+    }
+    function collect() {
+      entries = [...document.querySelectorAll('main button, main input:not([type="hidden"]), main select, main textarea, main summary')]
+        .filter(node => visible(node) && !node.closest('dialog, .atlas-reachable-panel'))
+        .map(node => {
+          const field = /^(INPUT|SELECT|TEXTAREA)$/.test(node.tagName);
+          const label = node.getAttribute('aria-label') || (field ? node.labels?.[0]?.textContent.trim() || node.placeholder : node.textContent.trim()) || node.title;
+          const contextNode = node.closest('tr, article, .machine-card, .panel, section');
+          const context = (contextNode?.querySelector('h2,h3,h4,th,td')?.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 100);
+          return {node, field, label: label?.replace(/\s+/g, ' ').slice(0, 140), context};
+        }).filter(entry => entry.label);
+    }
+    function render() {
+      const query = search.value.trim().toLowerCase();
+      const matches = entries.filter(e => `${e.label} ${e.context}`.toLowerCase().includes(query));
+      list.replaceChildren();
+      status.textContent = `${matches.length} controls · Fields open for editing`;
+      for (const entry of matches) {
+        const button = document.createElement('button'); button.type = 'button';
+        button.disabled = entry.node.matches(':disabled') || entry.node.getAttribute('aria-disabled') === 'true';
+        const label = document.createElement('span'); label.textContent = entry.label;
+        const context = document.createElement('small'); context.textContent = entry.context;
+        button.append(label, context);
+        button.onclick = () => {
+          // Recheck state at activation: navigation or live updates may have replaced the original.
+          if (!visible(entry.node) || entry.node.matches(':disabled') || entry.node.getAttribute('aria-disabled') === 'true') { collect(); render(); return; }
+          close(false);
+          entry.node.scrollIntoView({block:'center', behavior:'instant'});
+          entry.node.focus({preventScroll:true});
+          if (!entry.field) entry.node.click();
+        };
+        list.append(button);
+      }
+    }
+    toggle.onclick = () => {
+      if (!panel.hidden) return close();
+      collect(); search.value = ''; render(); panel.hidden = false;
+      toggle.setAttribute('aria-expanded', 'true'); search.focus();
+    };
+    search.oninput = render;
+    panel.querySelector('button').onclick = () => close();
+    document.addEventListener('keydown', event => { if (event.key === 'Escape' && !panel.hidden) { event.preventDefault(); close(); } });
+    document.addEventListener('pointerdown', event => { if (!panel.hidden && !panel.contains(event.target) && event.target !== toggle) close(false); });
+    window.addEventListener('hashchange', () => close(false));
+    document.body.append(toggle, panel);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install, {once:true}); else install();
+})();

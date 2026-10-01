@@ -56,3 +56,10 @@ Map labels and drawing surfaces retain their own geometry to avoid clipping or c
 - Map, console and utility visual density continues to use the shared design contract. Long data lists remain scrollable; no data was hidden to force it onto one screen.
 
 - Narrow 600px check exposed a Map-only content-box height on More (38px versus 28px). Applied border-box sizing to the shared control; mobile app links keep the same row and column positions.
+
+
+## Reachable actions — 2026-10-01
+- Shared floating Actions panel indexes visible controls on the current page only when opened. Search by control or section; fields receive focus and buttons use the original handler. Disabled and stale targets are rechecked at activation. Escape/outside click closes it.
+- Performance view/scan/PID controls and bulk rollout actions remain sticky beside long results. Short windows use the floating panel instead of a tall sticky performance block. Result tables scroll within bounded areas.
+- Native Draw.io iframe controls remain owned by the editor. Closed disclosures are reached through their summary, then indexed after opening.
+- Verified action search, field focus, original handlers, disabled/hidden and stale targets, Escape, and process termination confirmation tests. Demo browser inspection confirms live actions stay disabled.

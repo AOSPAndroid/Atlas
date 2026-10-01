@@ -342,6 +342,7 @@
             <div id="slowdownFindings"></div>
           </section>
           <div id="adminUtility" hidden></div>
+          <div class="atlas-performance-controls">
           <div
             class="performance-views"
             role="group"
@@ -386,6 +387,7 @@
             <label for="kill">Terminate by PID / name</label>
             <input id="kill" placeholder="PID or process.exe" autocomplete="off" />
             <button id="killBtn" type="button">Terminate…</button>
+          </div>
           </div>
           <div id="adminOverview"></div>
           <div class="row performance-filter">
@@ -444,7 +446,7 @@
               /></label>
             </div>
           </div>
-          <div class="row">
+          <div class="row atlas-sticky-actions">
             <span id="targetCount" class="pill">0 targets</span
             ><label
               ><input type="checkbox" role="switch" id="bulkFresh" />
