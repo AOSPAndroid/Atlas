@@ -397,3 +397,14 @@ Use **Ctrl+K > DESKTOP MODE (beta)** to switch between Classic Atlas and the doc
 
 
 Desktop layout: open Search Atlas (Ctrl+K), search DESKTOP MODE (beta), then run the command to switch between Classic and Desktop. The choice is remembered in this browser. Save unsaved diagrams before leaving Desktop.
+
+
+### AD health and comparison
+
+AD lookup shows compact read-only user/machine health, OU, machine password change, and replicated (approximate) last logon. User password expiry uses the directory-computed expiry attribute. Unknown values remain unknown.
+
+Group lookup traverses parents of direct and primary groups, detects cycles, and labels discovered memberships Nested. Traversal is bounded to 1,000 visited groups and a 20-second work budget (the existing 35-second process timeout still applies). Failed resolution or limits produce partial-result warnings. This is scoped directory evidence, not a complete cross-domain authorization calculation or proof of effective access.
+
+Compare users or computers to see both health cards and a property matrix with differences highlighted. Existing group filters and CSV export include nested memberships. Copy support summary (also in the palette) includes both objects, query times, returned properties, group memberships, differences and warnings. No AD changes or additional remote health scans are performed.
+
+References: https://learn.microsoft.com/en-us/powershell/module/activedirectory/get-adgroup and https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-adts/f9e9b7e2-c7ac-4db6-ba38-71d9696981e9

@@ -33,14 +33,52 @@ if($kind -eq 'user') {
  $details['DNS hostname']=$o.DNSHostName;$details['Operating system']=$o.OperatingSystem;$details['OS version']=$o.OperatingSystemVersion
 }
 $groups=@();$warnings=@();$membership=@($o.MemberOf | Sort-Object)
+$clock=[Diagnostics.Stopwatch]::StartNew()
+$resolved=@{}
+$pending=New-Object System.Collections.Queue
+$visited=@{}
+$nestedComplete=$true
 foreach($dn in ($membership | Select-Object -First 500)) {
- try { $g=Get-ADGroup -Identity $dn @opts; $groups+=@{name=$g.Name;dn=$g.DistinguishedName;scope=[string]$g.GroupScope;category=[string]$g.GroupCategory;membership='Direct'} }
+ if($clock.Elapsed.TotalSeconds -ge 20){$warnings+='Direct group lookup reached its time limit.';break}
+ try { $g=Get-ADGroup -Identity $dn -Properties MemberOf @opts; $resolved[$g.DistinguishedName]=$g; $groups+=@{name=$g.Name;dn=$g.DistinguishedName;scope=[string]$g.GroupScope;category=[string]$g.GroupCategory;membership='Direct'} }
  catch { $groups+=@{name=$dn;dn=$dn;scope='Unavailable';category='Unavailable';membership='Direct'};$warnings+='Some group details could not be resolved; membership DNs are still shown.' }
 }
 if($membership.Count -gt 500){$warnings+='Only the first 500 direct groups are shown.'}
 try {
  $sid=$o.SID.AccountDomainSid.Value+'-'+$o.PrimaryGroupID
- $g=Get-ADGroup -Identity $sid @opts
+ $g=Get-ADGroup -Identity $sid -Properties MemberOf @opts
+ $resolved[$g.DistinguishedName]=$g
  $groups+=@{name=$g.Name;dn=$g.DistinguishedName;scope=[string]$g.GroupScope;category=[string]$g.GroupCategory;membership='Primary'}
 } catch {$warnings+='Primary group could not be resolved.'}
-@{kind=$kind;queried_at=[datetime]::UtcNow.ToString('o');server=$(if($server){$server}else{'Default domain discovery'});operator=[System.Security.Principal.WindowsIdentity]::GetCurrent().Name;details=$details;groups=@($groups);warnings=@($warnings|Select-Object -Unique);membership_note='Direct membership plus primary group. Nested/transitive memberships and effective permissions are not calculated.'} | ConvertTo-Json -Depth 6 -Compress
+
+# Traverse upward from direct AND primary groups. Bound work and report partial evidence.
+foreach($g in @($resolved.Values)) {
+ $visited[$g.DistinguishedName]=$true
+ foreach($parentDN in @($g.MemberOf)){ $pending.Enqueue(@{dn=$parentDN;via=$g.DistinguishedName}) }
+}
+while($pending.Count -gt 0) {
+ if($clock.Elapsed.TotalSeconds -ge 20 -or $visited.Count -ge 1000){$nestedComplete=$false;$warnings+='Nested group traversal reached its time or group limit.';break}
+ $item=$pending.Dequeue();$dn=[string]$item.dn
+ if($visited.ContainsKey($dn)){continue}
+ $visited[$dn]=$true
+ try {
+  $g=Get-ADGroup -Identity $dn -Properties MemberOf @opts
+  $groups+=@{name=$g.Name;dn=$g.DistinguishedName;scope=[string]$g.GroupScope;category=[string]$g.GroupCategory;membership='Nested';via=$item.via}
+  foreach($parentDN in @($g.MemberOf)){$pending.Enqueue(@{dn=$parentDN;via=$g.DistinguishedName})}
+ } catch {$nestedComplete=$false;$warnings+='Some nested groups could not be resolved in the queried directory scope.'}
+}
+if($warnings.Count -gt 0){$nestedComplete=$false}
+if($kind -eq 'user') {
+ $details['Password expiry status']='Unavailable'
+ $details['Password expires']=$null
+ try {
+  $expiryObject=Get-ADUser -Identity $o.DistinguishedName -Properties 'msDS-UserPasswordExpiryTimeComputed' @opts
+  $expiry=$expiryObject.'msDS-UserPasswordExpiryTimeComputed'
+  if($null -ne $expiry) {
+   if([long]$expiry -eq [long]::MaxValue){$details['Password expiry status']='No expiry computed'}
+   elseif([long]$expiry -eq 0){$details['Password expiry status']='Must change / not set'}
+   else {$details['Password expires']=[datetime]::FromFileTimeUtc([long]$expiry).ToString('o');$details['Password expiry status']='Computed'}
+  }
+ } catch {$warnings+='Password expiry could not be read.'}
+}
+@{kind=$kind;queried_at=[datetime]::UtcNow.ToString('o');server=$(if($server){$server}else{'Default domain discovery'});operator=[System.Security.Principal.WindowsIdentity]::GetCurrent().Name;details=$details;groups=@($groups | Sort-Object dn -Unique);warnings=@($warnings|Select-Object -Unique);nested_complete=$nestedComplete;membership_note='Direct, primary and nested groups resolved upward within the queried directory scope. Cross-domain/resource-domain membership may be incomplete; effective permissions and sign-in access are not verified.'} | ConvertTo-Json -Depth 6 -Compress

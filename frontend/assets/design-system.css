@@ -1030,3 +1030,19 @@ body .atlas-site-info details summary { cursor:pointer; font-size:12px; padding:
 .ad-access-missing { color:#963d13; background:#fff0e3; border-radius:4px; padding:1px 4px; white-space:nowrap; }
 .ad-access-present { color:#216344; background:#e9f5ee; border-radius:4px; padding:1px 4px; white-space:nowrap; }
 .ad-access-unknown { color:var(--atlas-muted); font-size:11px; }
+
+.ad-health-comparison { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,290px),1fr)); gap:6px; margin:6px 0; }
+.ad-health-card { border:1px solid var(--atlas-line); border-radius:7px; padding:7px; min-width:0; overflow-wrap:anywhere; }
+.ad-health-card h3 { margin:0 0 4px; font-size:13px; }
+.ad-health-card p { margin:4px 0; font-size:11px; }
+.ad-health-card small { display:block; font-size:10px; color:var(--atlas-muted); }
+.ad-health-strip { display:flex; flex-wrap:wrap; gap:4px; margin:5px 0; font-size:11px; }
+.ad-health-strip > span { padding:2px 5px; border-radius:4px; background:#edf2f5; }
+.ad-health-strip .ad-health-good { color:#216344; background:#e9f5ee; }
+.ad-health-strip .ad-health-bad { color:#a02c36; background:#fdebee; }
+.ad-health-strip .ad-health-warn { color:#87540d; background:#fff3da; }
+.ad-object-details { overflow:auto; font-size:12px; margin:6px 0; }
+.ad-object-details table { width:100%; table-layout:fixed; }
+.ad-object-details :is(td,th) { overflow-wrap:anywhere; }
+.ad-property-different td { background:#fff3da; color:#624308; }
+#adOverview > textarea { width:100%; min-height:120px; font-size:11px; }
