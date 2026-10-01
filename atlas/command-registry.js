@@ -28,7 +28,7 @@ const targeted = new Set([
   "software",
   "report",
 ]);
-const viewerCommands = new Set(["ad-support-summary","daas","vdi","desktop-mode","ad-open","ad-user-groups","ad-machine-groups","ad-compare","ad-filter-groups","ad-export-groups",
+const viewerCommands = new Set(["ad-browser","ad-support-summary","daas","vdi","desktop-mode","ad-open","ad-user-groups","ad-machine-groups","ad-compare","ad-filter-groups","ad-export-groups",
 "kb-layers","kb-format","kb-duplicate","kb-delete","kb-zoom-in","kb-zoom-out","kb-png","knowledge","kb-new","kb-notes","kb-convert","kb-process","kb-decision","kb-database","kb-note","kb-connect","kb-fit","kb-undo","kb-redo","kb-save","kb-export","kb-drawio","kb-svg","kb-import","kb-template-flow","kb-template-network",
   "workspace",
   "admin",
@@ -55,6 +55,7 @@ const viewerCommands = new Set(["ad-support-summary","daas","vdi","desktop-mode"
 ]);
 // The single command catalogue used by the map and IT console.
 export const COMMANDS = [
+  ['ad-browser','AD directory browser','Browse OUs, users, computers, group members and properties','ad browse directory ou tree search group members'],
   ['ad-open','See AD groups','Open an exact directory account','ad membership groups'],
   ['ad-user-groups','See user groups','Look up the selected user in AD','ad user groups membership'],
   ['ad-machine-groups','See machine groups','Look up the selected machine in AD','ad computer machine groups membership'],

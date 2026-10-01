@@ -416,3 +416,11 @@ Atlas first resolves an exact logon name, SID or GUID. If a user account is not 
 Identity semantics: https://learn.microsoft.com/en-us/powershell/module/activedirectory/about/about_activedirectory_identity
 
 User identifiers from reports with B, G or X followed only by digits are normalized to X plus the same digits before AD lookup, including DOMAIN\account and numeric UPN local parts. Leading zeroes are preserved. This applies to user lookup and comparison, not computer objects or other usernames.
+
+
+### Read-only AD browser and complete group display
+See groups returns direct, primary and discovered nested memberships for users and computers. Windows PowerShell 5.1 group records are converted to objects before deduplication, avoiding the single-row hashtable sorting bug. All direct membership DNs remain visible even when enrichment times out; nested traversal limits and directory-scope failures are explicitly reported.
+
+Expand Directory browser in Active Directory, or search AD directory browser in the command palette. Choose a domain/controller, browse OU/container children, search within the current container, filter object type, inspect properties and direct group members, or open user/computer memberships by GUID. Back, Parent OU and Domain root support navigation. Load more increases the result window up to 5,000; beyond that narrow the search/OU. No AD data changes or automatic background queries. Demo/Preview expose the interface but disable live browsing.
+
+Tests include Windows PowerShell 5.1 and PowerShell 7 membership fixtures, escaped LDAP search, API token enforcement, navigation and read-only guards. Live bank-domain results require verification on the domain-connected Admin host.

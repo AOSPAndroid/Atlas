@@ -1071,3 +1071,14 @@ body.atlas-console :is(.tablewrap,.software-table-wrap) { max-height:60dvh; over
 body .atlas-reachable-panel .atlas-reachable-list button { height:auto; min-height:36px; max-height:none; flex-shrink:0; line-height:1.3; }
 body .atlas-reachable-panel .atlas-reachable-list small { display:block; max-width:100%; white-space:normal; line-height:1.3; }
 body .atlas-reachable-panel { width:min(350px,calc(100vw - 24px)); }
+/* Compact read-only directory browser. */
+body.atlas-console .ad-browser { margin:6px 0; border:1px solid var(--atlas-line); border-radius:7px; padding:6px; }
+body.atlas-console .ad-browser summary { font-weight:600; cursor:pointer; }
+body.atlas-console .ad-browser-tools { display:flex; flex-wrap:wrap; align-items:end; gap:5px; margin:6px 0; }
+body.atlas-console .ad-browser-tools label { display:grid; gap:3px; flex:1 1 150px; }
+body.atlas-console .ad-browser-path { font:11px monospace; overflow-wrap:anywhere; margin:4px 0; }
+body.atlas-console .ad-browser-results td { font-size:11px; padding:3px 5px; overflow-wrap:anywhere; }
+body.atlas-console .ad-browser-results td:last-child { min-width:135px; }
+body.atlas-console .ad-browser-results td button { margin:2px; }
+body.atlas-console .ad-browser-properties { display:grid; grid-template-columns:120px minmax(0,1fr); gap:3px 6px; font-size:11px; }
+body.atlas-console .ad-browser-properties :is(dt,dd) { margin:0; overflow-wrap:anywhere; }

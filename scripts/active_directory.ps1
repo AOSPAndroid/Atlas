@@ -53,12 +53,12 @@ $resolved=@{}
 $pending=New-Object System.Collections.Queue
 $visited=@{}
 $nestedComplete=$true
-foreach($dn in ($membership | Select-Object -First 500)) {
- if($clock.Elapsed.TotalSeconds -ge 20){$warnings+='Direct group lookup reached its time limit.';break}
+foreach($dn in $membership) {
+ if($clock.Elapsed.TotalSeconds -ge 20){$groups+=@{name=$dn;dn=$dn;scope='Unavailable';category='Unavailable';membership='Direct'};$warnings+='Some direct group details were not resolved within the time limit.';continue}
  try { $g=Get-ADGroup -Identity $dn -Properties MemberOf @opts; $resolved[$g.DistinguishedName]=$g; $groups+=@{name=$g.Name;dn=$g.DistinguishedName;scope=[string]$g.GroupScope;category=[string]$g.GroupCategory;membership='Direct'} }
  catch { $groups+=@{name=$dn;dn=$dn;scope='Unavailable';category='Unavailable';membership='Direct'};$warnings+='Some group details could not be resolved; membership DNs are still shown.' }
 }
-if($membership.Count -gt 500){$warnings+='Only the first 500 direct groups are shown.'}
+
 try {
  $sid=$o.SID.AccountDomainSid.Value+'-'+$o.PrimaryGroupID
  $g=Get-ADGroup -Identity $sid -Properties MemberOf @opts
@@ -96,4 +96,4 @@ if($kind -eq 'user') {
   }
  } catch {$warnings+='Password expiry could not be read.'}
 }
-@{kind=$kind;queried_at=[datetime]::UtcNow.ToString('o');server=$(if($server){$server}else{'Default domain discovery'});operator=[System.Security.Principal.WindowsIdentity]::GetCurrent().Name;details=$details;groups=@($groups | Sort-Object dn -Unique);warnings=@($warnings|Select-Object -Unique);nested_complete=$nestedComplete;membership_note='Direct, primary and nested groups resolved upward within the queried directory scope. Cross-domain/resource-domain membership may be incomplete; effective permissions and sign-in access are not verified.'} | ConvertTo-Json -Depth 6 -Compress
+@{kind=$kind;queried_at=[datetime]::UtcNow.ToString('o');server=$(if($server){$server}else{'Default domain discovery'});operator=[System.Security.Principal.WindowsIdentity]::GetCurrent().Name;details=$details;groups=@($groups | ForEach-Object { [pscustomobject]$_ } | Sort-Object dn -Unique);warnings=@($warnings|Select-Object -Unique);nested_complete=$nestedComplete;membership_note='Direct, primary and nested groups resolved upward within the queried directory scope. Cross-domain/resource-domain membership may be incomplete; effective permissions and sign-in access are not verified.'} | ConvertTo-Json -Depth 6 -Compress

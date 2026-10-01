@@ -390,6 +390,7 @@
       else by("Identity").focus();
     },
     command(id) {
+      if(id === "ad-browser"){page("active-directory");const browser=document.getElementById("adBrowser");browser.open=true;browser.scrollIntoView({block:"start"});browser.querySelector("input").focus();return;}
       if (id === "ad-user-groups")
         return this.show("user", S.user?.user_name || S.user?.email || "");
       if (id === "ad-machine-groups")
@@ -418,4 +419,48 @@
     },
   };
   controls();
+})();
+// Read-only directory navigation shares the same authenticated AD transport.
+(() => {
+ const form=document.getElementById('adForm'); if(!form)return;
+ const host=document.createElement('details');host.className='ad-browser';host.id='adBrowser';
+ host.innerHTML='<summary>Directory browser · OUs, users, computers and groups</summary><form class="ad-browser-tools"><label>Domain / controller<input name="server" placeholder="Default domain discovery" maxlength="128"></label><label>Search within current OU<input name="query" placeholder="Name, account or employee ID" maxlength="128"></label><label>Type<select name="kind"><option value="all">All objects</option><option value="user">Users</option><option value="computer">Computers</option><option value="group">Groups</option><option value="ou">OUs / containers</option></select></label><button type="submit">Search</button><button type="button" data-root>Domain root</button><button type="button" data-back disabled>Back</button><button type="button" data-up disabled>Parent OU</button></form><p role="status">Click Domain root to browse, or search. Live AD requires Atlas Admin.</p><div class="ad-browser-path"></div><div class="ad-browser-results"></div><button type="button" data-more hidden>Load more</button>';
+ form.before(host);
+ const tools=host.querySelector('form'),status=host.querySelector('[role="status"]'),results=host.querySelector('.ad-browser-results'),path=host.querySelector('.ad-browser-path');
+ const more=host.querySelector('[data-more]'),back=host.querySelector('[data-back]'),up=host.querySelector('[data-up]');
+ let current=null,parent='',history=[],busy=false;
+ const make=(tag,text)=>{const n=document.createElement(tag);if(text!=null)n.textContent=String(text);return n;};
+ const control=(label,fn)=>{const b=make('button',label);b.type='button';b.onclick=fn;return b;};
+ async function load(request,remember=true){
+  if(busy||window.AtlasReadOnly)return;
+  busy=true;status.textContent='Reading directory…';host.setAttribute('aria-busy','true');
+  const old=current;results.replaceChildren();more.hidden=true;
+  const payload={operation:'children',kind:tools.elements.kind.value,query:tools.elements.query.value.trim(),server:tools.elements.server.value.trim(),base:'',limit:200,...request};
+  for(const n of tools.elements)n.disabled=true;
+  try{
+   const data=await AtlasClient.request('/api/active-directory/browse',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+   if(remember&&old)history.push(old);
+   current={...payload,base:data.base};parent=data.parent||'';path.textContent=data.base;
+   if(data.details){const dl=make('dl');dl.className='ad-browser-properties';for(const [k,v] of Object.entries(data.details)){dl.append(make('dt',k),make('dd',v||'—'));}results.append(dl);}
+   const table=make('table');table.innerHTML='<thead><tr><th>Name / account</th><th>Type</th><th>Directory path</th><th>Actions</th></tr></thead>';const body=make('tbody');table.append(body);
+   for(const item of data.items){
+    const row=make('tr'),name=make('td',item.name+(item.account?' · '+item.account:'')),kind=make('td',item.kind),dn=make('td',item.dn),actions=make('td');
+    if(['organizationalUnit','container','domainDNS'].includes(item.kind))actions.append(control('Open',()=>load({base:item.dn,operation:'children',server:payload.server})));
+    if(['user','computer'].includes(item.kind))actions.append(control('See groups',()=>{document.getElementById('adServer').value=payload.server;AtlasAD.show(item.kind,item.guid||item.account||item.name);document.getElementById('adForm').scrollIntoView({block:'start'});}));
+    if(item.kind==='group')actions.append(control('Members',()=>load({operation:'members',base:item.dn,server:payload.server})));
+    actions.append(control('Properties',()=>load({operation:'details',base:item.dn,server:payload.server})));
+    row.append(name,kind,dn,actions);body.append(row);
+   }
+   const wrap=make('div');wrap.className='tablewrap';wrap.append(table);results.append(wrap);
+   status.textContent=`${data.items.length} ${payload.operation==='details'?'parent groups':'objects'}${data.more?' · More available; load more or narrow the search.': ''} · ${data.note||''}`;
+   more.hidden=!data.more;more.disabled=payload.limit>=5000;more.textContent=more.disabled?'Narrow the search to see additional objects':'Load more';
+  }catch(error){status.textContent=error.message;current=null;parent='';}
+  finally{busy=false;host.removeAttribute('aria-busy');for(const n of tools.elements)n.disabled=!!window.AtlasReadOnly;back.disabled=!history.length||!!window.AtlasReadOnly;up.disabled=!parent||!!window.AtlasReadOnly;}
+ }
+ tools.onsubmit=e=>{e.preventDefault();load({operation:'search',base:current?.server===tools.elements.server.value.trim()?(['members','details'].includes(current?.operation)?parent:current?.base)||'':''});};
+ host.querySelector('[data-root]').onclick=()=>load({operation:'children',base:''});
+ back.onclick=()=>{const previous=history.pop();if(previous)return load(previous,false);};
+ up.onclick=()=>load({operation:'children',base:parent,server:current?.server||''});
+ more.onclick=()=>{if(current)return load({...current,limit:Math.min(5000,current.limit+200)},false);};
+ if(window.AtlasReadOnly)for(const n of tools.elements)n.disabled=true;
 })();

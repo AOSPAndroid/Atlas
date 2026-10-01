@@ -2,7 +2,7 @@ import json, subprocess, unittest
 from pathlib import Path
 
 class DirectoryScriptTests(unittest.TestCase):
- def run_fixture(self, kind='user', broken=False, expiry='134050464000000000'):
+ def run_fixture(self, kind='user', broken=False, expiry='134050464000000000', shell='pwsh'):
   source=Path('scripts/active_directory.ps1').read_text(encoding='utf8')
   mock=r'''
 $kind='KIND';$identity='fixture';$server='dc.test';$broken=BROKEN
@@ -23,13 +23,17 @@ function Get-ADGroup {
  }
 }
 '''.replace('KIND',kind).replace('BROKEN','$true' if broken else '$false').replace('134050464000000000',expiry)
-  r=subprocess.run(['pwsh','-NoProfile','-NonInteractive','-Command',mock+'\n'+source],capture_output=True,text=True,timeout=15)
+  r=subprocess.run([shell,'-NoProfile','-NonInteractive','-Command',mock+'\n'+source],capture_output=True,text=True,timeout=15)
   self.assertEqual(r.returncode,0,r.stderr)
   return json.loads(r.stdout)
  def test_nested_cycle_and_primary_parent(self):
   data=self.run_fixture();groups={g['name']:g['membership'] for g in data['groups']}
   self.assertEqual(groups,{'A':'Direct','B':'Nested','C':'Nested','Primary':'Primary'})
   self.assertTrue(data['nested_complete']);self.assertEqual(data['details']['Password expiry status'],'Computed')
+ def test_windows_powershell_preserves_all_groups(self):
+  for kind in ('user','computer'):
+   data=self.run_fixture(kind=kind,shell='powershell.exe')
+   self.assertEqual(len(data['groups']),4)
  def test_password_expiry_sentinels(self):
   self.assertEqual(self.run_fixture(expiry='9223372036854775807')['details']['Password expiry status'],'No expiry computed')
   self.assertEqual(self.run_fixture(expiry='0')['details']['Password expiry status'],'Must change / not set')
