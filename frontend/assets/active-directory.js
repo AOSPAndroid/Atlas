@@ -45,6 +45,12 @@
   function renderGroups(data, result) {
     primary = data;
     secondary = null;
+    const access = el('div');
+    result.append(access);
+    let refreshAccess = () => {};
+    import('/site-info.js?v=3').then(({mountAccessCheck})=>{
+      if(access.isConnected) refreshAccess=mountAccessCheck(access,()=>[primary,secondary]);
+    }).catch(()=>{access.textContent='Access reference unavailable.';});
     const bar = el("div");
     bar.className = "ad-group-tools";
     const search = el("input");
@@ -113,6 +119,7 @@
     let rows = [];
     const key = (g) => String(g.dn || g.name).toLowerCase();
     const filter = () => {
+      refreshAccess();
       const a = new Map(primary.groups.map((g) => [key(g), g]));
       const b = new Map((secondary?.groups || []).map((g) => [key(g), g]));
       rows = [...new Set([...a.keys(), ...b.keys()])].map((k) => ({
@@ -246,6 +253,7 @@
             server: server.value.trim(),
           }),
         });
+        secondary.kind = kind.value;
         view.disabled = false;
         status.textContent =
           "Comparison complete. " + (secondary.warnings || []).join(" ");
@@ -312,7 +320,7 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      render(result);
+      render({...result,kind:payload.kind});
       by("Status").textContent =
         "AD lookup complete for " + payload.identity + ".";
     } catch (error) {

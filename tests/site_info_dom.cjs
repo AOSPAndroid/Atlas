@@ -3,7 +3,7 @@ const fs=require('fs'),assert=require('assert/strict'),{JSDOM}=require('jsdom');
 const w=new JSDOM('<body></body>',{url:'http://localhost/',runScripts:'outside-only'}).window;
 w.AtlasUI={dialog(){const element=w.document.createElement('dialog'),body=w.document.createElement('div');element.append(body);w.document.body.append(element);return {element,body};}};
 let copied;Object.defineProperty(w.navigator,'clipboard',{value:{writeText:async value=>{copied=value;}}});
-w.eval(fs.readFileSync('atlas/site-info.js','utf8').replaceAll('export const ','const ').replace('export function openSiteInfo','window.openSiteInfo = function openSiteInfo'));
+w.eval(fs.readFileSync('atlas/site-info.js','utf8').replaceAll('export const ','const ').replace('export function openSiteInfo','window.openSiteInfo = function openSiteInfo').replaceAll('export function ','function '));
 const dialog=w.openSiteInfo('daas');assert.equal(dialog.querySelectorAll('[role=tab]').length,4);
 assert.equal(dialog.querySelector('#site-info-daas').hidden,false);
 const copy=dialog.querySelector('#site-info-daas .site-copy');copy.click();await Promise.resolve();assert.equal(copied,'fGLBAZADCTXUsers');

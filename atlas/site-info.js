@@ -222,3 +222,40 @@ export function openSiteInfo(section = "vlans") {
   select(section);
   return element;
 }
+
+// Reference checks use the complete lookup result, never the filtered group list.
+export function mountAccessCheck(host, getObjects) {
+  const profiles=[
+    ...DAAS.map(([place,group])=>({label:'DaaS · '+place+' · INTRANET',groups:[group,MFA[0][1]]})),
+    ...VDI.map(([place,,group])=>({label:'VDI · '+place+' · INTRANET',groups:[group,MFA[0][1]]})),
+    ...CLOUD_GROUPS.map(([region,domain,group])=>({label:'Global RPC · '+region+' · '+domain,groups:[group.split('\\').at(-1),MFA[domain==='Client'?1:0][1]]})),
+  ];
+  host.className='ad-access-check';
+  const label=node('label','Access reference '),select=node('select');
+  select.setAttribute('aria-label','DaaS or VDI access profile');
+  const empty=node('option','Choose DaaS / VDI profile');empty.value='';select.append(empty);
+  profiles.forEach((p,i)=>{const o=node('option',p.label);o.value=String(i);select.append(o);});label.append(select);
+  const output=node('div',null,'ad-access-results'),note=node('small','Reference only · direct/primary memberships; nested membership and effective access are not verified.');
+  host.append(label,output,note);
+  function refresh(){
+    output.replaceChildren();
+    if(select.value===''){output.append(node('span','Not checked · choose the expected profile','ad-access-unknown'));return;}
+    const expected=profiles[Number(select.value)].groups;
+    for(const [index,data] of getObjects().entries()){
+      const card=node('details',null,'ad-access-user'),summary=node('summary');
+      const name=data?.details?.Account || data?.details?.Name || (index?'Comparison user':'User');
+      if(!data || data.kind!=='user'){
+        summary.textContent=name+' · '+(!data?'Not checked': 'Not applicable · machine');card.append(summary);output.append(card);continue;
+      }
+      const names=new Set((data.groups||[]).map(g=>String(g.name||'').split('\\').at(-1).toLowerCase()));
+      const absent=expected.filter(g=>!names.has(g.toLowerCase()));
+      const partial=(data.warnings||[]).length>0;
+      const badge=node('span',partial?'Incomplete lookup':absent.length?absent.length+' not found':'All listed',partial?'ad-access-unknown':absent.length?'ad-access-missing':'ad-access-present');
+      summary.append(node('strong',name),badge);card.append(summary);
+      for(const group of expected){const found=names.has(group.toLowerCase());const row=node('div',null,'ad-access-row');row.append(node('span',found?'✓ Listed':partial?'? Unknown':'! Not found',found?'ad-access-present':partial?'ad-access-unknown':'ad-access-missing'),node('code',group));card.append(row);}
+      if(partial)card.append(node('small','Lookup warnings prevent a complete assessment.'));
+      output.append(card);
+    }
+  }
+  select.onchange=refresh;refresh();return refresh;
+}

@@ -1017,3 +1017,16 @@ body .atlas-site-info .site-tenant-links { display:flex; flex-wrap:wrap; gap:5px
 body .atlas-site-info details { margin-top:8px; }
 body .atlas-site-info details summary { cursor:pointer; font-size:12px; padding:5px 0; }
 @media(pointer:coarse) { body .atlas-site-info :is(.site-copy,.site-tabs button) { min-height:42px; } }
+
+.ad-access-check { padding:6px 8px; border:1px solid var(--atlas-line); border-radius:7px; margin:6px 0; font-size:12px; }
+.ad-access-check > label { display:flex; align-items:center; gap:6px; flex-wrap:wrap; font-weight:600; }
+.ad-access-check > small { display:block; font-size:10px; color:var(--atlas-muted); margin-top:4px; }
+.ad-access-results { display:flex; flex-wrap:wrap; gap:4px 12px; margin-top:4px; }
+.ad-access-user { min-width:180px; flex:1; }
+.ad-access-user summary { display:flex; align-items:center; gap:8px; cursor:pointer; padding:3px 0; }
+.ad-access-user summary::after { content:'⌄'; }
+.ad-access-row { display:flex; gap:6px; padding:3px 0; }
+.ad-access-row code { overflow-wrap:anywhere; font-size:11px; }
+.ad-access-missing { color:#963d13; background:#fff0e3; border-radius:4px; padding:1px 4px; white-space:nowrap; }
+.ad-access-present { color:#216344; background:#e9f5ee; border-radius:4px; padding:1px 4px; white-space:nowrap; }
+.ad-access-unknown { color:var(--atlas-muted); font-size:11px; }
