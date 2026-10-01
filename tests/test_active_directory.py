@@ -13,6 +13,14 @@ class ADTests(unittest.TestCase):
   for identity in ["x';whoami", '*', '@file', 'a,b', 'a b', 'user\nexit', '-admin']:
    with self.assertRaises(HTTPException):ad.script_for(ad.Lookup(kind='user',identity=identity))
   with self.assertRaises(HTTPException):ad.script_for(ad.Lookup(kind='computer',identity='PC',server='dc;exit'))
+ def test_report_ids_map_to_x_user_accounts(self):
+  for identity in ['G01426046','b01426046','x01426046',r'INTRANET\G01426046']:
+   script=ad.script_for(ad.Lookup(kind='user',identity=identity))
+   self.assertIn("$identity='X01426046'",script)
+  self.assertIn("$identity='X00123@example.test'",ad.script_for(ad.Lookup(kind='user',identity='g00123@example.test')))
+  for identity in ['bob','g123-admin','GBRPWMF20844775','12345']:
+   self.assertIn("$identity='"+identity+"'",ad.script_for(ad.Lookup(kind='user',identity=identity)))
+  self.assertIn("$identity='G01426046'",ad.script_for(ad.Lookup(kind='computer',identity='G01426046')))
  def test_result_and_errors(self):
   payload=ad.Lookup(kind='computer',identity='PC01')
   ps=Mock(return_value=json.dumps({'details':{'Enabled':False},'groups':[]}))

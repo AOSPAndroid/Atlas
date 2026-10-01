@@ -414,3 +414,5 @@ References: https://learn.microsoft.com/en-us/powershell/module/activedirectory/
 Atlas first resolves an exact logon name, SID or GUID. If a user account is not found, it checks exact account, UPN, mail, employeeID and employeeNumber values in the selected domain/controller (maximum two matches; ambiguous matches are rejected). Access errors do not trigger fallback. Use Domain / controller to match the server displayed in AD Users and Computers. No cross-domain guessing or directory changes are performed. Structured errors replace raw PowerShell CLIXML. Restart Atlas after updating the Python backend.
 
 Identity semantics: https://learn.microsoft.com/en-us/powershell/module/activedirectory/about/about_activedirectory_identity
+
+User identifiers from reports with B, G or X followed only by digits are normalized to X plus the same digits before AD lookup, including DOMAIN\account and numeric UPN local parts. Leading zeroes are preserved. This applies to user lookup and comparison, not computer objects or other usernames.

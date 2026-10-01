@@ -25,6 +25,11 @@ def script_for(body):
             raise HTTPException(400, 'Invalid domain account')
         domain, identity = parts
         server = server or domain
+    if body.kind == 'user':
+        # Report IDs B/G/X + digits map to the bank's X domain account.
+        match = re.fullmatch(r'[BGXbgx]([0-9]+)(@[^@]+)?', identity)
+        if match:
+            identity = 'X' + match[1] + (match[2] or '')
     if server and not re.fullmatch(r'(?![-.])(?!.*\.\.)[A-Za-z0-9_.-]{1,128}', server):
         raise HTTPException(400, 'Enter a domain or domain-controller hostname')
     # Validated values are additionally quoted as PowerShell literals.
