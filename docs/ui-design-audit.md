@@ -63,3 +63,5 @@ Map labels and drawing surfaces retain their own geometry to avoid clipping or c
 - Performance view/scan/PID controls and bulk rollout actions remain sticky beside long results. Short windows use the floating panel instead of a tall sticky performance block. Result tables scroll within bounded areas.
 - Native Draw.io iframe controls remain owned by the editor. Closed disclosures are reached through their summary, then indexed after opening.
 - Verified action search, field focus, original handlers, disabled/hidden and stale targets, Escape, and process termination confirmation tests. Demo browser inspection confirms live actions stay disabled.
+
+Actions panel correction: non-shrinking rows, capped 520px panel, one section heading per group and cleaned labels excluding select options. Verified no overlapping rows at default viewport and 600x650; panel stays within viewport. Existing action/field, disabled-state and Escape tests pass.

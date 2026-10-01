@@ -802,7 +802,9 @@ window.AtlasGroups = {
         .filter(node => visible(node) && !node.closest('dialog, .atlas-reachable-panel'))
         .map(node => {
           const field = /^(INPUT|SELECT|TEXTAREA)$/.test(node.tagName);
-          const label = node.getAttribute('aria-label') || (field ? node.labels?.[0]?.textContent.trim() || node.placeholder : node.textContent.trim()) || node.title;
+          const labelCopy = field ? node.labels?.[0]?.cloneNode(true) : null;
+          labelCopy?.querySelectorAll('input,select,textarea,button').forEach(n => n.remove());
+          const label = node.getAttribute('aria-label') || (field ? labelCopy?.textContent.trim() || node.placeholder : node.textContent.trim()) || node.title;
           const contextNode = node.closest('tr, article, .machine-card, .panel, section');
           const context = (contextNode?.querySelector('h2,h3,h4,th,td')?.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 100);
           return {node, field, label: label?.replace(/\s+/g, ' ').slice(0, 140), context};
@@ -812,12 +814,15 @@ window.AtlasGroups = {
       const query = search.value.trim().toLowerCase();
       const matches = entries.filter(e => `${e.label} ${e.context}`.toLowerCase().includes(query));
       list.replaceChildren();
-      status.textContent = `${matches.length} controls · Fields open for editing`;
+      status.textContent = `${matches.length} ${matches.length === 1 ? 'control' : 'controls'} · Select to open or run`;
+      let lastContext;
       for (const entry of matches) {
+        if(entry.context && entry.context !== lastContext){const heading=document.createElement('div');heading.className='atlas-action-group';heading.textContent=entry.context;list.append(heading);lastContext=entry.context;}
         const button = document.createElement('button'); button.type = 'button';
         button.disabled = entry.node.matches(':disabled') || entry.node.getAttribute('aria-disabled') === 'true';
         const label = document.createElement('span'); label.textContent = entry.label;
-        const context = document.createElement('small'); context.textContent = entry.context;
+        const context = document.createElement('small'); context.textContent = entry.field ? 'Edit field' : entry.node.tagName === 'SUMMARY' ? 'Expand / collapse' : 'Action';
+        button.title=entry.context ? entry.label+' · '+entry.context : entry.label;
         button.append(label, context);
         button.onclick = () => {
           // Recheck state at activation: navigation or live updates may have replaced the original.
