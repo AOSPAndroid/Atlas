@@ -43,7 +43,7 @@ const {fixture, root} = require('./ui_fixture.cjs');
   get('adminOut').querySelector('[data-process-index]').dispatchEvent(new w.KeyboardEvent('keydown',{bubbles:true,key:'F10',shiftKey:true}));
   menu.querySelector('button').click();get('confirmProcessKill').click();await settle();kills[1].resolve({count:0,failed:1,results:[{Process:'app.exe',PID:84,state:'failed',message:'Access denied'}]});await settle();
   assert(get('processStatus').textContent.includes('Access denied'));assert.equal(lists.length,5,'No retry after failed termination');
-  get('kill').value='other.exe';get('killBtn').click();assert(get('processKillDialog').open);get('cancelProcessKill').click();await settle();assert.equal(kills.length,2,'Manual termination also confirms');
+  assert(get('kill').compareDocumentPosition(get('adminOverview')) & 4,'Quick termination is before the overview and process list');get('kill').value='other.exe';get('kill').dispatchEvent(new w.KeyboardEvent('keydown',{key:'Enter',bubbles:true}));assert(get('processKillDialog').open);get('cancelProcessKill').click();await settle();assert.equal(kills.length,2,'Manual termination also confirms');
   open();menu.querySelector('button').click();get('adminPc').value='PC4';get('adminPc').dispatchEvent(new w.Event('input'));await settle();assert(!get('processKillDialog').open);assert.equal(kills.length,2,'Changing the machine cancels a pending confirmation');
   assert.equal(f.errors.length,0,f.errors.join('\n'));w.close();
   console.log('PASS: process menus, viewport bounds, keyboard, filtering, immutable target/PID, confirmation, duplicate protection, refresh and failure reporting');

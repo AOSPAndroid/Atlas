@@ -850,6 +850,12 @@ function bindProcessControls() {
       processSnapshot,
     );
   };
+  $("#kill").addEventListener("keydown", (event) => {
+    if(event.key === "Enter" && !event.isComposing) {
+      event.preventDefault();
+      $("#killBtn").click();
+    }
+  });
   $("#adminOut").addEventListener("contextmenu", (event) => {
     const row = event.target.closest("[data-process-index]");
     if (row) processMenu(event, Number(row.dataset.processIndex));

@@ -382,6 +382,11 @@
             Enter a machine, then click Scan Overview. Changing views never
             starts a scan.
           </p>
+          <div class="manual-termination" role="group" aria-label="Quick process termination">
+            <label for="kill">Terminate by PID / name</label>
+            <input id="kill" placeholder="PID or process.exe" autocomplete="off" />
+            <button id="killBtn" type="button">Terminate…</button>
+          </div>
           <div id="adminOverview"></div>
           <div class="row performance-filter">
             <input
@@ -395,16 +400,7 @@
             inspect CPU usage.
           </p>
           <div id="adminOut"></div>
-          <details class="manual-termination">
-            <summary>Terminate by PID or name</summary>
-            <div class="row">
-              <input id="kill" placeholder="PID or process" /><button
-                id="killBtn"
-              >
-                Terminate
-              </button>
-            </div>
-          </details>
+
         </div>
       </section>
       <section id="knowledge" class="page" aria-label="Knowledge Base"></section>

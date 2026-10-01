@@ -1046,3 +1046,8 @@ body .atlas-site-info details summary { cursor:pointer; font-size:12px; padding:
 .ad-object-details :is(td,th) { overflow-wrap:anywhere; }
 .ad-property-different td { background:#fff3da; color:#624308; }
 #adOverview > textarea { width:100%; min-height:120px; font-size:11px; }
+
+body.atlas-console .manual-termination { display:flex; flex-wrap:wrap; align-items:center; gap:5px; padding:5px 7px; margin:5px 0; border:1px solid var(--atlas-line); border-radius:7px; background:var(--atlas-surface); }
+body.atlas-console .manual-termination label { font-size:12px; font-weight:600; }
+body.atlas-console .manual-termination #kill { flex:0 1 200px; width:200px; min-width:120px; margin:0; }
+body.atlas-console .manual-termination #killBtn { color:var(--atlas-danger); margin:0; }
