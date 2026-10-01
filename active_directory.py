@@ -3,6 +3,7 @@ import json
 import re
 import secrets
 import subprocess
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Literal
 from fastapi import HTTPException, Request
@@ -30,6 +31,18 @@ def script_for(body):
     quote = lambda s: "'" + s.replace("'", "''") + "'"
     return '$kind=' + quote(body.kind) + ';$identity=' + quote(identity) + ';$server=' + quote(server) + ';' + (Path(__file__).parent/'scripts/active_directory.ps1').read_text(encoding='utf-8')
 
+def readable_error(error):
+    text = str(error)
+    if '<Objs' in text:
+        try:
+            root = ET.fromstring(text[text.index('<Objs'):text.rindex('</Objs>') + 7])
+            text = ' '.join(n.text or '' for n in root.iter() if n.tag.endswith('}S') and n.get('S') == 'Error')
+        except (ValueError, ET.ParseError):
+            return 'PowerShell could not complete the lookup. Check RSAT, domain connectivity and Domain / controller.'
+    text = re.sub(r'_x([0-9a-fA-F]{4})_', lambda m: chr(int(m[1], 16)), text)
+    text = re.split(r'\r?\n\s*(?:At line:|\+|CategoryInfo)', text)[0]
+    return ' '.join(text.split())[:900]
+
 def lookup(body, powershell):
     script = script_for(body)
     try:
@@ -37,13 +50,15 @@ def lookup(body, powershell):
         if len(output) > 1000000:
             raise ValueError('AD response exceeds the display limit')
         result = json.loads(output)
+        if isinstance(result, dict) and isinstance(result.get('error'), str):
+            raise ValueError(result['error'])
         if not isinstance(result, dict) or not isinstance(result.get('details'), dict) or not isinstance(result.get('groups'), list):
             raise ValueError('Unexpected directory response')
         return result
     except subprocess.TimeoutExpired:
         raise HTTPException(504, 'AD lookup timed out. Check domain connectivity and the selected server.')
     except Exception as error:
-        raise HTTPException(502, 'AD lookup failed: ' + str(error)[:1200]) from error
+        raise HTTPException(502, 'AD lookup failed: ' + readable_error(error)) from error
 
 def register(app, powershell):
     @app.post('/api/active-directory/lookup')

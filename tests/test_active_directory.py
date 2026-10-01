@@ -21,6 +21,13 @@ class ADTests(unittest.TestCase):
    with self.assertRaises(HTTPException):ad.lookup(payload,Mock(return_value=response))
   with self.assertRaises(HTTPException) as e:ad.lookup(payload,Mock(side_effect=subprocess.TimeoutExpired('powershell',35)))
   self.assertEqual(e.exception.status_code,504)
+ def test_readable_errors(self):
+  xml = '#< CLIXML\n<Objs xmlns="http://schemas.microsoft.com/powershell/2004/04"><S S="Error">Get-ADUser: Cannot find object._x000D__x000A_At line:14 char:1</S></Objs>'
+  self.assertEqual(ad.readable_error(xml),'Get-ADUser: Cannot find object.')
+  self.assertNotIn('Objs',ad.readable_error('# CLIXML <Objs broken'))
+  with self.assertRaises(HTTPException) as e:
+   ad.lookup(ad.Lookup(kind='user',identity='test'),Mock(return_value='{"error":"No user matched. Check server."}'))
+  self.assertIn('No user matched', e.exception.detail)
  def test_token_before_any_query(self):
   from atlas_api import TOKEN
   app=FastAPI();ps=Mock(return_value='{"details": {}, "groups": []}');ad.register(app,ps)

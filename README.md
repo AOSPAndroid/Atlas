@@ -408,3 +408,9 @@ Group lookup traverses parents of direct and primary groups, detects cycles, and
 Compare users or computers to see both health cards and a property matrix with differences highlighted. Existing group filters and CSV export include nested memberships. Copy support summary (also in the palette) includes both objects, query times, returned properties, group memberships, differences and warnings. No AD changes or additional remote health scans are performed.
 
 References: https://learn.microsoft.com/en-us/powershell/module/activedirectory/get-adgroup and https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-adts/f9e9b7e2-c7ac-4db6-ba38-71d9696981e9
+
+
+### AD identity lookup troubleshooting
+Atlas first resolves an exact logon name, SID or GUID. If a user account is not found, it checks exact account, UPN, mail, employeeID and employeeNumber values in the selected domain/controller (maximum two matches; ambiguous matches are rejected). Access errors do not trigger fallback. Use Domain / controller to match the server displayed in AD Users and Computers. No cross-domain guessing or directory changes are performed. Structured errors replace raw PowerShell CLIXML. Restart Atlas after updating the Python backend.
+
+Identity semantics: https://learn.microsoft.com/en-us/powershell/module/activedirectory/about/about_activedirectory_identity

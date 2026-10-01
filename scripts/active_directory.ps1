@@ -1,17 +1,31 @@
 $ErrorActionPreference='Stop'
 $ProgressPreference='SilentlyContinue'
+# Return a structured error rather than leaking PowerShell's CLIXML transport.
+trap { @{error=$_.Exception.Message} | ConvertTo-Json -Compress; exit 0 }
 if (!(Get-Module -ListAvailable ActiveDirectory)) { throw 'Install the RSAT Active Directory PowerShell module on the Atlas host using your approved software process.' }
 Import-Module ActiveDirectory -ErrorAction Stop
 $opts=@{}
 if($server){$opts.Server=$server}
 $common=@('CanonicalName','Description','Created','Modified','LastLogonDate','PasswordLastSet','PasswordNeverExpires','MemberOf','PrimaryGroupID')
+$scope=if($server){$server}else{'the default domain'}
+function Resolve-ExactUser {
+ param($value,$properties)
+ # Identity supports account/SID/GUID, but not employee IDs or email addresses.
+ if(!$value.Contains('@')) {
+  try { return Get-ADUser -Identity $value -Properties $properties @opts }
+  catch {
+   if($_.FullyQualifiedErrorId -notmatch 'ADIdentityNotFoundException' -and $_.Exception.GetType().Name -ne 'ADIdentityNotFoundException'){throw}
+  }
+ }
+ $filter="SamAccountName -eq '$value' -or UserPrincipalName -eq '$value' -or mail -eq '$value' -or employeeID -eq '$value' -or employeeNumber -eq '$value'"
+ $found=@(Get-ADUser -Filter $filter -ResultSetSize 2 -Properties $properties @opts)
+ if($found.Count -eq 0){throw "No user matched '$value' in $scope. Checked account, UPN, email, employee ID and employee number. Enter the exact logon name or set Domain / controller to the server used in Active Directory Users and Computers."}
+ if($found.Count -ne 1){throw "More than one user matched '$value' in $scope. Use the exact logon name or UPN; no account was selected."}
+ return $found[0]
+}
 if($kind -eq 'user') {
- $properties=$common+@('LockedOut','PasswordExpired','AccountExpirationDate','EmailAddress','Department','Title','Manager')
- if($identity.Contains('@')) {
-  $matches=@(Get-ADUser -Filter "UserPrincipalName -eq '$identity'" -Properties $properties @opts)
-  if($matches.Count -ne 1){throw 'The UPN did not resolve to exactly one user. Check the domain/server.'}
-  $o=$matches[0]
- } else { $o=Get-ADUser -Identity $identity -Properties $properties @opts }
+ $properties=$common+@('LockedOut','PasswordExpired','AccountExpirationDate','EmailAddress','Department','Title','Manager','EmployeeID','EmployeeNumber')
+ $o=Resolve-ExactUser $identity $properties
 } else {
  $o=Get-ADComputer -Identity $identity -Properties ($common+@('DNSHostName','OperatingSystem','OperatingSystemVersion')) @opts
 }
@@ -26,6 +40,7 @@ $details=[ordered]@{
  'Password last set'=(DateText $o.PasswordLastSet);'Password never expires'=$o.PasswordNeverExpires
 }
 if($kind -eq 'user') {
+ $details['Employee ID']=$o.EmployeeID;$details['Employee number']=$o.EmployeeNumber
  $details['Locked out']=$o.LockedOut;$details['Password expired']=$o.PasswordExpired
  $details['Account expiration']=DateText $o.AccountExpirationDate
  $details['Email']=$o.EmailAddress;$details['Department']=$o.Department;$details['Job title']=$o.Title;$details['Manager DN']=$o.Manager
