@@ -74,7 +74,7 @@
       for(const group of data.groups)lines.push(`[${group.membership||'Unknown'}] ${group.name} | ${group.description??'Description unavailable'} | ${group.dn||''}`);
     }
     if(secondary){const key=g=>String(g.dn||g.name).toLowerCase(),a=new Set(primary.groups.map(key)),b=new Set(secondary.groups.map(key));lines.push('','Only first object: '+primary.groups.filter(g=>!b.has(key(g))).map(g=>g.name).join(', '),'Only second object: '+secondary.groups.filter(g=>!a.has(key(g))).map(g=>g.name).join(', '));}
-    const access=document.querySelector('.ad-access-check');if(access)lines.push('','Access reference: '+(access.querySelector('select')?.selectedOptions[0]?.textContent||''),access.querySelector('.ad-access-results')?.textContent||'Not checked');
+    const access=document.querySelector('.ad-access-check');if(access)lines.push('','Access reference: '+(document.querySelector('[aria-label="DaaS or VDI access profile"]')?.selectedOptions[0]?.textContent||''),access.querySelector('.ad-access-results')?.textContent||'Not checked');
     lines.push('','Read-only evidence. Replicated logon is approximate; group membership is not proof of effective access.');return lines.join('\n');
   }
   let primary = null,
@@ -385,11 +385,12 @@
       by("Results").replaceChildren();
       this.groupActions = null;
       this.open();
+      window.AtlasEdges?.revealFor(by("Form"));
       if (run && identity && !window.AtlasReadOnly) by("Form").requestSubmit();
       else by("Identity").focus();
     },
     command(id) {
-      if(id === "ad-browser"){page("active-directory");const browser=document.getElementById("adBrowser");browser.open=true;browser.scrollIntoView({block:"start"});browser.querySelector("input").focus();return;}
+      if(id === "ad-browser"){page("active-directory");const browser=document.getElementById("adBrowser");browser.open=true;browser.scrollIntoView({block:"start"});const input=document.querySelector(".ad-browser-tools input");window.AtlasEdges?.revealFor(input);input?.focus();return;}
       if (id === "ad-user-groups")
         return this.show("user", S.user?.user_name || S.user?.email || "");
       if (id === "ad-machine-groups")
@@ -401,12 +402,16 @@
         "ad-filter-groups": "filter",
         "ad-export-groups": "export",
       }[id];
-      if (this.groupActions?.[action]) this.groupActions[action]();
+      if (this.groupActions?.[action]) {
+        window.AtlasEdges?.open("ad-result-tools");
+        this.groupActions[action]();
+      }
       else {
         by("Status").textContent =
           "Look up an AD object first to " +
           (action || "view") +
           " its groups.";
+        window.AtlasEdges?.revealFor(by("Form"));
         by("Identity").focus();
       }
     },

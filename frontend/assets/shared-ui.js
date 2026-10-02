@@ -791,7 +791,10 @@ window.AtlasGroups = {
     panel.setAttribute('aria-label', 'Actions on this page');
     panel.innerHTML = '<div class="atlas-reachable-heading"><strong>Actions on this page</strong><button type="button" aria-label="Close actions">×</button></div><input type="search" aria-label="Find a button or field" placeholder="Find a button or field…"><p role="status"></p><div class="atlas-reachable-list"></div>';
     const search = panel.querySelector('input'), list = panel.querySelector('.atlas-reachable-list'), status = panel.querySelector('[role="status"]');
-    const visible = node => node.isConnected && !node.closest('[hidden], [inert]') && node.getClientRects().length > 0;
+    const visible = node => {
+      const inert = node.closest('[inert]');
+      return node.isConnected && !node.closest('[hidden], .page:not(.active)') && node.getClientRects().length > 0 && (!inert || inert.classList.contains('atlas-edge-panel'));
+    };
     let entries = [];
     function close(restore = true) {
       panel.hidden = true; toggle.setAttribute('aria-expanded', 'false');
@@ -828,6 +831,7 @@ window.AtlasGroups = {
           // Recheck state at activation: navigation or live updates may have replaced the original.
           if (!visible(entry.node) || entry.node.matches(':disabled') || entry.node.getAttribute('aria-disabled') === 'true') { collect(); render(); return; }
           close(false);
+          window.AtlasEdges?.revealFor(entry.node);
           entry.node.scrollIntoView({block:'center', behavior:'instant'});
           entry.node.focus({preventScroll:true});
           if (!entry.field) entry.node.click();

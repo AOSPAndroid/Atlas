@@ -178,6 +178,7 @@
     }
     $("#activeApp").textContent = active ? apps[active].title : "Desktop";
   }
+  window.addEventListener("atlas-shell-resize", refresh);
   function activate(id) {
     const win = windows.get(id);
     if (!win) return;

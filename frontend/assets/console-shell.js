@@ -583,6 +583,7 @@ async function runSharedCommand(id) {
       return;
     }
     const control = document.querySelector(selector);
+    window.AtlasEdges?.revealFor(control);
     if (control?.closest("#deploymentPanel")) openDeploymentPanel();
     if (control?.closest("#packagePicker")) $("#packagePicker").open = true;
     for (
