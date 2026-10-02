@@ -4,6 +4,7 @@
   const panels = new Map(),
     modeKey = "atlas-controls-mode",
     pinKey = "atlas-controls-pins";
+  const edgeDepth = { top: 22, bottom: 22 };
   let automatic = true,
     pins = {},
     keyboard = false,
@@ -41,6 +42,7 @@
     return true;
   }
   function locked(panel) {
+    if (panel.node.getAttribute("aria-busy") === "true") return true;
     const active = document.activeElement;
     if (
       panel.node.contains(active) &&
@@ -101,9 +103,14 @@
     )
       return;
     clearTimeout(panel.openTimer);
+    panel.openTimer = null;
     clearTimeout(panel.closeTimer);
     for (const other of panels.values()) {
-      if (other === panel || other.edge !== panel.edge || !other.open) continue;
+      if (other === panel || other.edge !== panel.edge) continue;
+      // A delayed hover must never replace a panel explicitly opened by click.
+      clearTimeout(other.openTimer);
+      other.openTimer = null;
+      if (!other.open) continue;
       if (pins[other.id] || locked(other)) {
         if (!explicit) return;
         if (pins[other.id]) {
@@ -120,6 +127,7 @@
   }
   function hide(panel, force = false) {
     clearTimeout(panel.openTimer);
+    panel.openTimer = null;
     clearTimeout(panel.closeTimer);
     if (!automatic || (!force && (pins[panel.id] || locked(panel) || dragging)))
       return;
@@ -349,6 +357,17 @@
     }
     if (document.body.classList.contains("atlas-database")) {
       group(q("main > header"), "database-nav", ["a"], "Menu");
+      // Keep upload fields, their actions and feedback together. Review panels
+      // remain inside the hidden preview until validation has succeeded.
+      for (const [id, label] of [
+        ["directory", "Users & devices"],
+        ["directory-review", "Apply directory"],
+        ["seating", "Users & desks"],
+        ["seating-review", "Apply seating"],
+        ["moves", "Desk moves"],
+        ["moves-review", "Apply moves"],
+      ])
+        register(q(`[data-database-controls="${id}"]`), `database-${id}`, label);
       group(
         q("main"),
         "database-tools",
@@ -359,7 +378,7 @@
           ":scope > section > button",
           ":scope > section > a",
         ],
-        "Database tools",
+        "Templates & exports",
       );
     }
     if (document.body.classList.contains("atlas-desktop")) {
@@ -440,7 +459,9 @@
     }
     for (const edge of ["top", "bottom"]) {
       const property = `--atlas-${edge}-edge-rows`;
-      const value = String(Math.max(1, Math.ceil(counts[edge] / slots)));
+      const rows = Math.max(1, Math.ceil(counts[edge] / slots));
+      const value = String(rows);
+      edgeDepth[edge] = rows * (window.matchMedia("(pointer:coarse)").matches ? 32 : 22);
       if (document.documentElement.style.getPropertyValue(property) !== value)
         document.documentElement.style.setProperty(property, value);
     }
@@ -497,21 +518,29 @@
       return;
     // Refresh owns visibility. Pointer movement only measures handles at a
     // nearby edge; moving over content never needs a panel/layout scan.
+    let closest = null, distance = Infinity;
     for (const panel of panels.values()) {
       if (panel.handle.hidden) continue;
-      const near = panel.edge === "top" ? event.clientY <= 22
-        : panel.edge === "bottom" ? event.clientY >= innerHeight - 22
+      const near = panel.edge === "top" ? event.clientY <= edgeDepth.top
+        : panel.edge === "bottom" ? event.clientY >= innerHeight - edgeDepth.bottom
           : panel.edge === "left" ? event.clientX <= 22
             : event.clientX >= innerWidth - 22;
       let candidate = false;
       if (near) {
         const r = panel.handle.getBoundingClientRect();
         candidate = panel.edge === "top" || panel.edge === "bottom"
-          ? Math.abs(event.clientX - (r.left + r.width / 2)) <
+          ? event.clientY >= r.top - 8 && event.clientY <= r.top + r.height + 8 &&
+            Math.abs(event.clientX - (r.left + r.width / 2)) <
               Math.max(50, r.width / 2 + 20)
           : Math.abs(event.clientY - (r.top + r.height / 2)) < 70;
+        const d = (event.clientX - (r.left + r.width / 2)) ** 2 +
+          (event.clientY - (r.top + r.height / 2)) ** 2;
+        if (candidate && d < distance) { closest = panel; distance = d; }
       }
-      if (candidate) {
+    }
+    for (const panel of panels.values()) {
+      if (panel.handle.hidden) continue;
+      if (panel === closest) {
         clearTimeout(panel.closeTimer);
         if (!panel.open && !panel.openTimer)
           panel.openTimer = setTimeout(() => {

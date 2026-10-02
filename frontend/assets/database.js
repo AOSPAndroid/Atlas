@@ -1,8 +1,9 @@
 (() => {
   const $ = (id) => document.getElementById(id);
-  let token = "",
-    staged = null,
-    working = false;
+  let staged = null,
+    working = false,
+    operation = "",
+    interacted = false;
   const esc = (v) =>
     String(v ?? "").replace(
       /[&<>"']/g,
@@ -15,14 +16,18 @@
           "'": "&#39;",
         })[c],
     );
-  async function api(url, opts = {}) {
-    const r = await fetch(url, {
-      ...opts,
-      headers: { "X-Atlas-Token": token, ...opts.headers },
-    });
-    const d = await r.json();
-    if (!r.ok) throw Error(d.detail || "Request failed");
-    return d;
+  const api = (url, opts = {}) =>
+    window.AtlasClient.request(url, { ...opts, atlasSilent: true });
+  function message(text, scope = "directory") {
+    $(scope === "review" ? "review-message" : "directory-message").textContent =
+      text;
+    $("message").textContent = text;
+  }
+  function resetPreview() {
+    staged = null;
+    $("preview").hidden = true;
+    $("full").checked = false;
+    $("confirm").value = "";
   }
   function controls() {
     $("apply").disabled =
@@ -33,29 +38,52 @@
     $("validate").disabled = working;
     $("file").disabled = working;
     $("cancel").disabled = working;
+    $("full").disabled = working;
+    $("confirm").disabled = working;
+    $("validate").textContent =
+      operation === "validate" ? "Validating…" : "Validate and preview";
+    $("apply").textContent =
+      operation === "apply" ? "Applying…" : "Back up and apply";
+    $("directory-progress").hidden =
+      !working || operation === "apply" || operation === "cancel";
+    $("review-progress").hidden =
+      !working || (operation !== "apply" && operation !== "cancel");
+    document
+      .querySelector('[data-database-controls="directory"]')
+      .setAttribute("aria-busy", String(!$("directory-progress").hidden));
+    document
+      .querySelector('[data-database-controls="directory-review"]')
+      .setAttribute("aria-busy", String(!$("review-progress").hidden));
     document
       .querySelectorAll("[data-restore]")
       .forEach((b) => (b.disabled = working));
   }
-  async function task(fn) {
+  async function task(action, fn) {
     if (working) return;
+    interacted = true;
     working = true;
+    operation = action;
     controls();
     try {
       await fn();
     } catch (e) {
-      $("message").textContent = e.message;
+      message(
+        e.message + " You can try again.",
+        action === "apply" || action === "cancel" ? "review" : "directory",
+      );
     } finally {
       working = false;
+      operation = "";
       controls();
     }
   }
-  async function status() {
+  async function status(summary = !interacted) {
     const d = await api("/api/database/status");
     if ($("coverage") && d.coverage)
       $("coverage").innerHTML = coverage(d.coverage);
-    $("message").textContent =
-      `${d.counts.users.toLocaleString()} users · ${d.counts.machines.toLocaleString()} machines · ${d.counts.assignments.toLocaleString()} relationships${d.busy ? " — jobs active; imports are blocked." : ""}`;
+    if (summary && !interacted)
+      $("message").textContent =
+        `${d.counts.users.toLocaleString()} users · ${d.counts.machines.toLocaleString()} machines · ${d.counts.assignments.toLocaleString()} relationships${d.busy ? " — jobs active; imports are blocked." : ""}`;
     $("history").innerHTML = d.history.length
       ? d.history
           .map(
@@ -67,10 +95,10 @@
     document.querySelectorAll("[data-restore]").forEach(
       (b) =>
         (b.onclick = () =>
-          task(async () => {
-            staged = null;
-            $("preview").hidden = true;
-            $("message").textContent = "Preparing backup comparison…";
+          task("restore", async () => {
+            resetPreview();
+            message("Preparing backup comparison…");
+            window.AtlasEdges?.revealFor($("file"));
             show(
               await api("/api/database/restore-preview/" + b.dataset.restore, {
                 method: "POST",
@@ -78,6 +106,7 @@
             );
           })),
     );
+    controls();
   }
   function show(d) {
     staged = d.id;
@@ -112,18 +141,38 @@
       2,
     );
     $("preview").hidden = false;
-    $("message").textContent =
-      "Preview ready. No directory data has changed. Preview expires after one hour.";
+    message(
+      "Preview ready. No directory data has changed. Review the changes below; the preview expires after one hour.",
+    );
+    $("review-message").textContent =
+      "Review the removals, confirm the complete snapshot, then type APPLY to enable saving.";
+    $("preview").scrollIntoView({ block: "start", behavior: "instant" });
+    window.AtlasEdges?.refresh();
+    window.AtlasEdges?.revealFor($("full"));
   }
+  $("file").onchange = () => {
+    interacted = true;
+    resetPreview();
+    const file = $("file").files[0];
+    message(
+      file
+        ? `${file.name} selected · ${(file.size / 1024 / 1024).toFixed(1)} MB. Click Validate and preview. Large extracts can take a few minutes.`
+        : "Choose your users and devices workbook, then validate it.",
+    );
+    controls();
+  };
   $("validate").onclick = () =>
-    task(async () => {
+    task("validate", async () => {
+      resetPreview();
       const file = $("file").files[0];
       if (!file) throw Error("Choose an Excel workbook.");
       if (!file.name.toLowerCase().endsWith(".xlsx"))
         throw Error("Use an .xlsx workbook.");
-      staged = null;
-      $("preview").hidden = true;
-      $("message").textContent = "Validating and comparing your extract…";
+      if (file.size > 50 * 1024 * 1024)
+        throw Error("Excel file exceeds the 50 MB upload limit.");
+      message(
+        `Validating ${file.name} and comparing your extract… Large extracts can take a few minutes. Keep this page open.`,
+      );
       show(
         await api("/api/database/preview", {
           method: "POST",
@@ -136,8 +185,8 @@
       );
     });
   $("apply").onclick = () =>
-    task(async () => {
-      $("message").textContent = "Backing up and applying directory changes…";
+    task("apply", async () => {
+      message("Backing up and applying directory changes…", "review");
       const d = await api("/api/database/apply/" + staged, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -146,21 +195,32 @@
           full_snapshot: $("full").checked,
         }),
       });
-      staged = null;
-      $("preview").hidden = true;
-      await status();
-      $("message").textContent +=
-        "\nImport completed. Backup: " +
+      resetPreview();
+      const completed =
+        "Import completed. Backup: " +
         d.backup +
         "\nReload any open Atlas or console tabs to refresh displayed records.";
+      message(completed);
+      window.AtlasEdges?.refresh();
+      window.AtlasEdges?.revealFor($("file"));
+      try {
+        await status(false);
+      } catch {
+        message(
+          completed +
+            "\nCounts and history could not refresh. Reload this page to see them.",
+        );
+      }
     });
   $("cancel").onclick = () =>
-    task(async () => {
+    task("cancel", async () => {
+      message("Discarding preview…", "review");
       if (staged)
         await api("/api/database/preview/" + staged, { method: "DELETE" });
-      staged = null;
-      $("preview").hidden = true;
-      $("message").textContent = "Preview discarded. Directory unchanged.";
+      resetPreview();
+      message("Preview discarded. Directory unchanged.");
+      window.AtlasEdges?.refresh();
+      window.AtlasEdges?.revealFor($("file"));
     });
   $("full").onchange = controls;
   $("confirm").oninput = controls;
@@ -175,8 +235,14 @@
         .join("")
     );
   }
-  task(async () => {
-    token = (await api("/api/session")).token;
-    await status();
+  // Loading counts and history must not disable uploads. Mutation requests
+  // acquire a session lazily and recover on the next click after expiry.
+  controls();
+  status().catch((e) => {
+    if (!interacted)
+      $("message").textContent =
+        "Database status unavailable: " +
+        e.message +
+        " You can still validate a workbook.";
   });
 })();
