@@ -247,14 +247,12 @@
         "admin-tools",
         [
           ".admin-tools",
-          ".performance-views",
-          ".performance-view-heading > .row",
-          ".process-filter-field",
           ".quick-process-actions",
           ".manual-termination-disclosure",
         ],
-        "Remote tools",
+        "Machine tools",
       );
+      group(admin, "scan-tools", [".performance-views", ".performance-view-heading > .row"], "Scan & views");
       group(
         q("#workspace"),
         "workspace-tools",

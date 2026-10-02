@@ -10,9 +10,9 @@ const performanceViews = {
   },
   cpu: {
     label: "CPU",
-    title: "CPU & threads",
+    title: "CPU & processes",
     description:
-      "Find busy processes, saturated logical processors and CPU queues. Inspect threads only when needed.",
+      "Total usage, every logical processor and the busiest processes in one snapshot.",
   },
   gpu: {
     label: "GPU",
@@ -53,6 +53,8 @@ function invalidateProcesses() {
   performanceInFlight = null;
   performanceCache.clear();
   performanceErrors.clear();
+  $("#cpuProcessScope").value = "all";
+  $("#cpuProcessSort").value = "cpu";
   $("#adminUtility").replaceChildren();
   $("#adminUtility").hidden = true;
   $("#quickKillStatus").textContent = "";
@@ -64,10 +66,12 @@ function selectPerformanceView(kind) {
   window.AtlasDiagnostics?.stop();
   closeProcessSelection();
   activePerformance = kind;
+  $("#admin").dataset.performanceView = kind;
+  $("#cpuProcessControls").hidden = kind !== "cpu";
   processSnapshot = performanceCache.get(kind) || null;
   if (processSnapshot?.computer !== adminComputer()) processSnapshot = null;
   S.processes = processSnapshot?.data.items || [];
-  document.querySelectorAll("[data-performance]").forEach((button) => {
+  document.querySelectorAll("button[data-performance]").forEach((button) => {
     button.setAttribute(
       "aria-pressed",
       String(button.dataset.performance === kind),
@@ -76,7 +80,9 @@ function selectPerformanceView(kind) {
   $("#performanceTitle").textContent = performanceViews[kind].title;
   $("#performanceDescription").textContent = performanceViews[kind].description;
   $("#processHint").textContent =
-    kind === "cpu" || kind === "overview"
+    kind === "cpu"
+      ? "Right-click for process actions · Click a thread count for a manual CPU thread sample."
+      : kind === "overview"
       ? "Right-click a process for actions, or click its thread count to inspect CPU usage. Thread inspection is a separate manual scan."
       : "Right-click a process for actions. Values reflect the last scan; refresh to check for changes.";
   $("#processHint").hidden = !processSnapshot;
@@ -118,6 +124,8 @@ function updatePerformanceControls() {
   $("#diagnoseSlowness").disabled =
     !!window.AtlasReadOnly || !adminComputer() || !!busy || !!capturing;
   $("#copyPerformance").disabled = !processSnapshot;
+  $("#cpuProcessScope").disabled = !processSnapshot;
+  $("#cpuProcessSort").disabled = !processSnapshot;
   updateProcessActionControls();
   $("#adminOut").setAttribute("aria-busy", String(!!busy));
   if (processSnapshot) renderProcesses();
@@ -280,7 +288,9 @@ function renderProcesses() {
   closeProcessMenu();
   if (!processSnapshot || processSnapshot.computer !== adminComputer()) return;
   const kind = processSnapshot.kind,
-    q = $("#processFilter").value.trim().toLowerCase();
+    q = $("#processFilter").value.trim().toLowerCase(),
+    scope = kind === "cpu" ? $("#cpuProcessScope").value : "all",
+    sort = kind === "cpu" ? $("#cpuProcessSort").value : "";
   const rows = S.processes
     .map((row, index) => ({ row, index }))
     .filter(({ row }) =>
@@ -289,11 +299,22 @@ function renderProcesses() {
           .toLowerCase()
           .includes(q),
       ),
-    );
+    )
+    .filter(({ row }) => scope === "all" || (perfNumber(row.CPU) != null && row.CPU >= (scope === "busy" ? 10 : 1)));
+  if (kind === "cpu") {
+    rows.sort((a, b) => {
+      if (sort === "name") return String(a.row.Process || "").localeCompare(String(b.row.Process || ""), undefined, { sensitivity: "base" }) || a.index-b.index;
+      if (sort === "pid") return (perfNumber(a.row.PID) ?? Infinity)-(perfNumber(b.row.PID) ?? Infinity) || a.index-b.index;
+      const field = sort === "threads" ? "Threads" : "CPU";
+      return (perfNumber(b.row[field]) ?? -Infinity)-(perfNumber(a.row[field]) ?? -Infinity) || a.index-b.index;
+    });
+  }
   const error = performanceErrors.get(kind),
-    busy = performanceInFlight;
+    busy = performanceInFlight,
+    total = processSnapshot.data.total_processes ?? S.processes.length,
+    ordering = kind === "cpu" ? ({cpu:"CPU",threads:"threads",name:"process name",pid:"PID"}[sort] || "CPU") : kind === "memory" ? "resident memory" : kind === "overview" ? "CPU" : kind.toUpperCase();
   $("#processStatus").textContent =
-    `${processSnapshot.computer} · ${S.processes.length} of ${processSnapshot.data.total_processes ?? S.processes.length} processes · Sorted by ${kind === "memory" ? "resident memory" : kind === "overview" ? "CPU" : kind.toUpperCase()} · Checked ${processSnapshot.checked}${q ? ` · ${rows.length} matching` : ""}${busy ? ` · Scanning ${performanceViews[busy.kind].label}… Previous result shown.` : window.AtlasDiagnostics?.isRunning() ? " · Slowness capture running." : " · Snapshot; no scan running."}${error ? ` · ${error}` : ""}`;
+    `${processSnapshot.computer} · ${S.processes.length} of ${total} ${kind === "cpu" ? "returned" : `processes returned · Sorted by ${ordering}`} · Checked ${processSnapshot.checked}${q || scope !== "all" ? ` · ${rows.length} matching` : ""}${busy ? ` · Scanning ${performanceViews[busy.kind].label}… Previous result shown.` : window.AtlasDiagnostics?.isRunning() ? " · Slowness capture running." : kind === "cpu" ? "" : " · Snapshot; no scan running."}${error ? ` · ${error}` : ""}`;
   const columns = performanceColumns(kind);
   $("#processCount").textContent =
     `${rows.length} of ${processSnapshot.data.total_processes ?? S.processes.length}`;
@@ -451,7 +472,34 @@ function performanceComparison(snapshot) {
 function perfStat(label, value, detail, tone = "") {
   return `<article class="perf-card ${tone}"><div><h3>${esc(label)}</h3><strong class="perf-big">${esc(value)}</strong><p>${esc(detail)}</p></div></article>`;
 }
+function renderCPUPerformance(snapshot) {
+  const s = performanceSummary(snapshot), cores = s.cores || [],
+    measured = cores.map(core => ({core, value:perfNumber(core.percent)})).filter(c => c.value != null),
+    busiest = measured.reduce((best, current) => !best || current.value > best.value ? current : best, null),
+    queue = perfNumber(s.processor_queue), logical = perfNumber(s.logical_processors),
+    notes = performanceInsights(s), warnings = snapshot.data.warnings || [];
+  const stat = (label, value, detail = "", tone = "") => `<div class="cpu-stat ${tone}"><span>${esc(label)}</span><b>${esc(value)}</b>${detail ? `<small>${esc(detail)}</small>` : ""}</div>`;
+  const summary = `<div class="cpu-summary" aria-label="CPU summary">
+    <div class="cpu-stat cpu-total ${perfTone(s.cpu_percent,70,85)}"><span>Total CPU</span>${perfMeter(s.cpu_percent,70,85)}<small>Across all logical processors</small></div>
+    ${stat("Busiest logical CPU",perfValue(busiest?.value,"%"),busiest ? `CPU ${busiest.core.name}` : "Counter unavailable",perfTone(busiest?.value,70,90))}
+    ${stat("Queued threads",perfValue(queue),logical == null ? "Logical CPU count unavailable" : `${perfValue(logical)} logical CPUs`,queue != null && logical > 0 && queue > logical ? "perf-warn" : "")}
+    ${stat("Threads",perfValue(s.thread_count))}
+    ${stat("Context switches / s",perfValue(s.context_switches_sec))}
+    ${stat("Logical CPUs",perfValue(logical),`${measured.length} usable counters`)}
+  </div>`;
+  const activity = `<section class="cpu-core-panel" aria-label="Logical processor activity"><div class="cpu-core-heading"><b>Logical processor activity</b><small>${cores.length ? `${measured.length} of ${cores.length} returned counters available` : "Counters unavailable"}</small></div>
+    ${cores.length ? `<div class="perf-cores cpu-core-grid" tabindex="0" aria-label="All returned logical processor readings">${cores.map(core => {const value=perfNumber(core.percent);return `<div class="cpu-core ${perfTone(value,70,90)}" aria-label="Logical CPU ${esc(core.name)}: ${value == null ? "unavailable" : perfValue(value,"%")}"><span>CPU ${esc(core.name)}</span><b>${perfValue(value,"%")}</b><i style="--usage:${value == null ? 0 : Math.min(100,Math.max(0,value))}%" aria-hidden="true"></i></div>`}).join("")}</div>` : '<p class="perf-unavailable">Windows did not return logical processor counters for this scan.</p>'}
+  </section>`;
+  const evidence = `<details class="cpu-reading-details"><summary>CPU interpretation${notes.length ? ` · ${notes.length} cues` : ""}${warnings.length ? ` · Partial scan: ${warnings.length} counter groups unavailable` : ""}</summary>
+    ${notes.length ? `<ul>${notes.map(note => `<li>${esc(note)}</li>`).join("")}</ul>` : '<p>No CPU warning threshold crossed among available counters in this sample.</p>'}
+    <p>Process CPU % is relative to all logical processors. A busy logical CPU can indicate a single saturated thread even when total CPU is low. Use a process's thread count to sample its threads. Queue depth and thread counts need comparison across scans to establish sustained pressure.</p>
+    <p>These are sampled readings. CPU ≥85%, logical CPU ≥90% and process CPU ≥25% are investigation cues. Missing counters remain unavailable. Compare manual scans while reproducing the issue.</p>
+    ${warnings.length ? `<ul>${warnings.map(warning => `<li>${esc(warning)}</li>`).join("")}</ul>` : ""}
+  </details>`;
+  $("#adminOverview").innerHTML = `<div class="cpu-results">${summary}${activity}${performanceComparison(snapshot)}${evidence}</div>`;
+}
 function renderPerformance() {
+  if (processSnapshot.kind === "cpu") return renderCPUPerformance(processSnapshot);
   const data = processSnapshot.data,
     kind = processSnapshot.kind,
     s = performanceSummary(processSnapshot);
@@ -494,24 +542,7 @@ function renderPerformance() {
   let cards = "",
     detail = "",
     extra = "";
-  if (kind === "cpu") {
-    cards =
-      cpu() +
-      perfStat(
-        "CPU queue",
-        perfValue(s.processor_queue),
-        `${perfValue(s.logical_processors)} logical processors available. Repeat the scan to check whether contention persists.`,
-        s.logical_processors > 0 && s.processor_queue > s.logical_processors
-          ? "perf-warn"
-          : "",
-      ) +
-      perfStat(
-        "Threads",
-        perfValue(s.thread_count),
-        `${perfValue(s.context_switches_sec, "/s")} context switches. A high thread count alone does not mean overload.`,
-      );
-    detail = `<details class="perf-details perf-resource-detail"><summary>Logical processor activity (${cores.length} processors)</summary><p class="muted">One busy logical processor can limit an application even when total CPU looks low. Click a process's thread count below to investigate.</p>${coreGrid}</details>`;
-  } else if (kind === "gpu") {
+  if (kind === "gpu") {
     const engines = s.gpu_engines || [],
       adapters = [...new Set(engines.map((e) => e.adapter))].sort();
     cards =
@@ -585,7 +616,6 @@ function renderPerformance() {
     detail = `<details class="perf-details"><summary>Processor activity & disks</summary><p class="muted">${esc(s.os || "Windows version unavailable")} · ${esc(s.model || "Model unavailable")} · Console logon: ${esc(s.console_user || "Not reported")}</p>${coreGrid}<div class="tablewrap"><table><thead><tr><th>Physical disk</th><th>Read response</th><th>Write response</th><th>Queue</th><th>Read / sec</th><th>Write / sec</th></tr></thead><tbody>${disks.map((d) => `<tr><td>${esc(d.name)}</td><td class="${perfTone(d.read_ms, 20, 50)}">${perfValue(d.read_ms, " ms")}</td><td class="${perfTone(d.write_ms, 20, 50)}">${perfValue(d.write_ms, " ms")}</td><td>${perfValue(d.queue)}</td><td>${perfBytes(d.read_bytes_sec)}</td><td>${perfBytes(d.write_bytes_sec)}</td></tr>`).join("")}</tbody></table></div><div class="perf-facts">${volumes.map((v) => `<span class="${perfNumber(v.free_percent) != null && v.free_percent < 10 ? "perf-high" : ""}">${esc(v.name)} <b>${perfBytes(v.free_bytes)} / ${perfBytes(v.total_bytes)} free (${perfValue(v.free_percent, "%")})</b></span>`).join("")}</div></details>`;
   }
   const guides = {
-    cpu: "Process CPU % is relative to all logical processors. Thread inspection also shows usage of one logical processor, making a saturated thread easier to spot. Red process CPU ≥25%, amber ≥10%; 500+ threads is an amber cue only. Counter rates use the target's timestamps across at least one second.",
     gpu: "GPU usage is each process's busiest reported engine. Overall usage is the busiest physical engine across processes; engines are not added together. Process GPU ≥80% is red, ≥50% amber. Missing process counters remain unknown, not zero. GPU memory is not measured by this scan. These readings do not measure Citrix connection latency.",
     memory:
       "Resident memory is physical RAM currently occupied by a process; RAM % divides it by usable RAM. Shared pages may occur in multiple processes, so do not sum working sets. Private commit is memory reserved for the process that must be backed by RAM or the page file, not necessarily resident RAM. Page faults include soft and hard faults; paging reads can include mapped files. Red process RAM ≥20%, amber ≥10%. A single large allocation does not establish a leak.",
@@ -889,7 +919,9 @@ function processMenu(event, index) {
 function bindProcessControls() {
   $("#adminPc").addEventListener("input", invalidateProcesses);
   $("#processFilter").oninput = renderProcesses;
-  document.querySelectorAll("[data-performance]").forEach((button) => {
+  $("#cpuProcessScope").onchange = renderProcesses;
+  $("#cpuProcessSort").onchange = renderProcesses;
+  document.querySelectorAll("button[data-performance]").forEach((button) => {
     button.onclick = () => selectPerformanceView(button.dataset.performance);
   });
   $("#refreshProcesses").onclick = () => admin(activePerformance);

@@ -433,6 +433,19 @@
                   disabled
                 />
               </label>
+              <div id="cpuProcessControls" class="cpu-process-controls" hidden>
+                <label>Show<select id="cpuProcessScope" disabled>
+                  <option value="all">All returned processes</option>
+                  <option value="active">CPU ≥ 1%</option>
+                  <option value="busy">CPU ≥ 10%</option>
+                </select></label>
+                <label>Sort<select id="cpuProcessSort" disabled>
+                  <option value="cpu">CPU · highest first</option>
+                  <option value="threads">Threads · highest first</option>
+                  <option value="name">Process name</option>
+                  <option value="pid">PID</option>
+                </select></label>
+              </div>
             </div>
             <div
               class="quick-process-actions"
