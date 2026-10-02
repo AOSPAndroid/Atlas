@@ -484,25 +484,23 @@
       event.pointerType === "touch"
     )
       return;
-    const handles = [...panels.values()].filter((panel) => eligible(panel));
-    const candidates = handles.filter((panel) => {
-      const r = panel.handle.getBoundingClientRect();
-      return panel.edge === "top"
-        ? event.clientY <= 22 &&
-            Math.abs(event.clientX - (r.left + r.width / 2)) <
+    // Refresh owns visibility. Pointer movement only measures handles at a
+    // nearby edge; moving over content never needs a panel/layout scan.
+    for (const panel of panels.values()) {
+      if (panel.handle.hidden) continue;
+      const near = panel.edge === "top" ? event.clientY <= 22
+        : panel.edge === "bottom" ? event.clientY >= innerHeight - 22
+          : panel.edge === "left" ? event.clientX <= 22
+            : event.clientX >= innerWidth - 22;
+      let candidate = false;
+      if (near) {
+        const r = panel.handle.getBoundingClientRect();
+        candidate = panel.edge === "top" || panel.edge === "bottom"
+          ? Math.abs(event.clientX - (r.left + r.width / 2)) <
               Math.max(50, r.width / 2 + 20)
-        : panel.edge === "bottom"
-          ? event.clientY >= innerHeight - 22 &&
-            Math.abs(event.clientX - (r.left + r.width / 2)) <
-              Math.max(50, r.width / 2 + 20)
-          : panel.edge === "left"
-            ? event.clientX <= 22 &&
-              Math.abs(event.clientY - (r.top + r.height / 2)) < 70
-            : event.clientX >= innerWidth - 22 &&
-              Math.abs(event.clientY - (r.top + r.height / 2)) < 70;
-    });
-    for (const panel of handles) {
-      if (candidates.includes(panel)) {
+          : Math.abs(event.clientY - (r.top + r.height / 2)) < 70;
+      }
+      if (candidate) {
         clearTimeout(panel.closeTimer);
         if (!panel.open && !panel.openTimer)
           panel.openTimer = setTimeout(() => {

@@ -45,7 +45,6 @@ const softwareState = {
   software: new Map(),
   currentSoftware: [],
   softwareTarget: "",
-  health: null,
 };
 const navigationIcons = {
   knowledge: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h7l2 2 2-2h7v15h-7l-2 2-2-2H3zM12 6v15M6 8h3m-3 4h3m6-4h3m-3 4h3"/></svg>',

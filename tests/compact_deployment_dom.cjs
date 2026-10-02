@@ -184,6 +184,8 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 15));
     "true",
   );
 
+  run('page("bulk")');
+  await settle();
   const bulk = doc.querySelector("#bulkPkg");
   bulk.value = "B";
   bulk.dispatchEvent(new w.Event("change", { bubbles: true }));
@@ -210,6 +212,7 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 15));
   assert.deepEqual(bulkWrites[0].computers, ["PC-A", "PC-B"]);
   bulkSubmit();
   await bulkRun;
+  run('page("workspace")');
   doc.querySelector("#fresh").click();
   const deployment = run("deploy()");
   await settle();

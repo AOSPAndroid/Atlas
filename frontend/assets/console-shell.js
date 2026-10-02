@@ -38,6 +38,7 @@ function page(id) {
   if (id === "history") loadDeploymentHistory();
   if (id === "psexec") window.AtlasPsExec?.open();
   if (id === "active-directory") window.AtlasAD?.open();
+  if (id === "bulk" && !bulkCatalogueLoaded && !bulkBusy) bulkPackages();
   syncDeploymentPanel();
 }
 async function init() {
@@ -46,7 +47,6 @@ async function init() {
   $("#health").innerHTML =
     `Version ${h.version}<br>${h.database ? "●" : "○"} Database · ${h.users.toLocaleString()} users<br>${h.machines.toLocaleString()} machines<br>${h.repository ? "●" : "○"} Repository`;
   await packages();
-  await bulkPackages();
   renderRecent();
   $("#search").focus();
 }

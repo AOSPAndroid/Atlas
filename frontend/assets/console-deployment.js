@@ -229,9 +229,6 @@ async function scripts() {
     }
   }
 }
-function packageFolder(pkg) {
-  return pkg;
-}
 async function preflight() {
   if (!S.target) return;
   const pc = S.target;
@@ -266,7 +263,7 @@ async function deploy(mode = "full") {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         computer: target,
-        folder: packageFolder(pkg),
+        folder: pkg,
         script: $("#script").value,
         action: $("#action").value,
         fresh: $("#fresh").checked,
@@ -329,9 +326,11 @@ function renderFav() {
   let p = prefs(),
     pkg = $("#pkg").value;
   const favourite = p.favs.includes(pkg);
-  $("#favBtn").textContent = favourite ? "★" : "☆";
-  $("#favBtn").setAttribute("aria-pressed", String(favourite));
-  $("#favBtn").disabled = !pkg || packageBusy || $("#packagePicker").open;
+  const button = $("#favBtn"), text = favourite ? "★" : "☆",
+    pressed = String(favourite), disabled = !pkg || packageBusy || $("#packagePicker").open;
+  if (button.textContent !== text) button.textContent = text;
+  if (button.getAttribute("aria-pressed") !== pressed) button.setAttribute("aria-pressed", pressed);
+  if (button.disabled !== disabled) button.disabled = disabled;
 }
 function toggleFav() {
   let p = prefs(),
@@ -383,7 +382,7 @@ function bulkTargets() {
     ),
   ];
 }
-let bulkBusy = false, bulkSubmitting = false;
+let bulkBusy = false, bulkSubmitting = false, bulkCatalogueLoaded = false;
 async function bulkPackages() {
   const request = bulkPackageRequest();
   bulkBusy = true;
@@ -405,6 +404,7 @@ async function bulkPackages() {
     if (previous && !d.items.some(item => item.folder === previous))
       $("#bulkPkg").add(new Option(label || previous, previous));
     $("#bulkPkg").value = previous || d.items[0]?.folder || "";
+    bulkCatalogueLoaded = true;
     await bulkScripts();
   } catch (e) {
     if (e.name !== "AbortError" && request.current()) toast(e.message);
@@ -445,7 +445,7 @@ async function startBulk() {
   if (!pcs.length) return toast("Enter targets");
   if (!$("#bulkPkg").value || $("#bulkScript").disabled || !$("#bulkScript").value)
     return toast("Choose a package with an available action script");
-  const payload = { computers: pcs, folder: packageFolder($("#bulkPkg").value),
+  const payload = { computers: pcs, folder: $("#bulkPkg").value,
     script: $("#bulkScript").value, action: $("#bulkAction").value,
     fresh: $("#bulkFresh").checked, threads: +$("#bulkThreads").value,
     concurrency: +$("#concurrency").value };
@@ -557,7 +557,7 @@ function currentPackagePayload(mode = "full") {
   const pkg = document.querySelector("#pkg").value;
   return {
     computer: S.target,
-    folder: packageFolder(pkg),
+    folder: pkg,
     script: document.querySelector("#script").value,
     action: document.querySelector("#action").value,
     fresh: document.querySelector("#fresh").checked,
@@ -887,16 +887,16 @@ function refreshConsoleSummary() {
       !script.value ||
       deploySubmitting;
   for (const button of [$("#deploy"), $("#copyOnly"), $("#execOnly")])
-    button.disabled = unavailable;
+    if (button.disabled !== unavailable) button.disabled = unavailable;
 
-  $("#deploy").textContent = deploySubmitting ? "Starting…" : $("#action").value + " on " + (S.target || "machine");
-  for (const button of document.querySelectorAll("[data-deploy-action]"))
-    button.setAttribute(
-      "aria-pressed",
-      String(button.dataset.deployAction === $("#action").value),
-    );
-  if (host)
-    host.textContent = packageBusy
+  const label = deploySubmitting ? "Starting…" : $("#action").value + " on " + (S.target || "machine");
+  if ($("#deploy").textContent !== label) $("#deploy").textContent = label;
+  for (const button of document.querySelectorAll("[data-deploy-action]")) {
+    const pressed = String(button.dataset.deployAction === $("#action").value);
+    if (button.getAttribute("aria-pressed") !== pressed) button.setAttribute("aria-pressed", pressed);
+  }
+  if (host) {
+    const text = packageBusy
       ? "Loading packages…"
       : choosing
         ? "Choose a package to continue."
@@ -907,5 +907,7 @@ function refreshConsoleSummary() {
             : !script.value
               ? "No script for this action."
               : "";
+    if (host.textContent !== text) host.textContent = text;
+  }
   renderFav();
 }

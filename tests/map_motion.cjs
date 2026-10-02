@@ -412,7 +412,11 @@ const { fixture, root } = require("./ui_fixture.cjs");
         people[0].id,
         "viewer right-click still inspects the desk",
       );
-      assert.equal(w.document.querySelector(".desk-menu"), null);
+      const menu = w.document.querySelector(".desk-menu");
+      assert(menu, "viewer right-click exposes the stored-directory group lookup");
+      assert.equal(menu.querySelectorAll("button").length, 1);
+      assert.equal(menu.querySelector("button").textContent, "See groups");
+      assert.equal(menu.querySelector("[data-action]"), null, "viewer has no desk editing actions");
     } else {
       assert(
         w.document.querySelector(".desk-menu"),

@@ -71,7 +71,6 @@ document.querySelector("#map-labels").parentElement.append(mapPanel);
 const settingsBody = mapPanel.querySelector(".map-settings-body");
 const settingsView = mapPanel.querySelector(".map-settings-view");
 settingsView.append($(".view-switch"), $("#name-tags").closest("label"));
-const displayControl = document.querySelector(".atlas-display-mode");
 // Display stays in the shared More menu.
 settingsBody.append($(".map-tools"));
 for (const [layer, title] of [
