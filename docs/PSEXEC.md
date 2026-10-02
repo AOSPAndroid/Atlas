@@ -1,6 +1,6 @@
 # PsExec terminal and command workbench
 
-Open **IT Console → PsExec**, below **History**. Atlas can now run commands through your existing PsExec installation and display live output in the embedded terminal. There are **30 templates**. Nothing starts when you open the page, select a machine or browse commands: click **Run on target** explicitly.
+Open **IT Console → PsTools**, below **History**. Atlas runs commands through your existing PsExec and adjacent PsTools executables and displays live output in the embedded terminal. There are **72 templates** across the tool families. Nothing starts when you open the page, select a machine or browse commands: click **Run on target** explicitly.
 
 ## Run a command
 
@@ -29,7 +29,7 @@ This is a line-oriented Command Prompt, not a full terminal emulator. Full-scree
 
 ## First run and troubleshooting
 
-Atlas checks the executable and the current Windows account's PsExec licence-acceptance record before launch. If the licence has not been accepted, open PsExec once on the Atlas host under that same account and review Microsoft's prompt. Atlas does not accept the licence automatically, download PsExec or store credentials.
+Atlas checks that the selected tool exists on the Atlas host and that Atlas is running elevated. PsExec and all direct PsTools commands include `-accepteula`, including copied PowerShell/Command Prompt commands. Clicking **Run**, or executing a copied command, accepts the [Microsoft Sysinternals licence terms](https://learn.microsoft.com/en-us/sysinternals/license-terms) for that tool under the Windows account executing it. Opening the page, selecting a target, preparing or copying a command does not launch a tool or change licence acceptance. Atlas does not require a pre-existing acceptance registry entry or write that entry itself; the Microsoft executable handles first use. Atlas uses your existing tools and Windows account.
 
 PsExec uses remote administrative connectivity and starts a service on the target. Access denied means checking account permissions, elevation and target policy. Connection errors call for checking hostname resolution, administrative shares and service-control connectivity. A command's nonzero exit status is shown in the terminal; it is not a successful run.
 
@@ -41,7 +41,7 @@ Copy remains available for a separate PowerShell or Command Prompt window. **Cop
 
 Favourites, executable path and copy format are remembered in this browser. The target, command parameters and elevation choice are not saved as preferences. Elevation resets when selecting another template. In Atlas 7, Demo and the private preview show the entire command workbench: search templates, enter a target and parameters, review and copy commands. Run, Stop and terminal input are greyed out and require elevated Atlas Admin. Execution and transcripts are Admin-only; Demo and the private read-only preview expose none of these endpoints.
 
-## All 30 templates
+## Original PsExec templates
 
 | Template | Required input beyond the target | Purpose |
 | --- | --- | --- |

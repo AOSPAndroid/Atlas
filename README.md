@@ -34,7 +34,7 @@ The **map** helps you explore floors and seating in 2D or 3D. The **IT console**
 
 **New to the performance tools?** Read the [Remote Admin performance guide](docs/REMOTE_ADMIN_PERFORMANCE.md) for what each CPU, GPU, Memory and Overview button does, how to interpret the results, and a practical slowness investigation workflow. All scans require an explicit button click.
 
-**PsExec terminal:** Open **PsExec** below **History** in the admin IT console for 30 templates covering Excel, sessions, diagnostics, networking, services, printing and repairs. Select a target and click **Run** to see live output and exit status in Atlas. Remote Command Prompt supports typed follow-up commands. Runs use the Atlas host account and your existing PsExec in `C:\Data`; repairs require target confirmation. Includes Stop, recent transcripts, favourites and optional command copying. Nothing starts automatically. [Setup, terminal controls and all 30 commands](docs/PSEXEC.md).
+**PsTools terminal:** Open **PsTools** below **History** in the admin IT console for 72 templates covering PsExec and the adjacent Sysinternals tools, including Excel, sessions, diagnostics, networking, services, printing and repairs. Select a target and click **Run** to see live output and exit status in Atlas. Remote Command Prompt supports typed follow-up commands. Runs use the Atlas host account and your existing PsExec in `C:\Data`; repairs require target confirmation. Includes Stop, recent transcripts, favourites and optional command copying. Nothing starts automatically. [Setup, terminal controls and PsExec commands](docs/PSEXEC.md).
 
 | Area | Capabilities |
 | --- | --- |
@@ -49,7 +49,7 @@ Atlas runs from Python source with FastAPI and SQLite; the interface uses HTML, 
 
 ## Atlas 7: Admin, Demo and private preview
 
-All three versions share the current map and full console: Workspace, Remote Admin, Bulk Deploy, History, PsExec and the package catalogue. Demo and the owner-private preview let you explore every console page, select stored machines, switch between Overview/CPU/GPU/Memory, and prepare or copy any of the 30 PsExec commands.
+All three versions share the current map and full console: Workspace, Remote Admin, Bulk Deploy, History, PsExec and the package catalogue. Demo and the owner-private preview let you explore every console page, select stored machines, switch between Overview/CPU/GPU/Memory, and prepare or copy any of the 72 PsTools commands.
 
 **Deployment, live metrics/health, remote tools and PsExec execution are greyed out** with an explanation: use Atlas Admin from an elevated Windows account. Demo remains read-only even if its host is elevated; its server has no remote execution routes and rejects all writes. The hosted preview has no Windows backend. Neither starts scans or commands when browsing. Real metrics, package-share contents, deployment history and terminal transcripts are not fabricated or copied into the preview.
 
@@ -348,7 +348,7 @@ Desktop settings include utility light/dark appearance, four minimal Atlas wallp
 
 ### PsTools suite in Classic and Desktop
 
-The **PsTools** page (formerly PsExec) now includes a tool selector, searchable templates, command previews and the existing embedded terminal. Search Ctrl+K for PsTools or a utility name. Extract Microsoft's PsTools into `C:\Data` on the **Atlas host**, then start Atlas from an elevated account. The PsExec path determines the folder: `C:\Data\PsExec.exe` selects the adjacent tool executables; a PsExec64 path selects their 64-bit names. Each tool must be present and its Microsoft licence reviewed under the same account before running it here. Atlas does not download tools or accept licences automatically.
+The **PsTools** page (formerly PsExec) now includes a tool selector, searchable templates, command previews and the existing embedded terminal. Search Ctrl+K for PsTools or a utility name. Extract Microsoft's PsTools into `C:\Data` on the **Atlas host**, then start Atlas from an elevated account. The PsExec path determines the folder: `C:\Data\PsExec.exe` selects the adjacent tool executables; a PsExec64 path selects their 64-bit names. Each tool must be present on the Atlas host. PsExec and direct PsTools commands include `-accepteula`: clicking Run or executing a copied command accepts the [Microsoft Sysinternals licence terms](https://learn.microsoft.com/en-us/sysinternals/license-terms) for that tool under the Windows account executing it. Browsing, preparing and copying commands do not launch a tool or accept a licence. Atlas uses your existing tool installation and does not require a previous licence-acceptance registry entry.
 
 | Tool | Included functions |
 | --- | --- |
@@ -366,7 +366,7 @@ The **PsTools** page (formerly PsExec) now includes a tool selector, searchable 
 | PsSuspend | Suspend/resume one confirmed PID |
 | PsPasswd | Local help only; password changes are deliberately not sent through Atlas's recorded terminal |
 
-PsUptime is incorporated into PsInfo. No alternate credentials are collected by these templates. Review current process/file IDs immediately before a change; they can be reused. Changes require typing the target hostname. Direct tools run with argument arrays without a command shell; they do not inherit PsExec's flags. Terminal completion describes the command process, not proof a reboot or application operation has finished. Some tools have nonstandard exit codes (PsInfo can return the service-pack number); inspect their output. Stopping a local session does not undo a remote operation.
+PsUptime is incorporated into PsInfo. No alternate credentials are collected by these templates. Review current process/file IDs immediately before a change; they can be reused. Changes require typing the target hostname. Direct tools run with argument arrays without a command shell; they include the common `-accepteula` flag, without inheriting PsExec-specific connection or elevation flags. Terminal completion describes the command process, not proof a reboot or application operation has finished. Some tools have nonstandard exit codes (PsInfo can return the service-pack number); inspect their output. Stopping a local session does not undo a remote operation.
 
 Admin is required for execution; Demo and hosted Preview show the same catalogue with execution blocked. PsInfo and some logon queries require permitted Remote Registry access; Atlas does not enable it implicitly. PsPing tests the path **from the Atlas host**, not the target's historical or outbound internet connectivity. PsPasswd passwords can appear in process arguments, and omitting its new-password argument applies a NULL password, so use your approved password-management workflow.
 

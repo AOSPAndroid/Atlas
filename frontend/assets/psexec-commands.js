@@ -76,10 +76,11 @@
         )
       : path;
     const tokens = item.direct
-      ? [executable, ...args]
+      ? [executable, "-accepteula", ...args]
       : [
           path,
           "\\\\" + target,
+          "-accepteula",
           "-n",
           "10",
           "-nobanner",

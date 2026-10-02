@@ -33,11 +33,12 @@ const settle = () => new Promise(r => setTimeout(r, 40));
     assert(d.querySelector('#processStatus').textContent.includes('elevated'));
   }
   run('page("psexec")'); await settle();
-  assert.equal(d.querySelectorAll('[data-template]').length,39);
+  assert.equal(d.querySelectorAll('[data-template]').length,72);
   d.querySelector('[data-template="shell"]').click();
   const session=d.querySelector('#pxArg-session');session.value='1';session.dispatchEvent(new w.Event('input'));
   await settle(); assert(!d.querySelector('#pxCopy').disabled);
   d.querySelector('#pxCopy').click();await settle();assert(copied[0].includes('TESTPC'));
+  assert.equal(copied[0].split('-accepteula').length-1,1);
   for(const id of ['pxRun','bulkStart','diagnoseSlowness','refreshProcesses','deploy','killBtn']) {
     const b=d.getElementById(id);assert(b.disabled,id);b.click();
     b.disabled=false;await settle();assert(b.disabled,'Must remain disabled: '+id);

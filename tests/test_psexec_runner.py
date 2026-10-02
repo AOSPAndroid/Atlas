@@ -23,7 +23,7 @@ class PsExecTests(unittest.TestCase):
         def start(args, **options):
             calls.append(args)
             return subprocess.Popen([sys.executable, '-u', '-c', script], **options)
-        runner = px.Runner(popen=start, preflight=lambda p:dict(exists=True,eula_accepted=True,account='TEST\\Operator',elevated=True), **kw)
+        runner = px.Runner(popen=start, preflight=lambda p:dict(exists=True,eula_accepted=False,account='TEST\\Operator',elevated=True), **kw)
         self.addCleanup(runner.close)
         return runner, calls
 
@@ -47,7 +47,7 @@ class PsExecTests(unittest.TestCase):
         item, target, args, text=px.prepare(payload(template='service',values={'service':'MSSQL$INSTANCE'}))
         self.assertIn("'Name=''MSSQL$INSTANCE'''",text)
         self.assertEqual(base64.b64decode(args[-1]).decode('utf-16le'),text)
-        self.assertNotIn('-s',args);self.assertNotIn('-accepteula',args)
+        self.assertNotIn('-s',args);self.assertEqual(args.count('-accepteula'),1)
 
     def test_direct_tools_are_allowlisted_and_do_not_use_psexec_flags(self):
         for item in px.CATALOGUE.values():
@@ -57,13 +57,13 @@ class PsExecTests(unittest.TestCase):
             _,_,args,_=px.prepare(payload(template=item['id'],values=values,confirmation='TESTPC',elevated=True))
             self.assertEqual(args[0], 'C:\\Data\\'+item['tool']+'.exe')
             self.assertNotIn('-nobanner',args)
-            self.assertNotIn('-accepteula',args)
+            self.assertEqual(args.count('-accepteula'),1)
             if item.get('change'):
                 with self.assertRaises(HTTPException):px.prepare(payload(template=item['id'],values=values))
         _,_,args,_=px.prepare(payload(template='pst-tcp',values={'port':'443'}))
-        self.assertEqual(args[1:],['-n','10','TESTPC:443'])
+        self.assertEqual(args[1:],['-accepteula','-n','10','TESTPC:443'])
         _,_,args,_=px.prepare(payload(template='pst-password-help'))
-        self.assertEqual(args[1:],['-?'])
+        self.assertEqual(args[1:],['-accepteula','-?'])
         for bad in ['1','4','123 & calc']:
             with self.assertRaises(HTTPException):px.prepare(payload(template='pst-kill',values={'pid':bad},confirmation='TESTPC'))
         with self.assertRaises(HTTPException):px.prepare(payload(template='pst-tcp',values={'port':'65536'}))
@@ -112,11 +112,25 @@ class PsExecTests(unittest.TestCase):
         with self.assertRaises(HTTPException):r.send(key,'hostname')
         j=self.wait(r,key);self.assertEqual(j['state'],'failed');self.assertEqual(j['exit_code'],7)
 
-    def test_preflight_never_accepts_eula_or_starts_missing_executable(self):
-        for exists,accepted in [(False,True),(True,False)]:
-            r,calls=self.runner('print(1)');r.preflight=lambda p:dict(exists=exists,eula_accepted=accepted)
+    def test_preflight_requires_executable_and_elevation(self):
+        for exists,elevated in [(False,True),(True,False)]:
+            r,calls=self.runner('print(1)');r.preflight=lambda p:dict(exists=exists,elevated=elevated)
             with self.assertRaises(HTTPException):r.start(payload())
             self.assertFalse(calls)
+
+    def test_first_use_acceptance_runs_selected_tool_once(self):
+        for template,values in [('identity',{}),('pst-tcp',{'port':'443'})]:
+            r,calls=self.runner('print("SIMULATED FIRST RUN")')
+            # No acceptance registry record is required; the actual executable
+            # handles the flag. The test launches only a harmless Python pipe.
+            r.preflight=lambda p:dict(exists=True,elevated=True,account='TEST\\Operator')
+            p=payload(template=template,values=values,path=r'C:\Data\PsExec64.exe')
+            job=r.start(p);result=self.wait(r,job['id']);r.start(p)
+            self.assertEqual(result['state'],'complete')
+            self.assertIn('SIMULATED FIRST RUN',result['output'])
+            self.assertEqual(len(calls),1)
+            self.assertEqual(calls[0].count('-accepteula'),1)
+            self.assertEqual(calls[0][0],r'C:\Data\PsExec64.exe' if template=='identity' else r'C:\Data\PsPing64.exe')
 
     def test_routes_require_token_and_reject_client_scripts(self):
         from atlas_api import TOKEN

@@ -75,7 +75,7 @@ def prepare(p):
         if 'pid' in values and int(values['pid']) <= 4 and item.get('change'):
             raise HTTPException(400, 'System process IDs cannot be changed')
         substitutions = {**values, 'target': target, 'unc': '\\\\' + target}
-        args = [executable] + [re.sub(r'\{([a-z]+)\}', lambda m: substitutions[m[1]], a) for a in item['args']]
+        args = [executable, '-accepteula'] + [re.sub(r'\{([a-z]+)\}', lambda m: substitutions[m[1]], a) for a in item['args']]
         return item, target, args, subprocess.list2cmdline(args)
     def fill(text):
         return re.sub(r'\{(service|destination|port|pid)\}', lambda m: values[m[1]], text)
@@ -87,7 +87,7 @@ def prepare(p):
     else:
         remote = [fill(a) for a in item['args']]
         readable = ' '.join(remote)
-    args = [executable, '\\\\' + target, '-n', '10', '-nobanner']
+    args = [executable, '\\\\' + target, '-accepteula', '-n', '10', '-nobanner']
     if item.get('system'):
         args.append('-s')
     elif p.elevated:
@@ -99,19 +99,11 @@ def prepare(p):
 
 def host_status(path):
     exists = bool(re.fullmatch(TOOL_EXE, path, re.I) and Path(path).is_file())
-    accepted = False
     elevated = False
     if os.name == 'nt':
-        import winreg
         elevated = bool(ctypes.windll.shell32.IsUserAnAdmin())
-        try:
-            tool = re.sub(r'64$', '', PureWindowsPath(path).stem, flags=re.I)
-            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, 'Software\\Sysinternals\\' + tool) as key:
-                accepted = winreg.QueryValueEx(key, 'EulaAccepted')[0] == 1
-        except OSError:
-            pass
     return {'account': os.environ.get('USERDOMAIN', '') + '\\' + getpass.getuser(),
-            'elevated': elevated, 'exists': exists, 'eula_accepted': accepted}
+            'elevated': elevated, 'exists': exists}
 
 
 class Runner:
@@ -151,8 +143,6 @@ class Runner:
                 raise HTTPException(403, 'Run Atlas from an elevated Windows account to use PsTools.')
             if not status['exists']:
                 raise HTTPException(400, 'Tool not found on the Atlas host: ' + args[0])
-            if not status['eula_accepted']:
-                raise HTTPException(400, 'First run: open ' + PureWindowsPath(args[0]).name + ' on the Atlas host and review its Microsoft licence prompt using the same Windows account. Then retry here.')
             # Expire completed transcripts only; never lose an active handle.
             while len(self.jobs) >= 20:
                 del self.jobs[next(iter(self.jobs))]

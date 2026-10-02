@@ -127,7 +127,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
     (el) => el.textContent,
   );
   assert(commands.length > 20);
-  for (const name of ["Remote Admin", "PsExec", "User & machine lookup"]) {
+  for (const name of ["Remote Admin", "PsTools / PsExec", "User & machine lookup"]) {
     const option = [...rootEl.querySelectorAll("[role=option]")].find(el => el.querySelector("strong").textContent === name);
     assert(option, name); assert.equal(option.getAttribute("aria-disabled"), "false");
   }

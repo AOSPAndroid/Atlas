@@ -297,6 +297,7 @@
           ".px-library > .px-search",
           ".px-filters",
           "#pxFavourite",
+          "#pxEulaNote",
           "#pxRun",
           "#pxCopy",
           ".px-elevation",

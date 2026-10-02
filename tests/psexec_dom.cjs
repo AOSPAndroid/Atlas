@@ -23,7 +23,9 @@ const {fixture,root}=require('./ui_fixture.cjs');
   Object.defineProperty(w.navigator,'clipboard',{value:{writeText:async text=>copied.push(text)}});
   await get('Copy').onclick();assert.equal(copied[0],build('identity',options).command);
   assert(copied[0].startsWith("& 'C:\\Data\\PsExec.exe' '\\\\TESTPC'"));
-  assert(!copied[0].includes('-accepteula'));assert(!copied[0].includes("'-s'"));assert(!copied[0].includes("'-h'"));
+  assert.equal(copied[0].split('-accepteula').length-1,1);assert(!copied[0].includes("'-s'"));assert(!copied[0].includes("'-h'"));
+  assert(get('EulaNote').textContent.includes('executing a copied command'));
+  assert.equal(get('EulaNote').querySelector('a').href,'https://learn.microsoft.com/en-us/sysinternals/license-terms');
   const input=(id,value)=>{get(id).value=value;get(id).dispatchEvent(new w.Event('input'))};
   input('Target','MANUALPC');run("S.target='NEXTPC'; AtlasPsExec.syncTarget(S.target)");
   assert.equal(get('Target').value,'MANUALPC');assert.equal(run('S.target'),'NEXTPC');
@@ -57,10 +59,15 @@ const {fixture,root}=require('./ui_fixture.cjs');
   get('Cards').querySelector('button').click();assert(get('Elevated').disabled);
   assert(get('Command').textContent.includes('PsInfo64.exe'));
   assert(!get('Command').textContent.includes('-nobanner'));
+  assert.equal(get('Command').textContent.split('-accepteula').length-1,1);
   assert(build('pst-tcp',{...options,values:{port:'443'}}).command.includes('TESTPC:443'));
   assert.throws(()=>build('pst-kill',{...options,values:{pid:'4'}}));
   // Parse every generated remote PowerShell script without executing it.
-  const scripts=commands.map(c=>build(c.id,{...options,values:{service:'MSSQL$INSTANCE',destination:'SERVER01',port:'445',pid:'1234',session:'1',fileid:'123',account:'DOMAIN\\user'}})).filter(c=>c.encoded).map(c=>c.readable);
+  const scripts=commands.map(c=>{
+    const result=build(c.id,{...options,values:{service:'MSSQL$INSTANCE',destination:'SERVER01',port:'445',pid:'1234',session:'1',fileid:'123',account:'DOMAIN\\user'}});
+    assert.equal(result.command.split('-accepteula').length-1,1,c.id);
+    return result;
+  }).filter(c=>c.encoded).map(c=>c.readable);
   const os=require('node:os'), cp=require('node:child_process'), dir=fs.mkdtempSync(path.join(os.tmpdir(),'atlas-psexec-'));
   try {
     const source=path.join(dir,'scripts.json');fs.writeFileSync(source,JSON.stringify(scripts));

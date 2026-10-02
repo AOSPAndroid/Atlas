@@ -675,6 +675,11 @@
               <pre id="pxCommand" tabindex="0"></pre>
             </details>
             <p id="pxError" class="px-error" role="status"></p>
+            <p id="pxEulaNote" class="px-footnote">
+              Clicking Run or executing a copied command accepts the
+              <a href="https://learn.microsoft.com/en-us/sysinternals/license-terms" target="_blank" rel="noopener noreferrer">Microsoft Sysinternals EULA</a>
+              for that tool under the executing Windows account.
+            </p>
             <button id="pxRun" class="primary" type="button" disabled>
               Run on target
             </button>
@@ -734,8 +739,9 @@ Ready. Choose a command and click Run.</pre>
                   starts a service on the target even for a diagnostic command.
                 </li>
                 <li>
-                  Review the Microsoft licence prompt on first use. Atlas does
-                  not add automatic EULA acceptance.
+                  Commands include -accepteula so the selected tool can accept
+                  its Microsoft licence on first use. Acceptance occurs when
+                  you run the command, including from a copied command.
                 </li>
                 <li>
                   Access denied: check your account's remote administration
