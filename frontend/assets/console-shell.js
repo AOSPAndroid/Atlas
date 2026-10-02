@@ -737,6 +737,7 @@ document.addEventListener("DOMContentLoaded", () => {
     searchInput.value = "";
     searchInput.addEventListener("pointerdown", () => searchInput.focus());
     searchInput.addEventListener("click", () => searchInput.focus());
+    searchInput.addEventListener("input", clearDirectTarget);
     searchInput.addEventListener("keydown", (event) => {
       if (event.key === "Enter") {
         event.preventDefault();

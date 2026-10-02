@@ -98,3 +98,11 @@ Actions panel correction: non-shrinking rows, capped 520px panel, one section he
 - Browser checks covered all seven console pages, seven utilities, Map, Database Manager, Classic/Desktop and Demo at 390, 768 and 1366px. At 1366px, Map canvas width increased from 770 to 1366px. Revealing controls left content bounds unchanged. All remote test responses were fictional; no live Windows action was executed.
 - Dedicated control-manager regression checks cover identity, delay, focus/pin/Escape, dialogs, drag guards, preference changes, active-page scoping and dynamic cleanup. Existing process/service/performance, AD, Knowledge Base, utilities, reachable-action and deployment checks passed.
 - The hosted preview is prepared with the same assets and its original read-only snapshot. Live publication remains blocked by its public audience, which conflicts with the owner-private requirement above.
+
+
+## Direct hostname targets — 2026-10-02
+
+- An empty Workspace lookup now offers **Use hostname as target** for a literal hostname or `machine:HOSTNAME`, using the backend's name rules. The entered hostname is selected only on that action; normal deployment tools open without requiring a directory record. No inventory record is added and no package is launched by selection.
+- The offer reports that the hostname is absent from the directory. Editing the query, starting another lookup or receiving an old response cannot select an old hostname. Known inventory/user lookups retain their existing path; Demo/Preview can select a hostname but cannot deploy.
+- Regression checks use simulated responses and verify the deployment payload, canonical hostname/FQDN, invalid input, stale queries/selection handlers and read-only enforcement. Existing deployment and edge-control checks pass.
+- Browser checks passed in Classic, Desktop, Demo and the prepared Preview at 390 and 1366 px. A simulated Admin API job completed with the exact entered hostname and selected script; read-only deployment controls stayed disabled. Served Admin/Demo/Preview assets match, and the original database plus all 358 preview JSON assets are unchanged. No live Windows action was executed.

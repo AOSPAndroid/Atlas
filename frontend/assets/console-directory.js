@@ -25,6 +25,7 @@ function setTarget(pc, status = "", quick = true) {
   updatePackagePresence();
 }
 function clearLookup() {
+  clearDirectTarget();
   AtlasHealth.cancel($("#healthLine"));
   S.user = null;
   S.users = [];
@@ -43,6 +44,34 @@ function clearLookup() {
   $("#healthLine").classList.add("hidden");
   $("#preflight").innerHTML = "";
   $("#packagePresence").innerHTML = "";
+}
+function directHostname(term) {
+  const pc = term.replace(/^machine:\s*/i, "").trim().toUpperCase();
+  return /^[A-Z0-9_.-]{1,64}$/.test(pc) && !/^[-.]/.test(pc) && !pc.includes("..") ? pc : "";
+}
+function clearDirectTarget() {
+  $("#useHostname").hidden = true;
+  $("#useHostname").onclick = null;
+  $("#unlistedTargetStatus").hidden = true;
+  $("#workspace .lookup-empty").hidden = false;
+}
+function offerDirectTarget(term, sequence) {
+  if (sequence !== lookupSequence || $("#search").value.trim() !== term) return;
+  const pc = directHostname(term);
+  if (!pc) return toast("No matching users or machines");
+  const button = $("#useHostname"), status = $("#unlistedTargetStatus");
+  status.textContent = `No directory record for ${pc}. You can use this hostname as a target.`;
+  status.hidden = false;
+  $("#workspace .lookup-empty").hidden = true;
+  button.hidden = false;
+  button.title = `Use ${pc} as target`;
+  button.onclick = () => {
+    if (button.hidden || sequence !== lookupSequence || $("#search").value.trim() !== term) return;
+    clearDirectTarget();
+    $("#workspace .lookup-empty").hidden = true;
+    setTarget(pc, "Entered hostname · not in directory");
+    openDeploymentPanel();
+  };
 }
 async function search() {
   const term = $("#search").value.trim(),
@@ -68,7 +97,7 @@ async function search() {
   renderUsers();
   renderMachines();
   if (!d.users.length && !d.machines.length)
-    toast("No matching users or machines");
+    offerDirectTarget(term, sequence);
 }
 function renderUsers() {
   if (!S.users.length) return ($("#users").innerHTML = "");

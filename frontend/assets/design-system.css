@@ -1402,6 +1402,7 @@ body.atlas-console .ad-group-list summary { cursor:pointer; }
 
 /* Control panels reclaim the layout; their reveal animation never resizes data. */
 .atlas-edge-chrome { display:none; }
+#useHostname { margin-top:4px; }
 .atlas-edge-handle[hidden], .atlas-content-context[hidden] { display:none!important; }
 html.atlas-auto-hide body .atlas-edge-panel[data-atlas-edge] {
   position:fixed!important; z-index:1200; margin:0!important; box-sizing:border-box;
