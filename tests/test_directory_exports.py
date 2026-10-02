@@ -35,6 +35,19 @@ def workbook(path, sheets):
         z.writestr('xl/_rels/workbook.xml.rels', ET.tostring(rels))
 
 
+def device_sheets():
+    # The columns from the user's exports, with fictional data only.
+    return {
+        'devices': [['assigned_to','asset_tag','model_category','ci','model','cmp_last_used','install_status','serial_number','assigned','display_name','location'],
+                    ['E001','ASSET-1','Computer','testpc-1','Dell Example','02/10/2026 10:00','In Use','000123','01/10/2026','ASSET-1 - Dell Example','Paris'],
+                    ['','ASSET-2','Computer','TESTPC-2','HP Example','','In Stock','000124','','ASSET-2 - HP Example','London'],
+                    ['','ASSET-3','Computer','','Stock Example','','In Stock','000125','','Unidentified stock device','Paris']],
+        'users': [['user_name','name','email','u_organisational_unit','u_business_unit','u_start_date','manager','location','title','u_job_type','employee_number'],
+                  ['u1','Example Person','e@example.invalid','IT','Technology','01/10/2024','Example Manager','Paris','Support','Permanent','E001'],
+                  ['u2','Other Person','other@example.invalid','IT','Technology','','Example Manager','London','Support','Permanent','E002']],
+    }
+
+
 class ExportTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(); self.root = Path(self.temp.name)
@@ -138,6 +151,93 @@ class ExportTests(unittest.TestCase):
             self.assertEqual(client.get('/api/database/export-archive').status_code,404)
             self.assertEqual(client.post('/api/directory/record',json={}).status_code,403)
             self.assertEqual(client.get('/api/directory/record?kind=bad&key=uid:u1').status_code,400)
+
+    def test_devices_users_headers_records_and_complete_source_retention(self):
+        sheets=device_sheets()
+        sheets={' DeViCeS ':sheets['devices'],'uSeRs':sheets['users']}
+        workbook(self.xlsx,sheets)
+        self.assertEqual(prepare(self.xlsx,self.db),{'users':2,'machines':2,'assignments':1})
+        c=self.connect();prepare_views(c)
+        machine=c.execute("select * from machines where machine_name='TESTPC-1'").fetchone()
+        self.assertEqual((machine['model_id'],machine['serial_number'],machine['assigned_to']),('Dell Example','000123','E001'))
+        self.assertEqual(machine['operational_status'],'','Asset state must not be treated as online/operational status')
+        self.assertEqual(c.execute("select count(*) from assignments a join machines m on m.id=a.machine_id where m.machine_name='TESTPC-2'").fetchone()[0],0)
+        user=c.execute("select * from users where user_id='u1'").fetchone()
+        for column,expected in [('organisational_unit','IT'),('business_unit','Technology'),('start_date','01/10/2024'),('manager','Example Manager'),('location','Paris'),('job_role','Support'),('job_type','Permanent'),('employee_number','E001')]:
+            self.assertEqual(user[column],expected)
+        self.assertEqual(c.execute('select login_id,machine_name,relationship_type from user_machine_links').fetchone()[:],('u1','TESTPC-1','assigned_to'))
+        for term in ['TESTPC-1','serial:000123','model:Dell Example']:
+            self.assertEqual(search_directory(c,term)['machines'][0]['name'],'TESTPC-1')
+        fields=exports.record(c,'machine','testpc-1')['fields']
+        self.assertEqual([f['header'] for f in fields],sheets[' DeViCeS '][0])
+        self.assertEqual([f['value'] for f in fields],sheets[' DeViCeS '][1])
+        self.assertEqual(fields[3]['field'],'machine_name');self.assertEqual(fields[4]['field'],'model_id')
+        coverage=next(s for s in exports.coverage(c)['sheets'] if s['kind']=='machine')
+        self.assertEqual((coverage['rows'],coverage['linked']),(3,2))
+        orphan=c.execute("select entity_key,cells from directory_export_rows where sheet=' DeViCeS ' and row_number=4").fetchone()
+        self.assertEqual(orphan['entity_key'],'');self.assertEqual(json.loads(orphan['cells']),sheets[' DeViCeS '][3])
+        from backend import viewer
+        from fastapi.testclient import TestClient
+        with patch.object(viewer,'DB',self.db),TestClient(viewer.app) as client:
+            data=client.get('/api/directory/record',params={'kind':'machine','key':'testpc-1'}).json()
+            self.assertEqual({f['header'] for f in data['fields']},{'assigned_to','ci','model','serial_number'})
+            self.assertEqual(data['restricted_columns'],7)
+            self.assertEqual(client.post('/api/database/preview',content=self.xlsx.read_bytes()).status_code,403)
+
+    def test_new_sheet_aliases_reject_ambiguous_sheets_headers_and_duplicate_identities(self):
+        cases=[]
+        sheets=device_sheets();sheets['computers']=[['name'],['ANOTHERPC']];cases.append((sheets,'Multiple machine worksheets'))
+        for header in ['name','model_id']:
+            sheets=device_sheets();sheets['devices'][0].append(header)
+            for row in sheets['devices'][1:]:row.append('conflicting')
+            cases.append((sheets,'duplicate columns'))
+        sheets=device_sheets();sheets['devices'][2][3]=' TESTPC-1 ';cases.append((sheets,'duplicate identity'))
+        sheets=device_sheets();sheets['users'][2][0]=' U1 ';cases.append((sheets,'duplicate identity'))
+        sheets=device_sheets();sheets['devices'][0][3]='asset_identifier';cases.append((sheets,'ci or name'))
+        sheets=device_sheets()
+        for row in sheets['devices'][1:]:row[3]=''
+        cases.append((sheets,'Empty user or device extract'))
+        before=self.db.read_bytes()
+        for sheets,error in cases:
+            with self.subTest(error=error):
+                workbook(self.xlsx,sheets)
+                with self.assertRaisesRegex(ValueError,error):prepare(self.xlsx,self.db)
+                self.assertEqual(self.db.read_bytes(),before,'Rejected imports must preserve the existing database')
+
+    def test_actual_device_upload_preview_apply_backup_and_seating_preservation(self):
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+        import database_manager as manager
+        with fixture_connect(self.db) as c:
+            c.execute('create table desk_user_links(desk_id text primary key,user_key text,method text,updated_at text)')
+            c.execute("insert into desk_user_links values('D1','uid:u1','confirmed','fixture')")
+        sheets=device_sheets();workbook(self.xlsx,sheets)
+        app=FastAPI()
+        with patch.object(manager,'__file__',str(self.root/'database_manager.py')):
+            manager.register_database_manager(app,SimpleNamespace(MASTER_DB=self.db,jobs={},queue_jobs={}),lambda request:None)
+        with TestClient(app) as client:
+            response=client.post('/api/database/preview',content=self.xlsx.read_bytes(),headers={'X-File-Name':'EMEA.xlsx'})
+            self.assertEqual(response.status_code,200,response.text)
+            data=response.json();report=data['report']
+            self.assertEqual((report['users']['after'],report['machines']['after']),(2,2))
+            self.assertEqual(report['devices_without_hostnames'],1)
+            self.assertTrue(any('no ci/name hostname' in w for w in report['warnings']))
+            column_warning=' '.join(w for w in report['warnings'] if w.startswith('Columns absent'))
+            for retained in ['computers.name','computers.model_id','computers.assigned_to','computers.serial_number','Users.user_name','Users.name','Users.email']:
+                self.assertNotIn(retained,column_warning,'Renamed tabs/header aliases must not appear as missing fields')
+            self.assertIn('computers.u_barclays_correlation_id',column_warning,'Actually absent fields remain visible')
+            with fixture_connect(self.db) as c:self.assertEqual(c.execute('select machine_name from machines').fetchone()[0],'PC-1','Preview cannot mutate the live directory')
+            path='/api/database/apply/'+data['id']
+            self.assertEqual(client.post(path,json={'confirmation':'APPLY'}).status_code,400)
+            response=client.post(path,json={'confirmation':'APPLY','full_snapshot':True})
+            self.assertEqual(response.status_code,200,response.text)
+            backup=self.root/'backups'/response.json()['backup'];self.assertTrue(backup.is_file())
+            with fixture_connect(backup) as c:self.assertEqual(c.execute('select machine_name from machines').fetchone()[0],'PC-1')
+            with fixture_connect(self.db) as c:
+                self.assertEqual(c.execute('select desk_id,user_key from desk_user_links').fetchone(),('D1','uid:u1'))
+                self.assertEqual(c.execute('select count(*) from machines').fetchone()[0],2)
+                self.assertEqual(c.execute("select kind from directory_export_sheets where sheet='devices'").fetchone()[0],'machine')
+            self.assertEqual(client.post(path,json={'confirmation':'APPLY','full_snapshot':True}).status_code,409)
 
 
 if __name__ == '__main__':

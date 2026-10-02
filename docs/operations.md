@@ -30,7 +30,7 @@ Remote software operations require WMI process creation, the administrative shar
 
 ## Directory imports replace a complete snapshot
 
-Use **Manage Database → Users and computers import** for the complete Europe export, with `Users` and `computers` worksheets and the existing column headings. Choose **Validate and preview**, review additions, removals and changes, confirm the complete snapshot, type `APPLY`, then choose **Back up and apply**. Missing rows are removed from the directory, so a filtered list or one edited user is not a complete import.
+Use **Manage Database → Users and devices import** for the complete intended directory export, with `users` and `devices` worksheets. Original device headers `ci` (hostname), `model`, `assigned_to` and `serial_number` are accepted; the existing `Users` and `computers` format remains supported. Choose **Validate and preview**, review additions, removals, changes and devices without hostnames, confirm the complete snapshot, type `APPLY`, then choose **Back up and apply**. Missing rows are removed from the directory, so a filtered list or one edited user is not a complete import.
 
 Duplicate identities, duplicate machine names and empty required sheets are rejected. Original source columns and values are retained alongside operational fields. Prefer the normal richer export when extra fields must remain populated. Import the directory before a seating sheet that refers to newly added accounts.
 

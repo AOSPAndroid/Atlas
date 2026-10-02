@@ -35,9 +35,16 @@ FIELDS = {'user': USER_FIELDS, 'machine': MACHINE_FIELDS}
 TABLES = ('directory_export_sheets', 'directory_export_rows')
 
 
+def sheet_kind(name):
+    return {'users': 'user', 'devices': 'machine', 'computers': 'machine'}.get(str(name).strip().casefold(), '')
+
+
 def field_map(kind):
-    return {alias: (column, label) for source, column, label in FIELDS.get(kind, ())
-            for alias in (source, column)}
+    mapping = {alias: (column, label) for source, column, label in FIELDS.get(kind, ())
+               for alias in (source, column)}
+    if kind == 'machine':
+        mapping.update(ci=mapping['name'], model=mapping['model_id'])
+    return mapping
 
 
 def exists(con):
@@ -65,7 +72,7 @@ def capture(con, path):
     from directory_workbook import workbook_parts, iter_rows, canonical_header, clean, norm
     schema(con)
     for sheet, part in workbook_parts(path):
-        kind = {'users': 'user', 'computers': 'machine'}.get(sheet.casefold(), '')
+        kind = sheet_kind(sheet)
         rows = iter_rows(path, part, raw=True)
         first = next(rows, None)
         if first is None:
@@ -118,7 +125,7 @@ def coverage(con):
     if exists(con) and con.execute('select 1 from directory_export_sheets limit 1').fetchone():
         sheets = []
         for sheet, kind, source, headers, populated, rows, linked in con.execute('select * from directory_export_sheets order by sheet'):
-            sheets.append({'sheet': sheet, 'source': source, 'rows': rows, 'linked': linked,
+            sheets.append({'sheet': sheet, 'kind': kind, 'source': source, 'rows': rows, 'linked': linked,
                            'columns': column_info(kind, json.loads(headers), json.loads(populated))})
         return {'original_cells': True, 'sheets': sheets}
     sheets = []
@@ -126,7 +133,7 @@ def coverage(con):
         fields = FIELDS[kind]
         query = ','.join('sum(case when trim(coalesce("'+column+'",\'\'))<>\'\' then 1 else 0 end)' for _, column, _ in fields)
         row = con.execute('select count(*),'+query+' from '+table).fetchone()
-        sheets.append({'sheet': name, 'source': 'Stored directory', 'rows': row[0], 'linked': row[0],
+        sheets.append({'sheet': name, 'kind': kind, 'source': 'Stored directory', 'rows': row[0], 'linked': row[0],
                        'columns': column_info(kind, [f[0] for f in fields], [v or 0 for v in row[1:]])})
     return {'original_cells': False, 'sheets': sheets}
 

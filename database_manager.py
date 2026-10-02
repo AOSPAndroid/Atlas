@@ -34,10 +34,14 @@ def compare(target,candidate):
   result['warnings']=[f'{t}: more than 10% of existing records disappear.' for t in ('users','machines') if result[t]['removed']>result[t]['before']*.1]
   result['unlinked_machine_references']=b.execute("select count(*) from machines m where (trim(coalesce(assigned_to,''))<>'' or trim(coalesce(last_logon_user,''))<>'') and not exists(select 1 from assignments a where a.machine_id=m.id)").fetchone()[0]
   result['coverage']=directory_exports.coverage(b)
-  old_columns={(s['sheet'],col['header']) for s in directory_exports.coverage(a)['sheets'] for col in s['columns']}
-  new_columns={(s['sheet'],col['header']) for s in result['coverage']['sheets'] for col in s['columns']}
-  missing=sorted(old_columns-new_columns)
-  if missing:result['warnings'].append('Columns absent from this snapshot: '+', '.join(s+'.'+col for s,col in missing))
+  result['devices_without_hostnames']=sum(s['rows']-s['linked'] for s in result['coverage']['sheets'] if s['kind']=='machine')
+  if result['devices_without_hostnames']:
+   result['warnings'].append(f"{result['devices_without_hostnames']:,} device rows have no ci/name hostname; retained in the export archive, excluded from searchable machines.")
+  def columns(coverage):
+   return {(s['kind'] or s['sheet'].strip().casefold(),col['field'] or 'header:'+col['header'].strip().casefold()):s['sheet']+'.'+col['header'] for s in coverage['sheets'] for col in s['columns']}
+  old_columns=columns(directory_exports.coverage(a));new_columns=columns(result['coverage'])
+  missing=sorted(old_columns[k] for k in old_columns.keys()-new_columns.keys())
+  if missing:result['warnings'].append('Columns absent from this snapshot: '+', '.join(missing))
   if directory_exports.exists(a) and not result['coverage']['original_cells']:
    result['warnings'].append('This older backup has no original export archive. Restoring it removes the current archive; stored directory fields remain.')
   return result
@@ -144,7 +148,7 @@ def register_database_manager(app,wmi,check_token):
  def apply(stage_id:str,body:dict,request:Request):
   check_token(request);clean();s=staged.get(stage_id)
   if not s:raise HTTPException(409,'Preview expired or was replaced. Validate the file again.')
-  if body.get('confirmation')!='APPLY' or body.get('full_snapshot') is not True:raise HTTPException(400,'Confirm a complete Europe snapshot and type APPLY.')
+  if body.get('confirmation')!='APPLY' or body.get('full_snapshot') is not True:raise HTTPException(400,'Confirm the complete intended directory snapshot and type APPLY.')
   if busy():raise HTTPException(409,'Active jobs or queues must finish first.')
   if fingerprint(wmi.MASTER_DB)!=s['fingerprint']:raise HTTPException(409,'Directory or account links changed. Prepare a fresh preview.')
   backup=apply_refresh(wmi.MASTER_DB,s['candidate'],root/'backups')

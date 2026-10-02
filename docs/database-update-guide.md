@@ -11,15 +11,23 @@ Classic and Desktop share one local database. Import once to update both Admin l
 
 ## Recommended: Admin import
 
-1. Obtain a **complete Europe snapshot** from your approved ServiceNow exports. Export all intended rows, not just the visible page. Keep the agreed location and machine filters consistent. A partial extract can remove other accounts from directory search.
-2. Combine the exports into one `.xlsx` file with worksheets named **Users** and **computers**. Preserve original column headings and all useful columns. Keep unique user accounts and machine names, plus assignment fields. The computers sheet requires its Name column. Avoid duplicate identities or duplicate mapped headings.
+After updating Atlas, restart local Admin and Demo before importing so both load the current workbook support.
+
+1. Obtain the **complete intended directory snapshot** from your approved ServiceNow exports. Export all intended rows, not just the visible page. Keep the agreed location and machine filters consistent. A partial extract can remove other accounts from directory search.
+2. Combine the exports into one `.xlsx` file with worksheets named **users** and **devices**. The existing **Users** and **computers** format remains supported. Names are case-insensitive; use one user sheet and one device sheet. Preserve the original headers and all useful columns. Users require `user_name`, `name` and `email`; devices require `ci` or `name` for the hostname. Avoid duplicate identities or two headings mapping to the same field.
 3. Finish active deployments and queue jobs. Open local **Admin**, then **Manage Database**. Demo and hosted Preview cannot import.
 4. Select the workbook and click **Validate and preview**. This creates a separate candidate without changing the live directory.
 5. Review added/removed users, machines and assignments, column coverage warnings, and missing desk accounts. Unexpected large removals usually indicate incomplete exports or changed filters. Discard the preview if necessary.
-6. Tick **This is the complete Europe snapshot, and I have reviewed the removals**, type `APPLY`, then click **Back up and apply**. Atlas creates a full backup first.
+6. Tick **This is the complete intended directory snapshot, and I have reviewed the removals**, type `APPLY`, then click **Back up and apply**. Atlas creates a full backup first.
 7. Search known people and machines, verify assignments, and review missing desk links. Reload or use **Refresh records** in both local layouts and Demo.
 
 The directory is a full snapshot replacement, not an incremental import. Accounts absent from it disappear from directory search. Desk positions, edited labels, confirmed account links, package catalogue and operation history stay in place. Retained desk links to missing accounts need review.
+
+The devices export accepts `ci` as hostname and `model` as model; `assigned_to` and `serial_number` already match. The user headers `u_organisational_unit`, `u_business_unit`, `u_start_date`, `manager`, `location`, `title`, `u_job_type` and `employee_number` are supported unchanged. Atlas retains every original column, including device `asset_tag`, `model_category`, `cmp_last_used`, `install_status`, `assigned`, `display_name` and `location`, in the admin export details. Asset state is not substituted for operational status or proof that a device is online.
+
+Blank `assigned_to` does not discard a named device. References match a unique user account, email, employee number or full name. Device rows without a `ci`/`name` hostname are retained in the source archive and reported in the preview, but do not create searchable machines or remote targets. Atlas does not invent a hostname from an asset tag or serial number. Keep a Computers export's discovery and last-logon columns if those details are required; fields absent from a replacement snapshot are not carried forward.
+
+Validation covers the original directory template and the users/devices export, source-column retention, unique assignment matching, duplicate identities/aliases, preview/apply/backup guards and Demo restrictions. A synthetic scale check imported 300,000 named devices plus one archived device without a hostname; it does not establish performance for a particular production export. The Admin preview was also checked at 390, 768 and 1366 px. The hosted read-only snapshot is separate and unchanged by importer updates.
 
 ## Standalone refresh
 

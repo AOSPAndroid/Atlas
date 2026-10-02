@@ -68,6 +68,38 @@ def iter_rows(path,target,raw=False):
 def canonical_header(v):return re.sub(r'[^a-z0-9]+','_',norm(v)).strip('_')
 def rowdict(headers,row):return {headers[i]:clean(row[i]) if i<len(row) else '' for i in range(len(headers))}
 
+def directory_parts(path):
+    from directory_exports import sheet_kind
+    parts={}
+    for name,part in workbook_parts(path):
+        kind=sheet_kind(name)
+        if not kind:continue
+        if kind in parts:raise ValueError(f'Multiple {kind} worksheets: {parts[kind][0]} and {name}. Keep one users tab and one devices/computers tab.')
+        parts[kind]=(name,part)
+    if not {'user','machine'}<=parts.keys():raise ValueError('Include users and devices worksheets (Users and computers are also supported).')
+    return parts
+
+def directory_rows(path,kind,sheet,part):
+    from directory_exports import field_map
+    rows=iter_rows(path,part);first=next(rows,None)
+    if first is None:raise ValueError(f'{sheet}: worksheet is empty.')
+    mapping=field_map(kind)
+    headers=[mapping.get(canonical_header(h),(canonical_header(h),''))[0] for h in first[1]]
+    known=[h for h in headers if h in {v[0] for v in mapping.values()}]
+    if len(known)!=len(set(known)):raise ValueError(f'{sheet}: duplicate columns map to the same directory field.')
+    required={'user_id','full_name','email'} if kind=='user' else {'machine_name'}
+    if not required<=set(headers):
+        expected='user_name, name and email' if kind=='user' else 'ci or name (machine hostname)'
+        raise ValueError(f'{sheet}: missing identity columns; include {expected}.')
+    seen=set()
+    for number,row in rows:
+        data=rowdict(headers,row)
+        value=norm(data.get('user_id') or data.get('email') or data.get('full_name')) if kind=='user' else norm(data.get('machine_name'))
+        if value:
+            if value in seen:raise ValueError(f'{sheet}: duplicate identity {value} at row {number}. Remove duplicate rows and validate again.')
+            seen.add(value)
+        yield data
+
 def schema(c):
     c.executescript('''
     pragma journal_mode=delete;pragma synchronous=normal;pragma temp_store=memory;
@@ -95,18 +127,12 @@ def build(src,out):
     c=sqlite3.connect(candidate)
     try:
         schema(c)
-        parts={('Users' if n.casefold()=='users' else 'computers' if n.casefold()=='computers' else n):v for n,v in workbook_parts(src)}
+        parts=directory_parts(src)
         # Users
-        it=iter_rows(src,parts['Users']);_,header=next(it);headers=[canonical_header(x) for x in header]
-        aliases={'user_name':'user_id','name':'full_name','u_organisational_unit':'organisational_unit','u_business_unit':'business_unit','u_start_date':'start_date','title':'job_role','u_job_type':'job_type'}
-        headers=[aliases.get(h,h) for h in headers]
-        from directory_exports import field_map, capture, MACHINE_FIELDS
-        known=[h for h in headers if h in {v[0] for v in field_map('user').values()}]
-        if len(known)!=len(set(known)):raise ValueError('Users: duplicate columns map to the same directory field')
-        if not {'user_id','full_name','email'}.issubset(headers):raise ValueError('Users sheet is missing identity columns')
+        from directory_exports import capture
         user_count=0
-        for _,row in it:
-            d=rowdict(headers,row);uid=clean(d.get('user_id'));email=clean(d.get('email'));name=clean(d.get('full_name'))
+        for d in directory_rows(src,'user',*parts['user']):
+            uid=clean(d.get('user_id'));email=clean(d.get('email'));name=clean(d.get('full_name'))
             if not (uid or email or name):continue
             key=('uid:'+norm(uid)) if uid else ('email:'+norm(email)) if email else ('name:'+norm(name))
             vals=(key,uid,norm(uid),name,norm(name),email,norm(email),d.get('organisational_unit',''),d.get('business_unit',''),excel_date(d.get('start_date','')),d.get('manager',''),d.get('location',''),excel_date(d.get('last_login','')),d.get('job_role',''),d.get('job_type',''),d.get('employee_number',''),d.get('department',''),d.get('last_login_time',''))
@@ -120,20 +146,15 @@ def build(src,out):
             for typ,val in [('user_id',uid),('email',email),('name',name),('employee_number',employee)]:
                 if clean(val):c.execute('insert or ignore into user_aliases(user_id_ref,alias_type,alias_value,alias_norm) values(?,?,?,?)',(ref,typ,val,norm(val)))
         # Machines
-        it=iter_rows(src,parts['computers']);_,header=next(it);headers=[canonical_header(x) for x in header]
-        mapping=field_map('machine')
-        known=[mapping[h][0] for h in headers if h in mapping]
-        if len(known)!=len(set(known)):raise ValueError('computers: duplicate columns map to the same directory field')
-        aliases={column:source for source,column,_ in MACHINE_FIELDS}
-        headers=[aliases.get(h,h) for h in headers]
         machine_count=0
-        for _,row in it:
-            d=rowdict(headers,row);name=clean(d.get('name')).upper()
+        for d in directory_rows(src,'machine',*parts['machine']):
+            name=clean(d.get('machine_name')).upper()
             if not name:continue
-            values=(name,norm(name),d.get('u_infrastructure_itsi',''),d.get('sys_class_name',''),d.get('operational_status',''),d.get('u_barclays_correlation_id','').upper(),re.sub(r'\s+',' ',d.get('serial_number','')).strip(),normalise_vendor(d.get('manufacturer','')),re.sub(r'\s+',' ',d.get('model_id','')).strip(),d.get('short_description',''),excel_date(d.get('sys_updated_on','')),excel_date(d.get('last_discovered','')),d.get('discovery_source',''),d.get('assigned_to',''),d.get('u_last_logon_user',''))
+            values=(name,norm(name),d.get('infrastructure_itsi',''),d.get('sys_class_name',''),d.get('operational_status',''),d.get('correlation_id','').upper(),re.sub(r'\s+',' ',d.get('serial_number','')).strip(),normalise_vendor(d.get('manufacturer','')),re.sub(r'\s+',' ',d.get('model_id','')).strip(),d.get('short_description',''),excel_date(d.get('updated_on','')),excel_date(d.get('last_discovered','')),d.get('discovery_source',''),d.get('assigned_to',''),d.get('last_logon_user',''))
             c.execute('insert or replace into machines(machine_name,machine_name_norm,infrastructure_itsi,sys_class_name,operational_status,correlation_id,serial_number,manufacturer,model_id,short_description,updated_on,last_discovered,discovery_source,assigned_to,last_logon_user) values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',values)
             machine_count+=1
             if machine_count%5000==0:c.commit()
+        if not user_count or not machine_count:raise ValueError('Empty user or device extract refused. The existing directory was not changed.')
         links=rebuild_links(c)
         capture(c,src)
         print('Relationship matching:',links)

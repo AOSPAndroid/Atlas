@@ -79,7 +79,7 @@
       <header>
         <div>
           <h1>Manage Database</h1>
-          <p>Excel seating updates and Europe directory imports</p>
+          <p>Excel seating updates and directory imports</p>
         </div>
         <a class="atlas-return" href="/installer">IT Console</a
         ><a class="atlas-return" href="/">Floor atlas</a>
@@ -121,10 +121,10 @@
             <a href="#seating-panel">Upload completed seating sheet ↓</a>
           </article>
           <article>
-            <h3>Users and computers</h3>
+            <h3>Users and devices</h3>
             <p>
-              Two worksheets for directory users, PC hostnames and user–computer
-              links.
+              Import users and devices worksheets with the original export
+              headers. Users and computers workbooks are also supported.
             </p>
             <p>
               <a class="atlas-return" href="/api/excel-templates/directory"
@@ -132,7 +132,7 @@
               >
             </p>
             <p>
-              <b>Complete Europe dataset required.</b> This import replaces the
+              <b>Complete directory snapshot required.</b> This import replaces the
               directory; missing rows are removed. For updates to an existing
               rich export, retain its extra columns.
             </p>
@@ -278,10 +278,17 @@
         <p id="moves-message" role="status" aria-live="polite"></p>
       </section>
       <section class="panel" id="directory-import">
-        <h2>Users and computers import</h2>
+        <h2>Users and devices import</h2>
         <p>
-          Choose a complete Europe snapshot with Users and computers worksheets.
+          Choose a complete snapshot with users and devices worksheets, or the
+          existing Users and computers format. Device ci identifies the hostname;
+          model, assigned_to and serial_number keep their original headers.
           Validation builds a separate preview before changing the directory.
+        </p>
+        <p class="muted">
+          Devices without a ci/name hostname are retained in the export archive
+          and counted in the preview, but cannot be searched or used as remote
+          targets. Unassigned devices with a hostname remain usable.
         </p>
         <label
           >Excel workbook (.xlsx)<input
@@ -306,8 +313,8 @@
           search.
         </p>
         <label
-          ><input type="checkbox" id="full" />This is the complete Europe
-          snapshot, and I have reviewed the removals.</label
+          ><input type="checkbox" id="full" />This is the complete intended
+          directory snapshot, and I have reviewed the removals.</label
         ><label
           >Type APPLY to proceed<input id="confirm" autocomplete="off"
         /></label>
