@@ -170,7 +170,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   assert(dialog.textContent.includes("Assigned to user"));
   const details = dialog.querySelector(".atlas-machine-details");
   assert(details.open);
-  assert.equal(details.querySelector("summary").textContent, "Machine details");
+  assert.equal(details.querySelector("summary").textContent, "Device details");
   assert(details.textContent.includes("SERIAL-1"));
   assert(details.textContent.includes("CI-1"));
   assert(details.textContent.includes("Fixture discovery"));

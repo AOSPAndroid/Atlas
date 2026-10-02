@@ -128,7 +128,9 @@ export function createOperations({
       .forEach(
         (input) =>
           (input.onchange = () => {
-            target = current.machines[+input.value].name;
+            const machine = current.machines[+input.value];
+            if (!AtlasUI.supportsWindows(machine)) return;
+            target = machine.name;
             q("#ops-target-label").textContent = target;
             host()
               .querySelectorAll(".ops-machine")
@@ -154,6 +156,8 @@ export function createOperations({
             ]) {
               const button = document.createElement("button");
               button.textContent = label;
+              button.disabled = !AtlasUI.supportsWindows(m);
+              if (button.disabled) button.title = "Windows tools require a PC";
               button.onclick = () => {
                 element.close();
                 action();
@@ -485,7 +489,7 @@ export function createOperations({
                 group,
             );
           return rows.length
-            ? `<div class="ops-machine-group"><h4>${esc(group)} <span>${rows.length}</span></h4>${rows.map(({ m, i }) => `<div class="ops-machine-entry" data-machine-kind="${AtlasUI.machineKind(m)}"><label class="ops-machine"><input type="radio" name="ops-machine" value="${i}"><div><b>${esc(m.name)}</b>${window.AtlasHealth.badges(m)}<span>${esc(m.model_id || "Model unavailable")} · ${esc(m.operational_status || "Status unavailable")} (inventory)</span><small>${esc(m.match_type || m.link_source || "Recorded at this desk")}${m.desk_equipment && m.assigned_relationship ? " · Also recorded at this desk" : ""}</small><small>Inventory discovered: ${esc(m.inventory_discovered_at || m.last_discovered || "Not supplied")}</small><small>Record updated: ${esc(m.inventory_updated_at || m.updated_on || "Not supplied")}</small></div></label>${AtlasUI.machineDetails(m)}</div>`).join("")}</div>`
+            ? `<div class="ops-machine-group"><h4>${esc(group)} <span>${rows.length}</span></h4>${rows.map(({ m, i }) => `<div class="ops-machine-entry" data-machine-kind="${AtlasUI.machineKind(m)}"><label class="ops-machine"><input type="radio" name="ops-machine" value="${i}" ${AtlasUI.supportsWindows(m) ? "" : 'disabled aria-label="Inventory only: Windows tools require a PC"'}><div><b>${esc(m.name)}</b>${window.AtlasHealth.badges(m)}<span>${esc(m.model_id || "Model unavailable")}${m.operational_status ? " · " + esc(m.operational_status) + " (inventory)" : ""}</span>${AtlasUI.supportsWindows(m) ? "" : '<small class="atlas-device-note">Inventory only · Windows tools require a PC.</small>'}<small>${esc(m.match_type || m.link_source || "Recorded at this desk")}${m.desk_equipment && m.assigned_relationship ? " · Also recorded at this desk" : ""}</small><small>Inventory discovered: ${esc(m.inventory_discovered_at || m.last_discovered || "Not supplied")}</small><small>Record updated: ${esc(m.inventory_updated_at || m.updated_on || "Not supplied")}</small></div></label>${AtlasUI.machineDetails(m)}</div>`).join("")}</div>`
             : "";
         })
         .join("") ||

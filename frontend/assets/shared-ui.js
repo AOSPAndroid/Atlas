@@ -468,6 +468,10 @@
           ["Infrastructure", machine.infrastructure_itsi],
           ["Manufacturer", machine.manufacturer],
           ["Model", machine.model_id],
+          ["Device category", machine.model_category],
+          ["Asset tag", machine.asset_tag],
+          ["Asset display name", machine.display_name],
+          ["Device location", machine.device_location],
           ["Serial number", machine.serial_number],
           ["Correlation ID", machine.correlation_id],
           ["Record class", machine.sys_class_name],
@@ -478,6 +482,7 @@
         "Ownership",
         [
           ["Assigned to", machine.assigned_to || "Not supplied"],
+          ["Assignment date", exportDate(machine.assigned_at)],
           ["Last logged-on user", machine.last_logon_user || "Not supplied"],
         ],
       ],
@@ -485,6 +490,8 @@
         "Discovery",
         [
           ["Inventory status", machine.operational_status],
+          ["Asset state", machine.install_status],
+          ["Last used", exportDate(machine.last_used)],
           ["Discovery source", machine.discovery_source],
           ["Last discovered", machine.last_discovered],
           ["Record updated", machine.updated_on],
@@ -511,7 +518,7 @@
             .join("")}</dl></section>`,
       )
       .join("");
-    return `<details class="atlas-machine-details"${open ? " open" : ""}><summary>Machine details</summary><div class="atlas-machine-inventory"><p>${machineNote}</p>${sections}${exportButton("machine", machine.machine_name_norm || String(machine.name || machine.machine_name || "").toLowerCase())}</div></details>`;
+    return `<details class="atlas-machine-details"${open ? " open" : ""}><summary>Device details</summary><div class="atlas-machine-inventory"><p>${machineNote}</p>${sections}${exportButton("machine", machine.machine_name_norm || String(machine.name || machine.machine_name || "").toLowerCase())}</div></details>`;
   }
   function machineReport(machine) {
     return [
@@ -601,6 +608,8 @@
             "last_login_time",
             "updated_on",
             "last_discovered",
+            "last_used",
+            "assigned_at",
           ].includes(field.field)
             ? exportDate(value)
             : value;
@@ -652,15 +661,49 @@
     true,
   );
   function machineKind(machine) {
+    if (machine.device_kind) return machine.device_kind;
     const name = String(machine.name || machine.machine_name || "")
       .trim()
       .toUpperCase()
       .split(".")[0];
+    const text = [machine.model_category, machine.model_id, machine.sys_class_name].filter(Boolean).join(" ").toLowerCase();
+    if (text.includes("iphone") || name.startsWith("IPHONE-")) return "iphone";
+    if (/\b(ipad|tablet)\b/.test(text) || name.startsWith("IPAD-")) return "tablet";
+    if (/mobile device|handheld|android|\b(phone|smartphone)\b/.test(text)) return "phone";
+    if (/\b(macbook|imac|mac mini|mac pro)\b/.test(text)) return "mac";
+    if (/\b(laptop|notebook|latitude|thinkpad|elitebook|zbook|probook)\b/.test(text)) return "laptop";
     // The K belongs to PWMK, not the country prefix (e.g. NYK).
     if (/^[A-Z]{3}PWMK/.test(name)) return "kiosk";
     if (name.includes("VDI")) return "vdi";
     if (/^[A-Z]{3}PWMF/.test(name)) return "desktop";
+    if (/\b(computer|desktop|workstation)\b/.test(text)) return "desktop";
     return "other";
+  }
+  function supportsWindows(machine) {
+    return !["iphone", "phone", "tablet", "mac"].includes(machineKind(machine));
+  }
+  function machineBadges(machine) {
+    const kind = machineKind(machine);
+    const labels = {desktop:"Desktop", laptop:"Laptop", iphone:"iPhone", phone:"Phone", tablet:"Tablet", mac:"Mac", kiosk:"Kiosk", vdi:"VDI", other:"Device"};
+    const date = value => String(exportDate(value) || "").split(/[ T]/)[0];
+    const assigned = String(machine.assigned_to || "").trim();
+    const owned = !!assigned || !!Number(machine.assigned_relationship);
+    const ownership = owned
+      ? (assigned ? "Assigned to " + assigned : "Assigned relationship in inventory") + (machine.assigned_at ? " · " + exportDate(machine.assigned_at) : "")
+      : "No assignee supplied in the export";
+    const entries = [
+      [labels[kind] || "Device", "kind", labels[kind] || "Device"],
+      [owned ? "Assigned" : "Unassigned", owned ? "assigned" : "unassigned", ownership],
+    ];
+    if (machine.install_status)
+      entries.push([machine.install_status, "asset-state", "Asset state from the export: " + machine.install_status]);
+    entries.push(["Last used: " + (date(machine.last_used) || "—"), "last-used", "Last used in the export: " + (exportDate(machine.last_used) || "Not supplied")]);
+    const logon = machine.logon_relationship !== undefined ? !!Number(machine.logon_relationship) : !!machine.last_logon_user;
+    if (logon)
+      entries.push(["Last logged-on", "logon", "Inventory relationship" + (machine.last_logon_user ? ": " + machine.last_logon_user : "") + "; not a live sign-in check"]);
+    return '<div class="atlas-device-badges" aria-label="Stored device information">' + entries.map(([label, style, title]) =>
+      `<span class="atlas-device-badge ${style}" title="${esc(title)}">${esc(label)}</span>`
+    ).join("") + '</div>';
   }
   function machineFilters(host) {
     if (!host || host.querySelector(":scope > .atlas-machine-filters")) return;
@@ -668,7 +711,12 @@
     if (!rows.length) return;
     const types = [
       ["all", "All"],
-      ["desktop", "Dedicated desktops"],
+      ["desktop", "Desktops"],
+      ["laptop", "Laptops"],
+      ["iphone", "iPhones"],
+      ["phone", "Phones"],
+      ["tablet", "Tablets"],
+      ["mac", "Macs"],
       ["vdi", "VDI"],
       ["kiosk", "Kiosks"],
       ["other", "Other"],
@@ -683,7 +731,7 @@
     const empty = document.createElement("p");
     empty.className = "atlas-machine-filter-empty";
     empty.textContent =
-      "No machines match these filters. Choose All to show every linked machine.";
+      "No devices match these filters. Choose All to show every linked device.";
     empty.hidden = true;
     host.prepend(bar);
     host.append(empty);
@@ -699,7 +747,7 @@
             : selected.has(button.dataset.kind),
         );
       const count = rows.filter((row) => !row.hidden).length;
-      status.textContent = `${count} of ${rows.length} machines · Select one or more types`;
+      status.textContent = `${count} of ${rows.length} devices · Select one or more types`;
       empty.hidden = count > 0;
       for (const section of host.querySelectorAll(".ops-machine-group")) {
         const visible = [
@@ -715,7 +763,7 @@
         kind === "all"
           ? rows.length
           : rows.filter((row) => row.dataset.machineKind === kind).length;
-      if (kind === "other" && !count) continue;
+      if (!count && !["all", "desktop", "vdi", "kiosk"].includes(kind)) continue;
       const button = document.createElement("button");
       button.type = "button";
       button.dataset.kind = kind;
@@ -737,6 +785,8 @@
   }
   window.AtlasUI = {
     machineKind,
+    supportsWindows,
+    machineBadges,
     machineFilters,
     esc,
     person,

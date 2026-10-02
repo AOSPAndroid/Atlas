@@ -15,7 +15,7 @@ const assert=require('node:assert/strict');const {fixture}=require('./ui_fixture
  const machine={name:'PC-A',serial_number:'SERIAL<&>',manufacturer:'Fixture vendor',model_id:'Fixture model',correlation_id:'CI-123',infrastructure_itsi:'WINDOWS VIRTUAL DESKTOPS',sys_class_name:'Computer',discovery_source:'ServiceNow Discovery',operational_status:'Operational',assigned_to:'',last_logon_user:'Example User',last_discovered:'2026-09-04 00:28:48',updated_on:'2026-09-04 02:31:40'};
  run(`S.machines=${JSON.stringify([machine,{name:'PC-B'}])};renderMachines()`);
  const details=w.document.querySelector('#machines .atlas-machine-details'),requestCount=calls.length;
- assert.equal(details.querySelector('summary').textContent,'Machine details');details.querySelector('summary').click();
+ assert.equal(details.querySelector('summary').textContent,'Device details');details.querySelector('summary').click();
  assert.equal(run('S.target'),'');assert.equal(calls.length,requestCount);
  const fields=Object.fromEntries([...details.querySelectorAll('dl > div')].map(el=>[el.querySelector('dt').textContent,el.querySelector('dd').textContent]));
  assert.equal(fields['Serial number'],'SERIAL<&>');assert.equal(fields['Correlation ID'],'CI-123');assert.equal(fields.Infrastructure,'WINDOWS VIRTUAL DESKTOPS');assert.equal(fields['Assigned to'],'Not supplied');assert.equal(fields['Last logged-on user'],'Example User');assert.equal(fields['Inventory status'],'Operational');

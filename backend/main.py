@@ -38,6 +38,15 @@ NAME_RE=re.compile(r'^[A-Za-z0-9_.-]{1,64}$')
 def validate_pc(pc):
  pc=pc.strip().upper()
  if not NAME_RE.fullmatch(pc) or pc.startswith(('-', '.')) or '..' in pc:raise HTTPException(400,'Invalid computer name')
+ from device_inventory import supports_windows
+ record={'machine_name':pc}
+ if Path(MASTER_DB).exists():
+  with sqlite3.connect(Path(MASTER_DB).resolve().as_uri()+'?mode=ro',uri=True,factory=ClosingConnection) as c:
+   c.row_factory=sqlite3.Row
+   if c.execute("select 1 from sqlite_master where type='table' and name='machines'").fetchone():
+    row=c.execute('select * from machines where machine_name_norm=?',(pc.lower(),)).fetchone()
+    if row:record=dict(row)
+ if not supports_windows(record):raise HTTPException(400,'This device is inventory only. Windows deployment and remote tools require a PC.')
  return pc
 def quote(v):return "'"+str(v).replace("'","''")+"'"
 def unc(pc,p='C:'):return rf'\\{validate_pc(pc)}\{p.replace(":","$",1).lstrip(chr(92))}'
@@ -643,7 +652,7 @@ def index():
 from atlas_api import register_atlas
 register_atlas(app)
 from psexec_runner import register as register_psexec
-register_psexec(app)
+register_psexec(app,validate_pc)
 
 # Independent live health results; retains the application's local-only middleware.
 from machine_health import register_machine_health

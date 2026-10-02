@@ -70,30 +70,7 @@
     return "Unavailable";
   }
   function badges(m) {
-    const explicit =
-      m.assigned_relationship !== undefined ||
-      m.logon_relationship !== undefined;
-    const entries = explicit
-      ? [
-          [!!Number(m.assigned_relationship), "Assigned", "assigned"],
-          [!!Number(m.logon_relationship), "Last logged-on", "logon"],
-        ]
-      : [
-          [!!m.assigned_to, "Assigned: " + m.assigned_to, "assigned"],
-          [
-            !!m.last_logon_user,
-            "Last logged-on: " + m.last_logon_user,
-            "logon",
-          ],
-        ];
-    return (
-      '<div class="atlas-relationships">' +
-      entries
-        .filter((x) => x[0])
-        .map((x) => `<span class="atlas-relation ${x[2]}">${esc(x[1])}</span>`)
-        .join("") +
-      "</div>"
-    );
+    return AtlasUI.machineBadges(m);
   }
   function cancel(host) {
     const old = active.get(host);

@@ -30,6 +30,13 @@ MACHINE_FIELDS = (
     ('discovery_source', 'discovery_source', 'Discovery source'),
     ('assigned_to', 'assigned_to', 'Assigned to'),
     ('u_last_logon_user', 'last_logon_user', 'Last logged-on user'),
+    ('asset_tag', 'asset_tag', 'Asset tag'),
+    ('model_category', 'model_category', 'Device category'),
+    ('cmp_last_used', 'last_used', 'Last used'),
+    ('install_status', 'install_status', 'Asset state'),
+    ('assigned', 'assigned_at', 'Assignment date'),
+    ('display_name', 'display_name', 'Asset display name'),
+    ('location', 'device_location', 'Device location'),
 )
 FIELDS = {'user': USER_FIELDS, 'machine': MACHINE_FIELDS}
 TABLES = ('directory_export_sheets', 'directory_export_rows')
@@ -131,7 +138,8 @@ def coverage(con):
     sheets = []
     for kind, table, name in (('user', 'users', 'Users'), ('machine', 'machines', 'computers')):
         fields = FIELDS[kind]
-        query = ','.join('sum(case when trim(coalesce("'+column+'",\'\'))<>\'\' then 1 else 0 end)' for _, column, _ in fields)
+        known = {r[1] for r in con.execute('pragma table_info('+table+')')}
+        query = ','.join('sum(case when trim(coalesce('+('"'+column+'"' if column in known else 'NULL')+',\'\'))<>\'\' then 1 else 0 end)' for _, column, _ in fields)
         row = con.execute('select count(*),'+query+' from '+table).fetchone()
         sheets.append({'sheet': name, 'kind': kind, 'source': 'Stored directory', 'rows': row[0], 'linked': row[0],
                        'columns': column_info(kind, [f[0] for f in fields], [v or 0 for v in row[1:]])})
@@ -170,5 +178,5 @@ def _record(con, kind, key, *, include_unmapped):
             return {'name': name, 'source': source, 'sheet': sheet, 'row': number,
                     'original_cells': True, 'fields': visible, 'restricted_columns': len(fields)-len(visible)}
     return {'name': name, 'source': 'Stored directory', 'original_cells': False,
-            'fields': [{'header': source, 'label': label, 'field': column, 'value': data[column]}
+            'fields': [{'header': source, 'label': label, 'field': column, 'value': data.get(column, '')}
                        for source, column, label in FIELDS[kind]], 'restricted_columns': 0}

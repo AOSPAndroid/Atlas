@@ -3,6 +3,27 @@ function setTarget(pc, status = "", quick = true, groups = true) {
     .trim()
     .toUpperCase();
   if (!pc) return;
+  const record = S.machines.find(m => String(m.name || "").toUpperCase() === pc) || {name: pc};
+  S.selectedDevice = pc;
+  if (!AtlasUI.supportsWindows(record)) {
+    S.target = "";
+    window.AtlasPsExec?.syncTarget("");
+    window.AtlasDiagnostics?.stop("Selected an inventory device");
+    AtlasHealth.cancel($("#healthLine"));
+    invalidateProcesses();
+    syncDeploymentPanel();
+    $("#adminPc").value = "";
+    $("#deployTarget").textContent = "Select a PC";
+    $("#targetBar").classList.add("hidden");
+    $("#healthLine").classList.add("hidden");
+    $("#preflight").innerHTML = "";
+    $("#packagePresence").innerHTML = "";
+    if (S.user) window.AtlasAD?.select("user", S.user.user_name || S.user.email);
+    else window.AtlasAD?.clear();
+    $$("[data-machine]").forEach(x => x.classList.toggle("selected", String(S.machines[+x.dataset.machine]?.name || "").toUpperCase() === pc));
+    refreshConsoleSummary();
+    return;
+  }
   if (pc === S.target) {
     if (groups) window.AtlasAD?.select("computer", pc);
     if (quick) refreshTargetHealth("quick");
@@ -34,6 +55,7 @@ function clearLookup() {
   S.users = [];
   S.machines = [];
   S.target = "";
+  S.selectedDevice = "";
   window.AtlasPsExec?.syncTarget("");
   syncDeploymentPanel();
   masterState.resolution = null;
@@ -168,7 +190,7 @@ function renderKyc() {
 function renderMachines() {
   if (!S.machines.length) return ($("#machines").innerHTML = "");
   $("#machines").innerHTML =
-    `<small>LINKED MACHINES · ${S.machines.length}</small><div class=machinegrid>${S.machines.map((m, i) => `<div class="card machine ${m.name === S.target ? "selected" : ""}" data-machine-kind="${AtlasUI.machineKind(m)}" data-machine="${i}"><button class=copyhost data-host="${i}">Copy</button><span class="state ${String(m.operational_status).toLowerCase() === "operational" ? "" : "bad"}">● ${esc(m.operational_status)}</span><h3>${esc(m.name)}</h3><div class=facts><span>Match<b>${esc(m.match_type || "Hostname")}</b></span><span>Model<b>${esc(m.model_id || "—")}</b></span><span>Inventory discovered<b>${esc(m.last_discovered || "Not supplied")}</b></span><span>Record updated<b>${esc(m.updated_on || "Not supplied")}</b></span></div></div>`).join("")}</div>`;
+    `<small>LINKED DEVICES · ${S.machines.length}</small><div class=machinegrid>${S.machines.map((m, i) => `<div class="card machine ${m.name === (S.selectedDevice || S.target) ? "selected" : ""}" data-machine-kind="${AtlasUI.machineKind(m)}" data-machine="${i}"><button class=copyhost data-host="${i}">Copy</button><h3>${esc(m.name)}</h3><p class="workspace-device-model">${esc(m.model_id || m.model_category || "Model not supplied")}${m.asset_tag ? " · " + esc(m.asset_tag) : ""}</p>${AtlasUI.supportsWindows(m) ? "" : '<p class="atlas-device-note">Inventory only · Windows tools require a PC.</p>'}<div class=facts><span>Match<b>${esc(m.match_type || "Device identity")}</b></span><span>Inventory discovered<b>${esc(m.last_discovered || "Not supplied")}</b></span><span>Record updated<b>${esc(m.updated_on || "Not supplied")}</b></span>${m.operational_status ? `<span>Inventory status<b>${esc(m.operational_status)}</b></span>` : ""}</div></div>`).join("")}</div>`;
   $$("[data-machine]").forEach(
     (x) =>
       (x.onclick = () =>
@@ -181,7 +203,7 @@ function renderMachines() {
     (x) =>
       (x.onclick = (e) => {
         e.stopPropagation();
-        copy(S.machines[+x.dataset.host].name, "Hostname");
+        copy(S.machines[+x.dataset.host].name, "Device identity");
       }),
   );
   if (S.machines.length === 1) {
@@ -200,7 +222,7 @@ function renderMachines() {
     details.append(facts);
     const heading = card.querySelector("h3"), choose = document.createElement("button");
     choose.type = "button";choose.className = "workspace-machine-select";choose.textContent = m.name;
-    choose.setAttribute("aria-label", "Select machine " + m.name + " and show groups");
+    choose.setAttribute("aria-label", AtlasUI.supportsWindows(m) ? "Select machine " + m.name + " and show groups" : "Select inventory device " + m.name);
     heading.replaceChildren(choose);
     card.classList.add("workspace-machine-row");
   });
@@ -359,6 +381,7 @@ function machineContext(event, index) {
   const m = S.machines[index],
     menu = document.querySelector("#machineMenu");
   if (!m || !menu) return;
+  const windows = AtlasUI.supportsWindows(m);
   menu.replaceChildren();
   menu.setAttribute("role", "menu");
   menu.setAttribute("aria-label", "Actions for " + m.name);
@@ -380,13 +403,15 @@ function machineContext(event, index) {
       }
     };
     menu.append(button);
+    if (!windows && select) { button.disabled = true; button.title = "Windows tools require a PC"; }
   };
   add("ad-groups", "See groups", () => AtlasGroups.open("computer",m.name), false);
+  menu.lastElementChild.disabled = !windows;
   add("target", "Set as target", () => {});
   add("health", "Refresh health", () => refreshTargetHealth());
-  add("copy", "Copy hostname", () => copy(m.name, "Hostname"));
+  add("copy", "Copy device identity", () => copy(m.name, "Device identity"), false);
   add("details", "Copy machine details", () =>
-    copy(JSON.stringify(m, null, 2), "Machine details"),
+    copy(JSON.stringify(m, null, 2), "Device details"), false,
   );
   for (const [tool, label] of [
     ["msra", "Open MSRA"],
@@ -406,11 +431,12 @@ function machineContext(event, index) {
     false,
   );
   menu.querySelector('[data-cmd="remote-registry"]').disabled =
-    !!window.AtlasReadOnly;
+    !!window.AtlasReadOnly || !windows;
   add("admin", "Remote Admin", () => page("admin"));
   add("queue", "Add deployment to queue", () => addQueue());
   add("clean", "Clean package folder", () => cleanPackages());
   add("specs", "View specifications", () => AtlasHealth.specs(m.name), false);
+  menu.lastElementChild.disabled = !windows;
   add("software", "Software inventory", () => loadSoftware(m.name));
   add("report", "Copy complete machine report", () =>
     copy(completeMachineReport(), "Machine report"),

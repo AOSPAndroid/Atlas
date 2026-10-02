@@ -261,7 +261,7 @@ class Runner:
 runner = Runner()
 
 
-def register(app):
+def register(app, validate_target=None):
     def token(request):
         from atlas_api import TOKEN
         if not secrets.compare_digest(request.headers.get('x-atlas-token', ''), TOKEN):
@@ -276,6 +276,7 @@ def register(app):
     @app.post('/api/psexec/run')
     def start(body: RunRequest, request: Request):
         token(request)
+        if validate_target: body.target = validate_target(body.target)
         return runner.start(body)
 
     @app.get('/api/psexec/runs/{key}')

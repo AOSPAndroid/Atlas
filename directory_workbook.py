@@ -111,6 +111,8 @@ def schema(c):
     create index ix_users_name on users(full_name_norm);create index ix_users_login on users(user_id_norm);create index ix_users_email on users(email_norm);create index ix_alias on user_aliases(alias_norm);create index ix_machine on machines(machine_name_norm);create index ix_assign_user on assignments(user_id_ref);create index ix_assign_machine on assignments(machine_id);
     create view user_machine_links as select u.canonical_key,u.user_id as login_id,u.employee_number as brid,u.email,u.full_name,m.machine_name,a.relationship_type from assignments a join users u on u.id=a.user_id_ref join machines m on m.id=a.machine_id;
     ''')
+    from device_inventory import ensure_asset_columns
+    ensure_asset_columns(c)
 
 def normalise_vendor(v):
     x=clean(v);low=x.lower()
@@ -146,19 +148,23 @@ def build(src,out):
             for typ,val in [('user_id',uid),('email',email),('name',name),('employee_number',employee)]:
                 if clean(val):c.execute('insert or ignore into user_aliases(user_id_ref,alias_type,alias_value,alias_norm) values(?,?,?,?)',(ref,typ,val,norm(val)))
         # Machines
+        from device_inventory import ASSET_COLUMNS
+        machine_columns = 'machine_name,machine_name_norm,infrastructure_itsi,sys_class_name,operational_status,correlation_id,serial_number,manufacturer,model_id,short_description,updated_on,last_discovered,discovery_source,assigned_to,last_logon_user,' + ','.join(ASSET_COLUMNS)
+        machine_sql = 'insert into machines('+machine_columns+') values('+','.join('?' for _ in range(15+len(ASSET_COLUMNS)))+')'
         machine_count=0
         for d in directory_rows(src,'machine',*parts['machine']):
             name=clean(d.get('machine_name')).upper()
             if not name:continue
             values=(name,norm(name),d.get('infrastructure_itsi',''),d.get('sys_class_name',''),d.get('operational_status',''),d.get('correlation_id','').upper(),re.sub(r'\s+',' ',d.get('serial_number','')).strip(),normalise_vendor(d.get('manufacturer','')),re.sub(r'\s+',' ',d.get('model_id','')).strip(),d.get('short_description',''),excel_date(d.get('updated_on','')),excel_date(d.get('last_discovered','')),d.get('discovery_source',''),d.get('assigned_to',''),d.get('last_logon_user',''))
-            c.execute('insert or replace into machines(machine_name,machine_name_norm,infrastructure_itsi,sys_class_name,operational_status,correlation_id,serial_number,manufacturer,model_id,short_description,updated_on,last_discovered,discovery_source,assigned_to,last_logon_user) values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',values)
+            values += tuple(excel_date(d.get(column,'')) if column in ('last_used','assigned_at') else d.get(column,'') for column in ASSET_COLUMNS)
+            c.execute(machine_sql,values)
             machine_count+=1
             if machine_count%5000==0:c.commit()
         if not user_count or not machine_count:raise ValueError('Empty user or device extract refused. The existing directory was not changed.')
         links=rebuild_links(c)
         capture(c,src)
         print('Relationship matching:',links)
-        c.executemany('insert into metadata(key,value) values(?,?)',[('schema_version','2'),('created_at',datetime.now().isoformat(sep=' ',timespec='seconds')),('source_file',src.name)])
+        c.executemany('insert into metadata(key,value) values(?,?)',[('schema_version','3'),('created_at',datetime.now().isoformat(sep=' ',timespec='seconds')),('source_file',src.name)])
         c.commit();check=c.execute('pragma integrity_check').fetchone()[0]
         counts={t:c.execute(f'select count(*) from {t}').fetchone()[0] for t in ('users','machines','assignments','user_aliases')};c.close()
         if check!='ok':raise RuntimeError(check)

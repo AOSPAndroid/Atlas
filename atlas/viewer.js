@@ -24,7 +24,7 @@ function machinesCard(machines, inspect = true) {
     (machines
       .map((m) => {
         const name = m.name || m.machine_name;
-        return `<article class="viewer-machine" data-ad-kind="computer" data-ad-identity="${esc(name)}" data-machine-kind="${AtlasUI.machineKind(m)}"><b>${esc(name)}</b><p class="ops-muted">${esc(relationship(m))}</p><p>${esc(m.model_id || "Model not supplied")} · ${esc(m.operational_status || "Status not supplied")} (inventory)</p>${AtlasUI.machineDetails(m, { open: !inspect })}${inspect ? `<button type="button" data-machine="${esc(name)}">Inspect machine</button>` : ""}</article>`;
+        return `<article class="viewer-machine" ${AtlasUI.supportsWindows(m) ? `data-ad-kind="computer" data-ad-identity="${esc(name)}"` : ""} data-machine-kind="${AtlasUI.machineKind(m)}"><b>${esc(name)}</b>${AtlasUI.machineBadges(m)}<p class="ops-muted">${esc(relationship(m))}</p><p>${esc(m.model_id || "Model not supplied")}${m.operational_status ? " · " + esc(m.operational_status) + " (inventory)" : ""}</p>${AtlasUI.machineDetails(m, { open: !inspect })}${inspect ? `<button type="button" data-machine="${esc(name)}">Inspect machine</button>` : ""}</article>`;
       })
       .join("") || "<p>No linked machines recorded.</p>") +
     "</div>"

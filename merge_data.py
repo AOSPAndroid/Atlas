@@ -11,6 +11,8 @@ def merge_directory(target,source):
  src=connect(Path(source).resolve().as_uri()+'?mode=ro');dst=connect(target)
  try:
   dst.execute('begin immediate')
+  from device_inventory import ensure_asset_columns
+  ensure_asset_columns(dst)
   for table in reversed(TABLES):dst.execute('delete from '+table)
   for table in TABLES:
    columns=[r[1] for r in src.execute('pragma table_info('+table+')')]

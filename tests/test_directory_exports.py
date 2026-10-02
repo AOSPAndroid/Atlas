@@ -180,8 +180,8 @@ class ExportTests(unittest.TestCase):
         from fastapi.testclient import TestClient
         with patch.object(viewer,'DB',self.db),TestClient(viewer.app) as client:
             data=client.get('/api/directory/record',params={'kind':'machine','key':'testpc-1'}).json()
-            self.assertEqual({f['header'] for f in data['fields']},{'assigned_to','ci','model','serial_number'})
-            self.assertEqual(data['restricted_columns'],7)
+            self.assertEqual({f['header'] for f in data['fields']},set(sheets[' DeViCeS '][0]))
+            self.assertEqual(data['restricted_columns'],0)
             self.assertEqual(client.post('/api/database/preview',content=self.xlsx.read_bytes()).status_code,403)
 
     def test_new_sheet_aliases_reject_ambiguous_sheets_headers_and_duplicate_identities(self):

@@ -154,11 +154,11 @@ const settle = () => new Promise((resolve) => setImmediate(resolve));
     ),
   );
   assert(
-    !A.badges({
+    A.badges({
       assigned_relationship: 0,
       logon_relationship: 0,
       assigned_to: "other",
-    }).includes("Assigned"),
+    }).includes("Assigned to other"),
   );
   assert(A.badges({ assigned_to: "<unsafe>" }).includes("&lt;unsafe&gt;"));
   assert(
