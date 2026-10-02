@@ -4,6 +4,8 @@ Atlas helps support staff investigate a slow machine from the IT console using o
 
 **Selecting a machine, opening Remote Admin or switching views does not start a scan.** Refresh collects another reading only when clicked. Each view retains its own last result and timestamp for the current target; changing target clears those results. These privileged checks are available in Admin, not the read-only Demo or hosted preview.
 
+All four views share the target toolbar, scan controls and process filter. The scan-state label distinguishes unscanned targets, active scans, stored snapshots and failed refreshes. **Where to look**, processor/disk details and GPU engine activity expand on demand; process counts show how many rows are visible out of the recorded total.
+
 ## Which button should I use?
 
 | Button / view | What you get | When to use it |
@@ -60,6 +62,20 @@ The light capture excludes GPU engine enumeration, individual thread enumeration
 ## Process actions
 
 Right-click a listed process to copy its PID/details or choose **Kill process**. Termination requires confirmation, rechecks process identity and blocks core Windows processes. Nothing is killed automatically by scans or warning colours. Ending Excel can lose unsaved work, so confirm the user's work is saved before using this action.
+
+For direct entry, expand **Terminate by PID or name** above the process table. Enter a PID or executable name and choose **Terminate…** (or press Enter). The confirmation identifies the target and whether the action affects one PID or all processes with that executable name.
+
+**Kill OpenFin…** targets every process named `openfin.exe` on the selected machine. **Kill matching processes…** uses the adjacent **Process name contains** field, initially `a180`: for example, it matches `a180.exe`, `A180Updater.exe` and `tool-a180-worker.exe`. Matching is a literal, case-insensitive substring of the executable name, across all sessions; command-line arguments and wildcards are excluded. Enter 3–64 characters starting with a letter or number.
+
+Both quick actions require confirmation and work without a performance scan. They query the full live process list rather than the displayed or filtered rows, recheck each process's name and creation time before termination, skip protected or changed processes, and report unsuccessful results without retrying. Demo and hosted Preview show the controls but cannot run them.
+
+## Service actions
+
+Choose **List services** in the target toolbar to load a compact, searchable inventory. Each row shows the display name, Windows service name, status, startup mode and PID. Search matches names, status and startup mode; **Refresh** explicitly reloads the selected target. Selecting a machine or opening Remote Admin starts no service query.
+
+Choose **Stop…** on a running or paused service and confirm its name and target. Atlas rechecks the service configuration and Windows stop permission, calls `Win32_Service.StopService()` and waits up to ten seconds to verify `Stopped`. A pending stop, access denial or running dependents is reported without claiming success or retrying automatically; refresh the list before another attempt. Atlas preserves startup settings, does not cascade to dependent services and does not kill a shared service-host PID. Core Windows and remote administration services are protected on the server.
+
+Demo and hosted Preview display the controls but cannot query or stop live services. Changing the target clears the list and cancels an open stop confirmation; results from the previous machine cannot appear on the new target.
 
 ## Implementation and validation
 

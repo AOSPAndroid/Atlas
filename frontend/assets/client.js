@@ -70,7 +70,7 @@
     const { atlasSilent = false, ...transport } = options;
     const endLoading = atlasSilent ? () => {} : beginLoading();
     const tracked =
-      /^\/api\/(deploy$|bulk\/deploy$|queue$|psexec\/run$|software-tools\/(inventory|uninstall)$|performance\/|processes\/|remote-registry\/enable$|kill$|cleanup-packages\/|ping\/|disk\/|overview\/|access\/|preflight\/|open-tool\/)/.test(
+      /^\/api\/(deploy$|bulk\/deploy$|queue$|psexec\/run$|software-tools\/(inventory|uninstall)$|performance\/|processes\/|services(?:\/stop)?$|remote-registry\/enable$|kill$|cleanup-packages\/|ping\/|disk\/|overview\/|access\/|preflight\/|open-tool\/)/.test(
         url,
       );
     if (tracked)

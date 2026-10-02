@@ -3,6 +3,7 @@ param(
     [ValidateSet('list', 'kill')][string]$Action = 'list',
     [ValidateSet('cpu', 'memory', 'gpu')][string]$Kind = 'cpu',
     [string]$Value = '',
+    [ValidateSet('exact', 'contains')][string]$Match = 'exact',
     [string]$ExpectedCreated = '',
     [string]$ExpectedName = ''
 )
@@ -19,8 +20,13 @@ function Get-BlockReason($Record) {
 
 try {
     if ($Action -eq 'kill') {
-        $filter = if ($Value -match '^\d+$') { "ProcessId=$Value" } else { "Name='$Value'" }
-        $records = @(Get-WmiObject -ComputerName $Computer -Class Win32_Process -Filter $filter -ErrorAction Stop)
+        if ($Match -eq 'contains') {
+            $records = @(Get-WmiObject -ComputerName $Computer -Class Win32_Process -ErrorAction Stop |
+                Where-Object { ([string]$_.Name).IndexOf($Value, [StringComparison]::OrdinalIgnoreCase) -ge 0 })
+        } else {
+            $filter = if ($Value -match '^\d+$') { "ProcessId=$Value" } else { "Name='$Value'" }
+            $records = @(Get-WmiObject -ComputerName $Computer -Class Win32_Process -Filter $filter -ErrorAction Stop)
+        }
         $results = @(
             foreach ($record in $records) {
                 $reason = Get-BlockReason $record
@@ -31,17 +37,27 @@ try {
                 }
                 if (-not $reason) {
                     try {
-                        $code = $record.Terminate(1).ReturnValue
-                        if ($null -eq $code) { throw 'Windows returned no termination result; refresh to check the process.' }
-                        $state = if ($code -eq 0) { 'terminated' } else { 'failed' }
-                        $reason = switch ([long]$code) {
-                            0 { 'Terminated' }
-                            2 { 'Access denied' }
-                            3 { 'Insufficient privilege' }
-                            8 { 'Windows reported an unknown failure' }
-                            9 { 'Process no longer exists' }
-                            21 { 'Windows rejected the process parameter' }
-                            default { "Windows returned error $code" }
+                        $current = Get-WmiObject -ComputerName $Computer -Class Win32_Process -Filter "ProcessId=$($record.ProcessId)" -ErrorAction Stop
+                        if (-not $current) {
+                            $state = 'gone'; $reason = 'Process no longer exists'
+                        } elseif ($current.CreationDate -cne $record.CreationDate -or $current.Name -ine $record.Name) {
+                            $state = 'changed'; $reason = 'Process changed during termination. Review the target before trying again.'
+                        } else {
+                            $reason = Get-BlockReason $current
+                            if (-not $reason) {
+                                $code = $current.Terminate(1).ReturnValue
+                                if ($null -eq $code) { throw 'Windows returned no termination result; refresh to check the process.' }
+                                $state = if ($code -eq 0) { 'terminated' } else { 'failed' }
+                                $reason = switch ([long]$code) {
+                                    0 { 'Terminated' }
+                                    2 { 'Access denied' }
+                                    3 { 'Insufficient privilege' }
+                                    8 { 'Windows reported an unknown failure' }
+                                    9 { 'Process no longer exists' }
+                                    21 { 'Windows rejected the process parameter' }
+                                    default { "Windows returned error $code" }
+                                }
+                            }
                         }
                     } catch { $state = 'failed'; $reason = $_.Exception.Message }
                 }

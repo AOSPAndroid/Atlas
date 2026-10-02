@@ -46,6 +46,7 @@ function closeProcessSelection() {
   closeProcessMenu();
 }
 function invalidateProcesses() {
+  window.dispatchEvent(new Event("atlas:admin-target-change"));
   window.AtlasDiagnostics?.clear();
   adminRequest();
   utilityRequest();
@@ -54,6 +55,8 @@ function invalidateProcesses() {
   performanceErrors.clear();
   $("#adminUtility").replaceChildren();
   $("#adminUtility").hidden = true;
+  $("#quickKillStatus").textContent = "";
+  $("#quickKillStatus").hidden = true;
   selectPerformanceView(activePerformance);
 }
 function selectPerformanceView(kind) {
@@ -78,6 +81,7 @@ function selectPerformanceView(kind) {
       : "Right-click a process for actions. Values reflect the last scan; refresh to check for changes.";
   $("#processHint").hidden = !processSnapshot;
   $("#processFilter").disabled = !processSnapshot;
+  $("#processCount").textContent = "No scan";
   if (processSnapshot) {
     renderPerformance();
   } else {
@@ -91,14 +95,30 @@ function updatePerformanceControls() {
   const label = performanceViews[activePerformance].label,
     busy = performanceInFlight;
   const capturing = window.AtlasDiagnostics?.isRunning();
+  const state = $("#performanceState");
+  state.textContent = window.AtlasReadOnly
+    ? "Read-only"
+    : busy
+      ? `Scanning ${performanceViews[busy.kind].label}…`
+      : capturing
+        ? "Capturing slowness…"
+        : !adminComputer()
+          ? "Choose a target"
+          : performanceErrors.has(activePerformance)
+            ? processSnapshot ? "Previous scan" : "Scan failed"
+            : processSnapshot ? "Snapshot" : "Not scanned";
+  state.dataset.state = busy || capturing
+    ? "busy"
+    : performanceErrors.has(activePerformance) ? "error" : "idle";
   $("#refreshProcesses").textContent = busy
     ? `Scanning ${performanceViews[busy.kind].label}…`
     : `${processSnapshot ? "Refresh" : "Scan"} ${label}`;
   $("#refreshProcesses").disabled =
     !!window.AtlasReadOnly || !adminComputer() || !!busy || !!capturing;
   $("#diagnoseSlowness").disabled =
-    !!window.AtlasReadOnly || !!busy || !!capturing;
+    !!window.AtlasReadOnly || !adminComputer() || !!busy || !!capturing;
   $("#copyPerformance").disabled = !processSnapshot;
+  updateProcessActionControls();
   $("#adminOut").setAttribute("aria-busy", String(!!busy));
   if (processSnapshot) renderProcesses();
   else
@@ -275,6 +295,8 @@ function renderProcesses() {
   $("#processStatus").textContent =
     `${processSnapshot.computer} · ${S.processes.length} of ${processSnapshot.data.total_processes ?? S.processes.length} processes · Sorted by ${kind === "memory" ? "resident memory" : kind === "overview" ? "CPU" : kind.toUpperCase()} · Checked ${processSnapshot.checked}${q ? ` · ${rows.length} matching` : ""}${busy ? ` · Scanning ${performanceViews[busy.kind].label}… Previous result shown.` : window.AtlasDiagnostics?.isRunning() ? " · Slowness capture running." : " · Snapshot; no scan running."}${error ? ` · ${error}` : ""}`;
   const columns = performanceColumns(kind);
+  $("#processCount").textContent =
+    `${rows.length} of ${processSnapshot.data.total_processes ?? S.processes.length}`;
   $("#adminOut").innerHTML = rows.length
     ? `<table class="process-table"><thead><tr><th>Process / PID</th>${columns.map((c) => `<th>${c.label}</th>`).join("")}<th>Actions</th></tr></thead><tbody>${rows.map(({ row, index }) => `<tr data-process-index="${index}" tabindex="0" aria-label="${esc(row.Process)}, PID ${esc(row.PID)}" title="${esc(row.CommandLine || row.Process)}"><td><b>${esc(row.Process)}</b><small>PID ${esc(row.PID)} · Session ${esc(row.SessionId ?? "—")}</small></td>${columns.map((c) => `<td>${c.html ? c.html(row, index) : esc(c.text(row))}</td>`).join("")}<td><button data-process-actions="${index}" aria-label="Actions for ${esc(row.Process)}, PID ${esc(row.PID)}">•••</button></td></tr>`).join("")}</tbody></table>`
     : `<p class="empty">${kind === "gpu" && !q ? "No GPU process counters were reported in this scan." : "No matching processes."}</p>`;
@@ -504,7 +526,7 @@ function renderPerformance() {
         perfValue(s.gpu_process_count),
         "Processes with a reported engine above 0% during this scan.",
       );
-    detail = `<section class="perf-resource-detail"><h3>GPU engines</h3>${engines.length ? `<div class="perf-engine-grid">${engines.map((e) => `<div class="perf-engine" title="${esc(e.name)}"><span><b>${esc(e.engine)}</b><small>Adapter ${adapters.indexOf(e.adapter) + 1} · Engine ${esc((e.name.match(/_eng_(\d+)/) || [])[1] || "—")}</small></span>${perfMeter(e.percent, 70, 85)}</div>`).join("")}</div><p class="muted">Showing ${engines.length} of ${perfValue(s.gpu_engine_count)} engines, busiest first. Adapter numbers identify counters within this snapshot.</p>` : '<p class="perf-unavailable">Windows did not expose GPU engine counters in this session. This can occur on virtual desktops. Unavailable does not mean 0% usage.</p>'}</section>`;
+    detail = `<details class="perf-details perf-resource-detail"><summary>GPU engine activity</summary>${engines.length ? `<div class="perf-engine-grid">${engines.map((e) => `<div class="perf-engine" title="${esc(e.name)}"><span><b>${esc(e.engine)}</b><small>Adapter ${adapters.indexOf(e.adapter) + 1} · Engine ${esc((e.name.match(/_eng_(\d+)/) || [])[1] || "—")}</small></span>${perfMeter(e.percent, 70, 85)}</div>`).join("")}</div><p class="muted">Showing ${engines.length} of ${perfValue(s.gpu_engine_count)} engines, busiest first. Adapter numbers identify counters within this snapshot.</p>` : '<p class="perf-unavailable">Windows did not expose GPU engine counters in this session. This can occur on virtual desktops. Unavailable does not mean 0% usage.</p>'}</details>`;
   } else if (kind === "memory") {
     cards =
       memory() +
@@ -571,7 +593,7 @@ function renderPerformance() {
       "CPU percentages are relative to all logical processors. Process memory is the resident working set divided by usable RAM; shared pages can occur in more than one process, so do not sum process memory. GPU shows the busiest engine, not a sum of engines. Red process values: CPU ≥25%, GPU ≥80%, RAM ≥20%. Amber: CPU/RAM ≥10%, GPU ≥50%. Thread count alone does not establish overload. I/O includes files, network and devices.",
   };
   $("#adminOverview").innerHTML =
-    `<div class="perf-summary ${kind === "overview" ? "" : "perf-focused"}">${cards}</div>${extra}${performanceComparison(processSnapshot)}<div class="perf-insights"><b>Where to look</b>${notes.length ? `<ul>${notes.map((note) => `<li>${esc(note)}</li>`).join("")}</ul>` : "<p>No warning threshold crossed among available counters. One sample cannot rule out intermittent slowness or network / Citrix latency.</p>"}</div>${detail}<details class="perf-details"><summary>How to read ${esc(performanceViews[kind].label)} readings</summary><p class="muted">${guides[kind]}</p><p class="muted">Investigation thresholds are cues, not proof of a fault. Ring charts show overall usage versus remaining capacity. Compare manual scans while the user reproduces the issue.</p></details>${warnings.length ? `<details class="perf-details perf-warnings"><summary>${warnings.length} counter groups unavailable — partial results shown</summary><ul>${warnings.map((w) => `<li>${esc(w)}</li>`).join("")}</ul></details>` : ""}`;
+    `<div class="perf-summary ${kind === "overview" ? "" : "perf-focused"}">${cards}</div>${extra}${performanceComparison(processSnapshot)}<details class="perf-insights"><summary>Where to look${notes.length ? ` · ${notes.length} investigation cues` : " · No warning thresholds crossed"}</summary>${notes.length ? `<ul>${notes.map((note) => `<li>${esc(note)}</li>`).join("")}</ul>` : "<p>No warning threshold crossed among available counters. One sample cannot rule out intermittent slowness or network / Citrix latency.</p>"}</details>${detail}<details class="perf-details"><summary>How to read ${esc(performanceViews[kind].label)} readings</summary><p class="muted">${guides[kind]}</p><p class="muted">Investigation thresholds are cues, not proof of a fault. Ring charts show overall usage versus remaining capacity. Compare manual scans while the user reproduces the issue.</p></details>${warnings.length ? `<details class="perf-details perf-warnings"><summary>${warnings.length} counter groups unavailable — partial results shown</summary><ul>${warnings.map((w) => `<li>${esc(w)}</li>`).join("")}</ul></details>` : ""}`;
 }
 async function showProcessThreads(index) {
   window.AtlasDiagnostics?.stop();
@@ -673,8 +695,13 @@ function copyPerformanceReport() {
   );
   return copy(lines.join("\n"), `${performanceViews[kind].label} report`);
 }
-function confirmProcessKill(question) {
+function confirmProcessKill(question, multiple = false) {
   const dialog = $("#processKillDialog");
+  $("#processKillTitle").textContent = multiple ? "Kill processes?" : "Kill process?";
+  $("#confirmProcessKill").textContent = multiple ? "Kill processes" : "Kill process";
+  $("#processKillWarning").textContent = multiple
+    ? "Unsaved work in these processes may be lost."
+    : "Unsaved work in this process may be lost.";
   $("#processKillQuestion").textContent = question;
   dialog.returnValue = "";
   return new Promise((resolve) => {
@@ -688,7 +715,29 @@ function confirmProcessKill(question) {
     $("#cancelProcessKill").focus();
   });
 }
+function updateProcessActionControls() {
+  const disabled = !!window.AtlasReadOnly || !adminComputer() || processActionPending;
+  document.querySelectorAll('#killBtn, [data-quick-kill], #killMatches').forEach(button => {
+    button.disabled = disabled;
+  });
+}
+function quickProcessKill(value, match = "exact") {
+  const computer = adminComputer();
+  value = value.trim();
+  if (!computer) return toast("Enter a target machine first");
+  if (match === "contains" && !/^[A-Za-z0-9][A-Za-z0-9_. -]{2,63}$/.test(value))
+    return toast("Enter 3–64 characters of a process name, starting with a letter or number; wildcards are not supported");
+  const scope = match === "contains"
+    ? `all processes whose names contain "${value}" (case-insensitive)`
+    : `all processes named ${value}`;
+  return terminateProcess(
+    { computer, value, match },
+    `Kill ${scope} on ${computer}, across all sessions?`,
+    processSnapshot,
+  );
+}
 async function terminateProcess(payload, question, snapshot) {
+  if (window.AtlasReadOnly) return toast(AtlasReadOnly.reason);
   if (processActionPending) return;
   if (
     payload.computer !== adminComputer() ||
@@ -696,14 +745,20 @@ async function terminateProcess(payload, question, snapshot) {
   )
     return toast("Target or process list changed. Select the process again.");
   processActionPending = true;
-  $("#killBtn").disabled = true;
+  updateProcessActionControls();
   try {
-    if (!(await confirmProcessKill(question))) return;
+    if (!(await confirmProcessKill(question, !!payload.match || !/^\d+$/.test(payload.value)))) return;
     if (
       payload.computer !== adminComputer() ||
       (snapshot && snapshot !== processSnapshot)
     )
       return toast("Target or process list changed. Select the process again.");
+    if (payload.match) {
+      $("#quickKillStatus").textContent = payload.match === "contains"
+        ? `Terminating process names containing "${payload.value}" on ${payload.computer}…`
+        : `Terminating ${payload.value} on ${payload.computer}…`;
+      $("#quickKillStatus").hidden = false;
+    }
     const result = await api("/api/kill", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -724,14 +779,23 @@ async function terminateProcess(payload, question, snapshot) {
       }
       if (failures.length || !result.count)
         $("#processStatus").textContent = message;
+      if (payload.match) {
+        $("#quickKillStatus").textContent = message;
+        $("#quickKillStatus").hidden = false;
+      }
     }
   } catch (error) {
     toast(error.message);
-    if (payload.computer === adminComputer())
+    if (payload.computer === adminComputer()) {
       $("#processStatus").textContent = error.message;
+      if (payload.match) {
+        $("#quickKillStatus").textContent = error.message;
+        $("#quickKillStatus").hidden = false;
+      }
+    }
   } finally {
     processActionPending = false;
-    $("#killBtn").disabled = false;
+    updateProcessActionControls();
   }
 }
 function processMenu(event, index) {
@@ -831,6 +895,16 @@ function bindProcessControls() {
   $("#refreshProcesses").onclick = () => admin(activePerformance);
   selectPerformanceView(activePerformance);
   $("#copyPerformance").onclick = copyPerformanceReport;
+  document.querySelectorAll('[data-quick-kill]').forEach(button => {
+    button.onclick = () => quickProcessKill(button.dataset.quickKill);
+  });
+  $("#killMatches").onclick = () => quickProcessKill($("#killMatchWord").value, "contains");
+  $("#killMatchWord").addEventListener("keydown", event => {
+    if (event.key === "Enter" && !event.isComposing) {
+      event.preventDefault();
+      $("#killMatches").click();
+    }
+  });
   $("#refreshThreads").onclick = refreshProcessThreads;
   $("#closeThreads").onclick = () => $("#threadDialog").close();
   $("#threadDialog").addEventListener("close", () => {

@@ -32,13 +32,20 @@ def list_processes(wmi, pc, kind):
 def terminate(wmi, request):
     pc = wmi.validate_pc(request.computer)
     value = request.value.strip()
-    if not re.fullmatch(r'[A-Za-z0-9_. -]{1,260}', value):
+    match = getattr(request, 'match', 'exact')
+    if match not in ('exact', 'contains'):
+        raise HTTPException(400, 'Choose exact or contains process-name matching')
+    if match == 'contains':
+        if (not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_. -]{2,63}', value)
+                or request.created is not None or request.name is not None):
+            raise HTTPException(400, 'Enter 3–64 characters of a process name, starting with a letter or number; wildcards are not supported')
+    elif not re.fullmatch(r'[A-Za-z0-9_. -]{1,260}', value):
         raise HTTPException(400, 'Invalid PID or executable name')
-    if value.isdigit():
+    if match == 'exact' and value.isdigit():
         if not 4 < int(value) <= 4294967295:
             raise HTTPException(400, 'Choose a valid non-system PID')
         value = str(int(value))
-    elif not value.lower().endswith('.exe'):
+    elif match == 'exact' and not value.lower().endswith('.exe'):
         value += '.exe'
     created, name = request.created, request.name
     if created is not None or name is not None:
@@ -47,6 +54,6 @@ def terminate(wmi, request):
                 or len(name) > 260 or any(c in name for c in '\r\n\x00')):
             raise HTTPException(400, 'Refresh the process list to obtain its identity')
     operator = wmi.identity()
-    result = call(wmi, pc, Action='kill', Value=value, ExpectedCreated=created or '', ExpectedName=name or '')
-    logging.warning('Process termination target=%s value=%s result=%s operator=%s', pc, value, result, operator)
+    result = call(wmi, pc, Action='kill', Value=value, Match=match, ExpectedCreated=created or '', ExpectedName=name or '')
+    logging.warning('Process termination target=%s match=%s value=%s result=%s operator=%s', pc, match, value, result, operator)
     return result

@@ -30,7 +30,7 @@ class ViewerTests(unittest.TestCase):
         before=hashlib.sha256(self.db.read_bytes()).digest()
         for path in ['/api/performance/PC', '/api/performance/PC?kind=diagnose', '/api/performance/PC/threads/42?created=x&name=app.exe']:
             self.assertEqual(self.client.get(path).status_code,404,path)
-        paths=['/api/save','/api/move','/api/vacate','/api/deploy','/api/kill','/api/reboot','/api/ops/settings','/api/database/apply/x','/api/open-tool/cmd/PC','/api/official/map-occupant']
+        paths=['/api/save','/api/move','/api/vacate','/api/deploy','/api/kill','/api/services','/api/services/stop','/api/reboot','/api/ops/settings','/api/database/apply/x','/api/open-tool/cmd/PC','/api/official/map-occupant']
         for method in ('POST','PUT','PATCH','DELETE'):
             for path in paths:self.assertEqual(self.client.request(method,path,json={}).status_code,403,(method,path))
         for path in ['/api/processes/PC?kind=gpu','/api/preflight/PC','/api/overview/PC','/api/v28/software/PC','/api/access/PC','/api/backup','/api/package-script','/api/ops/settings','/manage-database','/office_atlas.db','/config.json','/api/docs','/openapi.json','/operations.js','/.git/config','/%2e%2e/config.json']:

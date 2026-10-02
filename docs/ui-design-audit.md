@@ -65,3 +65,26 @@ Map labels and drawing surfaces retain their own geometry to avoid clipping or c
 - Verified action search, field focus, original handlers, disabled/hidden and stale targets, Escape, and process termination confirmation tests. Demo browser inspection confirms live actions stay disabled.
 
 Actions panel correction: non-shrinking rows, capped 520px panel, one section heading per group and cleaned labels excluding select options. Verified no overlapping rows at default viewport and 600x650; panel stays within viewport. Existing action/field, disabled-state and Escape tests pass.
+
+## Remote Admin consistency — 2026-10-02
+
+- Labelled target toolbar and consistent Overview/CPU/GPU/Memory controls, with explicit scan-state labels. Slowness capture is disabled until a target is entered.
+- Separate process heading, visible row count and labelled filter. Direct PID/name termination is an expandable control before the scrollable table; confirmation and target checks are preserved.
+- Investigation cues and GPU engine details expand on demand, matching the existing processor/disk disclosures. Remote Admin component spacing and responsive rules live in the final shared design layer.
+- Browser checks used fictional performance responses against running Admin and Demo services at 390, 487, 600, 768, 1000 and 1366 px widths. Classic and Desktop frames, manual-only scans, cached views, filters/counts and termination confirmations passed. The prepared hosted preview was checked locally with its read-only adapter; no performance values were added to it. Native Windows actions were not executed.
+- Performance, process-action, slowness-capture, reachable-action, console, desktop and header-navigation suites passed. Backend checks confirmed the full Demo console is served while privileged reads and all writes are blocked. Two broader viewer DOM tests also fail on the unchanged repository baseline: an old PsExec template count (39 versus 72) and an old PsExec navigation label.
+- The hosted update preserves all 358 directory/snapshot files. Publication is pending resolution of the existing Sites public audience, which conflicts with this repository's owner-private preview requirement.
+
+### Quick process termination
+
+- Added visible **Kill OpenFin…** and **Kill matching processes…** controls; the editable name fragment defaults to `a180`. Both bind to the displayed target, cover all sessions, require confirmation and stay disabled in Demo/Preview.
+- Contains matching queries the full live process list, uses a literal case-insensitive name substring and ignores command-line arguments. Every candidate's PID, name and creation time is checked again before termination; protected, changed and disappeared processes are skipped and partial failures remain visible.
+- Six Python process tests passed, including both PowerShell provider fixtures with simulated WMI/Terminate methods. API-route and Demo write-blocking checks, quick-action DOM checks, existing process/performance suites and Classic/Desktop browser checks passed. No live process was terminated.
+
+### Service inventory and stopping
+
+- Added **List services** beside Installed software, opening a compact searchable table with display/service names, state, startup mode, PID and confirmed **Stop…** controls. Refresh is explicit; entering or selecting a target does not query Windows. The same dialog and shared design tokens are used in Classic/Desktop; Demo/Preview block inventory and stop execution.
+- Stop requests bind to the confirmed machine, exact service name and a configuration fingerprint. The server rechecks identity, protects core Windows/remote administration services, uses Windows service control, preserves startup settings and never stops dependencies or kills a shared host process. `Stopped` must be verified; pending, blocked, changed, missing and failed outcomes remain explicit with no automatic retry.
+- Six service Python tests passed, including the simulated PowerShell provider fixture. Service API validation, cross-origin rejection, existing RemoteRegistry tests and Demo write blocking passed. DOM checks covered search, safe metadata rendering, confirmation, duplicate prevention, stale responses, target changes, pending/errors and read-only guards. Existing console/process/performance/action suites also passed.
+- Browser checks used 201 fictional services at 390, 768 and 1366 px, confirming native modal/Escape behavior, search, exact stop payloads, responsive scrolling, Classic/Desktop and Demo/Preview restrictions. The broader Remote Admin browser checks also passed. No live Windows service was queried or stopped.
+- Restarted Admin and Demo after adding routes, verified their served assets against the prepared Preview and preserved the original database and all 358 preview snapshot files. Saved Preview version **94**, source `fb5f81b4d48d324576f25299b83aedf73e5e6204`, with a verified 3,674-file static archive. It is not deployed; live Preview remains out of date pending the owner-only access decision described above.

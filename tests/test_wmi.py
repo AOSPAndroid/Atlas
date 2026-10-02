@@ -164,14 +164,35 @@ class Regression(unittest.TestCase):
    self.assertEqual(self.client.get('/api/processes/TESTPC?kind=invalid').status_code,400);remote.assert_not_called()
   payload={'computer':'TESTPC','value':'42','created':item['CreatedAt'],'name':item['Process']}
   outcome={'ok':True,'count':0,'failed':1,'results':[{'PID':42,'Process':'sample.exe','state':'failed','message':'Access denied'}]}
-  with patch.object(app,'ps',return_value=json.dumps(outcome)):
+  with patch.object(app,'ps',return_value=json.dumps(outcome)) as remote:
    response=self.client.post('/api/kill',json=payload);self.assertEqual(response.status_code,200);self.assertEqual(response.json()['count'],0);self.assertEqual(response.json()['failed'],1)
+   response=self.client.post('/api/kill',json={'computer':'TESTPC','value':'a180','match':'contains'})
+   self.assertEqual(response.status_code,200);self.assertIn("-Match 'contains'",remote.call_args.args[0]);self.assertIn("-Value 'a180'",remote.call_args.args[0])
   with patch.object(app,'ps',side_effect=RuntimeError('WMI unreachable')):
    self.assertEqual(self.client.get('/api/processes/TESTPC?kind=cpu').status_code,502)
   with patch.object(app,'ps') as remote:
    self.assertEqual(self.client.post('/api/kill',json=dict(payload,value='4')).status_code,400)
+   self.assertEqual(self.client.post('/api/kill',json={'computer':'TESTPC','value':'a180','match':'regex'}).status_code,422)
+   self.assertEqual(self.client.post('/api/kill',json={'computer':'TESTPC','value':'*','match':'contains'}).status_code,400)
    self.assertEqual(self.client.post('/api/kill',headers={'Origin':'https://other.example'},json=payload).status_code,403)
    remote.assert_not_called()
+ def test_service_routes_require_target_identity_and_report_verified_outcomes(self):
+  inventory={'ok':True,'computer':'TESTPC','items':[]}
+  payload={'computer':'TESTPC','name':'TestService','expected_identity':'a'*64}
+  with patch.object(app,'ps',return_value=json.dumps(inventory)) as remote:
+   response=self.client.post('/api/services',json={'computer':'TESTPC'});self.assertEqual(response.status_code,200);self.assertEqual(response.json(),inventory)
+   remote.reset_mock()
+   self.assertEqual(self.client.post('/api/services',json={'computer':'bad;name'}).status_code,400)
+   self.assertEqual(self.client.post('/api/services/stop',json=dict(payload,expected_identity='bad')).status_code,422)
+   self.assertEqual(self.client.post('/api/services/stop',json={'computer':'TESTPC','name':'TestService'}).status_code,422)
+   self.assertEqual(self.client.post('/api/services/stop',headers={'Origin':'https://other.example'},json=payload).status_code,403)
+   remote.assert_not_called()
+  with patch.object(app,'ps',return_value=json.dumps({'ok':True,'computer':'TESTPC','name':'TestService','outcome':'stopped','state':'Stopped'})) as remote:
+   response=self.client.post('/api/services/stop',json=payload);self.assertEqual(response.status_code,200);self.assertEqual(response.json()['state'],'Stopped')
+   self.assertIn("-Action 'stop'",remote.call_args.args[0])
+  with patch.object(app,'ps',side_effect=RuntimeError('WMI unreachable')):
+   self.assertEqual(self.client.post('/api/services',json={'computer':'TESTPC'}).status_code,502)
+   response=self.client.post('/api/services/stop',json=payload);self.assertEqual(response.status_code,502);self.assertIn('outcome may be unknown',response.json()['detail'])
  def test_unique_encoded_remote_commands(self):
   commands=[]
   with patch.object(app,'wmi_create',side_effect=lambda pc,cmd:commands.append(cmd) or 12):

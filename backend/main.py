@@ -117,8 +117,11 @@ def monitor(pc,pid,log,ex):
 
 class Deploy(BaseModel):computer:str;folder:str;script:str;action:Literal['Install','Uninstall','Repair']='Install';fresh:bool=False;threads:int=Field(8,ge=1,le=128);mode:Literal['full','copy','execute']='full'
 class Bulk(BaseModel):computers:list[str]=Field(min_length=1,max_length=200);folder:str;script:str;action:Literal['Install','Uninstall','Repair']='Install';fresh:bool=False;threads:int=Field(8,ge=1,le=128);concurrency:int=Field(5,ge=1,le=10)
-class Kill(BaseModel):computer:str;value:str;created:str|None=None;name:str|None=None
+class Kill(BaseModel):computer:str;value:str;created:str|None=None;name:str|None=None;match:Literal['exact','contains']='exact'
 class Machine(BaseModel):computer:str
+class ServiceStop(Machine):
+ name:str=Field(min_length=1,max_length=256)
+ expected_identity:str=Field(pattern=r'^[a-f0-9]{64}$')
 class QueueItem(BaseModel):
  computer:str;folder:str;script:str;action:Literal['Install','Uninstall','Repair']='Install';fresh:bool=False;threads:int=Field(8,ge=1,le=128);mode:Literal['full','copy','execute']='full'
 class QueueRequest(BaseModel):
@@ -336,6 +339,16 @@ def enable_remote_registry(p:Machine):
  result=service_actions.enable_remote_registry(sys.modules[__name__],p.computer)
  logging.info('Enabled RemoteRegistry target=%s operator=%s previous_state=%s startup=%s',result['computer'],identity(),result['previous_state'],result['start_mode'])
  return result
+
+@app.post('/api/services')
+def list_services(p:Machine):
+ import service_actions,sys
+ return service_actions.list_services(sys.modules[__name__],p.computer)
+
+@app.post('/api/services/stop')
+def stop_service(p:ServiceStop):
+ import service_actions,sys
+ return service_actions.stop_service(sys.modules[__name__],p)
 
 @app.post('/api/reboot')
 def reboot(p:Machine):

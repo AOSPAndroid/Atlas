@@ -296,31 +296,52 @@
       >
         Deployment
       </button>
-      <section id="admin" class="page">
+      <section id="admin" class="page" aria-label="Remote Admin">
         <div class="panel performance-panel">
           <div class="performance-heading">
             <div>
               <small>REMOTE ADMIN</small>
-              <h2>What is slowing this machine down?</h2>
+              <h2>Performance &amp; processes</h2>
               <p class="muted">
-                Performance scans run only when you click a scan or refresh
-                button. Selecting a machine checks disk space and uptime only.
-                Scan for slowness runs for up to 60 seconds; you can stop it at
-                any time.
+                Choose a target, then run a scan. Each view keeps its last result.
               </p>
             </div>
-            <span class="pill">Manual performance scans</span>
+            <span class="pill">On-demand scans</span>
           </div>
-          <div class="row admin-tools">
-            <input id="adminPc" placeholder="Computer" /><button
-              id="diagnoseSlowness"
-              class="primary"
+          <div class="admin-tools">
+            <label class="admin-target-field" for="adminPc">
+              Target machine
+              <input
+                id="adminPc"
+                placeholder="Enter hostname"
+                autocomplete="off"
+                spellcheck="false"
+                maxlength="64"
+              />
+            </label>
+            <div class="admin-diagnosis-action">
+              <button
+                id="diagnoseSlowness"
+                title="Capture slowness evidence for up to 60 seconds; stop at any time"
+              >
+                Scan for slowness
+              </button>
+              <small>Up to 60 seconds · stoppable</small>
+            </div>
+            <div
+              class="admin-machine-actions"
+              role="group"
+              aria-label="Machine tools"
             >
-              Scan for slowness</button
-            ><button id="adminSoftware">Installed software</button
-            ><button data-ping>Ping</button><button data-access>C$</button
-            ><button data-disk>Disk</button
-            ><button class="danger" data-reboot>Reboot</button>
+              <button id="adminSoftware">Installed software</button>
+              <button id="adminServices" disabled>List services</button>
+              <button data-ping>Ping</button>
+              <button data-access title="Check access to the administrative C$ share">
+                C$ access
+              </button>
+              <button data-disk>Disk space</button>
+              <button class="danger" data-reboot>Reboot…</button>
+            </div>
           </div>
           <section
             id="slowdownPanel"
@@ -343,66 +364,127 @@
           </section>
           <div id="adminUtility" hidden></div>
           <div class="atlas-performance-controls">
-          <div
-            class="performance-views"
-            role="group"
-            aria-label="Performance view"
-          >
-            <button
-              data-performance="overview"
-              data-overview
-              aria-pressed="true"
+            <div class="performance-view-toolbar">
+              <div
+                class="performance-views"
+                role="group"
+                aria-label="Performance view"
+              >
+                <button data-performance="overview" data-overview aria-pressed="true">
+                  Overview
+                </button>
+                <button data-performance="cpu" data-cpu aria-pressed="false">
+                  CPU
+                </button>
+                <button data-performance="gpu" data-gpu aria-pressed="false">
+                  GPU
+                </button>
+                <button data-performance="memory" data-memory aria-pressed="false">
+                  Memory
+                </button>
+              </div>
+              <span id="performanceState" class="pill performance-state" role="status"
+                >Choose a target</span
+              >
+            </div>
+            <div class="performance-view-heading">
+              <div>
+                <h3 id="performanceTitle">Performance overview</h3>
+                <p id="performanceDescription" class="muted">
+                  CPU, GPU, RAM and disk pressure in one manual scan.
+                </p>
+              </div>
+              <div class="row">
+                <button id="refreshProcesses" class="primary" disabled>
+                  Scan Overview
+                </button>
+                <button id="copyPerformance" disabled>Copy report</button>
+              </div>
+            </div>
+            <p id="processStatus" role="status">
+              Enter a machine, then click Scan Overview. Changing views never starts a
+              scan.
+            </p>
+          </div>
+          <div id="adminOverview" aria-labelledby="performanceTitle"></div>
+          <section class="admin-processes" aria-labelledby="processListTitle">
+            <div class="performance-filter">
+              <div class="process-list-heading">
+                <h3 id="processListTitle">Processes</h3>
+                <span id="processCount" class="pill">No scan</span>
+              </div>
+              <label class="process-filter-field" for="processFilter">
+                Filter processes
+                <input
+                  id="processFilter"
+                  placeholder="Filter by process, PID or session"
+                  autocomplete="off"
+                  disabled
+                />
+              </label>
+            </div>
+            <div
+              class="quick-process-actions"
+              role="group"
+              aria-label="Quick process termination"
             >
-              Overview
-            </button>
-            <button data-performance="cpu" data-cpu aria-pressed="false">
-              CPU
-            </button>
-            <button data-performance="gpu" data-gpu aria-pressed="false">
-              GPU
-            </button>
-            <button data-performance="memory" data-memory aria-pressed="false">
-              Memory
-            </button>
-          </div>
-          <div class="performance-view-heading">
-            <div>
-              <h3 id="performanceTitle">Performance overview</h3>
-              <p id="performanceDescription" class="muted">
-                CPU, GPU, RAM and disk pressure in one manual scan.
-              </p>
-            </div>
-            <div class="row">
-              <button id="refreshProcesses" class="primary" disabled>
-                Scan Overview
+              <button
+                id="killOpenFin"
+                class="danger"
+                data-quick-kill="openfin.exe"
+                type="button"
+                disabled
+              >
+                Kill OpenFin…
               </button>
-              <button id="copyPerformance" disabled>Copy report</button>
+              <label for="killMatchWord"
+                >Process name contains
+                <input
+                  id="killMatchWord"
+                  value="a180"
+                  placeholder="At least 3 characters"
+                  title="Literal part of a process name; wildcards are not supported"
+                  minlength="3"
+                  maxlength="64"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+              </label>
+              <button id="killMatches" class="danger" type="button" disabled>
+                Kill matching processes…
+              </button>
+              <small
+                >All sessions on this target · names only · case-insensitive</small
+              >
+              <p id="quickKillStatus" role="status" hidden></p>
             </div>
-          </div>
-          <p id="processStatus" role="status">
-            Enter a machine, then click Scan Overview. Changing views never
-            starts a scan.
-          </p>
-          <div class="manual-termination" role="group" aria-label="Quick process termination">
-            <label for="kill">Terminate by PID / name</label>
-            <input id="kill" placeholder="PID or process.exe" autocomplete="off" />
-            <button id="killBtn" type="button">Terminate…</button>
-          </div>
-          </div>
-          <div id="adminOverview"></div>
-          <div class="row performance-filter">
-            <input
-              id="processFilter"
-              placeholder="Filter by process, PID or session"
-              aria-label="Filter processes"
-            />
-          </div>
-          <p id="processHint" class="muted">
-            Right-click a process for actions, or click its thread count to
-            inspect CPU usage.
-          </p>
-          <div id="adminOut"></div>
-
+            <p id="processHint" class="muted">
+              Right-click a process for actions, or click its thread count to inspect
+              CPU usage.
+            </p>
+            <details class="manual-termination-disclosure">
+              <summary>Terminate by PID or name</summary>
+              <div
+                class="manual-termination"
+                role="group"
+                aria-label="Quick process termination"
+              >
+                <label for="kill">PID or process name</label>
+                <input
+                  id="kill"
+                  placeholder="PID or process.exe"
+                  autocomplete="off"
+                />
+                <button id="killBtn" type="button">Terminate…</button>
+              </div>
+            </details>
+            <div
+              id="adminOut"
+              tabindex="0"
+              role="region"
+              aria-label="Process results"
+            ></div>
+          </section>
         </div>
       </section>
       <section id="knowledge" class="page" aria-label="Knowledge Base"></section>
@@ -752,6 +834,74 @@ Ready. Choose a command and click Run.</pre>
         <button id="confirmProcessKill" class="danger">Kill process</button>
       </div>
     </dialog>
+    <dialog
+      id="servicesDialog"
+      class="atlas-dialog"
+      aria-labelledby="servicesTitle"
+    >
+      <header class="services-heading">
+        <div>
+          <h2 id="servicesTitle">Services</h2>
+          <span id="servicesTarget">No target</span>
+        </div>
+        <button id="closeServices" aria-label="Close services" autofocus>
+          Close
+        </button>
+      </header>
+      <div class="services-toolbar">
+        <label for="servicesFilter">Search services</label>
+        <input
+          id="servicesFilter"
+          type="search"
+          placeholder="Name, status or startup mode"
+          autocomplete="off"
+        />
+        <button id="refreshServices">Refresh</button>
+        <span id="servicesCount" class="pill">0 services</span>
+      </div>
+      <p id="servicesStatus" role="status">
+        Choose a target and list its services.
+      </p>
+      <p class="services-help">
+        Stop requests affect the selected service. Dependent services and startup
+        settings are preserved.
+      </p>
+      <div
+        class="services-table-wrap"
+        tabindex="0"
+        role="region"
+        aria-label="Services list"
+      >
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Service</th>
+              <th scope="col">Status</th>
+              <th scope="col">Startup</th>
+              <th scope="col">PID</th>
+              <th scope="col">Action</th>
+            </tr>
+          </thead>
+          <tbody id="servicesBody"></tbody>
+        </table>
+      </div>
+    </dialog>
+    <dialog
+      id="serviceStopDialog"
+      class="atlas-dialog"
+      aria-labelledby="serviceStopTitle"
+      aria-describedby="serviceStopQuestion serviceStopWarning"
+    >
+      <h2 id="serviceStopTitle">Stop service?</h2>
+      <p id="serviceStopQuestion"></p>
+      <p id="serviceStopWarning">
+        Applications using this service may stop working.
+      </p>
+      <div class="row">
+        <button id="cancelServiceStop" autofocus>Cancel</button
+        ><button id="confirmServiceStop" class="danger">Stop service</button>
+      </div>
+    </dialog>
     <aside id="softwareDrawer" class="software-drawer">
       <div class="software-head">
         <div>
@@ -869,5 +1019,6 @@ Ready. Choose a command and click Run.</pre>
     <script src="/assets/knowledge-base.js"></script>
     <script src="/assets/console-shell.js"></script>
     <script src="/assets/remote-software.js"></script>
+    <script src="/assets/remote-services.js"></script>
   </body>
 </html>
