@@ -181,6 +181,26 @@ body.atlas-console :is(.action-widget, .reboot-card) {
 body.atlas-console .console-sidebar nav {
   gap: 2px;
 }
+body.atlas-console .console-sidebar nav button[data-page] {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) 22px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-align: center;
+}
+body.atlas-console .console-sidebar nav .nav-icon {
+  display: grid;
+  place-items: center;
+}
+body.atlas-console .console-sidebar nav .nav-label {
+  min-width: 0;
+}
+@media (max-width: 760px) {
+  body.atlas-console .console-sidebar nav button[data-page] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 body.atlas-console .console-page-heading p {
   margin: 2px 0;
   font-size: 12px;
@@ -407,6 +427,8 @@ body.atlas-console .admin-diagnosis-action {
 body.atlas-console .admin-diagnosis-action small {
   font-size: var(--atlas-label-size);
   color: var(--atlas-muted);
+  order: -1;
+  line-height: 1.4;
 }
 body.atlas-console .admin-machine-actions {
   display: flex;
@@ -419,7 +441,7 @@ body.atlas-console .performance-view-toolbar {
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
-  align-items: center;
+  align-items: end;
   gap: var(--atlas-space-2);
 }
 body.atlas-console .performance-views {
@@ -435,6 +457,13 @@ body.atlas-console .performance-views {
 body.atlas-console .performance-views button {
   min-width: 70px;
   flex: 1 1 auto;
+}
+body.atlas-console #atlas-edge-admin-tools {
+  align-items: end;
+}
+body.atlas-console #atlas-edge-admin-tools .performance-views {
+  align-self: end;
+  margin-bottom: -3px;
 }
 body.atlas-console .performance-state {
   font-size: var(--atlas-label-size);
@@ -811,6 +840,53 @@ body:is(.atlas-console, .atlas-map, .atlas-utility, .atlas-database)
   font-size: 12px;
   line-height: 1.4;
   border-radius: var(--atlas-control-radius);
+}
+/* Center action content in every first-party surface. Record tables and map
+   labels keep their own reading alignment; Desktop keeps its dock geometry. */
+body:is(.atlas-console, .atlas-map, .atlas-utility, .atlas-database, .atlas-desktop)
+  button:not(.map-name):not(.room-label):not(.dock-item):not(.window-activate):not([data-page]),
+body :is(.atlas-return, .primary-button, .ops-header-link),
+body .atlas-primary-nav a,
+body .atlas-header-more > summary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: var(--atlas-space-2);
+  box-sizing: border-box;
+  vertical-align: middle;
+}
+body button > :is(svg, img, .kb-icon) {
+  flex-shrink: 0;
+}
+body #knowledge :is(.kb-templates, .kb-file-menu) button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+body #knowledge #kbDocuments button,
+body .atlas-catalogue #catalog-list button,
+body.atlas-map .ops-user-result {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 2px;
+}
+body:is(.atlas-console, .atlas-map, .atlas-utility, .atlas-database)
+  :is(.row, .actions, .copybar, .services-toolbar, .atlas-control-group) {
+  gap: var(--atlas-space-2);
+}
+body:is(.atlas-console, .atlas-map, .atlas-utility, .atlas-database)
+  :is(.row, .actions, .copybar, .services-toolbar, .atlas-control-group)
+  > :is(button, input, select) {
+  margin: 0;
+}
+body.atlas-console :is(.deployments-toolbar, .software-toolbar, .px-filters)
+  > :is(button, input, select) {
+  margin: 0;
 }
 body :is(button, a, input, select, textarea, summary):focus-visible {
   outline: 2px solid var(--atlas-focus);
@@ -1262,6 +1338,25 @@ body.atlas-database button {
   min-height: var(--atlas-control-height);
   padding: 4px 7px;
 }
+body.atlas-database input[type="file"]::file-selector-button {
+  font: inherit;
+  color: var(--atlas-text);
+  background: var(--atlas-surface-subtle);
+  border: 1px solid var(--atlas-line);
+  border-radius: var(--atlas-control-radius);
+  padding: 2px 6px;
+  margin-inline-end: 6px;
+  text-align: center;
+  cursor: pointer;
+}
+body.atlas-database .review-grid article {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+body.atlas-database .review-grid article > :last-child {
+  margin-top: auto;
+}
 body.atlas-database li {
   margin: 4px 0;
 }
@@ -1374,7 +1469,7 @@ body.atlas-console .atlas-performance-controls #processStatus { margin:3px 0; }
 body.atlas-console :is(.tablewrap,.software-table-wrap) { max-height:60dvh; overflow:auto; }
 @media (max-height:600px) { body.atlas-console .atlas-performance-controls { position:static; } }
 @media (pointer:coarse) { .atlas-reachable-toggle { bottom:74px; } .atlas-reachable-panel { bottom:124px; max-height:calc(100dvh - 140px); } }
-body .atlas-reachable-panel .atlas-reachable-list button { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; height:auto; min-height:34px; max-height:none; flex:0 0 auto; line-height:1.4; padding:6px 8px; margin:0; border-radius:5px; box-sizing:border-box; gap:8px; text-align:left; }
+body .atlas-reachable-panel .atlas-reachable-list button { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; justify-content:center; height:auto; min-height:34px; max-height:none; flex:0 0 auto; line-height:1.4; padding:6px 8px; margin:0; border-radius:5px; box-sizing:border-box; gap:8px; text-align:center; }
 body .atlas-reachable-panel .atlas-reachable-list small { display:block; position:static; max-width:100%; white-space:nowrap; line-height:1.4; font-size:10px; margin:0; }
 body .atlas-reachable-panel > :not(.atlas-reachable-list) { flex-shrink:0; }
 body .atlas-reachable-panel .atlas-action-group { flex:0 0 auto; font-size:10px; font-weight:600; padding:6px 4px 3px; color:var(--atlas-muted); overflow-wrap:anywhere; }
@@ -1539,13 +1634,14 @@ body.atlas-console #workspace > .atlas-access-note { grid-column:1/-1; margin:0;
 body.atlas-console #workspace .lookup-column { max-height:calc(100dvh - 104px); overflow:auto; scrollbar-gutter:stable; padding-right:3px; }
 body.atlas-console #workspace :is(.lookup-heading,.searchbox) { margin:0 0 6px; }
 body.atlas-console #workspace .lookup-heading h2 { font-size:13px; }
-body.atlas-console #workspace .searchbox input { width:100%; height:30px; font-size:12px; padding:5px 44px 5px 8px; border-radius:7px; }
-body.atlas-console #workspace .searchbox kbd { font-size:10px; }
+body.atlas-console #workspace .searchbox { display:grid; grid-template-columns:minmax(0,1fr); gap:4px; }
+body.atlas-console #workspace .searchbox input { grid-area:1/1; width:100%; height:30px; font-size:12px; padding:5px 44px 5px 8px; border-radius:7px; }
+body.atlas-console #workspace .searchbox kbd { grid-area:1/1; position:static; justify-self:end; align-self:center; margin-right:8px; padding:1px 5px; font-size:10px; }
 body.atlas-console #workspace :is(.card,.panel) { margin:4px 0; padding:6px; border-radius:7px; }
 body.atlas-console #workspace .usercard { display:grid; grid-template-columns:28px minmax(0,1fr); gap:6px; }
 body.atlas-console #workspace .usercard .avatar { width:28px; height:28px; border-radius:6px; font-size:11px; }
 body.atlas-console #workspace .usercard h2 { margin:0; font-size:13px; }
-body.atlas-console #workspace :is(.workspace-user-select,.workspace-machine-select) { padding:0; border:0; background:none; color:var(--atlas-text); min-height:24px; height:auto; font:600 12px/1.4 var(--atlas-font); text-align:left; overflow-wrap:anywhere; }
+body.atlas-console #workspace :is(.workspace-user-select,.workspace-machine-select) { display:flex; width:100%; padding:0; border:0; background:none; color:var(--atlas-text); min-height:24px; height:auto; font:600 12px/1.4 var(--atlas-font); text-align:center; overflow-wrap:anywhere; }
 body.atlas-console #workspace :is(.workspace-user-select,.workspace-machine-select):hover { color:var(--atlas-accent); text-decoration:underline; }
 body.atlas-console #workspace .workspace-user-summary { font-size:11px; overflow-wrap:anywhere; margin:2px 0; color:var(--atlas-muted); }
 body.atlas-console #workspace :is(.atlas-person-details,.atlas-machine-details) { margin:2px 0 0; }
@@ -1559,6 +1655,7 @@ body.atlas-console #workspace .atlas-relationships { grid-row:2; grid-column:2; 
 body.atlas-console #workspace .atlas-relation { font-size:10px!important; padding:1px 4px!important; }
 body.atlas-console #workspace .atlas-machine-details { grid-column:1/-1; }
 body.atlas-console #workspace .deployment-panel { position:static; width:100%; max-height:none; padding:6px; margin-top:6px; box-shadow:none; box-sizing:border-box; }
+body.atlas-console #workspace .deployment-panel .head { align-items:center; }
 body.atlas-console #workspace .deployment-panel .head h2 { font-size:13px; margin:0; overflow-wrap:anywhere; }
 body.atlas-console #workspace .deployment-panel :is(.deployment-advanced,.deployment-action-switch,.package-picker) { margin:4px 0; }
 body.atlas-console #workspace .deployment-script { margin:4px 0; }
@@ -1581,10 +1678,11 @@ body.atlas-console #adSelection { font-size:12px; color:var(--atlas-muted); over
 body.atlas-console #adStatus { font-size:11px; margin:4px 0; overflow-wrap:anywhere; }
 body.atlas-console #adStatus:empty { display:none; }
 body.atlas-console #adResults > :is(h3,p) { font-size:11px; margin:4px 0; }
-body.atlas-console #adResults .ad-group-filter { display:flex; flex-wrap:wrap; gap:4px; margin:6px 0 3px; }
+body.atlas-console #adResults .ad-group-filter { display:flex; flex-wrap:wrap; align-items:center; gap:4px; margin:6px 0 3px; }
 body.atlas-console .ad-group-filter input { flex:1 1 170px; min-width:100px; }
 body.atlas-console .ad-group-filter select { flex:0 1 150px; }
-body.atlas-console .ad-group-compare { display:flex; flex-wrap:wrap; gap:4px; margin:4px 0; }
+body.atlas-console .ad-group-compare { display:flex; flex-wrap:wrap; align-items:center; gap:4px; margin:4px 0; }
+body.atlas-console :is(.ad-group-filter,.ad-group-compare) > :is(input,select,button) { margin:0; height:var(--atlas-control-height); min-height:var(--atlas-control-height); }
 body.atlas-console .ad-group-compare input { flex:1 1 160px; min-width:120px; }
 body.atlas-console .ad-group-compare select { flex:0 0 90px; }
 body.atlas-console #adResults .ad-group-list { max-height:calc(100dvh - 360px); min-height:120px; scrollbar-gutter:stable; }

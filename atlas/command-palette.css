@@ -224,7 +224,8 @@
 }
 
 /* Shadow-root companion to design-system.css; inherit the shared tokens. */
-#atlas-commands,:host-context(.atlas-app-header) #atlas-commands{min-height:var(--atlas-control-height,28px);padding:4px 7px;gap:6px;font:12px/1.4 var(--atlas-font,system-ui);border-radius:var(--atlas-control-radius,7px)}
+#atlas-commands,:host-context(.atlas-app-header) #atlas-commands{min-height:var(--atlas-control-height,28px);padding:4px 7px;gap:6px;font:12px/1.4 var(--atlas-font,system-ui);border-radius:var(--atlas-control-radius,7px);justify-content:center;text-align:center}
+.palette-close{display:inline-flex;align-items:center;justify-content:center;text-align:center;min-height:var(--atlas-control-height,28px);font:12px/1.4 var(--atlas-font,system-ui)}
 .atlas-palette{font:13px/1.4 var(--atlas-font,system-ui);border-radius:12px;box-shadow:var(--atlas-overlay-shadow,0 8px 28px #17334626)}
 .palette-input-row{padding:8px;gap:6px}.palette-input-row input{font-size:14px;padding:5px 0}.palette-input-row>span{font-size:20px}
 #atlas-command-status{padding:5px 10px;font-size:11px}.palette-result{padding:6px 8px;gap:8px;border-radius:7px}.palette-result strong{font-size:12px}.palette-result small{font-size:11px;margin-top:2px}.atlas-palette footer{padding:6px 10px;gap:6px}
