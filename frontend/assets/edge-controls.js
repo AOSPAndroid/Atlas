@@ -37,7 +37,9 @@
         (node.classList.contains("page") && !node.classList.contains("active"))
       )
         return false;
-      if (getComputedStyle(node).display === "none") return false;
+      if (getComputedStyle(node).display === "none" &&
+          !(node === panel.node && node.dataset.atlasEdgeInline === "true" && !panel.open))
+        return false;
     }
     return true;
   }
@@ -73,14 +75,10 @@
     pin.setAttribute("aria-label", `Pin ${panel.label.toLowerCase()} open`);
     pin.onclick = () => {
       pins[panel.id] = !pins[panel.id];
-      if (pins[panel.id])
-        for (const other of panels.values())
-          if (other !== panel && other.edge === panel.edge) {
-            pins[other.id] = false;
-            hide(other, true);
-          }
       savePins();
       refresh();
+      panel.node.scrollIntoView({ block: "nearest" });
+      window.dispatchEvent(new Event("atlas-shell-resize"));
     };
     const close = document.createElement("button");
     close.type = "button";
@@ -90,6 +88,8 @@
       pins[panel.id] = false;
       savePins();
       hide(panel, true);
+      refresh();
+      window.dispatchEvent(new Event("atlas-shell-resize"));
     };
     bar.append(title, pin, close);
     panel.node.prepend(bar);
@@ -110,13 +110,9 @@
       // A delayed hover must never replace a panel explicitly opened by click.
       clearTimeout(other.openTimer);
       other.openTimer = null;
-      if (!other.open) continue;
-      if (pins[other.id] || locked(other)) {
+      if (!other.open || pins[other.id]) continue;
+      if (locked(other)) {
         if (!explicit) return;
-        if (pins[other.id]) {
-          pins[other.id] = false;
-          savePins();
-        }
         hide(other, true);
       } else hide(other);
     }
@@ -124,6 +120,8 @@
     panel.node.inert = false;
     panel.node.dataset.atlasEdgeOpen = "true";
     panel.handle.setAttribute("aria-expanded", "true");
+    if (explicit && panel.node.dataset.atlasEdgeInline === "true")
+      panel.node.scrollIntoView({ block: "nearest" });
   }
   function hide(panel, force = false) {
     clearTimeout(panel.openTimer);
@@ -238,11 +236,13 @@
       // The map assembles its settings first, keeping its existing handlers.
       if (q(".map-settings"))
         group(
-          q("#viewport"),
+          q(".workspace > main"),
           "map-tools",
           [".map-settings", ".floor-rail", "#site-info"],
           "Map tools",
         );
+      const mapTools = q('[data-atlas-control-group="map-tools"]');
+      if (mapTools?.parentElement === q("#viewport")) q("#viewport").before(mapTools);
       group(document.body, "map-activity", [".atlas-reachable-toggle"], "Actions", "bottom");
     }
     if (document.body.classList.contains("atlas-console")) {
@@ -421,10 +421,18 @@
         panels.delete(id);
       }
     adapt();
+    // Once controls are pinned, every revealed panel uses its original place
+    // in the page. Nothing can float over an existing pinned panel.
+    const inline = automatic && [...panels.values()].some(
+      (panel) => pins[panel.id] && eligible(panel),
+    );
+    document.body.dataset.atlasPinnedControls = String(inline);
     const counts = { top: 0, left: 0, right: 0, bottom: 0 };
     const slots = Math.max(1, Math.floor((window.innerWidth - 16) / 108));
     for (const panel of panels.values()) {
       chrome(panel);
+      panel.node.dataset.atlasEdgeInline = String(inline);
+      panel.node.dataset.atlasEdgePinned = String(automatic && !!pins[panel.id]);
       const present = eligible(panel),
         hidden = !automatic || !present;
       if (panel.handle.hidden !== hidden) panel.handle.hidden = hidden;
@@ -454,7 +462,12 @@
           panel.node.inert = true;
           panel.handle.setAttribute("aria-expanded", "false");
         }
-        if (pins[panel.id]) show(panel, true);
+        if (pins[panel.id]) {
+          panel.open = true;
+          panel.node.inert = false;
+          panel.node.dataset.atlasEdgeOpen = "true";
+          panel.handle.setAttribute("aria-expanded", "true");
+        }
       }
     }
     for (const edge of ["top", "bottom"]) {
@@ -465,6 +478,10 @@
       if (document.documentElement.style.getPropertyValue(property) !== value)
         document.documentElement.style.setProperty(property, value);
     }
+    const step = window.matchMedia("(pointer:coarse)").matches ? 32 : 22;
+    for (const edge of ["top", "bottom", "left", "right"])
+      document.documentElement.style.setProperty(`--atlas-${edge}-edge-space`,
+        `${counts[edge] ? (edge === "top" || edge === "bottom" ? Math.ceil(counts[edge] / slots) : 1) * step : 0}px`);
     const context = q("#atlasContentContext");
     if (context) {
       const pc = q("#admin.active")
@@ -556,6 +573,8 @@
     }
   }
   function boot() {
+    // The two upload workflows are primary actions and stay in their sections.
+    if (document.body.classList.contains("atlas-upload-workflows")) return;
     if (
       !document.body.matches(
         ".atlas-console,.atlas-map,.atlas-desktop,.atlas-database,.atlas-utility",

@@ -74,303 +74,297 @@
     <link rel="stylesheet" href="/assets/design-system.css" />
     <script defer src="/assets/edge-controls.js"></script>
   </head>
-  <body class="atlas-database">
+  <body class="atlas-database atlas-upload-workflows">
     <main>
       <header>
         <div>
-          <h1>Manage Database</h1>
-          <p>Excel seating updates and directory imports</p>
+          <h1>Upload data</h1>
+          <p>Choose a workbook → review changes → save</p>
         </div>
-        <a class="atlas-return" href="/installer">IT Console</a
-        ><a class="atlas-return" href="/">Floor atlas</a>
+        <div class="row">
+          <a class="atlas-return" href="/installer">IT Console</a
+          ><a class="atlas-return" href="/">Floor atlas</a>
+        </div>
       </header>
       <div id="message" role="status" aria-live="polite">
         Loading database status…
       </div>
-      <section class="panel" id="excel-templates">
-        <h2>Download Excel templates</h2>
-        <p>
-          <b
-            >Download → fill in Excel → upload → review changes → save to the
-            database.</b
-          >
-          Each workbook contains instructions and blank entry rows. Keep its
-          sheet names and column headers.
-        </p>
-        <div class="review-grid">
-          <article>
-            <h3>Users and desks</h3>
-            <p>
-              Names, teams, account links and desk assignments. Includes a
-              desk-code reference and Status dropdown.
-            </p>
-            <p>
-              <a
-                class="atlas-return"
-                href="/api/excel-templates/seating-official"
-                >Official desk template (.xlsx)</a
-              >
-            </p>
-            <p>
-              <a
-                class="atlas-return"
-                href="/api/excel-templates/seating-previous"
-                >Previous seating template (.xlsx)</a
-              >
-            </p>
-            <a href="#seating-panel">Upload completed seating sheet ↓</a>
-          </article>
-          <article>
-            <h3>Users and devices</h3>
-            <p>
-              Import users and devices worksheets with the original export
-              headers. Users and computers workbooks are also supported.
-            </p>
-            <p>
-              <a class="atlas-return" href="/api/excel-templates/directory"
-                >Directory template (.xlsx)</a
-              >
-            </p>
-            <p>
-              <b>Complete directory snapshot required.</b> This import replaces
-              the directory; missing rows are removed. For updates to an
-              existing rich export, retain its extra columns.
-            </p>
-            <a href="#directory-import">Upload completed directory sheet ↓</a>
-          </article>
-        </div>
-        <p>
-          For routine seating edits, you can also download your
-          <b>current users and desks</b> below, change the existing rows, and
-          upload that file.
-        </p>
-      </section>
-      <section class="panel" id="directory-coverage">
-        <h2>Directory column coverage</h2>
-        <p>
-          Inspect every imported column, its populated records and where it is
-          used.
-        </p>
-        <div id="coverage">Loading column coverage…</div>
-        <a class="atlas-return" href="/api/database/export-archive"
-          >Download all directory fields (.ndjson)</a
-        >
-      </section>
-      <section class="panel" id="seating-panel">
-        <h2>Users and desks · Excel sync</h2>
-        <p>
-          Keep one row per desk. Upload the latest sheet to detect assignments,
-          moves, vacancies, name and team changes. The preview compares with the
-          saved Atlas.
-        </p>
-        <div class="atlas-import-controls" data-database-controls="seating">
-          <label
-            >Layout
-            <select id="seating-layout">
-              <option value="official">Official desks</option>
-              <option value="previous">Previous seating</option>
-            </select></label
-          >
-          <a
-            class="atlas-return"
-            id="seating-export"
-            href="/api/seating-excel/export?layout=official"
-            >Download current users and desks (.xlsx)</a
-          >
+      <div class="atlas-upload-grid">
+        <section class="panel atlas-upload-section" id="directory-import">
+          <h2>Users &amp; devices</h2>
           <p>
-            Columns: <b>Desk ID, Name, Team, Account, Status</b>. Use a login,
-            email or BRID in Account to identify someone reliably, including
-            after a name change. New names can be seated without an account;
-            this does not create a directory account.
+            Upload one Excel workbook with <b>users</b> and <b>devices</b> tabs.
+            Preview the changes, then back up and apply.
           </p>
-          <p>
-            For a vacancy, clear Name and Account and set Status to
-            <b>vacant</b>. For an assignment, set Status to <b>assigned</b>. A
-            recognised move clears the person's old desk automatically.
-            Positions and equipment stay in place.
+          <p class="atlas-import-notice">
+            <b>Complete snapshot:</b> users and devices omitted from this
+            workbook are removed from the directory.
           </p>
-          <label
-            >Latest users and desks workbook<input
-              id="seating-file"
-              type="file"
-              accept=".xlsx" /></label
-          ><label
-            ><input id="seating-complete" type="checkbox" />Complete layout
-            snapshot: vacate every desk omitted from this sheet in the selected
-            layout.</label
-          >
-          <p>
-            Leave this unchecked for a partial update. Omitted people stay
-            seated unless a recognised move relocates them. Removing someone
-            from seating does not delete their directory account.
-          </p>
-          <button id="seating-preview" class="primary">Detect changes</button>
-          <p id="seating-message" role="status" aria-live="polite"></p>
-        </div>
-        <div id="seating-result" hidden>
-          <p id="seating-counts"></p>
-          <div id="seating-errors" role="alert"></div>
-          <details>
-            <summary>Account and data warnings</summary>
-            <ul id="seating-warnings"></ul>
-          </details>
-          <div style="overflow: auto; max-height: 480px">
-            <table
-              style="width: 100%; text-align: left; border-collapse: collapse"
+          <div class="atlas-import-controls" data-database-controls="directory">
+            <label
+              >Users and devices workbook (.xlsx)<input
+                id="file"
+                type="file"
+                accept=".xlsx" /></label
+            ><button id="validate" class="primary">Validate and preview</button>
+            <p id="directory-message" role="status" aria-live="polite">
+              Choose your users and devices workbook, then validate it.
+            </p>
+            <progress
+              id="directory-progress"
+              aria-label="Validating directory workbook"
+              hidden
+            ></progress>
+          </div>
+          <section id="preview" class="atlas-import-review" hidden>
+            <h3>Review directory changes</h3>
+            <p id="source"></p>
+            <div id="changes" class="review-grid"></div>
+            <div id="warnings"></div>
+            <details>
+              <summary>Examples and missing desk accounts</summary>
+              <pre id="examples"></pre>
+            </details>
+            <p>
+              A full backup is created before applying. Desk positions, edited
+              labels, confirmed account links, package catalogue and operation
+              history stay in place. Removed accounts disappear from directory
+              search.
+            </p>
+            <div
+              class="atlas-import-controls"
+              data-database-controls="directory-review"
             >
-              <thead>
-                <tr>
-                  <th>Desk</th>
-                  <th>Change</th>
-                  <th>Before</th>
-                  <th>After</th>
-                </tr>
-              </thead>
-              <tbody id="seating-changes"></tbody>
-            </table>
-          </div>
+              <label
+                ><input type="checkbox" id="full" />This is the complete
+                intended directory snapshot, and I have reviewed the
+                removals.</label
+              ><label
+                >Type APPLY to proceed<input id="confirm" autocomplete="off"
+              /></label>
+              <div class="row">
+                <button id="apply" class="primary" disabled>
+                  Back up and apply</button
+                ><button id="cancel">Discard preview</button>
+              </div>
+              <p id="review-message" role="status" aria-live="polite"></p>
+              <progress
+                id="review-progress"
+                aria-label="Applying directory changes"
+                hidden
+              ></progress>
+            </div>
+          </section>
+          <details class="atlas-import-help">
+            <summary>Workbook format and template</summary>
+            <p>
+              The original export headers are supported: devices use ci, model,
+              assigned_to, asset_tag, serial_number, install_status,
+              cmp_last_used, assigned and location. Laptops and corporate
+              iPhones are included. Existing Users and computers workbooks also
+              work.
+            </p>
+            <p>
+              Devices without a ci/name hostname stay in the export archive.
+              Unassigned devices with a hostname remain searchable and usable.
+            </p>
+            <a class="atlas-return" href="/api/excel-templates/directory"
+              >Download directory template (.xlsx)</a
+            >
+          </details>
+          <details id="directory-coverage" class="atlas-import-help">
+            <summary>Imported columns and field export</summary>
+            <p>
+              Inspect every imported column, its populated records and where it
+              is used.
+            </p>
+            <div id="coverage">Loading column coverage…</div>
+            <a class="atlas-return" href="/api/database/export-archive"
+              >Download all directory fields (.ndjson)</a
+            >
+          </details>
+          <details class="atlas-import-help">
+            <summary>Import history and restore</summary>
+            <p>
+              Restore directory stages a preview from the backup made before
+              that import. It preserves current seating and deployment history.
+            </p>
+            <div id="history"></div>
+          </details>
+        </section>
+        <section id="floorplan-import" class="panel atlas-upload-section">
+          <h2>Bulk floor plan changes</h2>
           <p>
-            A full database backup and per-desk history are saved. Changes apply
-            together. Account links shown in this preview are confirmed when you
-            apply; physical seating verification resets for changed desks.
+            Update desk occupants, teams, accounts and vacancies in bulk.
+            Download the current seating, edit it in Excel, then upload it here.
           </p>
-          <div
-            class="atlas-import-controls"
-            data-database-controls="seating-review"
-          >
-            <label
-              >Type APPLY<input
-                id="seating-confirm"
-                autocomplete="off" /></label
-            ><button id="seating-apply" class="primary" disabled>
-              Back up and apply seating changes
-            </button>
+          <div id="seating-panel">
+            <div class="atlas-import-controls" data-database-controls="seating">
+              <label
+                >Layout
+                <select id="seating-layout">
+                  <option value="official">Official desks</option>
+                  <option value="previous">Previous seating</option>
+                </select></label
+              >
+              <a
+                class="atlas-return"
+                id="seating-export"
+                href="/api/seating-excel/export?layout=official"
+                >Download current users and desks (.xlsx)</a
+              >
+              <label
+                >Latest users and desks workbook<input
+                  id="seating-file"
+                  type="file"
+                  accept=".xlsx"
+              /></label>
+              <button id="seating-preview" class="primary">
+                Detect changes
+              </button>
+              <p id="seating-message" role="status" aria-live="polite"></p>
+            </div>
+            <details class="atlas-import-help">
+              <summary>Full layout snapshot (optional)</summary>
+              <label
+                ><input id="seating-complete" type="checkbox" />Complete layout
+                snapshot: vacate every desk omitted from this sheet in the
+                selected layout.</label
+              >
+              <p>
+                Leave this unchecked for a partial update. Omitted people stay
+                seated unless a recognised move relocates them. Removing someone
+                from seating does not delete their directory account.
+              </p>
+            </details>
+            <div id="seating-result" hidden>
+              <p id="seating-counts"></p>
+              <div id="seating-errors" role="alert"></div>
+              <details>
+                <summary>Account and data warnings</summary>
+                <ul id="seating-warnings"></ul>
+              </details>
+              <div style="overflow: auto; max-height: 480px">
+                <table
+                  style="
+                    width: 100%;
+                    text-align: left;
+                    border-collapse: collapse;
+                  "
+                >
+                  <thead>
+                    <tr>
+                      <th>Desk</th>
+                      <th>Change</th>
+                      <th>Before</th>
+                      <th>After</th>
+                    </tr>
+                  </thead>
+                  <tbody id="seating-changes"></tbody>
+                </table>
+              </div>
+              <p>
+                A full database backup and per-desk history are saved. Changes
+                apply together. Account links shown in this preview are
+                confirmed when you apply; physical seating verification resets
+                for changed desks.
+              </p>
+              <div
+                class="atlas-import-controls"
+                data-database-controls="seating-review"
+              >
+                <label
+                  >Type APPLY<input
+                    id="seating-confirm"
+                    autocomplete="off" /></label
+                ><button id="seating-apply" class="primary" disabled>
+                  Back up and apply seating changes
+                </button>
+              </div>
+            </div>
+            <details class="atlas-import-help">
+              <summary>Floor plan format and blank templates</summary>
+              <p>
+                Columns: <b>Desk ID, Name, Team, Account, Status</b>. Use a
+                login, email or BRID in Account to identify someone reliably,
+                including after a name change. New names can be seated without
+                an account; this does not create a directory account.
+              </p>
+              <p>
+                For a vacancy, clear Name and Account and set Status to
+                <b>vacant</b>. For an assignment, set Status to <b>assigned</b>.
+                A recognised move clears the person's old desk automatically.
+                Positions and equipment stay in place.
+              </p>
+              <div class="row">
+                <a
+                  class="atlas-return"
+                  href="/api/excel-templates/seating-official"
+                  >Official desks template (.xlsx)</a
+                ><a
+                  class="atlas-return"
+                  href="/api/excel-templates/seating-previous"
+                  >Previous seating template (.xlsx)</a
+                >
+              </div>
+            </details>
+            <details>
+              <summary>Seating import history</summary>
+              <ul id="seating-history"></ul>
+            </details>
           </div>
-        </div>
-        <details>
-          <summary>Seating import history</summary>
-          <ul id="seating-history"></ul>
-        </details>
-      </section>
-      <section class="panel" id="desk-moves-panel">
-        <h2>Desk moves</h2>
-        <p>
-          Move several occupants between existing desks, including swaps. This
-          does not import directory data or reposition the physical desks.
-        </p>
-        <a class="atlas-return" href="/api/desk-moves/export?layout=official"
-          >Export official desks (.xlsx)</a
-        >
-        <a class="atlas-return" href="/api/desk-moves/export?layout=previous"
-          >Export previous seating (.xlsx)</a
-        >
-        <p>
-          Edit only the blue Move to desk column, then upload the workbook here.
-        </p>
-        <div class="atlas-import-controls" data-database-controls="moves">
-          <label
-            >Edited desk workbook<input
-              id="moves-file"
-              type="file"
-              accept=".xlsx" /></label
-          ><button id="moves-preview">Preview desk moves</button>
-          <p id="moves-message" role="status" aria-live="polite"></p>
-        </div>
-        <div id="moves-result" hidden>
-          <pre id="moves-summary"></pre>
-          <p>
-            Occupants and confirmed account links move together. Equipment stays
-            at its desk. All moves apply together after a full backup.
-          </p>
-          <div
-            class="atlas-import-controls"
-            data-database-controls="moves-review"
-          >
-            <label
-              >Type MOVE<input id="moves-confirm" autocomplete="off" /></label
-            ><button id="moves-apply" class="primary" disabled>
-              Back up and apply desk moves
-            </button>
-          </div>
-        </div>
-      </section>
-      <section class="panel" id="directory-import">
-        <h2>Users and devices import</h2>
-        <p>
-          Choose a complete snapshot with users and devices worksheets, or the
-          existing Users and computers format. Device ci identifies the
-          hostname; model, assigned_to and serial_number keep their original
-          headers. Validation builds a separate preview before changing the
-          directory.
-        </p>
-        <p class="muted">
-          Devices without a ci/name hostname are retained in the export archive
-          and counted in the preview, but cannot be searched or used as remote
-          targets. Unassigned devices with a hostname remain usable.
-        </p>
-        <div class="atlas-import-controls" data-database-controls="directory">
-          <label
-            >Excel workbook (.xlsx)<input
-              id="file"
-              type="file"
-              accept=".xlsx" /></label
-          ><button id="validate" class="primary">Validate and preview</button>
-          <p id="directory-message" role="status" aria-live="polite">
-            Choose your users and devices workbook, then validate it.
-          </p>
-          <progress
-            id="directory-progress"
-            aria-label="Validating directory workbook"
-            hidden
-          ></progress>
-        </div>
-      </section>
-      <section id="preview" class="panel" hidden>
-        <h2>Review directory changes</h2>
-        <p id="source"></p>
-        <div id="changes" class="review-grid"></div>
-        <div id="warnings"></div>
-        <details>
-          <summary>Examples and missing desk accounts</summary>
-          <pre id="examples"></pre>
-        </details>
-        <p>
-          A full backup is created before applying. Desk positions, edited
-          labels, confirmed account links, package catalogue and operation
-          history stay in place. Removed accounts disappear from directory
-          search.
-        </p>
-        <div
-          class="atlas-import-controls"
-          data-database-controls="directory-review"
-        >
-          <label
-            ><input type="checkbox" id="full" />This is the complete intended
-            directory snapshot, and I have reviewed the removals.</label
-          ><label
-            >Type APPLY to proceed<input id="confirm" autocomplete="off"
-          /></label>
-          <div class="row">
-            <button id="apply" class="primary" disabled>
-              Back up and apply</button
-            ><button id="cancel">Discard preview</button>
-          </div>
-          <p id="review-message" role="status" aria-live="polite"></p>
-          <progress
-            id="review-progress"
-            aria-label="Applying directory changes"
-            hidden
-          ></progress>
-        </div>
-      </section>
-      <section class="panel">
-        <h2>Import history</h2>
-        <p>
-          Restore directory stages a preview from the backup made before that
-          import. It preserves current seating and deployment history.
-        </p>
-        <div id="history"></div>
-      </section>
+          <details id="desk-moves-panel" class="atlas-import-help">
+            <summary>Move or swap existing occupants</summary>
+            <p>
+              Move several occupants between existing desks, including swaps.
+              This does not import directory data or reposition the physical
+              desks.
+            </p>
+            <a
+              class="atlas-return"
+              href="/api/desk-moves/export?layout=official"
+              >Export official desks (.xlsx)</a
+            >
+            <a
+              class="atlas-return"
+              href="/api/desk-moves/export?layout=previous"
+              >Export previous seating (.xlsx)</a
+            >
+            <p>
+              Edit only the blue Move to desk column, then upload the workbook
+              here.
+            </p>
+            <div class="atlas-import-controls" data-database-controls="moves">
+              <label
+                >Edited desk workbook<input
+                  id="moves-file"
+                  type="file"
+                  accept=".xlsx" /></label
+              ><button id="moves-preview">Preview desk moves</button>
+              <p id="moves-message" role="status" aria-live="polite"></p>
+            </div>
+            <div id="moves-result" hidden>
+              <pre id="moves-summary"></pre>
+              <p>
+                Occupants and confirmed account links move together. Equipment
+                stays at its desk. All moves apply together after a full backup.
+              </p>
+              <div
+                class="atlas-import-controls"
+                data-database-controls="moves-review"
+              >
+                <label
+                  >Type MOVE<input
+                    id="moves-confirm"
+                    autocomplete="off" /></label
+                ><button id="moves-apply" class="primary" disabled>
+                  Back up and apply desk moves
+                </button>
+              </div>
+            </div>
+          </details>
+        </section>
+      </div>
     </main>
     <script src="/assets/database.js"></script>
     <script src="/assets/desk-moves.js"></script>
