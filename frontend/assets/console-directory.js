@@ -438,8 +438,8 @@ function machineContext(event, index) {
   add("specs", "View specifications", () => AtlasHealth.specs(m.name), false);
   menu.lastElementChild.disabled = !windows;
   add("software", "Software inventory", () => loadSoftware(m.name));
-  add("report", "Copy complete machine report", () =>
-    copy(completeMachineReport(), "Machine report"),
+  add("report", "Copy device report", () =>
+    copy(windows ? completeMachineReport() : AtlasUI.machineReport(m), "Device report"), windows,
   );
   menu.classList.remove("hidden");
   menu.scrollTop = 0;
@@ -457,8 +457,10 @@ function machineContext(event, index) {
       gap,
       Math.min(event.clientY, window.innerHeight - bounds.height - gap),
     ) + "px";
-  const buttons = [...menu.querySelectorAll("button")];
+  window.AtlasReadOnly?.enforce?.();
+  const enabledButtons = () => [...menu.querySelectorAll("button")].filter(button => !button.disabled && button.getAttribute("aria-disabled") !== "true");
   menu.onkeydown = (e) => {
+    const buttons = enabledButtons();
     const current = buttons.indexOf(document.activeElement);
     let next;
     if (e.key === "ArrowDown") next = (current + 1) % buttons.length;
@@ -482,7 +484,7 @@ function machineContext(event, index) {
       }
     }
   };
-  buttons[0].focus({ preventScroll: true });
+  enabledButtons()[0]?.focus({ preventScroll: true });
 }
 function bindMachineContext() {
   document
