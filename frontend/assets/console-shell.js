@@ -12,6 +12,8 @@ async function copy(v, n = "Value") {
   toast(`${n} copied`);
 }
 function page(id) {
+  const directory = id === "active-directory";
+  if (directory) id = "workspace";
   const desktopApp=window.AtlasDesktop?.app;
   if(desktopApp==='workspace'&&id==='knowledge'){window.AtlasDesktop.navigate('/installer?command=knowledge');return;}
   if(desktopApp==='knowledge'&&id!=='knowledge'){window.AtlasDesktop.navigate('/installer?command='+id);return;}
@@ -37,7 +39,10 @@ function page(id) {
   if (id === "knowledge") window.AtlasKnowledge?.open();
   if (id === "history") loadDeploymentHistory();
   if (id === "psexec") window.AtlasPsExec?.open();
-  if (id === "active-directory") window.AtlasAD?.open();
+  if (directory) {
+    window.AtlasAD?.open();
+    $("#active-directory").scrollIntoView({ block: "nearest" });
+  }
   if (id === "bulk" && !bulkCatalogueLoaded && !bulkBusy) bulkPackages();
   syncDeploymentPanel();
 }

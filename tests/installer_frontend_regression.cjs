@@ -26,10 +26,10 @@ const assert=require('node:assert/strict');const {fixture}=require('./ui_fixture
  menu.getBoundingClientRect=()=>({width:260,height:680});
  const openMenu=()=>card.dispatchEvent(new w.MouseEvent('contextmenu',{bubbles:true,cancelable:true,clientX:1023,clientY:767}));
  const beforeMenu=calls.length;openMenu();assert.equal(calls.length,beforeMenu);assert.equal(run('S.target'),'PC-B');
- assert.equal(menu.style.left,'756px');assert.equal(menu.style.top,'80px');assert.equal(menu.querySelectorAll('[role="menuitem"]').length,18);
+ assert.equal(menu.style.left,'756px');assert.equal(menu.style.top,'80px');assert.equal(menu.querySelectorAll('[role="menuitem"]').length,19);
  for(const label of ['Refresh health','Remote Desktop','Computer Management','Event Viewer','Copy complete machine report'])assert([...menu.querySelectorAll('button')].some(b=>b.textContent===label));
  const key=value=>menu.dispatchEvent(new w.KeyboardEvent('keydown',{key:value,bubbles:true,cancelable:true}));
- key('End');assert.equal(w.document.activeElement.dataset.cmd,'report');key('Home');assert.equal(w.document.activeElement.dataset.cmd,'target');key('ArrowUp');assert.equal(w.document.activeElement.dataset.cmd,'report');key('Escape');assert(menu.classList.contains('hidden'));assert.equal(w.document.activeElement,card.querySelector('.copyhost'));
+ key('End');assert.equal(w.document.activeElement.dataset.cmd,'report');key('Home');assert.equal(w.document.activeElement.dataset.cmd,'ad-groups');key('ArrowUp');assert.equal(w.document.activeElement.dataset.cmd,'report');key('Escape');assert(menu.classList.contains('hidden'));assert.equal(w.document.activeElement,card.querySelector('.copyhost'));
  const healthCount=()=>calls.filter(url=>url.startsWith('/api/machine-health/PC-A/')).length;
  for(let i=0;i<2;i++){openMenu();const count=healthCount();menu.querySelector('[data-cmd="health"]').click();await sleep();await sleep();assert.equal(run('S.target'),'PC-A');assert.equal(healthCount()-count,8,'exactly one health pass, including after target change');assert(menu.classList.contains('hidden'))}
  for(const tool of ['rdp','compmgmt','eventvwr']){run("S.target='PC-B'");openMenu();const count=calls.length;menu.querySelector(`[data-cmd="${tool}"]`).click();await sleep();await sleep();assert.equal(run('S.target'),'PC-A');assert.deepEqual(calls.slice(count).filter(url=>url.startsWith('/api/open-tool/')),[`/api/open-tool/${tool}/PC-A`]);assert(menu.classList.contains('hidden'))}

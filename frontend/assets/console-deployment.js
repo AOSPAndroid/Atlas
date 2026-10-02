@@ -24,10 +24,10 @@ function syncDeploymentPanel({ selection = false } = {}) {
   refreshConsoleSummary();
 }
 function openDeploymentPanel() {
-  window.AtlasEdges?.open("navigation");
   if (!S.target) return toast("Select a target first");
   deploymentExpanded = true;
   syncDeploymentPanel();
+  $("#deploymentPanel").scrollIntoView({ block: "nearest" });
 }
 function installDeploymentPanel() {
   if ($("#deploymentPanel").dataset.installed) return;

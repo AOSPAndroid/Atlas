@@ -35,6 +35,8 @@ const settle = () => new Promise((resolve) => setImmediate(resolve));
   assert.equal(metric("wmi").textContent, "Not scanned");
   assert.equal(button().textContent, "Scan health");
   assert.equal(button().disabled, false);
+  assert.equal(host.querySelector('.atlas-health-details').open, false);
+  assert.equal(host.querySelectorAll('.atlas-health-mini > span').length, 4);
   assert(A.compact(host, "A").every((item) => item.text === "Not scanned"));
 
   button().click();
@@ -105,6 +107,8 @@ const settle = () => new Promise((resolve) => setImmediate(resolve));
   assert.equal(metric("cpu").textContent, "Not scanned");
   requests.slice(16).forEach((r) => reply(r, "QUICK-B"));
   await settle();
+  assert(host.querySelector('.atlas-health-mini').textContent.includes('Ping Available'));
+  assert(!host.querySelector('.atlas-health-mini').textContent.includes('CPU'));
   A.quick(host, "QUICK-B");
   await delay();
   assert.equal(

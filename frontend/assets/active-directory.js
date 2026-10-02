@@ -1,7 +1,7 @@
 (() => {
   const by = (id) => document.getElementById("ad" + id);
   if (!by("Form")) return;
-  let busy = false;
+  let busy = false, revision = 0, pending = null, selectionKey = "";
   const el = (tag, text) => {
     const n = document.createElement(tag);
     if (text != null) n.textContent = String(text);
@@ -9,17 +9,19 @@
   };
   function controls() {
     by("Lookup").disabled = busy || !!window.AtlasReadOnly;
+    by("Results").querySelectorAll('[data-ad-compare]').forEach(n => n.disabled = busy || !!window.AtlasReadOnly);
   }
   function render(data) {
     const result = by("Results");
     result.replaceChildren();
     if (window.AtlasAD) window.AtlasAD.groupActions = null;
-    result.append(
-      el("p", `Queried ${data.queried_at} - ${data.server} - ${data.operator}`),
-    );
-    const overview=el('div');overview.id='adOverview';result.append(overview);
-    result.append(el('h3', `Group memberships (${data.groups.length})`),el('p',data.membership_note));
-    for (const warning of data.warnings || []) result.append(el('p', warning));
+    const overview=el('details');overview.className='workspace-ad-details';
+    overview.append(el('summary','Account health & properties'));
+    const content=el('div');content.id='adOverview';overview.append(content);result.append(overview);
+    const evidence=el('details');evidence.className='workspace-ad-evidence';evidence.append(el('summary','Membership scope & lookup evidence'));
+    evidence.append(el('p',`Queried ${data.queried_at || 'Time unavailable'} · ${data.server || 'Server unavailable'} · ${data.operator || 'Operator unavailable'}`),el('p',data.membership_note));
+    for (const warning of data.warnings || []) evidence.append(el('p', warning));
+    result.append(evidence);
     renderGroups(data, result);
   }
   const valueText = value => value == null || value === '' ? 'Unavailable' : String(value);
@@ -88,14 +90,15 @@
     primary = data;
     secondary = null;
     renderOverview();
-    const access = el('div');
-    result.append(access);
+    const accessDetails = el('details');accessDetails.className='workspace-ad-access';accessDetails.append(el('summary','Access reference'));
+    const access = el('div');accessDetails.append(access);
+    result.append(accessDetails);
     let refreshAccess = () => {};
     import('/site-info.js?v=3').then(({mountAccessCheck})=>{
       if(access.isConnected) refreshAccess=mountAccessCheck(access,()=>[primary,secondary]);
     }).catch(()=>{access.textContent='Access reference unavailable.';});
     const bar = el("div");
-    bar.className = "ad-group-tools";
+    bar.className = "ad-group-tools ad-group-filter";
     const search = el("input");
     search.type = "search";
     search.placeholder = "Group name";
@@ -128,10 +131,11 @@
     view.disabled = true;
     const download = el("button", "Export CSV");
     download.type = "button";
-    bar.append(mode, search, view, download);
-    result.append(bar);
+    bar.append(search, mode, view);
+    result.prepend(bar);
+    const secondaryTools=el('div');secondaryTools.className='ad-group-tools';secondaryTools.append(download);result.append(secondaryTools);
     const compare = el("form");
-    compare.className = "ad-group-tools";
+    compare.className = "ad-group-tools ad-group-compare";
     const kind = el("select");
     kind.setAttribute("aria-label", "Compare object type");
     for (const v of ["user", "computer"]) {
@@ -139,7 +143,7 @@
       o.value = v;
       kind.append(o);
     }
-    kind.value = by("Kind").value;
+    kind.value = data.kind || by("Kind").value;
     const identity = el("input");
     identity.required = true;
     identity.maxLength = 128;
@@ -151,19 +155,21 @@
     server.value = by("Server").value;
     server.setAttribute("aria-label", "Comparison domain or controller");
     const go = el("button", "Compare groups");
+    go.dataset.adCompare = "";go.disabled = !!window.AtlasReadOnly;
     const status = el("p");
     status.setAttribute("role", "status");
     compare.append(kind, identity, server, go);
     result.append(compare, status);
-    const count = el("p");
+    const count = el("p");count.className='ad-group-count';count.setAttribute('role','status');
     const list = el("div");
     list.className = "ad-groups ad-group-list";
-    result.append(count, list);
+    list.tabIndex=0;list.setAttribute('aria-label','Scrollable AD group list');
+    bar.after(count,list);
+    compare.before(el('h3','Compare with another user or machine'));
+    result.append(by('Overview').parentElement, result.querySelector('.workspace-ad-evidence'), accessDetails);
     let rows = [];
     const key = (g) => String(g.dn || g.name).toLowerCase();
     const filter = () => {
-      refreshAccess();
-      renderOverview();
       const a = new Map(primary.groups.map((g) => [key(g), g]));
       const b = new Map((secondary?.groups || []).map((g) => [key(g), g]));
       rows = [...new Set([...a.keys(), ...b.keys()])].map((k) => ({
@@ -208,17 +214,20 @@
       const table = el('table');
       table.setAttribute('aria-label','AD group memberships');
       const head=el('thead'), header=el('tr');
-      for(const text of ['Group','Description',secondary?'First / second membership':'Membership', ...(secondary?['Comparison']:[])]){const th=el('th',text);th.scope='col';header.append(th);}
+      for(const text of ['Group','Membership', ...(secondary?['Comparison']:[]),'Description']){const th=el('th',text);th.scope='col';header.append(th);}
       head.append(header);table.append(head);const body=el('tbody');table.append(body);
       for (const g of rows) {
         const row=el('tr'),name=el('td'),description=el('td');
-        name.append(el('strong',g.name));
-        const detail=el('details');detail.append(el('summary','Directory path'),el('small',g.dn));name.append(detail);
+        const detail=el('details');detail.className='ad-group-record';
+        const summary=el('summary');summary.append(el('strong',g.name));detail.append(summary);
+        const properties=el('dl');
+        for(const [label,value] of [['Description',g.description==null?'Description unavailable':g.description||'No description recorded'],['Directory path',g.dn],['Scope',g.scope],['Category',g.category]])properties.append(el('dt',label),el('dd',value||'Unavailable'));
+        detail.append(properties);name.append(detail);
         description.className='ad-group-description';
-        description.textContent=g.description==null?'Description unavailable':g.description||'No description recorded';
-        row.append(name,description,el('td',secondary?`${g.firstMembership||'—'} / ${g.secondMembership||'—'}`:g.membership));
+        description.textContent=g.description==null?'Description unavailable':g.description||'No description recorded';description.title=description.textContent;
+        row.append(name,el('td',secondary?`${g.firstMembership||'—'} / ${g.secondMembership||'—'}`:g.membership));
         if(secondary)row.append(el('td',{both:'In both',first:'Only first object',second:'Only second object'}[g.presence]));
-        body.append(row);
+        row.append(description);body.append(row);
       }
       if(rows.length)list.append(table);else list.append(el('p','No matching groups.'));
       download.disabled = !rows.length;
@@ -268,12 +277,14 @@
     compare.onsubmit = async (e) => {
       e.preventDefault();
       if (busy || window.AtlasReadOnly) return;
+      const current = ++revision;
+      pending?.abort();pending = new AbortController();
       busy = true;
       controls();
       secondary = null;
       view.value = "all";
       view.disabled = true;
-      filter();
+      filter();renderOverview();refreshAccess();
       const inputs = [
         kind,
         identity,
@@ -287,8 +298,9 @@
       inputs.forEach((n) => (n.disabled = true));
       status.textContent = "Comparing memberships…";
       try {
-        secondary = await AtlasClient.request("/api/active-directory/lookup", {
+        const compared = await AtlasClient.request("/api/active-directory/lookup", {
           method: "POST",
+          signal: pending.signal,
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             kind: kind.value,
@@ -296,15 +308,17 @@
             server: server.value.trim(),
           }),
         });
-        secondary.kind = kind.value;
+        if (current !== revision || !compare.isConnected) return;
+        secondary = {...compared,kind:kind.value};
         view.disabled = false;
         status.textContent =
           "Comparison complete. " + (secondary.warnings || []).join(" ");
-        filter();
+        filter();renderOverview();refreshAccess();
       } catch (error) {
-        status.textContent = error.message;
+        if (current === revision) status.textContent = error.message;
       } finally {
-        busy = false;
+        if (current !== revision) return;
+        pending = null;busy = false;
         inputs.forEach((n) => (n.disabled = false));
         controls();
       }
@@ -316,7 +330,7 @@
         view.disabled = true;
         status.textContent =
           "Comparison changed. Click Compare groups to refresh.";
-        filter();
+        filter();renderOverview();refreshAccess();
       };
     window.AtlasAD.groupActions = {
       filter: () => search.focus(),
@@ -324,70 +338,78 @@
       export: () => download.click(),
       summary: () => by("CopySummary")?.click(),
     };
-    filter();
+    filter();controls();
   }
 
-  by("Selected").onclick = () => {
-    by("Kind").value = "computer";
-    by("Identity").value = S.target || "";
-    by("Results").replaceChildren();
-    if (window.AtlasAD) window.AtlasAD.groupActions = null;
-    by("Status").textContent = S.target
-      ? "Selected machine copied. Click Look up AD."
-      : "Select a machine in Workspace first.";
-  };
-  for (const id of ["Kind", "Identity", "Server"])
-    by(id).addEventListener("input", () => {
-      by("Results").replaceChildren();
-      window.AtlasAD.groupActions = null;
-      by("Status").textContent =
-        "Selection changed. Click Look up AD to refresh.";
-    });
-  by("Form").onsubmit = async (event) => {
-    event.preventDefault();
-    if (busy || window.AtlasReadOnly) return;
-    const payload = {
-      kind: by("Kind").value,
-      identity: by("Identity").value.trim(),
-      server: by("Server").value.trim(),
-    };
-    busy = true;
-    controls();
-    by("Results").replaceChildren();
-    if (window.AtlasAD) window.AtlasAD.groupActions = null;
-    by("Status").textContent = "Querying AD for " + payload.identity + "...";
-    for (const id of ["Kind", "Identity", "Server", "Selected"])
-      by(id).disabled = true;
+  const fields = ['Kind','Identity','Server','Selected'];
+  function reset() {
+    revision++;pending?.abort();pending=null;busy=false;
+    primary=secondary=null;selectionKey='';
+    by('Results').replaceChildren();
+    by('Results').setAttribute('aria-busy','false');
+    if(window.AtlasAD) window.AtlasAD.groupActions=null;
+    fields.forEach(id=>by(id).disabled=false);controls();
+  }
+  function selectedTitle(kind,identity) {
+    const title=document.getElementById('adSelection');
+    if(title)title.textContent=identity ? `${kind==='user'?'User':'Machine'} · ${identity}` : 'Select a user or machine';
+  }
+  async function lookup() {
+    if(window.AtlasReadOnly) return;
+    const payload={kind:by('Kind').value,identity:by('Identity').value.trim(),server:by('Server').value.trim()};
+    reset();selectionKey=JSON.stringify(payload);
+    const current=++revision;pending=new AbortController();busy=true;controls();
+    fields.forEach(id=>by(id).disabled=true);
+    selectedTitle(payload.kind,payload.identity);
+    by('Status').textContent='Loading groups for '+payload.identity+'…';
+    by('Results').setAttribute('aria-busy','true');
     try {
-      const result = await AtlasClient.request("/api/active-directory/lookup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      const result=await AtlasClient.request('/api/active-directory/lookup',{method:'POST',signal:pending.signal,headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+      if(current!==revision)return;
       render({...result,kind:payload.kind});
-      by("Status").textContent =
-        "AD lookup complete for " + payload.identity + ".";
-    } catch (error) {
-      by("Status").textContent = error.message;
+      by('Status').textContent=(result.warnings || []).join(' ');
+    } catch(error) {
+      if(current===revision) by('Status').textContent='Groups unavailable for '+payload.identity+'. '+error.message;
     } finally {
-      busy = false;
-      for (const id of ["Kind", "Identity", "Server", "Selected"])
-        by(id).disabled = false;
-      controls();
+      if(current!==revision)return;
+      pending=null;busy=false;fields.forEach(id=>by(id).disabled=false);controls();
+      by('Results').setAttribute('aria-busy','false');
     }
+  }
+  by('Selected').onclick=()=>{
+    reset();by('Kind').value='computer';by('Identity').value=S.target||'';
+    selectedTitle('computer',S.target);
+    by('Status').textContent=S.target?'Selected machine copied. Click Look up AD.':'Select a machine in Workspace first.';
   };
+  for(const id of ['Kind','Identity','Server'])by(id).addEventListener('input',()=>{
+    reset();selectedTitle(by('Kind').value,by('Identity').value.trim());
+    by('Status').textContent='Selection changed. Click Look up AD to refresh.';
+  });
+  by('Form').onsubmit=event=>{event.preventDefault();if(busy||window.AtlasReadOnly)return;return lookup();};
   window.AtlasAD = {
+    select(kind,identity,run=true) {
+      identity=String(identity||'').trim();
+      const payload={kind,identity,server:by('Server').value.trim()};
+      if(selectionKey===JSON.stringify(payload))return;
+      reset();by('Kind').value=kind;by('Identity').value=identity;
+      selectedTitle(kind,identity);
+      if(!identity){by('Status').textContent='No AD account supplied for this selection.';return;}
+      selectionKey=JSON.stringify(payload);
+      if(window.AtlasReadOnly){this.open();return;}
+      if(run)return lookup();
+      by('Status').textContent='Selected '+identity+'. Click Look up AD to load groups.';
+    },
+    clear() {
+      reset();by('Results').setAttribute('aria-busy','false');
+      by('Identity').value='';selectedTitle('', '');
+      by('Status').textContent='Select a user or machine to load its groups. Use AD lookup for another account or controller.';
+      if(window.AtlasReadOnly)this.open();
+    },
     show(kind, identity, run = true) {
-      if (busy) return;
-      page("active-directory");
-      by("Kind").value = kind;
-      by("Identity").value = identity || "";
-      by("Results").replaceChildren();
-      this.groupActions = null;
-      this.open();
-      window.AtlasEdges?.revealFor(by("Form"));
-      if (run && identity && !window.AtlasReadOnly) by("Form").requestSubmit();
-      else by("Identity").focus();
+      page('active-directory');
+      const result=this.select(kind,identity,run);
+      if(!run||!identity){window.AtlasEdges?.revealFor(by('Form'));by('Identity').focus();}
+      return result;
     },
     command(id) {
       if(id === "ad-browser"){page("active-directory");const browser=document.getElementById("adBrowser");browser.open=true;browser.scrollIntoView({block:"start"});const input=document.querySelector(".ad-browser-tools input");window.AtlasEdges?.revealFor(input);input?.focus();return;}
@@ -429,7 +451,7 @@
  const form=document.getElementById('adForm'); if(!form)return;
  const host=document.createElement('details');host.className='ad-browser';host.id='adBrowser';
  host.innerHTML='<summary>Directory browser · OUs, users, computers and groups</summary><form class="ad-browser-tools"><label>Domain / controller<input name="server" placeholder="Default domain discovery" maxlength="128"></label><label>Search within current OU<input name="query" placeholder="Name, account or employee ID" maxlength="128"></label><label>Type<select name="kind"><option value="all">All objects</option><option value="user">Users</option><option value="computer">Computers</option><option value="group">Groups</option><option value="ou">OUs / containers</option></select></label><button type="submit">Search</button><button type="button" data-root>Domain root</button><button type="button" data-back disabled>Back</button><button type="button" data-up disabled>Parent OU</button></form><p role="status">Click Domain root to browse, or search. Live AD requires Atlas Admin.</p><div class="ad-browser-path"></div><div class="ad-browser-results"></div><button type="button" data-more hidden>Load more</button>';
- form.before(host);
+ document.getElementById('adResults').after(host);
  const tools=host.querySelector('form'),status=host.querySelector('[role="status"]'),results=host.querySelector('.ad-browser-results'),path=host.querySelector('.ad-browser-path');
  const more=host.querySelector('[data-more]'),back=host.querySelector('[data-back]'),up=host.querySelector('[data-up]');
  let current=null,parent='',history=[],busy=false;

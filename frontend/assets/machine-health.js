@@ -113,9 +113,29 @@
           `<div class="atlas-health-item"><b>${label}</b><div data-metric="${key}">${scanning && scanning.includes(key) ? "Loading…" : "Not scanned"}</div><small data-time="${key}"></small></div>`,
       )
       .join("")}</div>`;
+    if (host.id === "healthLine") {
+      const details = document.createElement("details");
+      details.className = "atlas-health-details";
+      const summary = document.createElement("summary");
+      summary.textContent = "Full health readings";
+      details.append(summary, host.querySelector("p"), host.querySelector(".atlas-health-grid"));
+      const mini = document.createElement("div");
+      mini.className = "atlas-health-mini";
+      mini.setAttribute("aria-live", "polite");
+      host.append(mini, details);
+      updateMini(host, pc);
+    }
     const button = host.querySelector("[data-health-refresh]");
     button.onclick = () => scan(host, pc, isCurrent);
     return button;
+  }
+  function updateMini(host, pc) {
+    const mini = host.querySelector(".atlas-health-mini");
+    if (!mini) return;
+    mini.innerHTML = compact(host, pc)
+      .filter(row => [labels.ping, labels.cshare, labels.storage, labels.system].includes(row.label))
+      .map(row => `<span class="${row.warning ? "warning" : ""}" title="${esc(row.title)}"><b>${esc(row.label === labels.system ? "Uptime" : row.label)}</b> ${esc(row.text)}</span>`)
+      .join("");
   }
   function mount(host, pc, isCurrent = () => true) {
     if (!host) return;
@@ -207,6 +227,7 @@
             snapshots.get(host).metrics[key] = { state: "unavailable" };
           }
         } finally {
+          if (current()) updateMini(host, pc);
           clearTimeout(timer);
           controller.signal.removeEventListener("abort", stop);
         }

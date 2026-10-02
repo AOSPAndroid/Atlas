@@ -1,13 +1,15 @@
-function setTarget(pc, status = "", quick = true) {
+function setTarget(pc, status = "", quick = true, groups = true) {
   pc = String(pc || "")
     .trim()
     .toUpperCase();
   if (!pc) return;
   if (pc === S.target) {
+    if (groups) window.AtlasAD?.select("computer", pc);
     if (quick) refreshTargetHealth("quick");
     return;
   }
   S.target = pc;
+  if (groups) window.AtlasAD?.select("computer", pc);
   window.AtlasPsExec?.syncTarget(pc);
   syncDeploymentPanel({ selection: true });
   $("#deployTarget").textContent = pc;
@@ -25,6 +27,7 @@ function setTarget(pc, status = "", quick = true) {
   updatePackagePresence();
 }
 function clearLookup() {
+  window.AtlasAD?.clear();
   clearDirectTarget();
   AtlasHealth.cancel($("#healthLine"));
   S.user = null;
@@ -83,7 +86,7 @@ async function search() {
     resolved = await api("/api/master/resolve/" + encodeURIComponent(term));
   if (sequence !== lookupSequence) return;
   if (resolved?.matched) {
-    await loadUser(resolved.user_key, sequence);
+    await loadUser(resolved.user_key, sequence, !resolved.requested_machine);
     if (sequence === lookupSequence && resolved.requested_machine)
       setTarget(resolved.requested_machine, "Database record");
     return;
@@ -114,7 +117,7 @@ function renderUsers() {
     (b) => (b.onclick = () => copy(S.users[+b.dataset.email].email, "Email")),
   );
 }
-async function loadUser(id, sequence) {
+async function loadUser(id, sequence, groups = true) {
   if (sequence === undefined) {
     sequence = ++lookupSequence;
     clearLookup();
@@ -126,13 +129,26 @@ async function loadUser(id, sequence) {
   $("#users").innerHTML = "";
   renderKyc();
   renderMachines();
+  if (groups) window.AtlasAD?.select("user", S.user.user_name || S.user.email || "");
   AtlasUI.motion.slideUp($("#kyc"));
 }
 function renderKyc() {
   const u = S.user;
   $("#kyc").innerHTML = AtlasUI.person(u);
-  const host = $("#kyc .usercard>div:last-child"),
-    bar = document.createElement("div");
+  const title = $("#kyc h2"), select = document.createElement("button");
+  select.type = "button";
+  select.className = "workspace-user-select";
+  select.textContent = title.textContent;
+  select.setAttribute("aria-label", "Show groups for " + (u.user_name || u.name));
+  select.onclick = () => window.AtlasAD?.select("user", u.user_name || u.email || "");
+  title.replaceChildren(select);
+  const details = $("#kyc .atlas-person-details"), facts = $("#kyc .facts");
+  const summary = document.createElement("p");
+  summary.className = "workspace-user-summary";
+  summary.textContent = [u.user_name, u.email].filter(Boolean).join(" · ");
+  title.after(summary);
+  details.append(facts);
+  const bar = document.createElement("div");
   bar.className = "copybar";
   for (const [label, value] of [
     ["Copy account", u.user_name],
@@ -146,7 +162,7 @@ function renderKyc() {
     button.onclick = () => copy(value, label.replace("Copy ", ""));
     bar.append(button);
   }
-  host.append(bar);
+  details.append(bar);
   applyCompactWorkspace();
 }
 function renderMachines() {
@@ -170,7 +186,7 @@ function renderMachines() {
   );
   if (S.machines.length === 1) {
     let m = S.machines[0];
-    setTarget(m.name, m.operational_status, false);
+    setTarget(m.name, m.operational_status, false, !S.user);
   }
   AtlasUI.machineFilters($("#machines"));
   bindMachineContext();
@@ -180,6 +196,13 @@ function renderMachines() {
     card.insertAdjacentHTML("beforeend", AtlasUI.machineDetails(m));
     card.querySelector(".atlas-machine-details").onclick = (event) =>
       event.stopPropagation();
+    const details = card.querySelector(".atlas-machine-details"), facts = card.querySelector(".facts");
+    details.append(facts);
+    const heading = card.querySelector("h3"), choose = document.createElement("button");
+    choose.type = "button";choose.className = "workspace-machine-select";choose.textContent = m.name;
+    choose.setAttribute("aria-label", "Select machine " + m.name + " and show groups");
+    heading.replaceChildren(choose);
+    card.classList.add("workspace-machine-row");
   });
   applyCompactWorkspace();
 }

@@ -68,7 +68,6 @@
             ><span class="nav-label">History</span>
           </button>
           <button data-page="knowledge"><span class="nav-icon">◇</span><span class="nav-label">Knowledge Base</span></button>
-          <button data-page="active-directory"><span class="nav-icon">AD</span><span class="nav-label">Active Directory</span></button>
           <button data-page="psexec">
             <span class="nav-icon" aria-hidden="true">&gt;_</span
             ><span class="nav-label">PsTools</span>
@@ -76,6 +75,86 @@
         </nav>
       </div>
       <div class="console-sidebar-content">
+        <details class="sidebar-status">
+          <summary>Connection &amp; data</summary>
+          <code id="identity"></code>
+          <div id="health"></div>
+          <div id="dbFreshness" class="db-freshness"></div>
+          <div id="masterDbStatus" class="masterdb-status"></div>
+        </details>
+      </div>
+    </aside>
+    <main>
+      <div class="console-page-heading">
+        <div>
+          <h1 id="pageTitle">Workspace</h1>
+        </div>
+      </div>
+      <div id="targetBar" class="targetbar hidden">
+        <b id="barTarget"></b><span id="barState"></span
+        ><button data-copy-target>Copy</button
+        ><button data-preflight>Pre-flight</button
+        ><button data-admin-target>Admin</button>
+        <div id="targetActions" class="toolmenu">
+          <button class="toolmenu-btn">Actions ▾</button>
+          <div class="toolmenu-content">
+            <button data-qol-action="copy-host">Copy hostname</button
+            ><button data-qol-action="copy-summary">Copy support summary</button
+            ><button data-qol-action="admin">Remote Admin</button
+            ><button data-qol-action="queue">Add deployment to queue</button
+            ><button data-qol-action="health">Refresh health</button
+            ><button data-qol-action="cleanup" class="danger-item">
+              Clean package folder
+            </button>
+          </div>
+        </div>
+        <div id="targetTools" class="toolmenu">
+          <button class="toolmenu-btn">Open ▾</button>
+          <div class="toolmenu-content">
+            <button data-tool="msra">Offer Remote Assistance</button
+            ><button data-tool="quickassist">Quick Assist</button
+            ><button data-tool="remotehelp">Intune Remote Help</button
+            ><button data-tool="rdp">Remote Desktop</button
+            ><button data-tool="compmgmt">Computer Management</button
+            ><button data-tool="eventvwr">Event Viewer</button
+            ><button data-tool="cshare">Open C$</button
+            ><button data-tool="temp">Open C:\Temp</button
+            ><button data-tool="packages">Open Packages</button>
+          </div>
+        </div>
+        <button id="copySupport">Copy support summary</button
+        ><button id="cleanupPackages" class="danger">Clean Packages</button>
+      </div>
+      <section id="workspace" class="page active">
+        <div class="lookup-column">
+          <div class="lookup-heading">
+            <h2>User &amp; machines</h2>
+          </div>
+          <div class="searchbox">
+            <input
+              id="search"
+              type="text"
+              name="wmi-directory-search"
+              autocomplete="off"
+              spellcheck="false"
+              aria-label="Find a user or machine"
+              placeholder="User, email or machine"
+            /><kbd>Enter</kbd>
+            <button id="useHostname" type="button" hidden>Use hostname as target</button>
+          </div>
+          <div id="recentTargets" class="recent-targets"></div>
+          <p id="unlistedTargetStatus" class="muted" role="status" hidden></p>
+          <div id="users"></div>
+          <div id="kyc"></div>
+          <div id="machines"></div>
+          <div class="lookup-empty">
+            <h3>Your next support session starts here</h3>
+            <p>
+              Look up a colleague to see their linked machines, or search for a
+              hostname directly.
+            </p>
+          </div>
+          <div id="healthLine" class="healthline hidden"></div>
         <section
           id="deploymentPanel"
           class="deployment-panel"
@@ -209,86 +288,15 @@
             </details>
           </section>
         </section>
-        <details class="sidebar-status">
-          <summary>Connection &amp; data</summary>
-          <code id="identity"></code>
-          <div id="health"></div>
-          <div id="dbFreshness" class="db-freshness"></div>
-          <div id="masterDbStatus" class="masterdb-status"></div>
-        </details>
-      </div>
-    </aside>
-    <main>
-      <div class="console-page-heading">
-        <div>
-          <h1 id="pageTitle">Workspace</h1>
         </div>
-      </div>
-      <div id="targetBar" class="targetbar hidden">
-        <b id="barTarget"></b><span id="barState"></span
-        ><button data-copy-target>Copy</button
-        ><button data-preflight>Pre-flight</button
-        ><button data-admin-target>Admin</button>
-        <div id="targetActions" class="toolmenu">
-          <button class="toolmenu-btn">Actions ▾</button>
-          <div class="toolmenu-content">
-            <button data-qol-action="copy-host">Copy hostname</button
-            ><button data-qol-action="copy-summary">Copy support summary</button
-            ><button data-qol-action="admin">Remote Admin</button
-            ><button data-qol-action="queue">Add deployment to queue</button
-            ><button data-qol-action="health">Refresh health</button
-            ><button data-qol-action="cleanup" class="danger-item">
-              Clean package folder
-            </button>
+        <section id="active-directory" class="workspace-directory" aria-label="Directory groups">
+          <div class="panel workspace-directory-panel">
+            <div class="workspace-directory-heading"><h2>Groups</h2><span id="adSelection">Select a user or machine</span></div>
+            <form id="adForm" class="px-settings"><label>Object type<select id="adKind"><option value="computer">Computer</option><option value="user">User</option></select></label><label>Account or machine<input id="adIdentity" maxlength="128" required placeholder="Logon, UPN, email, employee ID or machine"></label><label>Domain / controller (optional)<input id="adServer" maxlength="128" placeholder="Default domain discovery"></label><button id="adSelected" type="button">Use selected machine</button><button id="adLookup" class="primary">Look up AD</button></form>
+            <p id="adStatus" role="status">Select a user or machine to load its groups. Use AD lookup for another account or controller.</p>
+            <div id="adResults"></div>
           </div>
-        </div>
-        <div id="targetTools" class="toolmenu">
-          <button class="toolmenu-btn">Open ▾</button>
-          <div class="toolmenu-content">
-            <button data-tool="msra">Offer Remote Assistance</button
-            ><button data-tool="quickassist">Quick Assist</button
-            ><button data-tool="remotehelp">Intune Remote Help</button
-            ><button data-tool="rdp">Remote Desktop</button
-            ><button data-tool="compmgmt">Computer Management</button
-            ><button data-tool="eventvwr">Event Viewer</button
-            ><button data-tool="cshare">Open C$</button
-            ><button data-tool="temp">Open C:\Temp</button
-            ><button data-tool="packages">Open Packages</button>
-          </div>
-        </div>
-        <button id="copySupport">Copy support summary</button
-        ><button id="cleanupPackages" class="danger">Clean Packages</button>
-      </div>
-      <section id="workspace" class="page active">
-        <div class="lookup-column">
-          <div class="lookup-heading">
-            <h2>Directory &amp; machines</h2>
-          </div>
-          <div id="healthLine" class="healthline hidden"></div>
-          <div class="searchbox">
-            <input
-              id="search"
-              type="text"
-              name="wmi-directory-search"
-              autocomplete="off"
-              spellcheck="false"
-              placeholder="Search username, email, name or machine"
-            /><kbd>Enter</kbd>
-            <button id="useHostname" type="button" hidden>Use hostname as target</button>
-          </div>
-          <div id="recentTargets" class="recent-targets"></div>
-          <p id="unlistedTargetStatus" class="muted" role="status" hidden></p>
-          <div id="users"></div>
-          <div id="kyc"></div>
-          <div id="machines"></div>
-          <div class="lookup-empty">
-            <h3>Your next support session starts here</h3>
-            <p>
-              Look up a colleague to see their linked machines, or search for a
-              hostname directly.
-            </p>
-          </div>
-        </div>
+        </section>
       </section>
       <button
         id="deploymentToggle"
@@ -587,7 +595,7 @@
           </div>
         </div>
       </section>
-      <section id="active-directory" class="page" aria-label="Active Directory"><div class="panel"><h2>Active Directory</h2><p>Read user and computer accounts using the Windows account running Atlas. No directory changes.</p><form id="adForm" class="px-settings"><label>Object type<select id="adKind"><option value="computer">Computer</option><option value="user">User</option></select></label><label>Account or machine<input id="adIdentity" maxlength="128" required placeholder="Logon, UPN, email, employee ID or machine"></label><label>Domain / controller (optional)<input id="adServer" maxlength="128" placeholder="Default domain discovery"></label><button id="adSelected" type="button">Use selected machine</button><button id="adLookup" class="primary">Look up AD</button></form><p id="adStatus" role="status">User report IDs B/G/X + digits are looked up as X + digits (G01426046 → X01426046). Other logons and machine names stay unchanged. If needed, enter the domain controller shown in AD Users and Computers. Requires RSAT and domain connectivity.</p><div id="adResults"></div></div></section>
+
 <section id="psexec" class="page" aria-label="PsTools command workbench">
         <div class="px-intro">
           <div>

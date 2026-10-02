@@ -258,8 +258,8 @@
       group(
         q("#workspace"),
         "workspace-tools",
-        [".searchbox", "#recentTargets"],
-        "Search",
+        ["#recentTargets"],
+        "Recent targets",
       );
       group(
         q("#targetBar"),
@@ -267,6 +267,7 @@
         [":scope > button", ":scope > .toolmenu"],
         "Target actions",
       );
+      group(q("#machines"), "machine-filters", [".atlas-machine-filters"], "Machine filters");
       group(
         q("#bulk .panel"),
         "bulk-tools",
@@ -288,7 +289,7 @@
         ["#adForm", ".ad-browser-tools"],
         "AD lookup",
       );
-      group(q("#adResults"), "ad-result-tools", [":scope > .ad-group-tools", ".ad-access-check > label"], "Group tools");
+      group(q("#adResults"), "ad-result-tools", [":scope > .ad-group-tools:not(.ad-group-filter):not(.ad-group-compare)", ".ad-access-check > label"], "Group tools");
       group(
         q("#psexec"),
         "psexec-tools",
@@ -404,13 +405,18 @@
       }
     adapt();
     const counts = { top: 0, left: 0, right: 0, bottom: 0 };
+    const slots = Math.max(1, Math.floor((window.innerWidth - 16) / 108));
     for (const panel of panels.values()) {
       chrome(panel);
       const present = eligible(panel),
         hidden = !automatic || !present;
       if (panel.handle.hidden !== hidden) panel.handle.hidden = hidden;
-      if (present)
-        panel.handle.style.setProperty("--edge-index", counts[panel.edge]++);
+      if (present) {
+        const index = counts[panel.edge]++;
+        panel.handle.style.setProperty("--edge-index", index);
+        panel.handle.style.setProperty("--edge-column", index % slots);
+        panel.handle.style.setProperty("--edge-row", Math.floor(index / slots));
+      }
       const pin = q(":scope > .atlas-edge-chrome .atlas-edge-pin", panel.node);
       pin.setAttribute("aria-pressed", String(!!pins[panel.id]));
       const text = pins[panel.id] ? "Unpin" : "Pin";
@@ -434,6 +440,12 @@
         if (pins[panel.id]) show(panel, true);
       }
     }
+    for (const edge of ["top", "bottom"]) {
+      const property = `--atlas-${edge}-edge-rows`;
+      const value = String(Math.max(1, Math.ceil(counts[edge] / slots)));
+      if (document.documentElement.style.getPropertyValue(property) !== value)
+        document.documentElement.style.setProperty(property, value);
+    }
     const context = q("#atlasContentContext");
     if (context) {
       const pc = q("#admin.active")
@@ -452,7 +464,7 @@
         : q("#workspace.active")
           ? q("#barState")?.textContent
           : "";
-      const text = [pc, state].filter(Boolean).join(" · ");
+      const text = q("#workspace.active") ? "" : [pc, state].filter(Boolean).join(" · ");
       if (context.textContent !== text) context.textContent = text;
       const hidden = !automatic || !text;
       if (context.hidden !== hidden) context.hidden = hidden;
@@ -595,6 +607,7 @@
       for (const panel of panels.values()) later(panel);
     });
     window.addEventListener("pointermove", proximity, { passive: true });
+    window.addEventListener("resize", schedule, { passive: true });
     document.addEventListener("input", schedule);
     document.addEventListener("click", schedule);
     window.addEventListener("atlas:admin-target-change", schedule);
