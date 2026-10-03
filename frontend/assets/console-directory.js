@@ -242,11 +242,11 @@ function installSelectionSidebar() {
   context.open = window.innerWidth > 760;
   summary.innerHTML = `<p class="selection-empty">Select a user or device in Workspace to keep their details here.</p>
     <section class="selection-card selection-user" aria-label="Selected user" hidden>
-      <small class="selection-label">USER</small><button type="button" class="selection-name" data-selection-user></button>
+      <small class="selection-label">USER</small><button type="button" class="selection-name" data-selection-user><span class="selection-avatar" aria-hidden="true"></span><span class="selection-title"></span></button>
       <div class="selection-user-facts"></div>
     </section>
     <section class="selection-card selection-machine" aria-label="Selected device" hidden>
-      <small class="selection-label">DEVICE</small><button type="button" class="selection-name" data-selection-machine>${AtlasUI.icon("admin")}<span></span></button>
+      <small class="selection-label">DEVICE</small><button type="button" class="selection-name" data-selection-machine><span class="selection-device-icon" aria-hidden="true">${AtlasUI.icon("admin")}</span><span class="selection-title"></span></button>
       <div class="selection-device-facts"></div><div class="selection-readings"></div>
       <p class="selection-checked"></p><button type="button" class="selection-scan">Scan health</button>
     </section>`;
@@ -280,22 +280,27 @@ function installSelectionSidebar() {
     text(caption, [user?.full_name || user?.name || user?.user_name, pc].filter(Boolean).join(" · "));
     if (user) {
       const name = user.full_name || user.name || user.user_name || "Selected user";
-      text(personButton, name); personButton.title = "Open details for " + name;
-      html(summary.querySelector(".selection-user-facts"), `<b>${esc(user.user_name || "Account not supplied")}</b>${user.email ? `<span title="${esc(user.email)}">${esc(user.email)}</span>` : ""}${[user.department || user.business_unit, user.location].filter(Boolean).map(value => `<span>${esc(value)}</span>`).join("")}`);
+      text(personButton.querySelector(".selection-title"), name); personButton.title = "Open details for " + name;
+      const words = String(name).trim().split(/\s+/);
+      text(personButton.querySelector(".selection-avatar"), ((words[0][0] || "?") + (words.length > 1 ? words.at(-1)[0] : "")).toUpperCase());
+      html(summary.querySelector(".selection-user-facts"), `<b class="selection-account">${esc(user.user_name || "Account not supplied")}</b>${user.email ? `<span class="selection-email" title="${esc(user.email)}">${esc(user.email)}</span>` : ""}<dl class="selection-meta">${[["Team", user.department || user.business_unit], ["Office", user.location]].filter(([, value]) => value).map(([label, value]) => `<div><dt>${label}</dt><dd>${esc(value)}</dd></div>`).join("")}</dl>`);
     }
     if (!pc) return;
-    text(deviceButton.querySelector("span"), pc); deviceButton.title = "Open stored details for " + pc;
-    html(summary.querySelector(".selection-device-facts"), `<p>${esc(record.model_id || record.model_category || "Model not supplied")}</p>${record.asset_tag ? `<small>${esc(record.asset_tag)}</small>` : ""}${S.machines.includes(record) ? AtlasUI.machineBadges(record) : '<small>Hostname target · no inventory record</small>'}`);
+    text(deviceButton.querySelector(".selection-title"), pc); deviceButton.title = "Open stored details for " + pc;
+    html(deviceButton.querySelector(".selection-device-icon"), AtlasUI.icon(["iphone", "phone", "tablet"].includes(AtlasUI.machineKind(record)) ? "phone" : "admin"));
+    html(summary.querySelector(".selection-device-facts"), `<p>${esc(record.model_id || record.model_category || "Model not supplied")}</p>${record.asset_tag ? `<dl class="selection-meta"><div><dt>Asset</dt><dd>${esc(record.asset_tag)}</dd></div></dl>` : ""}${S.machines.includes(record) ? AtlasUI.machineBadges(record) : '<small>Hostname target · no inventory record</small>'}`);
     scan.hidden = !windows;
     if (!windows) {
       html(summary.querySelector(".selection-readings"), '<p class="selection-note">Inventory device · PC health checks unavailable.</p>');
       text(summary.querySelector(".selection-checked"), ""); return;
     }
     const readings = AtlasHealth.compact(host, S.target), specs = AtlasHealth.specifications(host, S.target);
-    html(summary.querySelector(".selection-readings"), `<div class="selection-health-grid">${readings.filter(row => ["ping", "cshare", "storage", "system"].includes(row.key)).map(row => `<div class="${row.warning ? "warning" : ""}" title="${esc(row.title)}"><b>${esc(row.key === "system" ? "Uptime" : row.label)}</b><span>${esc(row.text)}</span></div>`).join("")}</div>${specs.length ? `<dl class="selection-specs">${specs.map(row => `<div><dt>${esc(row.label)}</dt><dd>${esc(row.text)}</dd></div>`).join("")}</dl>` : ""}`);
+    html(summary.querySelector(".selection-readings"), `<div class="selection-health-grid">${readings.filter(row => ["ping", "cshare", "storage", "system"].includes(row.key)).map(row => `<div class="${row.warning ? "warning" : row.text === "Available" ? "ready" : ""}" title="${esc(row.title)}"><b>${esc(row.key === "system" ? "Uptime" : row.label)}</b><span>${esc(row.key === "system" ? row.text.replace(/ uptime$/, "") : row.text)}</span></div>`).join("")}</div>${specs.length ? `<dl class="selection-specs">${specs.map(row => `<div${row.label === "CPU model" ? ' class="selection-spec-wide"' : ""}><dt>${esc(row.label === "Windows" ? "OS" : row.label)}</dt><dd>${esc(row.text)}</dd></div>`).join("")}</dl>` : ""}`);
     const dates = readings.map(row => row.checkedAt).filter(value => value && Number.isFinite(Date.parse(value))).sort((a, b) => Date.parse(b) - Date.parse(a));
     const checking = !!host.querySelector("[data-health-refresh]:disabled");
-    text(summary.querySelector(".selection-checked"), window.AtlasReadOnly ? "Stored inventory · live health requires Admin" : checking ? "Checking selected PC…" : dates.length ? "Last check · " + new Date(dates[0]).toLocaleString() : "No successful health check yet");
+    const checked = summary.querySelector(".selection-checked");
+    text(checked, window.AtlasReadOnly ? "Stored inventory · live health requires Admin" : checking ? "Checking selected PC…" : dates.length ? "Last check · " + new Intl.DateTimeFormat(undefined, {day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit"}).format(new Date(dates[0])) : "No successful health check yet");
+    checked.title = dates.length ? "Last check: " + new Date(dates[0]).toLocaleString() : "";
     scan.disabled = !!window.AtlasReadOnly || checking;
     scan.title = window.AtlasReadOnly?.reason || "Manually check connectivity and retrieve this PC's specifications";
     text(scan, checking ? "Checking…" : "Scan health");

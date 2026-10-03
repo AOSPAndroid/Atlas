@@ -273,23 +273,37 @@ body.atlas-console #selectionCaption { display:none; }
 body.atlas-console #selectionSummary { display:grid; gap:6px; padding-top:4px; }
 body.atlas-console .selection-card { min-width:0; padding:6px; border:1px solid var(--atlas-line); border-radius:7px; background:var(--atlas-surface); }
 body.atlas-console .selection-label { display:block; font-size:10px; letter-spacing:.05em; color:var(--atlas-muted); margin-bottom:4px; }
-body.atlas-console .selection-name { width:100%; min-height:28px; padding:4px; margin:0 0 4px; font-weight:650; font-size:12px; overflow-wrap:anywhere; white-space:normal; }
+body.atlas-console #selectionSummary .selection-name { display:inline-flex; align-items:center; justify-content:center; gap:6px; width:100%; min-height:32px; padding:4px; margin:0 0 6px; border-color:transparent; border-radius:5px; background:var(--atlas-surface-subtle); font-weight:650; font-size:12px; white-space:normal; }
+body.atlas-console #selectionSummary .selection-name:hover { border-color:var(--atlas-line); background:#eaf4f8; }
+body.atlas-console .selection-title { min-width:0; overflow-wrap:anywhere; line-height:1.35; text-align:center; }
+body.atlas-console :is(.selection-avatar,.selection-device-icon) { display:grid; place-items:center; width:24px; height:24px; flex-shrink:0; border-radius:5px; background:#e3f2f8; color:var(--atlas-accent); font-size:10px; }
+body.atlas-console .selection-device-icon .atlas-icon { width:16px; height:16px; }
 body.atlas-console .selection-user-facts { display:grid; gap:4px; overflow-wrap:anywhere; line-height:1.35; }
-body.atlas-console .selection-user-facts > span { color:var(--atlas-muted); }
-body.atlas-console .selection-user-facts > span[title] { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+body.atlas-console .selection-account { text-align:center; font-weight:600; }
+body.atlas-console .selection-email { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:center; color:var(--atlas-muted); }
+body.atlas-console .selection-meta { display:grid; gap:4px; margin:4px 0; line-height:1.35; }
+body.atlas-console .selection-meta > div { display:grid; grid-template-columns:36px minmax(0,1fr); gap:4px; align-items:baseline; }
+body.atlas-console .selection-meta dt { color:var(--atlas-muted); font-size:11px; }
+body.atlas-console .selection-meta dd { min-width:0; margin:0; overflow-wrap:anywhere; }
 body.atlas-console .selection-device-facts p { font-size:12px; line-height:1.35; margin:0 0 4px; overflow-wrap:anywhere; }
 body.atlas-console .selection-device-facts small { display:block; color:var(--atlas-muted); overflow-wrap:anywhere; }
-body.atlas-console .selection-device-facts .atlas-device-badges { margin:4px 0 6px; }
+body.atlas-console .selection-device-facts .atlas-device-badges { margin:6px 0; padding:0 0 6px; border-bottom:1px solid var(--atlas-line); gap:4px; }
+body.atlas-console .selection-device-facts .atlas-device-badge { font-size:11px; padding:1px 3px; }
+body.atlas-console .selection-device-facts .atlas-device-badge.assigned { color:var(--atlas-success); background:#edf7f2; border-color:#d5e8de; }
+body.atlas-console .selection-device-facts :is(.atlas-device-badge.last-used,.atlas-device-badge.logon) { justify-content:flex-start; flex-basis:100%; border:0; padding:0; background:transparent; color:var(--atlas-muted); }
 body.atlas-console .selection-health-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:4px; }
-body.atlas-console .selection-health-grid > div { padding:4px; border-radius:4px; background:var(--atlas-surface-subtle); overflow-wrap:anywhere; line-height:1.35; }
+body.atlas-console .selection-health-grid > div { display:flex; flex-direction:column; justify-content:space-between; gap:3px; min-height:39px; padding:4px; border:1px solid var(--atlas-line); border-radius:5px; background:var(--atlas-surface-subtle); overflow-wrap:anywhere; line-height:1.3; }
 body.atlas-console .selection-health-grid :is(b,span) { display:block; }
-body.atlas-console .selection-health-grid b { font-size:10px; color:var(--atlas-muted); margin-bottom:2px; }
-body.atlas-console .selection-health-grid .warning { color:var(--atlas-warning); background:#fff3da; }
-body.atlas-console .selection-specs { display:grid; gap:4px; margin:6px 0; line-height:1.35; }
-body.atlas-console .selection-specs dt { color:var(--atlas-muted); font-size:10px; }
-body.atlas-console .selection-specs dd { margin:0; overflow-wrap:anywhere; }
+body.atlas-console .selection-health-grid b { font-size:11px; font-weight:500; color:var(--atlas-muted); }
+body.atlas-console .selection-health-grid .ready { color:var(--atlas-success); background:#edf7f2; border-color:#d5e8de; }
+body.atlas-console .selection-health-grid .warning { color:var(--atlas-warning); background:#fff3da; border-color:#eadbbd; }
+body.atlas-console .selection-specs { display:grid; gap:4px; margin:6px 0; padding:6px 0; border-bottom:1px solid var(--atlas-line); line-height:1.35; }
+body.atlas-console .selection-specs > div { display:grid; grid-template-columns:46px minmax(0,1fr); gap:4px; align-items:baseline; }
+body.atlas-console .selection-specs > .selection-spec-wide { grid-template-columns:minmax(0,1fr); gap:2px; }
+body.atlas-console .selection-specs dt { color:var(--atlas-muted); font-size:11px; }
+body.atlas-console .selection-specs dd { min-width:0; margin:0; overflow-wrap:anywhere; }
 body.atlas-console :is(.selection-checked,.selection-note,.selection-empty) { color:var(--atlas-muted); font-size:11px; line-height:1.4; margin:6px 0; overflow-wrap:anywhere; }
-body.atlas-console .selection-scan { width:100%; min-height:28px; margin:0; font-size:11px; }
+body.atlas-console #selectionSummary .selection-scan { width:100%; min-height:28px; margin:0; border-radius:5px; font-size:11px; color:var(--atlas-accent); background:#edf6fa; }
 body.atlas-console .selection-context [hidden] { display:none!important; }
 body.atlas-console .console-sidebar .sidebar-status { margin-top:6px; }
 body.atlas-console.knowledge-open { grid-template-columns:var(--atlas-sidebar-width) minmax(0,1fr); }
@@ -304,7 +318,7 @@ body.atlas-console.knowledge-open > main { grid-column:2; }
   body.atlas-console.knowledge-open > main { grid-column:auto; }
 }
 @media (max-width:480px) { body.atlas-console #selectionSummary { grid-template-columns:minmax(0,1fr); } }
-@media (pointer:coarse) { body.atlas-console :is(.selection-name,.selection-scan,.selection-context > summary) { min-height:42px; } }
+@media (pointer:coarse) { body.atlas-console #selectionSummary :is(.selection-name,.selection-scan), body.atlas-console .selection-context > summary { min-height:42px; } }
 body.atlas-console .console-page-heading p {
   margin: 2px 0;
   font-size: 12px;
