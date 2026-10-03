@@ -178,6 +178,10 @@ Archive replacement is part of the same database transaction as a directory refr
 
 The demo shares the person/machine inspector, date display and field searches. It serves the established 28 directory fields; newly encountered columns and the full archive remain in the local admin interface until their intended shared use is defined.
 
+## Package states and ownership
+
+Open **Packages** in the console, command palette or with `Alt+6`. Upload the ServiceNow CSV in **Database > Package data**. See [the package data guide](docs/packages.md) for headers, matching and update behavior.
+
 ## Configuration and updates
 
 The default package repository is the synced **EPP_PACKAGE_REPO_BetaPackages - BetaPackages** SharePoint folder, inside **Shortcuts** or directly inside business OneDrive. Atlas checks `OneDriveCommercial`, the current account's registered business OneDrive folders, and the standard business OneDrive location. When running under a separate admin account, it can use the exact package folder from a loaded Windows profile if only one accessible match exists. It does not guess between multiple users' package folders.

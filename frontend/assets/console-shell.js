@@ -36,6 +36,7 @@ function page(id) {
   });
   if (id === "knowledge") window.AtlasKnowledge?.open();
   if (id === "history") loadDeploymentHistory();
+  if (id === "packages") window.dispatchEvent(new CustomEvent("atlas:packages-open"));
   if (id === "psexec") window.AtlasPsExec?.open();
   if (id === "active-directory") window.AtlasAD?.open();
   if (id === "bulk" && !bulkCatalogueLoaded && !bulkBusy) bulkPackages();
@@ -573,6 +574,7 @@ async function runSharedCommand(id) {
   }
   if (id === "desktop-mode") return window.AtlasDesktop?.open();
   if (id === "animations") return AtlasUI.motion.toggle();
+  if (id === "packages") { page("packages"); return; }
   if (id === "catalogue") return openConsoleCatalogue();
   const { MAP_COMMANDS, commandUrl } = await import("/command-registry.js");
   if (MAP_COMMANDS.has(id)) {
@@ -732,8 +734,11 @@ document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll('[data-section]').forEach(link => link.addEventListener('click',event => {event.preventDefault();page(link.dataset.section);}));
   installSupportDock();
   installDeploymentPanel();
-  $("#openCatalogue").onclick = () =>
-    openConsoleCatalogue().catch((e) => toast(e.message));
+  $("#openCatalogue").onclick = () => page("packages");
+  window.addEventListener("atlas:package-inspect", event => {
+    if (window.AtlasReadOnly || typeof event.detail?.folder !== "string") return;
+    openConsoleCatalogue(event.detail.folder).catch(e => toast(e.message));
+  });
   (() => {
     const searchInput = document.getElementById("search");
     searchInput.disabled = false;

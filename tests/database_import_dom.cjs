@@ -45,7 +45,7 @@ const preview = {id: 'stage-one', source: 'emea.xlsx', report: {
   assert(!get('validate').disabled, 'Slow status loading does not disable validation');
   assert(!w.document.querySelector('.atlas-edge-panel'), 'Upload workflows never move into floating controls');
   assert(get('preview').hidden, 'Confirmation remains hidden before a valid preview');
-  assert.equal(w.document.querySelectorAll('.atlas-upload-grid > section').length, 2);
+  assert.equal(w.document.querySelectorAll('.atlas-upload-grid > section').length, 3);
   assert(get('full').closest('#preview'));
   assert(get('seating-file').closest('#seating-panel'));
   assert(get('seating-confirm').closest('#seating-result'));

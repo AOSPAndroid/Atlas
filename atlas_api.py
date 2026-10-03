@@ -66,27 +66,36 @@ def register_atlas(app):
 
  @app.get('/api/catalog')
  def catalog(term:str=''):
+  from package_data import load,join_metadata
   source={'available':wmi.REPO.is_dir()};repo=str(wmi.REPO.resolve())
   if not source['available']:source['error']='Repository unavailable. Check Settings and OneDrive sync.'
-  with wmi.db() as c:metadata={r['folder']:dict(r) for r in c.execute('select * from package_catalog where repository=?',(repo,))}
+  with wmi.db() as c:
+   metadata={r['folder']:dict(r) for r in c.execute('select * from package_catalog where repository=?',(repo,))}
+   imported=load(c)
   # Enumerate once, without recursive scans. Filtering includes saved display names and versions.
   try:names=sorted([p.name for p in wmi.REPO.iterdir() if p.is_dir()],key=str.casefold) if source['available'] else []
   except OSError:names=[];source['error']='Cannot read repository';source['available']=False
-  items=[];q=term.strip().casefold()
+  items=[];q=term.strip().casefold();enrichment=join_metadata(names,imported)
   for folder in names:
    m=metadata.get(folder,{})
-   item={'folder':folder,'display_name':m.get('display_name') or folder,'version':m.get('version') or '', 'revision':m.get('revision',0)}
+   info=enrichment[folder] or {}
+   item={'folder':folder,'display_name':m.get('display_name') or info.get('display_name') or folder,'version':m.get('version') or '', 'revision':m.get('revision',0),'state':info.get('state',''),'package_id':info.get('package_id','')}
    if not q or any(q in str(item[k]).casefold() for k in ('folder','display_name','version')):items.append(item)
   return {'items':items[:500],'total':len(items),'truncated':len(items)>500,'repository':str(wmi.REPO),'available':source['available'],'error':source.get('error')}
 
  @app.get('/api/catalog/details')
  def catalog_details(folder:str):
   from package_catalog import inspect_package
+  from package_data import load,join_metadata,repository_names
   root=wmi.package_root(folder)
   with wmi.db() as c:
    row=c.execute('select * from package_catalog where repository=? and folder=?',(str(wmi.REPO.resolve()),root.name)).fetchone()
+   imported=load(c)
+  names,_,_=repository_names(wmi.REPO)
+  info=join_metadata(names,imported).get(root.name)
   metadata=dict(row) if row else {'folder':root.name,'display_name':root.name,'version':'','revision':0}
-  return {**metadata,**inspect_package(root)}
+  if info and not row:metadata['display_name']=info['display_name'] or root.name
+  return {**metadata,**inspect_package(root),'package_data':{k:v for k,v in info.items() if k!='raw_json'} if info else None}
 
  @app.post('/api/catalog/metadata')
  def catalog_metadata(body:dict,request:Request):
@@ -290,6 +299,8 @@ def register_atlas(app):
 
  from database_manager import register_database_manager
  register_database_manager(app,wmi,check_token)
+ from package_data_api import register as register_package_data
+ register_package_data(app,wmi,check_token)
 
  from official_atlas import register_official
  register_official(app,wmi,check_token)

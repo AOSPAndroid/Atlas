@@ -1,4 +1,5 @@
 export function openCatalogue({
+  folder = "",
   api = AtlasClient.request,
   toast = () => {},
   onSave = () => {},
@@ -30,7 +31,7 @@ export function openCatalogue({
       d.querySelector("#catalog-list").innerHTML = data.items
         .map(
           (p) =>
-            `<button data-catalog-folder="${esc(p.folder)}"><b>${esc(p.display_name)}</b><small>${esc(p.version || "Version not recorded")} · ${esc(p.folder)}</small></button>`,
+            `<button data-catalog-folder="${esc(p.folder)}"><b>${esc(p.display_name)}</b><small>${esc(p.version || "Version not recorded")} · ${esc(p.folder)}${p.state ? " · " + esc(p.state) : ""}</small></button>`,
         )
         .join("");
       d.querySelectorAll("[data-catalog-folder]").forEach(
@@ -50,7 +51,7 @@ export function openCatalogue({
         "/api/catalog/details?folder=" + encodeURIComponent(folder),
       );
       if (!d.isConnected || v !== inspection) return;
-      host.innerHTML = `<h3>${esc(x.display_name || folder)}</h3><p class="catalog-muted">${esc(folder)}</p><p><b>${esc(x.availability)}</b> · ${x.files_checked} files checked</p><small>${esc(x.availability_note)}</small>${!x.complete ? '<p class="catalog-error">Scan incomplete. Script lists may be partial.</p>' : ""}<p class="catalog-muted">Checked ${esc(x.checked_at)}</p>${Object.entries(
+      host.innerHTML = `<h3>${esc(x.display_name || folder)}</h3><p class="catalog-muted">${esc(folder)}</p><p><b>${esc(x.availability)}</b> · ${x.files_checked} files checked</p><small>${esc(x.availability_note)}</small>${!x.complete ? '<p class="catalog-error">Scan incomplete. Script lists may be partial.</p>' : ""}<p class="catalog-muted">Checked ${esc(x.checked_at)}</p>${x.package_data ? `<details open><summary>Package data · ${esc(x.package_data.state || "State not supplied")}</summary><p>${esc(x.package_data.package_id)} · Packager: ${esc(x.package_data.packager || "Not supplied")} · Requester: ${esc(x.package_data.requester || "Not supplied")}</p><p>${esc(x.package_data.domain)} · ${esc(x.package_data.build)}</p><small>Imported ${esc(x.package_data.imported_at)}</small></details>` : "<p>No matching package data. State unknown.</p>"}${Object.entries(
         x.scripts,
       )
         .map(
@@ -110,6 +111,7 @@ export function openCatalogue({
     { once: true },
   );
   list();
+  if (folder) inspect(folder);
   d.querySelector("#catalog-search").focus();
   return d;
 }

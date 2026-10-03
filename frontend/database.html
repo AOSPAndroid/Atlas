@@ -72,14 +72,14 @@
       }
     </style>
     <link rel="stylesheet" href="/assets/atlas-interactions.css" />
-  <link rel="stylesheet" href="/assets/design-system.css" />
+    <link rel="stylesheet" href="/assets/design-system.css" />
   </head>
   <body class="atlas-database atlas-upload-workflows">
     <main>
       <header>
         <div>
           <h1>Upload data</h1>
-          <p>Choose a workbook → review changes → save</p>
+          <p>Choose a data section → upload → review → save</p>
         </div>
         <div class="row">
           <a class="atlas-return" href="/installer">IT Console</a
@@ -364,11 +364,100 @@
             </div>
           </details>
         </section>
+        <section class="panel atlas-upload-section" id="package-data-import">
+          <h2>Package data</h2>
+          <p>
+            Enrich the SharePoint catalogue with ServiceNow package states,
+            packagers and requesters.
+          </p>
+          <p class="atlas-import-notice">
+            Updates the short names supplied. Existing metadata absent from this
+            extract is kept; SharePoint remains the package source.
+          </p>
+          <p id="package-data-status" role="status">
+            Loading package import status…
+          </p>
+          <div class="atlas-import-controls" id="package-data-controls">
+            <label
+              >ServiceNow package export (.csv)<input
+                id="package-data-file"
+                type="file"
+                accept=".csv,text/csv"
+            /></label>
+            <button id="package-data-validate" class="primary" type="button">
+              Validate and preview
+            </button>
+            <p id="package-data-message" role="status" aria-live="polite">
+              Choose the ServiceNow package CSV.
+            </p>
+            <progress
+              id="package-data-progress"
+              aria-label="Processing package CSV"
+              hidden
+            ></progress>
+            <section
+              id="package-data-review"
+              class="atlas-import-review"
+              hidden
+            >
+              <h3>Review package data</h3>
+              <p id="package-data-source"></p>
+              <p id="package-data-summary"></p>
+              <p id="package-data-coverage"></p>
+              <p id="package-data-warnings"></p>
+              <details>
+                <summary>Example short names and states</summary>
+                <pre id="package-data-examples"></pre>
+              </details>
+              <p>
+                State and ownership reflect this extract. Short names match
+                exactly, ignoring case and outer spaces. Packages without data
+                keep an unknown state. A package-only backup is saved before
+                applying.
+              </p>
+              <div class="row">
+                <button
+                  id="package-data-apply"
+                  class="primary"
+                  type="button"
+                  disabled
+                >
+                  Back up and save package data</button
+                ><button id="package-data-cancel" type="button">
+                  Discard preview
+                </button>
+              </div>
+            </section>
+          </div>
+          <details>
+            <summary>Accepted package headers</summary>
+            <p>
+              <code>name</code> (Short Package Name) and
+              <code>u_package_sub_state</code> (Package State) are required.
+            </p>
+            <p>
+              Also reads <code>u_display_name</code>,
+              <code>u_barclays_correlation_id</code>, <code>u_requester</code>,
+              <code>assigned_to</code>, <code>u_domain</code>,
+              <code>u_build</code> and <code>sys_created_on</code>.
+              Display-label headers are accepted too. Extra columns are
+              retained. CSV limit: 10 MB / 20,000 rows.
+            </p>
+          </details>
+          <a class="atlas-return" href="/installer?command=packages"
+            >Browse packages</a
+          >
+        </section>
       </div>
     </main>
     <script src="/assets/database.js"></script>
+    <script src="/assets/package-data-import.js"></script>
     <script src="/assets/desk-moves.js"></script>
     <script src="/assets/seating-excel.js"></script>
-  <script type="module" src="/assets/atlas-interactions.js" data-atlas-interactions></script>
+    <script
+      type="module"
+      src="/assets/atlas-interactions.js"
+      data-atlas-interactions
+    ></script>
   </body>
 </html>

@@ -44,7 +44,7 @@
         <button id="openShortcuts" title="Keyboard shortcuts">
           Help <kbd>?</kbd>
         </button>
-        <button id="openCatalogue" title="Open package catalogue">
+        <button id="openCatalogue" title="Browse package status and ownership">
           Packages
         </button>
         <a class="atlas-return" href="/" title="Open floor map">Map</a>
@@ -58,6 +58,7 @@
             <span class="nav-icon">⌂</span
             ><span class="nav-label">Workspace</span></button
           ><button data-page="active-directory"><span class="nav-icon">☷</span><span class="nav-label">Active Directory</span></button
+          ><button data-page="packages"><span class="nav-icon">▤</span><span class="nav-label">Packages</span></button
           ><button data-page="admin">
             <span class="nav-icon">▣</span
             ><span class="nav-label">Remote Admin</span></button
@@ -291,6 +292,7 @@
           </section>
         </section>
       </section>
+      <section id="packages" class="page" aria-label="Packages"><div id="packageBrowser"><p>Loading the Packages view…</p></div></section>
         <section id="active-directory" class="page workspace-directory" aria-label="Active Directory">
           <div class="panel workspace-directory-panel">
             <div class="workspace-directory-heading"><h2>Active Directory</h2><span id="adSelection">Select a user or machine</span></div>

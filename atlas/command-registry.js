@@ -3,6 +3,7 @@ const shortcuts = {
   admin: "Alt+2",
   bulk: "Alt+3",
   history: "Alt+4",
+  packages: "Alt+6",
   deploy: "Ctrl+D",
   copy: "Ctrl+Shift+D",
   msra: "Ctrl+M",
@@ -37,6 +38,7 @@ const viewerCommands = new Set(["ad-browser","ad-support-summary","daas","vdi","
   "active-directory",
   "psexec",
   "catalogue",
+  "packages",
   "active",
   "recent",
   "queue",
@@ -55,6 +57,7 @@ const viewerCommands = new Set(["ad-browser","ad-support-summary","daas","vdi","
 ]);
 // The single command catalogue used by the map and IT console.
 export const COMMANDS = [
+  ["packages", "Packages", "Browse package states, ownership and source coverage", "package packages live packaging progress epp requester packager status metadata"],
   ['ad-browser','AD directory browser','Browse OUs, users, computers, group members and properties','ad browse directory ou tree search group members'],
   ['ad-open','See AD groups','Open an exact directory account','ad membership groups'],
   ['ad-user-groups','See user groups','Look up the selected user in AD','ad user groups membership'],
@@ -219,8 +222,8 @@ export const COMMANDS = [
   [
     "database",
     "Manage database",
-    "Open directory imports and seating tools",
-    "database import excel moves",
+    "Upload users, devices, package data and floor plan changes",
+    "database import excel csv packages metadata moves",
   ],
   ["view", "Switch 2D / 3D map", "Change the map view", "map view 2d 3d"],
   ["reset", "Fit floor", "Fit the current floor", "reset zoom map"],

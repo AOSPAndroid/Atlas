@@ -122,9 +122,10 @@ function installPackagePicker() {
     };
   });
 }
-async function openConsoleCatalogue() {
+async function openConsoleCatalogue(folder = "") {
   const { openCatalogue } = await import("/catalogue.js");
   return openCatalogue({
+    folder,
     api,
     toast,
     onSave: async (metadata) => {
@@ -160,12 +161,12 @@ async function packages() {
     for (const item of d.items)
       packageLabels.set(
         item.folder,
-        item.display_name + (item.version ? " · " + item.version : ""),
+        item.display_name + (item.version ? " · " + item.version : "") + (item.state ? " · " + item.state : ""),
       );
     $("#pkg").innerHTML = d.items
       .map(
         (x) =>
-          `<option value="${esc(x.folder)}">${esc(x.display_name)}${x.version ? " · " + esc(x.version) : ""}</option>`,
+          `<option value="${esc(x.folder)}">${esc(x.display_name)}${x.version ? " · " + esc(x.version) : ""}${x.state ? " · " + esc(x.state) : ""}</option>`,
       )
       .join("");
     if (previous && !d.items.some(item => item.folder === previous))
@@ -398,7 +399,7 @@ async function bulkPackages() {
     $("#bulkPkg").innerHTML = d.items
       .map(
         (x) =>
-          `<option value="${esc(x.folder)}">${esc(x.display_name)}${x.version ? " · " + esc(x.version) : ""}</option>`,
+          `<option value="${esc(x.folder)}">${esc(x.display_name)}${x.version ? " · " + esc(x.version) : ""}${x.state ? " · " + esc(x.state) : ""}</option>`,
       )
       .join("");
     if (previous && !d.items.some(item => item.folder === previous))

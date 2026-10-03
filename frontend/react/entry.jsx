@@ -1,10 +1,11 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
+import { Packages } from "./packages.jsx";
 import { ActionsHub } from "./actions-hub.jsx";
 import { installMotionBridge } from "./motion-bridge.js";
 import "./styles.css";
 
-// One small React island. Existing screens, APIs and large tables retain ownership.
+// Shared React islands; existing screens, APIs and map tables retain ownership.
 function install() {
   const main = document.querySelector("main");
   if (
@@ -24,11 +25,17 @@ function install() {
   else main.prepend(host);
   const root = createRoot(host);
   root.render(<ActionsHub />);
+  const packagesHost = document.getElementById("packageBrowser");
+  const packagesRoot = packagesHost ? createRoot(packagesHost) : null;
+  packagesRoot?.render(<Packages />);
   window.AtlasInteractions = { ready: true, ...installMotionBridge() };
   window.addEventListener(
     "pagehide",
     (event) => {
-      if (!event.persisted) root.unmount();
+      if (!event.persisted) {
+        root.unmount();
+        packagesRoot?.unmount();
+      }
     },
     { once: true },
   );

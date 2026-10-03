@@ -11,7 +11,7 @@ import * as Tabs from "@radix-ui/react-tabs";
 import * as Tooltip from "@radix-ui/react-tooltip";
 import { activateControl, collectControls, pageContext } from "./controls.js";
 
-function useAtlasMotion() {
+export function useAtlasMotion() {
   const read = () =>
     window.AtlasUI.motion.isReduced() || window.AtlasUI.performance.isCitrix();
   const [reduced, setReduced] = useState(read);

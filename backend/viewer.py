@@ -10,7 +10,7 @@ import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from directory_lookup import exact_users, linked_machines, search_directory, prepare_views
 from desk_directory import desk_context,person_desks,machine_context,palette_search
@@ -64,6 +64,15 @@ def capabilities():
 def master_status():
     data = health()
     return {'available': True, **{key: data[key] for key in ('users','machines','assignments')}}
+
+
+@app.get('/api/package-data')
+def packages(term: str = Query('', max_length=200), state: str = Query('', max_length=200),
+             coverage: str = Query('', pattern='^(|matched|source-only|metadata-only|ambiguous)$'),
+             offset: int = Query(0, ge=0), limit: int = Query(100, ge=1, le=200)):
+    from package_data import browse
+    with connect() as con:
+        return browse(con, term=term, state=state, coverage=coverage, offset=offset, limit=limit)
 
 
 @app.get('/api/master/resolve/{key}')

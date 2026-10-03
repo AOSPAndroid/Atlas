@@ -1871,3 +1871,42 @@ body .atlas-interactions-host :is(button,input):focus-visible { outline: 2px sol
 body .atlas-action-fallback { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; margin-bottom: 6px; }
 body .atlas-action-fallback .atlas-reachable-toggle { position: static; }
 body .atlas-action-fallback .atlas-reachable-panel { position: static; width: 100%; max-height: min(360px, 45dvh); margin: 0; box-sizing: border-box; }
+
+/* Package metadata: fixed, compact list and details, with all records paginated. */
+.package-browser { display: grid; gap: 6px; min-width: 0; font-size: 12px; }
+.package-toolbar { display: flex; align-items: end; flex-wrap: wrap; gap: 6px; }
+.package-toolbar label { display: grid; gap: 4px; margin: 0; font-size: 11px; }
+.package-toolbar .package-search { flex: 1 1 260px; }
+.package-toolbar input, .package-toolbar select { width: 100%; min-height: 30px; }
+.package-toolbar button, .package-toolbar .atlas-return { min-height: 30px; display: inline-flex; align-items: center; justify-content: center; }
+.package-counts, .package-source-note { margin: 0; padding: 4px 0; overflow-wrap: anywhere; }
+.package-source-note { color: var(--muted); }
+.package-browser-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(245px, 300px); gap: 6px; align-items: start; }
+.package-list-panel { min-width: 0; border: 1px solid var(--atlas-line); border-radius: var(--atlas-panel-radius); overflow: hidden; }
+.package-table-scroll { max-height: min(64vh, 650px); overflow: auto; }
+.package-browser table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.package-browser th { position: sticky; top: 0; background: var(--panel); z-index: 1; text-align: left; }
+.package-browser th, .package-browser td { padding: 5px 6px; border-bottom: 1px solid var(--atlas-line); vertical-align: middle; }
+.package-browser td { max-width: 230px; overflow-wrap: anywhere; }
+.package-browser tr.selected { background: var(--selected-bg, rgba(34, 117, 190, .1)); }
+body.atlas-console .package-browser .package-row-select { width: 100%; border: 0; background: transparent; padding: 2px 0; min-height: 28px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; line-height: 1.25; text-align: center; white-space: normal; }
+.package-row-select code { font-size: 11px; color: var(--muted); overflow-wrap: anywhere; }
+.package-state, .package-coverage { display: inline-block; padding: 2px 5px; border: 1px solid var(--atlas-line); border-radius: 4px; font-size: 11px; line-height: 1.4; }
+.package-state-live { color: var(--atlas-success); background: rgba(25, 140, 80, .08); }
+.package-state-progress { color: var(--atlas-warning); background: rgba(180, 130, 25, .08); }
+.package-state-unknown, .package-coverage { color: var(--muted); }
+.package-pagination { display: flex; align-items: center; justify-content: flex-end; gap: 6px; padding: 6px; }
+.package-pagination span { margin-right: auto; }
+.package-pagination button { min-height: 28px; }
+body.atlas-console .package-detail { min-width: 0; padding: 8px; margin: 0; font-size: 12px; overflow-wrap: anywhere; }
+.package-detail-heading { display: flex; align-items: start; gap: 6px; }
+.package-detail h3 { flex: 1; margin: 0 0 6px; font-size: 13px; }
+.package-detail-heading button { min-width: 28px; min-height: 28px; padding: 2px; }
+.package-detail p { margin: 6px 0; }
+.package-detail-tabs { display: flex; gap: 4px; padding: 4px 0; border-bottom: 1px solid var(--atlas-line); }
+.package-detail-tabs button { flex: 1; min-height: 28px; padding: 4px 6px; }
+.package-detail-tabs button[data-state="active"] { background: var(--selected-bg, rgba(34, 117, 190, .1)); }
+.package-detail dl { display: grid; grid-template-columns: 78px minmax(0, 1fr); gap: 5px 6px; margin: 8px 0; }
+.package-detail dt { color: var(--muted); }
+.package-detail dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 850px) { .package-browser-layout { grid-template-columns: minmax(0, 1fr); } .package-table-scroll { max-height: 55vh; } }
