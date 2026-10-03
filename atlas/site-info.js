@@ -189,7 +189,15 @@ export function openSiteInfo(section = "vlans") {
   for(const id of ['daas','vdi']) {
     const pane=panes[id];pane.append(node('p','Reference transcribed from supplied screenshots · 1 October 2026. Group membership is not checked or changed here.','site-reference-note'));
     const links=node('div',null,'site-tenant-links');
-    for(const [title,url] of TENANTS){const a=node('a',title+' ↗');a.href=url;a.target='_blank';a.rel='noopener noreferrer';links.append(a);}pane.append(links);
+    for (const [title, url] of TENANTS) {
+      const link = node('a', title, 'site-tenant-button');
+      link.href = url;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.setAttribute('aria-label', title + ' (opens in a new tab)');
+      links.append(link);
+    }
+    pane.append(links);
     referenceTable(pane,'MFA · cloud.com portal (barclayspvdi)',['Domain','User group'],MFA,[1]);
   }
   panes.daas.append(node('p','User visibility: the reference specifies a data-centre broker group plus MFA. The device also needs its matching DDC registration group.','site-reference-note'));
