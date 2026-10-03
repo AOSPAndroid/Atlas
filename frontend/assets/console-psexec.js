@@ -95,7 +95,7 @@
           el("small", c.category + (c.change ? " · Changes target" : "")),
           el("strong", (favourites.has(c.id) ? "★ " : "") + c.title),
           el("span", c.description),
-          el("span", "Review command →", "px-card-action"),
+          el("span", "Review command", "px-card-action"),
         );
         b.onclick = () => {
           select(c);

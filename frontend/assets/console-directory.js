@@ -163,6 +163,13 @@ function renderKyc() {
   summary.className = "workspace-user-summary";
   summary.textContent = [u.user_name, u.email].filter(Boolean).join(" · ");
   title.after(summary);
+  const context = [u.department, u.location].filter(Boolean).join(" · ");
+  if (context) {
+    const row = document.createElement("p");
+    row.className = "workspace-user-context";
+    row.textContent = context;
+    summary.after(row);
+  }
   details.append(facts);
   const bar = document.createElement("div");
   bar.className = "copybar";

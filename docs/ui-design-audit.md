@@ -1,5 +1,13 @@
 # Atlas UI consistency audit — 30 September 2026
 
+## PC layout refinement — 3 October 2026
+
+- Workspace records align names, model information and badges to the left, with Copy in its own grid cell. Department and location remain visible in the compact user summary. At 1440 px and above, devices use two aligned columns and the mini health check uses four cells; narrower screens retain a single device list. The directory and deployment panels share a top baseline.
+- The sidebar is 192 px wide. Shared panel headings, forms and table hover states are consistent. Bulk Deploy aligns the target textarea with its package/action controls. Active Directory uses a compact membership column and reserves space for group comparison; input sizing prevents overflow when its lookup fields wrap. Package names and short names share a left baseline.
+- Independent screens use their own target/action controls; the Workspace target bar remains visible on Workspace and Packages. PsTools has a shorter introduction, a proper reference button, aligned Tool/Search fields, smaller template cards and a compact command review.
+- Captured all seven console pages at 1920 × 1080 with fictional directory, device, group, package, history and CPU responses. In the Workspace fixture, all four devices and the mini health check fit within the PC viewport. Checked 35 populated layouts at five narrower widths and all seven pages in Admin, Demo and prepared Preview, plus Map, Knowledge Base, drawers, Tools and Desktop: no document overflow or toolbar overlap. Touch record controls are 42 px. Existing directory, PsTools, package, fixed-control, panel-motion, header and read-only suites pass; CPU filter/sort/thread/partial-scan checks pass with simulated responses.
+- Shared assets and entry points are synced to the prepared Preview without changing its 358 JSON assets. Live publication remains pending the existing public/owner-private access decision.
+
 ## Shared UI polish — 3 October 2026
 
 - Queue, Deployments and Tools share the page heading in normal document flow. Mobile controls form an aligned row; selecting a machine adds the Deployment control below it. Tools expands within the heading without adding an empty row when closed. Workspace and Active Directory remain separate.
