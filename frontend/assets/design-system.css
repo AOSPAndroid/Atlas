@@ -1716,9 +1716,9 @@ body.atlas-console #workspace > .atlas-access-note { grid-column:1/-1; margin:0;
 body.atlas-console #workspace .lookup-column { max-height:calc(100dvh - 104px); overflow:auto; scrollbar-gutter:stable; padding-right:3px; }
 body.atlas-console #workspace :is(.lookup-heading,.searchbox) { margin:0 0 6px; }
 body.atlas-console #workspace .lookup-heading h2 { font-size:13px; }
-body.atlas-console #workspace .searchbox { display:grid; grid-template-columns:minmax(0,1fr); gap:4px; }
-body.atlas-console #workspace .searchbox input { grid-area:1/1; width:100%; height:30px; font-size:12px; padding:5px 44px 5px 8px; border-radius:7px; }
-body.atlas-console #workspace .searchbox kbd { grid-area:1/1; position:static; justify-self:end; align-self:center; margin-right:8px; padding:1px 5px; font-size:10px; }
+body.atlas-console #workspace .searchbox { display:grid; grid-template-columns:minmax(0,1fr); gap:8px; margin-bottom:8px; }
+body.atlas-console #workspace .searchbox input { grid-area:1/1; width:100%; height:max(30px, var(--atlas-control-height)); font-size:12px; padding:5px 52px 5px 8px; border-radius:7px; }
+body.atlas-console #workspace .searchbox kbd { grid-area:1/1; position:static; inset:auto; justify-self:end; align-self:center; display:inline-flex; align-items:center; justify-content:center; margin:0 8px 0 0; padding:1px 5px; font-size:10px; line-height:1.2; }
 body.atlas-console #workspace :is(.card,.panel) { margin:4px 0; padding:6px; border-radius:7px; }
 body.atlas-console #workspace .usercard { display:grid; grid-template-columns:28px minmax(0,1fr); gap:6px; }
 body.atlas-console #workspace .usercard .avatar { width:28px; height:28px; border-radius:6px; font-size:11px; }
