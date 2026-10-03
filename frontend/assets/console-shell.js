@@ -736,7 +736,7 @@ AtlasContext.configure({
 });
 document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll('[data-section]').forEach(link => link.addEventListener('click',event => {event.preventDefault();page(link.dataset.section);}));
-  installSupportDock();
+  installSelectionSidebar();
   installDeploymentPanel();
   $("#openCatalogue").onclick = () => page("packages");
   window.addEventListener("atlas:package-inspect", event => {

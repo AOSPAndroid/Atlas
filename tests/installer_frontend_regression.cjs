@@ -48,21 +48,19 @@ const assert=require('node:assert/strict');const {fixture}=require('./ui_fixture
  run(`S.machines=${JSON.stringify([machine,{name:'PC-B'}])};renderMachines()`);
  const viewport={width:w.innerWidth,height:w.innerHeight};w.innerWidth=320;w.innerHeight=240;menu.getBoundingClientRect=()=>({width:304,height:224});openMenu();assert.equal(menu.style.left,'8px');assert.equal(menu.style.top,'8px');key('End');assert.equal(w.document.activeElement.dataset.cmd,'report');key('Escape');w.innerWidth=viewport.width;w.innerHeight=viewport.height;
  run('clearLookup()');hold=true;
- // Floating context follows scroll/selection without starting another health request.
+ // Fixed context remains visible on every console page without extra health requests.
+ run('installSelectionSidebar()');
  const settle=()=>new Promise(resolve=>setTimeout(resolve,35));
- run('installSupportDock()');
- const kyc=w.document.querySelector('#kyc'),health=w.document.querySelector('#healthLine'),dock=w.document.querySelector('#supportDock');
- let bottom=-20;kyc.getBoundingClientRect=health.getBoundingClientRect=()=>({bottom});
- w.document.querySelector('.lookup-column').getBoundingClientRect=()=>({left:240,width:500});
- run("S.user={name:'Alice <Example>',user_name:'alice',email:'alice@example.test'};renderKyc();S.target='PC-A'");
- const beforeMount=remoteScans();w.AtlasHealth.mount(health,'PC-A');assert.equal(remoteScans(),beforeMount);
- w.dispatchEvent(new w.Event('scroll'));await settle();assert(dock.textContent.includes('Not scanned'));assert.equal(remoteScans(),beforeMount);
- await w.AtlasHealth.scan(health,'PC-A');const healthCalls=calls.length;
- w.dispatchEvent(new w.Event('scroll'));await settle();
- assert(!dock.hidden);assert(dock.textContent.includes('Alice <Example>'));assert(dock.textContent.includes('PC-A'));assert(dock.textContent.includes('Unavailable'));assert.equal(dock.querySelectorAll('.support-health-metrics > span').length,8);assert.equal(calls.length,healthCalls);
- bottom=300;w.dispatchEvent(new w.Event('scroll'));await settle();assert(dock.hidden);
- bottom=-20;run("S.target='PC-B'");w.dispatchEvent(new w.Event('scroll'));await settle();assert(dock.textContent.includes('PC-B'));assert(dock.querySelector('.support-health-metrics').textContent.includes('Not scanned'));assert(!dock.textContent.includes('PC-A'));
- run("page('admin')");await settle();assert(dock.hidden);run("page('workspace');clearLookup()");await settle();assert(dock.hidden);
+ const health=w.document.querySelector('#healthLine'),context=w.document.querySelector('#selectionSummary');
+ run("S.user={name:'Alice <Example>',user_name:'alice',email:'alice@example.test'};renderKyc();setTarget('PC-A','',false)");
+ const beforeMount=remoteScans();w.AtlasHealth.mount(health,'PC-A');await settle();
+ assert(context.textContent.includes('Not scanned'));assert.equal(remoteScans(),beforeMount);
+ await w.AtlasHealth.scan(health,'PC-A');const healthCalls=calls.length;await settle();
+ assert(context.textContent.includes('Alice <Example>'));assert(context.textContent.includes('PC-A'));assert(context.textContent.includes('Unavailable'));
+ assert.equal(context.querySelectorAll('.selection-health-grid > div').length,4);assert.equal(calls.length,healthCalls);
+ run("setTarget('PC-B','',false)");await settle();assert(context.textContent.includes('PC-B'));assert(context.querySelector('.selection-readings').textContent.includes('Not scanned'));assert(!context.textContent.includes('PC-A'));
+ run("page('admin')");await settle();assert(!context.querySelector('.selection-machine').hidden);assert(context.textContent.includes('PC-B'));
+ run("page('workspace');clearLookup()");await settle();assert(context.querySelector('.selection-machine').hidden);assert(context.querySelector('.selection-user').hidden);
  // Old lookup must not replace a newer selection.
  w.document.querySelector('#search').value='first';const first=run('search()');w.document.querySelector('#search').value='second';const second=run('search()');pending[1].resolve({matched:false});await second;pending[0].resolve({matched:true,user_key:'id:1'});await first;assert.equal(run('S.target'),'');
  // Cleanup's preview is invalid after changing target.

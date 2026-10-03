@@ -303,8 +303,10 @@
                 "h uptime";
       }
       return {
+        key,
         label,
         text,
+        checkedAt: metric?.checked_at || "",
         warning:
           text === "Unavailable" ||
           d.available === false ||
@@ -317,6 +319,18 @@
       };
     });
   }
+  function specifications(host, pc) {
+    const snapshot = snapshots.get(host);
+    if (snapshot?.pc !== pc) return [];
+    const readings = snapshot.metrics;
+    return [
+      ["CPU model", readings.cpu, d => (d.processors || []).map(x => x.Name).filter(Boolean).join("; ")],
+      ["Memory", readings.ram, d => num(d.installed_bytes) === null ? "" : gib(d.installed_bytes)],
+      ["Windows", readings.system, d => [d.windows, d.version].filter(Boolean).join(" ")],
+    ].filter(([, metric]) => metric?.state === "ready")
+      .map(([label, metric, value]) => ({label, text: value(metric.data || {}), checkedAt: metric.checked_at || ""}))
+      .filter(row => row.text);
+  }
   window.AtlasHealth = {
     mount,
     quick,
@@ -327,5 +341,6 @@
     format,
     report,
     compact,
+    specifications,
   };
 })();

@@ -16,7 +16,7 @@ function syncDeploymentPanel({ selection = false } = {}) {
   workspace.classList.toggle("has-target", !!S.target);
   panel.hidden = !available || (compact && !deploymentExpanded);
   toggle.hidden = !available || !compact;
-  toggle.textContent = "Deployment · " + S.target;
+  $("#deploymentToggleLabel").textContent = "Deployment · " + S.target;
   toggle.setAttribute("aria-expanded", String(!panel.hidden));
   if (!panel.hidden && (wasHidden || selection)) AtlasUI.motion.slideUp(panel);
   if (!available && packageChoice) cancelPackageChoice();

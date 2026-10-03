@@ -150,6 +150,9 @@ body .atlas-header-more > summary {
 body .atlas-primary-nav a {
   padding: 4px 7px;
 }
+body .atlas-icon { display: block; width: 18px; height: 18px; flex-shrink: 0; }
+body .atlas-primary-nav .atlas-icon,
+body .console-page-actions .atlas-icon { width: 16px; height: 16px; }
 body.atlas-console .px-settings.panel {
   padding: 8px;
   margin: 8px 0;
@@ -263,11 +266,45 @@ body.atlas-console .console-sidebar nav .nav-icon {
 body.atlas-console .console-sidebar nav .nav-label {
   min-width: 0;
 }
+/* Selected context stays in the fixed sidebar, clear of the working area. */
+body.atlas-console .selection-context { border-top:1px solid var(--atlas-line); padding-top:6px; font-size:11px; }
+body.atlas-console .selection-context > summary { font-weight:600; color:var(--atlas-muted); padding:4px 0; cursor:pointer; }
+body.atlas-console #selectionCaption { display:none; }
+body.atlas-console #selectionSummary { display:grid; gap:6px; padding-top:4px; }
+body.atlas-console .selection-card { min-width:0; padding:6px; border:1px solid var(--atlas-line); border-radius:7px; background:var(--atlas-surface); }
+body.atlas-console .selection-label { display:block; font-size:10px; letter-spacing:.05em; color:var(--atlas-muted); margin-bottom:4px; }
+body.atlas-console .selection-name { width:100%; min-height:28px; padding:4px; margin:0 0 4px; font-weight:650; font-size:12px; overflow-wrap:anywhere; white-space:normal; }
+body.atlas-console .selection-user-facts { display:grid; gap:4px; overflow-wrap:anywhere; line-height:1.35; }
+body.atlas-console .selection-user-facts > span { color:var(--atlas-muted); }
+body.atlas-console .selection-user-facts > span[title] { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+body.atlas-console .selection-device-facts p { font-size:12px; line-height:1.35; margin:0 0 4px; overflow-wrap:anywhere; }
+body.atlas-console .selection-device-facts small { display:block; color:var(--atlas-muted); overflow-wrap:anywhere; }
+body.atlas-console .selection-device-facts .atlas-device-badges { margin:4px 0 6px; }
+body.atlas-console .selection-health-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:4px; }
+body.atlas-console .selection-health-grid > div { padding:4px; border-radius:4px; background:var(--atlas-surface-subtle); overflow-wrap:anywhere; line-height:1.35; }
+body.atlas-console .selection-health-grid :is(b,span) { display:block; }
+body.atlas-console .selection-health-grid b { font-size:10px; color:var(--atlas-muted); margin-bottom:2px; }
+body.atlas-console .selection-health-grid .warning { color:var(--atlas-warning); background:#fff3da; }
+body.atlas-console .selection-specs { display:grid; gap:4px; margin:6px 0; line-height:1.35; }
+body.atlas-console .selection-specs dt { color:var(--atlas-muted); font-size:10px; }
+body.atlas-console .selection-specs dd { margin:0; overflow-wrap:anywhere; }
+body.atlas-console :is(.selection-checked,.selection-note,.selection-empty) { color:var(--atlas-muted); font-size:11px; line-height:1.4; margin:6px 0; overflow-wrap:anywhere; }
+body.atlas-console .selection-scan { width:100%; min-height:28px; margin:0; font-size:11px; }
+body.atlas-console .selection-context [hidden] { display:none!important; }
+body.atlas-console .console-sidebar .sidebar-status { margin-top:6px; }
+body.atlas-console.knowledge-open { grid-template-columns:var(--atlas-sidebar-width) minmax(0,1fr); }
+body.atlas-console.knowledge-open > .console-sidebar { display:flex; }
+body.atlas-console.knowledge-open > main { grid-column:2; }
 @media (max-width: 760px) {
   body.atlas-console .console-sidebar nav button[data-page] {
     grid-template-columns: minmax(0, 1fr);
   }
+  body.atlas-console #selectionCaption { display:block; margin-top:4px; font-weight:400; overflow-wrap:anywhere; }
+  body.atlas-console #selectionSummary { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  body.atlas-console.knowledge-open > main { grid-column:auto; }
 }
+@media (max-width:480px) { body.atlas-console #selectionSummary { grid-template-columns:minmax(0,1fr); } }
+@media (pointer:coarse) { body.atlas-console :is(.selection-name,.selection-scan,.selection-context > summary) { min-height:42px; } }
 body.atlas-console .console-page-heading p {
   margin: 2px 0;
   font-size: 12px;
@@ -461,14 +498,6 @@ body .atlas-person-detail-sections > section {
 }
 body.atlas-console .copybar {
   margin-top: 5px;
-}
-body.atlas-console :is(.support-health, .support-health-metrics) {
-  padding: 6px;
-  gap: 5px;
-  margin: 4px 0;
-}
-body.atlas-console .support-health-metrics > span {
-  padding: 4px 6px;
 }
 /* Remote Admin uses one control and results contract for every resource view. */
 body.atlas-console .performance-panel {

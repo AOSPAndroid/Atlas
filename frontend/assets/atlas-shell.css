@@ -464,9 +464,6 @@ body.atlas-console > main {
 .deployment-toggle {
   display: none;
 }
-.atlas-console #supportDock {
-  top: calc(var(--atlas-header-height) + 12px);
-}
 .atlas-console #identity {
   display: block;
   margin-bottom: 12px;
@@ -580,9 +577,6 @@ body.atlas-console > main {
   }
   .console-page-heading {
     margin-bottom: 20px;
-  }
-  .atlas-console #supportDock {
-    top: 12px;
   }
   .atlas-console .deployment-panel {
     right: 16px;

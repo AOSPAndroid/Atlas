@@ -31,7 +31,7 @@
           height="32"
         /><span>Atlas</span><span class="atlas-admin-badge">Admin</span></a
       >
-      <div class="atlas-primary-nav" aria-label="Atlas sections"><a href="/">Map</a><a href="/installer" data-section="workspace" aria-current="page">Workspace</a><a href="/installer?command=knowledge" data-section="knowledge">Knowledge Base</a></div>
+      <div class="atlas-primary-nav" aria-label="Atlas sections"><a href="/" data-atlas-icon="map">Map</a><a href="/installer" data-section="workspace" aria-current="page" data-atlas-icon="workspace">Workspace</a><a href="/installer?command=knowledge" data-section="knowledge" data-atlas-icon="knowledge">Knowledge Base</a></div>
       <div class="header-actions atlas-header-actions">
         <a
           class="atlas-return"
@@ -76,6 +76,10 @@
         </nav>
       </div>
       <div class="console-sidebar-content">
+        <details id="selectionContext" class="selection-context" open>
+          <summary>Current selection <span id="selectionCaption"></span></summary>
+          <div id="selectionSummary"></div>
+        </details>
         <details class="sidebar-status">
           <summary>Connection &amp; data</summary>
           <code id="identity"></code>
@@ -91,20 +95,21 @@
           <h1 id="pageTitle">Workspace</h1>
         </div>
         <div class="console-page-actions" aria-label="Deployment controls">
-          <button id="deploymentsToggle" class="deployments-toggle">
+          <button id="deploymentsToggle" class="deployments-toggle" data-atlas-icon="deployment">
             Deployments <span id="deploymentsCount">0</span>
           </button>
-          <button id="queueToggle" class="queue-toggle">
+          <button id="queueToggle" class="queue-toggle" data-atlas-icon="queue">
             Queue <span id="queueCount">0</span>
           </button>
           <button
             id="deploymentToggle"
             class="deployment-toggle"
+            data-atlas-icon="deployment"
             aria-controls="deploymentPanel"
             aria-expanded="false"
             hidden
           >
-            Deployment
+            <span id="deploymentToggleLabel">Deployment</span>
           </button>
         </div>
       </div>
