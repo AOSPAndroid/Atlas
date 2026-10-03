@@ -1,0 +1,25 @@
+const assert = require('node:assert/strict'), fs = require('node:fs'), vm = require('node:vm');
+const {JSDOM} = require('jsdom');
+(async () => {
+  const dom = new JSDOM('<main><section><h2>CPU PC01</h2><button id="run">Scan CPU</button><button id="blocked" disabled>Reboot</button><label>PID<input id="pid"></label><label>Object type<select id="kind"><option>Computer</option><option>User</option></select></label><div hidden><button>Hidden action</button></div><div inert><button>Inert action</button></div></section><section class="page"><button>Inactive page</button></section><div class="atlas-interactions-host"><button>Own tools</button></div></main><aside id="ops-panel"><button id="specs">View specifications</button></aside>', {runScripts:'outside-only'});
+  const w = dom.window, d = w.document;
+  w.HTMLElement.prototype.getClientRects = function () {return this.closest('[hidden]') ? [] : [{}]};
+  w.HTMLElement.prototype.scrollIntoView = function () {};
+  const mod = new vm.SourceTextModule(fs.readFileSync('frontend/react/controls.js','utf8'), {context: dom.getInternalVMContext()});
+  await mod.link(() => {throw Error('Control indexing must not load services')});await mod.evaluate();
+  const {collectControls, activateControl} = mod.namespace;
+  let calls = 0;d.getElementById('run').onclick = () => calls++;
+  const entries = collectControls(d);
+  assert(entries.some(e => e.label === 'Object type'));
+  assert(entries.some(e => e.node.id === 'specs'), 'Map support controls are reachable');
+  assert(!entries.some(e => /Hidden|Inert|Inactive|Own tools/.test(e.label)));
+  assert(entries.find(e => e.node.id === 'blocked').disabled);
+  assert(!activateControl(entries.find(e => e.node.id === 'blocked')));
+  const run = entries.find(e => e.node.id === 'run');assert(activateControl(run));assert.equal(calls, 1);
+  assert(activateControl(entries.find(e => e.node.id === 'pid')));assert.equal(d.activeElement.id, 'pid');assert.equal(calls, 1);
+  run.node.disabled = true;assert(!activateControl(run));assert.equal(calls, 1);
+  run.node.disabled = false;run.node.remove();const replacement = d.createElement('button');replacement.id='run';replacement.textContent='New CPU action';replacement.onclick=()=>calls++;d.querySelector('section').append(replacement);
+  assert(!activateControl(run), 'A replaced record cannot execute an old callback');assert.equal(calls, 1);
+  replacement.setAttribute('aria-disabled','true');assert(collectControls(d).find(e=>e.node===replacement).disabled);
+  w.close();console.log('PASS: React tool indexing excludes hidden/inert/inactive/self controls, preserves field labels and map actions, invokes original controls, and rejects changed/replaced restrictions');
+})().catch(e=>{console.error(e);process.exitCode=1});

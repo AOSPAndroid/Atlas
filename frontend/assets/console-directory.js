@@ -512,6 +512,7 @@ function machineContext(event, index) {
   const first = enabledButtons()[0];
   first?.focus({ preventScroll: true });
   first?.scrollIntoView({ block: "nearest", behavior: "instant" });
+  window.AtlasInteractions?.animateMenu(menu);
 }
 function bindMachineContext() {
   document

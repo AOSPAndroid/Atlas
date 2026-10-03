@@ -939,6 +939,7 @@ window.AtlasContext = (() => {
     const first = enabled()[0];
     first?.focus({preventScroll: true});
     first?.scrollIntoView({block: "nearest"});
+    window.AtlasInteractions?.animateMenu(menu);
     return menu;
   }
   function fromEvent(event) {
@@ -970,7 +971,7 @@ window.AtlasContext = (() => {
 /* An on-demand index of original controls: no background scans or cloned handlers. */
 (() => {
   function install() {
-    if (document.querySelector('.atlas-reachable-toggle') || !document.querySelector('main')) return;
+    if (window.AtlasInteractions?.ready || document.querySelector('.atlas-reachable-toggle') || !document.querySelector('main')) return;
     const toggle = document.createElement('button');
     toggle.className = 'atlas-reachable-toggle'; toggle.type = 'button';
     toggle.textContent = 'Actions'; toggle.setAttribute('aria-expanded', 'false');
@@ -991,7 +992,7 @@ window.AtlasContext = (() => {
     }
     function collect() {
       entries = [...document.querySelectorAll('main button, main input:not([type="hidden"]), main select, main textarea, main summary')]
-        .filter(node => visible(node) && !node.closest('dialog, .atlas-reachable-panel'))
+        .filter(node => visible(node) && !node.closest('dialog, .atlas-reachable-panel, .atlas-action-fallback'))
         .map(node => {
           const field = /^(INPUT|SELECT|TEXTAREA)$/.test(node.tagName);
           const labelCopy = field ? node.labels?.[0]?.cloneNode(true) : null;
@@ -1034,10 +1035,23 @@ window.AtlasContext = (() => {
     };
     search.oninput = render;
     panel.querySelector('button').onclick = () => close();
-    document.addEventListener('keydown', event => { if (event.key === 'Escape' && !panel.hidden) { event.preventDefault(); close(); } });
-    document.addEventListener('pointerdown', event => { if (!panel.hidden && !panel.contains(event.target) && event.target !== toggle) close(false); });
-    window.addEventListener('hashchange', () => close(false));
-    document.body.append(toggle, panel);
+    const onKey = event => { if (event.key === 'Escape' && !panel.hidden) { event.preventDefault(); close(); } };
+    const onOutside = event => { if (!panel.hidden && !panel.contains(event.target) && event.target !== toggle) close(false); };
+    const onRoute = () => close(false);
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('pointerdown', onOutside);
+    window.addEventListener('hashchange', onRoute);
+    const fallback = document.createElement('div');fallback.className='atlas-action-fallback';
+    fallback.append(toggle, panel);
+    const main = document.querySelector('main');
+    const heading = main.querySelector(':scope > .console-page-heading, :scope > .map-heading, :scope > header');
+    if (heading) heading.after(fallback);else main.prepend(fallback);
+    window.AtlasReachableFallback = {destroy() {
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('pointerdown', onOutside);
+      window.removeEventListener('hashchange', onRoute);
+      fallback.remove();window.AtlasReachableFallback=null;
+    }};
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install, {once:true}); else install();
 })();

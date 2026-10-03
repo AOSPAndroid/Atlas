@@ -1,0 +1,5 @@
+/* Utilities are prefixed; Atlas owns reset, tokens and final component geometry. */
+@layer theme, utilities;
+@import "tailwindcss/theme.css" layer(theme) prefix(atl);
+@import "tailwindcss/utilities.css" layer(utilities) prefix(atl);
+@source "./";
