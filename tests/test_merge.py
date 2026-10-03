@@ -1,5 +1,5 @@
 """Shared database tests. All deployment workers are stubbed; no remote actions run."""
-import json,sqlite3,sys,tempfile,shutil,unittest,importlib,hashlib
+import json,sqlite3,sys,tempfile,unittest
 from pathlib import Path
 from unittest.mock import patch
 ROOT=Path(__file__).resolve().parents[1];sys.path.insert(0,str(ROOT))
@@ -126,7 +126,8 @@ class MergedAtlas(unittest.TestCase):
   self.assertEqual(assigned,sorted(assigned,reverse=True))
   pc=ctx['machines'][0]['name'];fixture=self.create_desk('group-overlap',name='Sabri El Jailani',hostname=pc)
   merged=self.client.get('/api/desks/'+fixture['id']+'/context').json()['machines']
-  self.assertEqual(len(merged),8);match=next(m for m in merged if m['name']==pc)
+  self.assertEqual(len(merged),8)
+  match=next(m for m in merged if m['name']==pc)
   self.assertTrue(match['desk_equipment']);self.assertEqual(match['relationship_group'],'Assigned to user' if match['assigned_relationship'] else 'Desk equipment')
   self.assertIn('inventory_discovered_at',match)
  def test_11_catalog_metadata_scripts_and_revision(self):

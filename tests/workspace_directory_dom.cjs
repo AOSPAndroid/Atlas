@@ -90,7 +90,7 @@ const settle = () => new Promise(resolve => setTimeout(resolve, 20));
   assert(d.querySelector('#adSelection').textContent.includes('viewer'));
   w.AtlasAD.show('computer', 'VIEWERPC');assert.equal(reads.length, count);
   // Mixed assets stay inspectable; selecting a phone clears the previous PC target.
-  run(`clearLookup();S.machines=[{name:'TESTPC',model_category:'Laptop',model_id:'Dell Latitude 7450',assigned_to:'alice'},{name:'IPHONE-EXAMPLE',model_category:'Mobile Device - Handheld',model_id:'APPLE iPhone 13',assigned_to:'alice',assigned_at:'2026-10-01 00:00:00',last_used:'2026-10-02 12:00:00',install_status:'In Use'}];renderMachines();setTarget('TESTPC','',false,false)`);
+  run(`clearLookup();S.machines=[{name:'TESTPC',model_category:'Laptop',model_id:'Dell Latitude 7450',assigned_to:'alice'},{name:'IPHONE-EXAMPLE',model_category:'Mobile Device - Handheld',model_id:'APPLE iPhone 13',assigned_to:'alice',assigned_at:'2026-10-01 00:00:00',last_used:'2026-10-02 12:00:00',install_status:'In Use'}];renderMachines();setTarget('TESTPC','',false)`);
   const phone=d.querySelector('[data-machine-kind=iphone]');
   assert(phone.querySelector('.atlas-device-badge.assigned').title.includes('2026-10-01'));
   assert(phone.querySelector('.atlas-device-badge.assigned').textContent==='Assigned');

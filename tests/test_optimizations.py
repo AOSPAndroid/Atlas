@@ -1,5 +1,3 @@
-import json
-import sqlite3
 import tempfile
 import time
 import unittest
@@ -16,7 +14,6 @@ from sqlite_fixture import connect
 class OptimizationTests(unittest.TestCase):
     def test_custom_official_location_survives_reload_and_export(self):
         from seating_excel import layout_records
-        from desk_moves import snapshot
         with tempfile.TemporaryDirectory() as tmp:
             db=Path(tmp)/'atlas.db'
             with connect(atlas_store.DB) as source,connect(db) as dest:source.backup(dest)

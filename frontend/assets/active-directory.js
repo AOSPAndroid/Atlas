@@ -408,11 +408,11 @@
     show(kind, identity, run = true) {
       page('active-directory');
       const result=this.select(kind,identity,run);
-      if(!run||!identity){window.AtlasEdges?.revealFor(by('Form'));by('Identity').focus();}
+      if(!run||!identity){by('Identity').focus();}
       return result;
     },
     command(id) {
-      if(id === "ad-browser"){page("active-directory");const browser=document.getElementById("adBrowser");browser.open=true;browser.scrollIntoView({block:"start"});const input=document.querySelector(".ad-browser-tools input");window.AtlasEdges?.revealFor(input);input?.focus();return;}
+      if(id === "ad-browser"){page("active-directory");const browser=document.getElementById("adBrowser");browser.open=true;browser.scrollIntoView({block:"start"});const input=document.querySelector(".ad-browser-tools input");input?.focus();return;}
       if (id === "ad-user-groups")
         return this.show("user", S.user?.user_name || S.user?.email || "");
       if (id === "ad-machine-groups")
@@ -425,7 +425,6 @@
         "ad-export-groups": "export",
       }[id];
       if (this.groupActions?.[action]) {
-        window.AtlasEdges?.open("ad-result-tools");
         this.groupActions[action]();
       }
       else {
@@ -433,7 +432,6 @@
           "Look up an AD object first to " +
           (action || "view") +
           " its groups.";
-        window.AtlasEdges?.revealFor(by("Form"));
         by("Identity").focus();
       }
     },

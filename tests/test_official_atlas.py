@@ -1,5 +1,5 @@
 from sqlite_fixture import connect as fixture_connect
-import unittest,sqlite3,tempfile,sys,json
+import unittest,tempfile,sys
 from pathlib import Path
 from types import SimpleNamespace
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))

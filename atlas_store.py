@@ -20,9 +20,15 @@ def connect():
 
 def get_record(con, desk_id):
     row = con.execute('SELECT body FROM records WHERE id=?', (desk_id,)).fetchone()
-    if not row and con.execute("select 1 from sqlite_master where name='official_records'").fetchone():row=con.execute('select body from official_records where id=?',(desk_id,)).fetchone()
-    if not row:return None
-    record=json.loads(row[0]);record.setdefault('layout', 'previous' if con.execute('select 1 from records where id=?',(desk_id,)).fetchone() else 'official');return record
+    layout = 'previous'
+    if not row and con.execute("select 1 from sqlite_master where type='table' and name='official_records'").fetchone():
+        row = con.execute('SELECT body FROM official_records WHERE id=?', (desk_id,)).fetchone()
+        layout = 'official'
+    if not row:
+        return None
+    record = json.loads(row[0])
+    record.setdefault('layout', layout)
+    return record
 
 def all_records(con):
     return [dict(json.loads(row[0]),layout='previous') for row in con.execute('SELECT body FROM records ORDER BY id')]

@@ -1,7 +1,8 @@
-import json, subprocess, unittest
+import json, subprocess, unittest, shutil
 from pathlib import Path
 class IdentityTests(unittest.TestCase):
  def resolve(self, scenario, identity='G01234'):
+  if not shutil.which('pwsh'):self.skipTest('PowerShell Core is not installed')
   source=Path('scripts/active_directory.ps1').read_text(encoding='utf8')
   source=source[:source.index('function DateText')]
   mock=r'''

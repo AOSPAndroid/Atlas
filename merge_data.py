@@ -1,5 +1,5 @@
 """Build or refresh the shared database without replacing desk records/history."""
-import argparse,json,sqlite3,uuid
+import argparse,json,sqlite3
 from pathlib import Path
 ROOT=Path(__file__).resolve().parent
 TABLES=('users','user_aliases','machines','assignments')

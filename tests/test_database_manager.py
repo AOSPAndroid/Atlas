@@ -1,6 +1,6 @@
 from sqlite_fixture import connect as fixture_connect
 """Temporary database only; no deployment or remote calls."""
-import unittest,tempfile,sqlite3,sys,io,zipfile,shutil
+import unittest,tempfile,sys,io,zipfile
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch

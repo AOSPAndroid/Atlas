@@ -70,7 +70,7 @@ def share_urls(port):
 
 def run(open_browser=True):
     specs=servers()
-    try:import fastapi,uvicorn
+    try:import fastapi,uvicorn  # noqa: F401 -- verify dependencies can actually import
     except ImportError:
         print('Dependencies missing. Run Install_Dependencies.bat using this same Python.');return 1
     for directory in ('logs','data'):(ROOT/directory).mkdir(exist_ok=True)

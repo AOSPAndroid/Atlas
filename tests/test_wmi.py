@@ -1,11 +1,11 @@
 """No remote Windows commands are executed by this suite."""
-import base64,importlib.util,json,sqlite3,sys,tempfile,unittest,uuid
+import base64,json,sqlite3,sys,tempfile,unittest,uuid
 from pathlib import Path
 from unittest.mock import patch
 ROOT=Path(__file__).resolve().parents[1];sys.path.insert(0,str(ROOT))
 from backend import main as app
 from fastapi.testclient import TestClient
-from identity_links import build_index,candidates,rebuild_links
+from identity_links import build_index,candidates
 
 class Regression(unittest.TestCase):
  @classmethod

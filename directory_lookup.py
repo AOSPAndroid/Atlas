@@ -55,7 +55,7 @@ def search_directory(c,term:str):
  if ':' in text and text.split(':',1)[0].lower() in ('machine','user','email','name','brid'):
   prefix,text=text.split(':',1);prefix=prefix.lower();text=text.strip()
  if not text:return {'users':[],'machines':[]}
- q=text.casefold();login=q.rsplit('\\',1)[-1];like='%'+q.replace('\\','\\\\').replace('%','\\%').replace('_','\\_')+'%'
+ q=text.casefold();like='%'+q.replace('\\','\\\\').replace('%','\\%').replace('_','\\_')+'%'
  users=[] if prefix=='machine' else exact_users(c,text)
  machines=[]
  if prefix not in ('user','email','name','brid'):

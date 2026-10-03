@@ -98,7 +98,6 @@
           task("restore", async () => {
             resetPreview();
             message("Preparing backup comparison…");
-            window.AtlasEdges?.revealFor($("file"));
             show(
               await api("/api/database/restore-preview/" + b.dataset.restore, {
                 method: "POST",
@@ -147,8 +146,6 @@
     $("review-message").textContent =
       "Review the removals, confirm the complete snapshot, then type APPLY to enable saving.";
     $("preview").scrollIntoView({ block: "start", behavior: "instant" });
-    window.AtlasEdges?.refresh();
-    window.AtlasEdges?.revealFor($("full"));
   }
   $("file").onchange = () => {
     interacted = true;
@@ -201,8 +198,6 @@
         d.backup +
         "\nReload any open Atlas or console tabs to refresh displayed records.";
       message(completed);
-      window.AtlasEdges?.refresh();
-      window.AtlasEdges?.revealFor($("file"));
       try {
         await status(false);
       } catch {
@@ -219,8 +214,6 @@
         await api("/api/database/preview/" + staged, { method: "DELETE" });
       resetPreview();
       message("Preview discarded. Directory unchanged.");
-      window.AtlasEdges?.refresh();
-      window.AtlasEdges?.revealFor($("file"));
     });
   $("full").onchange = controls;
   $("confirm").oninput = controls;

@@ -159,7 +159,7 @@ export function installCommandPalette({
             }))
             .concat({
               kind: "Person",
-            adKind:"user",adIdentity:u.user_name||u.email||"",
+            adKind:row.adKind,adIdentity:row.adIdentity,
               title: "Open person details",
               detail: row.title,
               run: () => openConsole("person", row.person),

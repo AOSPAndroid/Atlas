@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def run(*args, env):
-    subprocess.run(args, cwd=ROOT, env=env, check=True)
+    subprocess.run(args, cwd=ROOT, env=env, check=True, timeout=180)
 
 
 def main():
@@ -40,10 +40,16 @@ def main():
                         time.sleep(.1)
                 else:
                     raise RuntimeError(f'{script} startup timed out')
-            for script in ['shared_palette_dom', 'edge_controls_dom', 'database_import_dom', 'ui_efficiency_dom', 'direct_hostname_dom', 'workspace_directory_dom', 'mixed_inventory_dom', 'console_dom', 'installer_frontend_regression', 'compact_deployment_dom', 'scroll_motion_dom', 'panel_motion_dom', 'catalogue_dom',
-                           'remote_software_dom', 'remote_processes_dom', 'quick_process_kill_dom', 'remote_services_dom', 'performance_dom', 'psexec_dom', 'psexec_terminal_dom', 'slowdown_dom', 'machine_health_dom', 'optimization_dom',
-                           'render_cache', 'map_motion', 'map_labels', 'map_furniture', 'plan_details', 'viewer_dom', 'readonly_console_dom', 'site_info_dom', 'seating_excel_dom', 'export_fields_dom', 'user_details_dom']:
-                run('node', '--experimental-vm-modules', f'tests/{script}.cjs', env=env)
+            scripts = sorted({path.stem for path in (ROOT/'tests').glob('*_dom.cjs')} |
+                             {'installer_frontend_regression','render_cache','map_motion','map_labels','map_furniture','plan_details'})
+            failures = []
+            for script in scripts:
+                try:
+                    run('node', '--experimental-vm-modules', f'tests/{script}.cjs', env=env)
+                except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+                    failures.append(script)
+            if failures:
+                raise RuntimeError('Frontend regressions failed: '+', '.join(failures))
         finally:
             for child in children:
                 child.terminate()

@@ -1360,7 +1360,7 @@ if (!ready) {
   $("#webgl-error").hidden = false;
   setView("source");
 }
-function mesh(vertices, textured = false, cacheKey = null) {
+function mesh(vertices, cacheKey = null) {
   let buffer = cacheKey ? gpuGeometryCache.get(cacheKey) : null;
   if (buffer) gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
   else {
@@ -1840,7 +1840,6 @@ function renderFrame() {
   gl.uniform2f(loc.scale, (2 * unit) / w, (2 * unit) / h);
   mesh(
     architecturalMesh(),
-    false,
     floor + ":" + view + JSON.stringify(mapLayers),
   );
   const matches = new Set(lastMatches.map((r) => r.id)),
@@ -1912,7 +1911,7 @@ function renderFrame() {
     )
       screenRecords.push({ r, p: screen });
   }
-  mesh(deskVertices, false, "desks");
+  mesh(deskVertices, "desks");
   renderNames();
   finishFrame(started);
 }

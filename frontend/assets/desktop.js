@@ -462,7 +462,7 @@
   function renderLauncher() {
     const term = $("#appSearch").value.toLowerCase();
     launcher.querySelector(".launcher-grid").innerHTML = Object.entries(apps)
-      .filter(([id, a]) => a.title.toLowerCase().includes(term))
+      .filter(([, a]) => a.title.toLowerCase().includes(term))
       .map(
         ([id, a]) =>
           `<button data-app="${id}"><span class="dock-icon" style="--icon-light:${a.colors[0]};--icon-dark:${a.colors[1]}">${svg(a.icon)}</span><span>${a.title}</span></button>`,

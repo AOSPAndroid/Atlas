@@ -881,7 +881,6 @@ window.AtlasGroups = {
           // Recheck state at activation: navigation or live updates may have replaced the original.
           if (!visible(entry.node) || entry.node.matches(':disabled') || entry.node.getAttribute('aria-disabled') === 'true') { collect(); render(); return; }
           close(false);
-          window.AtlasEdges?.revealFor(entry.node);
           entry.node.scrollIntoView({block:'center', behavior:'instant'});
           entry.node.focus({preventScroll:true});
           if (!entry.field) entry.node.click();

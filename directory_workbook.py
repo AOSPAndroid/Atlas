@@ -42,8 +42,11 @@ def shared_strings(z,path_key=''):
     out=[]
     if 'xl/sharedStrings.xml' not in z.namelist():return out
     with z.open('xl/sharedStrings.xml') as f:
-        for _,e in ET.iterparse(f,events=('end',)):
-            if e.tag==NS+'si':out.append(''.join(t.text or '' for t in e.iter(NS+'t')));e.clear()
+        parser=ET.iterparse(f,events=('start','end'));_,root=next(parser)
+        for event,e in parser:
+            if event=='end' and e.tag==NS+'si':
+                out.append(''.join(t.text or '' for t in e.iter(NS+'t')))
+                root.remove(e)
     if cache is not None:cache[path_key]=out
     return out
 
@@ -51,8 +54,10 @@ def iter_rows(path,target,raw=False):
     with zipfile.ZipFile(path) as z:
         ss=shared_strings(z,str(path))
         with z.open(target) as f:
-            for _,e in ET.iterparse(f,events=('end',)):
-                if e.tag!=NS+'row':continue
+            sheet_data=None
+            for event,e in ET.iterparse(f,events=('start','end')):
+                if event=='start' and e.tag==NS+'sheetData':sheet_data=e
+                if event!='end' or e.tag!=NS+'row':continue
                 cells={}
                 for c in e.findall(NS+'c'):
                     i=col_idx(c.attrib.get('r','A1'));k=c.attrib.get('t');v=c.find(NS+'v');val=''
@@ -63,7 +68,7 @@ def iter_rows(path,target,raw=False):
                     row=['']*(max(cells)+1)
                     for i,v in cells.items():row[i]=v
                     yield int(e.attrib.get('r','0')),row
-                e.clear()
+                if sheet_data is not None:sheet_data.remove(e)
 
 def canonical_header(v):return re.sub(r'[^a-z0-9]+','_',norm(v)).strip('_')
 def rowdict(headers,row):return {headers[i]:clean(row[i]) if i<len(row) else '' for i in range(len(headers))}
@@ -144,7 +149,7 @@ def build(src,out):
         c.commit()
         # Rebuild aliases only from final records; keep duplicate names as ambiguous.
         c.execute('delete from user_aliases')
-        for ref,uid,email,name,employee in c.execute('select id,user_id,email,full_name,employee_number from users').fetchall():
+        for ref,uid,email,name,employee in c.execute('select id,user_id,email,full_name,employee_number from users'):
             for typ,val in [('user_id',uid),('email',email),('name',name),('employee_number',employee)]:
                 if clean(val):c.execute('insert or ignore into user_aliases(user_id_ref,alias_type,alias_value,alias_norm) values(?,?,?,?)',(ref,typ,val,norm(val)))
         # Machines

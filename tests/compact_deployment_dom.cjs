@@ -104,7 +104,7 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 15));
   w.matchMedia = (query) =>
     query.includes("760px") ? { matches: false } : originalMedia(query);
   run("S.target='PC-A';syncDeploymentPanel()");
-  assert.equal(panel.closest(".lookup-column").parentElement.id, "workspace");
+  assert.equal(panel.parentElement.id, "workspace");
   assert(!panel.hidden);
   assert.strictEqual(doc.querySelector("#workspace #deploymentPanel"), panel);
   assert.equal(select.value, "A");
@@ -250,7 +250,7 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 15));
   assert.equal(f.errors.length, 0, f.errors.join("\n"));
   w.close();
   console.log(
-    "PASS: Workspace left-column deployment, searchable picker cancellation/favourites, action selection, immutable submission, duplicate prevention and target-specific progress",
+    "PASS: Workspace deployment column, searchable picker cancellation/favourites, action selection, immutable submission, duplicate prevention and target-specific progress",
   );
 })().catch((error) => {
   console.error(error);

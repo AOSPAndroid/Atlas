@@ -1,6 +1,6 @@
 from sqlite_fixture import connect as fixture_connect
 """Verify bundled template downloads and filled-template import compatibility."""
-import io,sqlite3,tempfile,unittest,zipfile,sys
+import io,tempfile,unittest,zipfile,sys
 from pathlib import Path
 from types import SimpleNamespace
 import xml.etree.ElementTree as ET

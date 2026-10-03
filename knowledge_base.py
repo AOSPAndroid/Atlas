@@ -3,7 +3,6 @@ import json
 import sqlite3
 from contextlib import closing
 from datetime import datetime, timezone
-from typing import Literal
 from fastapi import HTTPException
 from pydantic import BaseModel, Field, model_validator
 

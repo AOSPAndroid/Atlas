@@ -1,5 +1,5 @@
 from sqlite_fixture import connect as fixture_connect
-import unittest,sqlite3,tempfile,sys,copy
+import unittest,tempfile,sys,copy
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 import desk_moves as dm

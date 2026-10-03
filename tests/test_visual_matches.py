@@ -1,5 +1,5 @@
 from sqlite_fixture import connect as fixture_connect
-import unittest,sqlite3,tempfile,json,sys
+import unittest,tempfile,json,sys
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 import atlas_store as store

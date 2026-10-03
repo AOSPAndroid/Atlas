@@ -40,7 +40,7 @@ const preview = {id: 'stage-one', source: 'emea.xlsx', report: {
   }});
   const {w, run} = f, get = id => w.document.getElementById(id);
   w.HTMLElement.prototype.getClientRects = function() {return this.closest('[hidden]') ? [] : [{}]};
-  for (const file of ['database.js', 'edge-controls.js']) run(fs.readFileSync(path.join(root, 'frontend/assets', file), 'utf8'));
+  for (const file of ['database.js']) run(fs.readFileSync(path.join(root, 'frontend/assets', file), 'utf8'));
   await sleep(50);
   assert(!get('validate').disabled, 'Slow status loading does not disable validation');
   assert(!w.document.querySelector('.atlas-edge-panel'), 'Upload workflows never move into floating controls');

@@ -1,4 +1,4 @@
-function setTarget(pc, status = "", quick = true, groups = false) {
+function setTarget(pc, status = "", quick = true) {
   pc = String(pc || "")
     .trim()
     .toUpperCase();
@@ -103,7 +103,7 @@ async function search() {
     resolved = await api("/api/master/resolve/" + encodeURIComponent(term));
   if (sequence !== lookupSequence) return;
   if (resolved?.matched) {
-    await loadUser(resolved.user_key, sequence, !resolved.requested_machine);
+    await loadUser(resolved.user_key, sequence);
     if (sequence === lookupSequence && resolved.requested_machine)
       setTarget(resolved.requested_machine, "Database record");
     return;
@@ -134,7 +134,7 @@ function renderUsers() {
     (b) => (b.onclick = () => copy(S.users[+b.dataset.email].email, "Email")),
   );
 }
-async function loadUser(id, sequence, groups = false) {
+async function loadUser(id, sequence) {
   if (sequence === undefined) {
     sequence = ++lookupSequence;
     clearLookup();

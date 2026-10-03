@@ -1,8 +1,9 @@
-import json, subprocess, unittest
+import json, subprocess, unittest, shutil
 from pathlib import Path
 
 class DirectoryScriptTests(unittest.TestCase):
  def run_fixture(self, kind='user', broken=False, expiry='134050464000000000', shell='pwsh'):
+  if not shutil.which(shell):self.skipTest(shell+' is not installed')
   source=Path('scripts/active_directory.ps1').read_text(encoding='utf8')
   mock=r'''
 $kind='KIND';$identity='fixture';$server='dc.test';$broken=BROKEN

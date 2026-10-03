@@ -18,19 +18,37 @@ def fingerprint(path):
     for row in c.execute('select * from '+t+' order by 1,2'):h.update(repr(row).encode())
   return h.hexdigest()
 
+def compare_rows(before, after, *, key=lambda row: row):
+ """Merge ordered unique keys, retaining at most 20 examples per side."""
+ result={'before':0,'after':0,'added':0,'removed':0,'changed':0,'added_examples':[],'removed_examples':[]}
+ old=next(before,None);new=next(after,None)
+ while old is not None or new is not None:
+  if new is None or (old is not None and key(old)<key(new)):
+   result['before']+=1;result['removed']+=1
+   if len(result['removed_examples'])<20:result['removed_examples'].append(key(old))
+   old=next(before,None)
+  elif old is None or key(new)<key(old):
+   result['after']+=1;result['added']+=1
+   if len(result['added_examples'])<20:result['added_examples'].append(key(new))
+   new=next(after,None)
+  else:
+   result['before']+=1;result['after']+=1;result['changed']+=old!=new
+   old=next(before,None);new=next(after,None)
+ return result
+
 def compare(target,candidate):
  with sqlite3.connect(target,factory=ClosingConnection) as a,sqlite3.connect(candidate,factory=ClosingConnection) as b:
   result={}
   for table,key in [('users','canonical_key'),('machines','machine_name_norm')]:
    def read(c):
     cols=[x[1] for x in c.execute('pragma table_info('+table+')')];ki=cols.index(key)
-    return {r[ki]:tuple(v for i,v in enumerate(r) if cols[i]!='id') for r in c.execute('select * from '+table)}
-   old,new=read(a),read(b);added=sorted(new.keys()-old.keys());removed=sorted(old.keys()-new.keys());changed=sorted(k for k in old.keys()&new.keys() if old[k]!=new[k])
-   result[table]={'before':len(old),'after':len(new),'added':len(added),'removed':len(removed),'changed':len(changed),'added_examples':added[:20],'removed_examples':removed[:20]}
-  def links(c):return set(c.execute('select u.canonical_key,m.machine_name_norm,a.relationship_type from assignments a join users u on u.id=a.user_id_ref join machines m on m.id=a.machine_id'))
-  old,new=links(a),links(b);result['relationships']={'before':len(old),'after':len(new),'added':len(new-old),'removed':len(old-new)}
-  keys={r[0] for r in b.execute('select canonical_key from users')}
-  result['missing_desk_accounts']=[{'desk':d,'account':k} for d,k in a.execute('select desk_id,user_key from desk_user_links') if k not in keys]
+    keep=[i for i,column in enumerate(cols) if column!='id']
+    return ((r[ki],tuple(r[i] for i in keep)) for r in c.execute('select * from '+table+' order by '+key))
+   result[table]=compare_rows(read(a),read(b),key=lambda row:row[0])
+  def links(c):return iter(c.execute('select distinct u.canonical_key,m.machine_name_norm,a.relationship_type from assignments a join users u on u.id=a.user_id_ref join machines m on m.id=a.machine_id order by 1,2,3'))
+  relationship_changes=compare_rows(links(a),links(b))
+  result['relationships']={key:relationship_changes[key] for key in ('before','after','added','removed')}
+  result['missing_desk_accounts']=[{'desk':d,'account':k} for d,k in a.execute('select desk_id,user_key from desk_user_links') if not b.execute('select 1 from users where canonical_key=?',(k,)).fetchone()]
   result['warnings']=[f'{t}: more than 10% of existing records disappear.' for t in ('users','machines') if result[t]['removed']>result[t]['before']*.1]
   result['unlinked_machine_references']=b.execute("select count(*) from machines m where (trim(coalesce(assigned_to,''))<>'' or trim(coalesce(last_logon_user,''))<>'') and not exists(select 1 from assignments a where a.machine_id=m.id)").fetchone()[0]
   result['coverage']=directory_exports.coverage(b)

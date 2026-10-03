@@ -1,4 +1,4 @@
-import hashlib,json,sqlite3,tempfile,unittest
+import hashlib,sqlite3,tempfile,unittest
 from pathlib import Path
 import atlas_store
 class IndexTests(unittest.TestCase):

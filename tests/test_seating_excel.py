@@ -1,6 +1,6 @@
 from sqlite_fixture import connect as fixture_connect
 """Excel seating import: real workbook bytes and isolated SQLite data."""
-import copy, json, sqlite3, tempfile, unittest, sys
+import tempfile, unittest, sys
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch

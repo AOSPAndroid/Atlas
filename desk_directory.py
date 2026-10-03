@@ -91,18 +91,18 @@ def people_desks(c, people, suggestions=True):
         return result
     pending = {person['canonical_key']: name_key(person['full_name']) for person in people
                if not result[person['canonical_key']]}
-    counts = {key: 0 for key in pending.values() if key}
+    named_desks = {}
+    for desk_id, desk in desks.items():
+        if desk_id not in links and desk.get('occupancy') != 'vacant':
+            key = name_key(desk.get('name', ''))
+            named_desks.setdefault(key, []).append({'id': desk_id, 'floor': desk['floor'], 'match': 'matching name; account not confirmed'})
+    counts = {key: 0 for key in pending.values() if key and key in named_desks}
     if not counts:
         return result
     for (full_name,) in c.execute('select full_name from users'):
         key = name_key(full_name)
         if key in counts:
             counts[key] += 1
-    named_desks = {}
-    for desk_id, desk in desks.items():
-        if desk_id not in links and desk.get('occupancy') != 'vacant':
-            key = name_key(desk.get('name', ''))
-            named_desks.setdefault(key, []).append({'id': desk_id, 'floor': desk['floor'], 'match': 'matching name; account not confirmed'})
     for account, key in pending.items():
         if counts.get(key) == 1:
             result[account] = named_desks.get(key, [])

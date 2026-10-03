@@ -96,6 +96,14 @@ class PaletteIdentityTests(unittest.TestCase):
         self.assertLessEqual(len(statements), 3, 'enrichment must batch directory and desk reads')
         self.assertTrue(all(new is not old for new, old in zip(enriched['users'], original['users'])))
 
+    def test_global_user_without_a_candidate_desk_skips_directory_name_scan(self):
+        person = self.person(10)
+        statements = []
+        self.c.set_trace_callback(statements.append)
+        self.assertEqual(person_desks(self.c, person), [])
+        self.c.set_trace_callback(None)
+        self.assertFalse(any('select full_name from users' in statement.lower() for statement in statements))
+
     def test_optional_admin_and_demo_enrichment_and_fresh_resolution_agree(self):
         from backend import main, viewer
         before = self.path.read_bytes()

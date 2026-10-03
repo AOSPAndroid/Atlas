@@ -1,10 +1,9 @@
 """Isolated seating UI fixture. No WMI workers or remote operations."""
-import sys,tempfile,sqlite3
+import sys,tempfile
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from fastapi import FastAPI,HTTPException
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
 from types import SimpleNamespace
 import database_manager as dm
 from sqlite_fixture import connect

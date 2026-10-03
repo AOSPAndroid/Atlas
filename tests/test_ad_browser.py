@@ -1,4 +1,4 @@
-import json,subprocess,unittest
+import json,subprocess,unittest,shutil
 from unittest.mock import Mock
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -14,6 +14,7 @@ class BrowserTests(unittest.TestCase):
    self.assertEqual(c.post('/api/active-directory/browse',headers=headers,json={'limit':5001}).status_code,422)
    self.assertEqual(c.post('/api/active-directory/browse',headers=headers,json={}).status_code,200)
  def test_ps51_browse_and_literal_filter(self):
+  if not shutil.which('powershell.exe'):self.skipTest('Windows PowerShell is not installed')
   ps=Mock(return_value='{"items":[]}')
   ad.browse(ad.Browse(operation='search',query="x*)(name=*)'",server='dc.test'),ps)
   script=ps.call_args.args[0]
