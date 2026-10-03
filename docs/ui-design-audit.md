@@ -153,3 +153,9 @@ Actions panel correction: non-shrinking rows, capped 520px panel, one section he
 - At 1366 px, the six-reading strip measures approximately 75 px, the eight-processor grid 29 px, and the first process row starts at 403 px. Search and selectors share a 28 px baseline. The CPU table fits all four columns at 390 px; touch selectors, thread buttons and action buttons measure 42 px. Classic, Desktop and 390/600/768/1000/1366 px layouts passed browser checks without page overflow or errors.
 - Browser checks used 100 fictional returned processes, verified the PID after sorting, local-only filtering, 128 accessible logical processors, unavailable counters and partial warnings. DOM checks cover metric scope, all sort modes, process identity, unknown versus zero CPU, stale scans, machine changes, report copy and thread refresh. Existing process actions, quick termination, slowness capture, edge controls and read-only checks passed. Demo and prepared Preview keep scanning disabled and do not invent CPU readings. No Windows machine was contacted.
 - Shared assets and the console are synced to the prepared Preview. The distributed seed and all 358 Preview JSON assets are unchanged. Hosted publication remains pending the existing public/owner-private audience decision.
+
+### Fixed layout restoration
+
+- Retired hover/pin edge controls across map, console, uploads and Desktop utilities. Existing browser preferences cannot hide or move controls.
+- Restored separate Workspace and Active Directory navigation, with lookup and deployment side by side. Group filtering/comparison, compact health, CPU views, mixed-device badges and the two-section upload flow remain.
+- Workspace selection no longer starts background AD lookups; explicit user/group shortcuts open the directory page.

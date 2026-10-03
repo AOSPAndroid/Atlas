@@ -32,10 +32,10 @@ async function until(fn){for(let i=0;i<100;i++){if(fn())return;await sleep(30)}t
  assert.equal(w.location.pathname,'/installer');
  w.document.querySelector('.atlas-site-info').close();
  for(const page of ['admin','bulk','history','psexec','workspace']){w.document.querySelector(`[data-page="${page}"]`).click();assert(w.document.querySelector('#'+page).classList.contains('active'));assert(w.document.querySelector('#pageTitle').textContent.trim().length>0)}
- assert.equal(w.document.querySelectorAll('nav .nav-label').length,6);
+ assert.equal(w.document.querySelectorAll('nav .nav-label').length,7);
  assert(w.document.querySelector('[data-page="knowledge"] svg'));
- assert(w.document.querySelector('#workspace #active-directory'));
- vm.runInContext('page("active-directory")',context);assert(w.document.querySelector('#workspace.active'));
+ assert(w.document.querySelector('main > #active-directory.page'));
+ vm.runInContext('page("active-directory")',context);assert(w.document.querySelector('#active-directory.active'));vm.runInContext('page("workspace")',context);
  for(const [toggle,drawer,close] of [['queueToggle','queueDrawer','closeQueue'],['deploymentsToggle','deploymentsDrawer','closeDeployments']]){w.document.querySelector('#'+toggle).click();assert(w.document.querySelector('#'+drawer).classList.contains('open'));w.document.querySelector('#'+close).click();assert(!w.document.querySelector('#'+drawer).classList.contains('open'))}
  // Disclosure clicks, panel exclusivity, Escape, and focus restoration.
  const q=w.document.querySelector('#queueToggle'),live=w.document.querySelector('#deploymentsToggle');
@@ -53,7 +53,7 @@ async function until(fn){for(let i=0;i<100;i++){if(fn())return;await sleep(30)}t
  w.document.dispatchEvent(new w.KeyboardEvent('keydown',{key:'k',ctrlKey:true,bubbles:true}));await until(()=>palette.querySelector('dialog').open);await sleep(100);commandSearch.value='> zzzznonexistent';commandSearch.dispatchEvent(new w.Event('input',{bubbles:true}));assert.equal(palette.querySelectorAll('[role=option]').length,0);palette.querySelector('.palette-close').click();
  w.document.querySelector('#openShortcuts').click();assert(!w.document.querySelector('#shortcutHelp').classList.contains('hidden'));w.document.querySelector('#closeShortcutHelp').click();
  w.document.querySelector('[data-page="workspace"]').click();
- const users=await(await fetch(base+'/api/search?term=smith')).json();assert(users.users.length);
+ const users=await(await fetch(base+'/api/search?term='+encodeURIComponent(process.env.ATLAS_TEST_USER||'smith'))).json();assert(users.users.length);
  const search=w.document.querySelector('#search');search.value=users.users[0].user_name;search.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Enter',bubbles:true}));
  await until(()=>w.document.querySelector('#kyc .usercard'));assert(w.document.querySelector('.lookup-column #kyc .usercard'));
  assert(w.document.querySelector('.deployment-panel #deploy'));

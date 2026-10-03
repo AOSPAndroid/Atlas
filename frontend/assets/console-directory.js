@@ -1,4 +1,4 @@
-function setTarget(pc, status = "", quick = true, groups = true) {
+function setTarget(pc, status = "", quick = true, groups = false) {
   pc = String(pc || "")
     .trim()
     .toUpperCase();
@@ -18,19 +18,15 @@ function setTarget(pc, status = "", quick = true, groups = true) {
     $("#healthLine").classList.add("hidden");
     $("#preflight").innerHTML = "";
     $("#packagePresence").innerHTML = "";
-    if (S.user) window.AtlasAD?.select("user", S.user.user_name || S.user.email);
-    else window.AtlasAD?.clear();
     $$("[data-machine]").forEach(x => x.classList.toggle("selected", String(S.machines[+x.dataset.machine]?.name || "").toUpperCase() === pc));
     refreshConsoleSummary();
     return;
   }
   if (pc === S.target) {
-    if (groups) window.AtlasAD?.select("computer", pc);
     if (quick) refreshTargetHealth("quick");
     return;
   }
   S.target = pc;
-  if (groups) window.AtlasAD?.select("computer", pc);
   window.AtlasPsExec?.syncTarget(pc);
   syncDeploymentPanel({ selection: true });
   $("#deployTarget").textContent = pc;
@@ -48,7 +44,6 @@ function setTarget(pc, status = "", quick = true, groups = true) {
   updatePackagePresence();
 }
 function clearLookup() {
-  window.AtlasAD?.clear();
   clearDirectTarget();
   AtlasHealth.cancel($("#healthLine"));
   S.user = null;
@@ -139,7 +134,7 @@ function renderUsers() {
     (b) => (b.onclick = () => copy(S.users[+b.dataset.email].email, "Email")),
   );
 }
-async function loadUser(id, sequence, groups = true) {
+async function loadUser(id, sequence, groups = false) {
   if (sequence === undefined) {
     sequence = ++lookupSequence;
     clearLookup();
@@ -151,7 +146,6 @@ async function loadUser(id, sequence, groups = true) {
   $("#users").innerHTML = "";
   renderKyc();
   renderMachines();
-  if (groups) window.AtlasAD?.select("user", S.user.user_name || S.user.email || "");
   AtlasUI.motion.slideUp($("#kyc"));
 }
 function renderKyc() {
@@ -162,7 +156,7 @@ function renderKyc() {
   select.className = "workspace-user-select";
   select.textContent = title.textContent;
   select.setAttribute("aria-label", "Show groups for " + (u.user_name || u.name));
-  select.onclick = () => window.AtlasAD?.select("user", u.user_name || u.email || "");
+  select.onclick = () => window.AtlasAD?.show("user", u.user_name || u.email || "");
   title.replaceChildren(select);
   const details = $("#kyc .atlas-person-details"), facts = $("#kyc .facts");
   const summary = document.createElement("p");
@@ -208,7 +202,7 @@ function renderMachines() {
   );
   if (S.machines.length === 1) {
     let m = S.machines[0];
-    setTarget(m.name, m.operational_status, false, !S.user);
+    setTarget(m.name, m.operational_status, false);
   }
   AtlasUI.machineFilters($("#machines"));
   bindMachineContext();
@@ -222,7 +216,7 @@ function renderMachines() {
     details.append(facts);
     const heading = card.querySelector("h3"), choose = document.createElement("button");
     choose.type = "button";choose.className = "workspace-machine-select";choose.textContent = m.name;
-    choose.setAttribute("aria-label", AtlasUI.supportsWindows(m) ? "Select machine " + m.name + " and show groups" : "Select inventory device " + m.name);
+    choose.setAttribute("aria-label", AtlasUI.supportsWindows(m) ? "Select machine " + m.name : "Select inventory device " + m.name);
     heading.replaceChildren(choose);
     card.classList.add("workspace-machine-row");
   });

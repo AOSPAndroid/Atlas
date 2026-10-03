@@ -57,6 +57,7 @@
           <button data-page="workspace" class="active">
             <span class="nav-icon">⌂</span
             ><span class="nav-label">Workspace</span></button
+          ><button data-page="active-directory"><span class="nav-icon">☷</span><span class="nav-label">Active Directory</span></button
           ><button data-page="admin">
             <span class="nav-icon">▣</span
             ><span class="nav-label">Remote Admin</span></button
@@ -155,6 +156,7 @@
             </p>
           </div>
           <div id="healthLine" class="healthline hidden"></div>
+        </div>
         <section
           id="deploymentPanel"
           class="deployment-panel"
@@ -288,16 +290,15 @@
             </details>
           </section>
         </section>
-        </div>
-        <section id="active-directory" class="workspace-directory" aria-label="Directory groups">
+      </section>
+        <section id="active-directory" class="page workspace-directory" aria-label="Active Directory">
           <div class="panel workspace-directory-panel">
-            <div class="workspace-directory-heading"><h2>Groups</h2><span id="adSelection">Select a user or machine</span></div>
+            <div class="workspace-directory-heading"><h2>Active Directory</h2><span id="adSelection">Select a user or machine</span></div>
             <form id="adForm" class="px-settings"><label>Object type<select id="adKind"><option value="computer">Computer</option><option value="user">User</option></select></label><label>Account or machine<input id="adIdentity" maxlength="128" required placeholder="Logon, UPN, email, employee ID or machine"></label><label>Domain / controller (optional)<input id="adServer" maxlength="128" placeholder="Default domain discovery"></label><button id="adSelected" type="button">Use selected machine</button><button id="adLookup" class="primary">Look up AD</button></form>
             <p id="adStatus" role="status">Select a user or machine to load its groups. Use AD lookup for another account or controller.</p>
             <div id="adResults"></div>
           </div>
         </section>
-      </section>
       <button
         id="deploymentToggle"
         class="deployment-toggle"
