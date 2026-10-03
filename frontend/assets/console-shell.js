@@ -516,8 +516,9 @@ async function openPaletteTarget() {
   if (location.hash === "#knowledge") page("knowledge");
   const params = new URLSearchParams(location.search),
     person = params.get("person"),
-    machine = params.get("machine");
-  if (!person && !machine) {
+    machine = params.get("machine"),
+    lookup = params.get("lookup");
+  if (!person && !machine && !lookup) {
     await runInitialSharedCommand(params);
     return;
   }
@@ -526,11 +527,14 @@ async function openPaletteTarget() {
       if (!/^id:\d+$/.test(person)) throw Error("Invalid person link");
       clearLookup();
       await loadUser(person, ++lookupSequence);
-    } else {
+    } else if (machine) {
       document.querySelector("#search").value = "machine:" + machine;
       await search();
       if (S.machines.some((m) => m.name === machine))
         setTarget(machine, "Selected from Atlas map");
+    } else {
+      document.querySelector("#search").value = lookup;
+      await search();
     }
     await runInitialSharedCommand(params);
   } catch (error) {
@@ -560,7 +564,7 @@ async function runSharedCommand(id) {
     if(id !== "knowledge") return AtlasKnowledge.command(id);
     return;
   }
-  if(id==='ad-open'){const p=new URLSearchParams(location.search);return AtlasAD.show(p.get('adkind')==='user'?'user':'computer',p.get('adidentity')||S.target||'');}
+  if(id==='ad-open'){const p=new URLSearchParams(location.search);return AtlasAD.show(p.get('adkind')==='user'?'user':'computer',p.get('adidentity')||S.target||'',true,p.get('adaction')||'groups');}
   if(id.startsWith('ad-'))return AtlasAD.command(id);
   if (id === "active-directory") { page("active-directory"); return; }
   if (["vlans","contacts","daas","vdi"].includes(id)) {
@@ -720,6 +724,10 @@ sharedPaletteReady = import("/command-palette.js").then(
     return sharedPalette;
   },
 );
+AtlasContext.configure({
+  openPerson: async key => {page("workspace");await loadUser(key);},
+  search: async term => {page("workspace");document.getElementById("search").value = term;await search();},
+});
 document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll('[data-section]').forEach(link => link.addEventListener('click',event => {event.preventDefault();page(link.dataset.section);}));
   installSupportDock();

@@ -24,7 +24,7 @@ function machinesCard(machines, inspect = true) {
     (machines
       .map((m) => {
         const name = m.name || m.machine_name;
-        return `<article class="viewer-machine" ${AtlasUI.supportsWindows(m) ? `data-ad-kind="computer" data-ad-identity="${esc(name)}"` : ""} data-machine-kind="${AtlasUI.machineKind(m)}"><b>${esc(name)}</b>${AtlasUI.machineBadges(m)}<p class="ops-muted">${esc(relationship(m))}</p><p>${esc(m.model_id || "Model not supplied")}${m.operational_status ? " · " + esc(m.operational_status) + " (inventory)" : ""}</p>${AtlasUI.machineDetails(m, { open: !inspect })}${inspect ? `<button type="button" data-machine="${esc(name)}">Inspect machine</button>` : ""}</article>`;
+        return `<article class="viewer-machine" ${AtlasContext.attributes("device", m)} data-machine-kind="${AtlasUI.machineKind(m)}"><b>${esc(name)}</b>${AtlasUI.machineBadges(m)}<p class="ops-muted">${esc(relationship(m))}</p><p>${esc(m.model_id || "Model not supplied")}${m.operational_status ? " · " + esc(m.operational_status) + " (inventory)" : ""}</p>${AtlasUI.machineDetails(m, { open: !inspect })}${inspect ? `<button type="button" data-machine="${esc(name)}">Inspect machine</button>` : ""}</article>`;
       })
       .join("") || "<p>No linked machines recorded.</p>") +
     "</div>"
@@ -46,7 +46,7 @@ function userButtons(users) {
   return users
     .map(
       (u) =>
-        `<button type="button" class="ops-user-result" data-ad-kind="user" data-ad-identity="${esc(u.user_name || u.email || "")}" data-person="id:${u.id}"><b>${esc(u.full_name || u.name)}</b><span>${esc(u.user_name)} · ${esc(u.email)}</span>${u.assigned_relationship || u.logon_relationship ? `<small>${esc(relationship(u))}</small>` : ""}</button>`,
+        `<button type="button" class="ops-user-result" ${AtlasContext.attributes("user", u)} data-person="id:${u.id}"><b>${esc(u.full_name || u.name)}</b><span>${esc(u.user_name)} · ${esc(u.email)}</span>${u.assigned_relationship || u.logon_relationship ? `<small>${esc(relationship(u))}</small>` : ""}</button>`,
     )
     .join("");
 }
@@ -65,7 +65,11 @@ export function createViewerOperations({ onSelect, toast }) {
   document.querySelector(".header-right").prepend(button);
   document.querySelector(".empty-detail").innerHTML =
     '<span class="eyebrow">SHARED ATLAS</span><h2>Find a desk or colleague.</h2><p>Search people, machines and locations with Ctrl+K, or explore all ten floors.</p><small>Shared directory and inventory. Changes and elevated operations require the local admin version.</small>';
-  function bindLinks(host) {
+  AtlasContext.configure({openPerson, search});
+  function bindLinks(host, machines = []) {
+    host.querySelectorAll(".viewer-machine").forEach((card, i) => {
+      if (machines[i]) AtlasContext.bindDevice(card, machines[i]);
+    });
     host
       .querySelectorAll("[data-machine-list]")
       .forEach(AtlasUI.machineFilters);
@@ -123,7 +127,7 @@ export function createViewerOperations({ onSelect, toast }) {
       if (version !== lookupVersion || !current.element.isConnected) return;
       current.results.innerHTML = render(data);
       if (url.startsWith("/api/user/")) AtlasUI.motion.slideUp(current.results);
-      bindLinks(current.results);
+      bindLinks(current.results, data.machines || (data.machine ? [data.machine] : []));
       const copy = current.results.querySelector("[data-copy-report]");
       if (copy)
         copy.onclick = async () => {
@@ -216,7 +220,7 @@ export function createViewerOperations({ onSelect, toast }) {
             ? `<button type="button" data-person="id:${data.user.id}">Open person details</button>`
             : userButtons(data.candidates || [])) +
           machinesCard(data.machines);
-        bindLinks(host);
+        bindLinks(host, data.machines);
       } catch (error) {
         if (error.name !== "AbortError" && n === generation && host.isConnected)
           host.textContent = error.message;

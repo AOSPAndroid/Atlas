@@ -48,7 +48,7 @@
     "#pxElevated",
     "#pxReconnect",
     "#pxSessions",
-    '#machineMenu [data-cmd]:not([data-cmd="target"]):not([data-cmd="copy"]):not([data-cmd="details"]):not([data-cmd="admin"]):not([data-cmd="report"])',
+    '#machineMenu [data-cmd]:not([data-readonly-allowed]):not([data-cmd="target"]):not([data-cmd="copy"]):not([data-cmd="details"]):not([data-cmd="admin"]):not([data-cmd="report"])',
     "#catalog-edit input",
     "#catalog-edit button",
     'a[href="/manage-database"]',

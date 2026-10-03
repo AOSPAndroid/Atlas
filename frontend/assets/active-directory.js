@@ -1,7 +1,7 @@
 (() => {
   const by = (id) => document.getElementById("ad" + id);
   if (!by("Form")) return;
-  let busy = false, revision = 0, pending = null, selectionKey = "";
+  let busy = false, revision = 0, pending = null, selectionKey = "", selectionPromise = null;
   const el = (tag, text) => {
     const n = document.createElement(tag);
     if (text != null) n.textContent = String(text);
@@ -337,6 +337,12 @@
       compare: () => identity.focus(),
       export: () => download.click(),
       summary: () => by("CopySummary")?.click(),
+      properties: () => {
+        const details = by("Results").querySelector(".workspace-ad-details");
+        details.open = true;
+        details.querySelector("summary").focus();
+        details.scrollIntoView({block: "nearest"});
+      },
     };
     filter();controls();
   }
@@ -344,7 +350,7 @@
   const fields = ['Kind','Identity','Server','Selected'];
   function reset() {
     revision++;pending?.abort();pending=null;busy=false;
-    primary=secondary=null;selectionKey='';
+    primary=secondary=null;selectionKey='';selectionPromise=null;
     by('Results').replaceChildren();
     by('Results').setAttribute('aria-busy','false');
     if(window.AtlasAD) window.AtlasAD.groupActions=null;
@@ -385,18 +391,18 @@
     reset();selectedTitle(by('Kind').value,by('Identity').value.trim());
     by('Status').textContent='Selection changed. Click Look up AD to refresh.';
   });
-  by('Form').onsubmit=event=>{event.preventDefault();if(busy||window.AtlasReadOnly)return;return lookup();};
+  by('Form').onsubmit=event=>{event.preventDefault();if(busy||window.AtlasReadOnly)return;return selectionPromise=lookup();};
   window.AtlasAD = {
     select(kind,identity,run=true) {
       identity=String(identity||'').trim();
       const payload={kind,identity,server:by('Server').value.trim()};
-      if(selectionKey===JSON.stringify(payload))return;
+      if(selectionKey===JSON.stringify(payload) && (primary || busy))return selectionPromise;
       reset();by('Kind').value=kind;by('Identity').value=identity;
       selectedTitle(kind,identity);
       if(!identity){by('Status').textContent='No AD account supplied for this selection.';return;}
       selectionKey=JSON.stringify(payload);
       if(window.AtlasReadOnly){this.open();return;}
-      if(run)return lookup();
+      if(run)return selectionPromise=lookup();
       by('Status').textContent='Selected '+identity+'. Click Look up AD to load groups.';
     },
     clear() {
@@ -405,11 +411,15 @@
       by('Status').textContent='Select a user or machine to load its groups. Use AD lookup for another account or controller.';
       if(window.AtlasReadOnly)this.open();
     },
-    show(kind, identity, run = true) {
+    async show(kind, identity, run = true, action = "groups") {
       page('active-directory');
       const result=this.select(kind,identity,run);
       if(!run||!identity){by('Identity').focus();}
-      return result;
+      const selectedRevision = revision;
+      await result;
+      // A delayed shortcut must never act on a different selection's results.
+      if (run && selectedRevision === revision && !window.AtlasReadOnly && ["compare", "properties", "export", "summary", "filter"].includes(action))
+        this.groupActions?.[action]?.();
     },
     command(id) {
       if(id === "ad-browser"){page("active-directory");const browser=document.getElementById("adBrowser");browser.open=true;browser.scrollIntoView({block:"start"});const input=document.querySelector(".ad-browser-tools input");input?.focus();return;}

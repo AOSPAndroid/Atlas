@@ -122,7 +122,7 @@ async function search() {
 function renderUsers() {
   if (!S.users.length) return ($("#users").innerHTML = "");
   $("#users").innerHTML =
-    `<div class=panel><small>MATCHING USERS</small><div class=row>${S.users.map((u, i) => `<button data-ad-kind="user" data-ad-identity="${esc(u.user_name || u.email || "")}" data-user="${i}">${esc(u.name)} · ${esc(u.user_name)} · ${esc(u.location)}</button><button data-email="${i}">Copy email</button>`).join("")}</div></div>`;
+    `<div class=panel><small>MATCHING USERS</small><div class=row>${S.users.map((u, i) => `<button ${AtlasContext.attributes("user", u)} data-user="${i}">${esc(u.name)} · ${esc(u.user_name)} · ${esc(u.location)}</button><button data-email="${i}">Copy email</button>`).join("")}</div></div>`;
   $$("[data-user]").forEach(
     (b) =>
       (b.onclick = () =>
@@ -380,6 +380,13 @@ function machineContext(event, index) {
   menu.setAttribute("role", "menu");
   menu.setAttribute("aria-label", "Actions for " + m.name);
   const close = () => menu.classList.add("hidden");
+  const section = (label) => {
+    const heading = document.createElement("div");
+    heading.className = "atlas-context-section";
+    heading.setAttribute("role", "presentation");
+    heading.textContent = label;
+    menu.append(heading);
+  };
   const add = (cmd, label, run, select = true) => {
     const button = document.createElement("button");
     button.type = "button";
@@ -390,7 +397,7 @@ function machineContext(event, index) {
     button.onclick = async () => {
       close();
       try {
-        if (select) setTarget(m.name, m.operational_status);
+        if (select) setTarget(m.name, m.operational_status, false);
         await run();
       } catch (error) {
         toast(error.message);
@@ -398,15 +405,30 @@ function machineContext(event, index) {
     };
     menu.append(button);
     if (!windows && select) { button.disabled = true; button.title = "Windows tools require a PC"; }
+    return button;
   };
-  add("ad-groups", "See groups", () => AtlasGroups.open("computer",m.name), false);
-  menu.lastElementChild.disabled = !windows;
+  section("Active Directory");
+  for (const action of AtlasContext.groupActions("computer", m.name, windows)) {
+    const button = add(action.id, action.label, action.run, false);
+    button.disabled = action.disabled;
+    if (button.disabled) button.title = action.reason;
+    if (action.id === "ad-groups") button.dataset.readonlyAllowed = "";
+  }
+  section("Target & inventory");
   add("target", "Set as target", () => {});
   add("health", "Refresh health", () => refreshTargetHealth());
   add("copy", "Copy device identity", () => copy(m.name, "Device identity"), false);
   add("details", "Copy machine details", () =>
     copy(JSON.stringify(m, null, 2), "Device details"), false,
   );
+  add("inventory", "View inventory details", () => AtlasContext.inventory(m), false).dataset.readonlyAllowed = "";
+  for (const [cmd, label, value] of [["copy-asset", "Copy asset tag", m.asset_tag], ["copy-serial", "Copy serial number", m.serial_number]]) {
+    const button = add(cmd, label, () => AtlasContext.copy(value, label.slice(5)), false);
+    button.dataset.readonlyAllowed = "";
+    button.disabled = !value;
+    if (!value) button.title = "Not supplied in this record";
+  }
+  section("Remote support");
   for (const [tool, label] of [
     ["msra", "Open MSRA"],
     ["rdp", "Remote Desktop"],
@@ -427,8 +449,14 @@ function machineContext(event, index) {
   menu.querySelector('[data-cmd="remote-registry"]').disabled =
     !!window.AtlasReadOnly || !windows;
   add("admin", "Remote Admin", () => page("admin"));
+  add("cpu", "Scan CPU & processes", () => {page("admin");selectPerformanceView("cpu");return admin("cpu");});
+  add("memory", "Scan memory", () => {page("admin");selectPerformanceView("memory");return admin("memory");});
+  add("services", "List services…", () => {page("admin");document.getElementById("adminServices").click();});
+  section("Deployment");
+  add("deploy", "Deploy software…", () => {page("workspace");openDeploymentPanel();document.getElementById("pkgSearch").focus();});
   add("queue", "Add deployment to queue", () => addQueue());
   add("clean", "Clean package folder", () => cleanPackages());
+  section("Reports & diagnostics");
   add("specs", "View specifications", () => AtlasHealth.specs(m.name), false);
   menu.lastElementChild.disabled = !windows;
   add("software", "Software inventory", () => loadSoftware(m.name));
@@ -441,15 +469,18 @@ function machineContext(event, index) {
   menu.style.left = menu.style.top = gap + "px";
   // Measure after all actions are present, including the constrained height.
   const bounds = menu.getBoundingClientRect();
+  const anchor = document.querySelector(`[data-machine="${index}"] .copyhost`)?.getBoundingClientRect();
+  const x = Number.isFinite(event.clientX) ? event.clientX : anchor?.left || gap;
+  const y = Number.isFinite(event.clientY) ? event.clientY : anchor?.bottom || gap;
   menu.style.left =
     Math.max(
       gap,
-      Math.min(event.clientX, window.innerWidth - bounds.width - gap),
+      Math.min(x, window.innerWidth - bounds.width - gap),
     ) + "px";
   menu.style.top =
     Math.max(
       gap,
-      Math.min(event.clientY, window.innerHeight - bounds.height - gap),
+      Math.min(y, window.innerHeight - bounds.height - gap),
     ) + "px";
   window.AtlasReadOnly?.enforce?.();
   const enabledButtons = () => [...menu.querySelectorAll("button")].filter(button => !button.disabled && button.getAttribute("aria-disabled") !== "true");
@@ -478,15 +509,21 @@ function machineContext(event, index) {
       }
     }
   };
-  enabledButtons()[0]?.focus({ preventScroll: true });
+  const first = enabledButtons()[0];
+  first?.focus({ preventScroll: true });
+  first?.scrollIntoView({ block: "nearest", behavior: "instant" });
 }
 function bindMachineContext() {
   document
     .querySelectorAll("[data-machine]")
     .forEach(
-      (card) =>
-        (card.oncontextmenu = (e) =>
-          machineContext(e, Number(card.dataset.machine))),
+      (card) => {
+        card.oncontextmenu = e => machineContext(e, Number(card.dataset.machine));
+        card.onkeydown = e => {
+          if (e.key === "ContextMenu" || (e.key === "F10" && e.shiftKey))
+            machineContext(e, Number(card.dataset.machine));
+        };
+      },
     );
 }
 function completeMachineReport() {

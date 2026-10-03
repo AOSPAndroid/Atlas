@@ -68,6 +68,26 @@ const settle = () => new Promise(resolve => setTimeout(resolve, 20));
   assert(d.querySelector('#adStatus').textContent.includes('Groups unavailable for MISSING'));
   assert.equal(d.querySelector('#adResults').textContent, '');
   assert.equal(run('S.target'), 'PC02');assert(!d.querySelector('#deploymentPanel').hidden, 'An AD failure does not block deployment to an existing target');
+  // Context comparison waits for its exact primary record, shares an in-flight lookup,
+  // and only focuses the second identity field; it never compares an old target.
+  const beforeShortcut = reads.length;
+  const shortcut = w.AtlasGroups.open('user', 'alice', 'compare');await settle();
+  const duplicate = w.AtlasGroups.open('user', 'alice', 'compare');await settle();
+  assert.equal(reads.length, beforeShortcut + 1, 'Repeated context actions share the pending primary lookup');
+  assert.equal(reads.at(-1).payload.identity, 'alice');
+  reads.at(-1).resolve(data('alice'));await Promise.all([shortcut, duplicate]);
+  assert.equal(d.activeElement, d.querySelector('[aria-label="Compare AD object"]'));
+  assert.equal(reads.length, beforeShortcut + 1, 'Focusing comparison performs no secondary query');
+  assert.equal(run('S.target'), 'PC02', 'Directory shortcuts retain the selected deployment target');
+  await w.AtlasGroups.open('user', 'alice', 'properties');
+  assert(d.querySelector('.workspace-ad-details').open);
+  const staleShortcut = w.AtlasGroups.open('computer', 'OLDPC', 'compare');await settle();
+  const oldRead = reads.at(-1);
+  const freshShortcut = w.AtlasGroups.open('user', 'fresh', 'properties');await settle();
+  oldRead.resolve(data('OLDPC'));await staleShortcut;
+  reads.at(-1).resolve(data('fresh'));await freshShortcut;
+  assert(d.querySelector('.workspace-ad-details').open);
+  assert.equal(d.activeElement, d.querySelector('.workspace-ad-details summary'), 'A superseded compare cannot steal focus');
   run('clearLookup()');w.AtlasAD.clear();assert.equal(w.AtlasAD.groupActions, null);assert.equal(d.querySelector('#adResults').textContent, '');
   assert.equal(d.querySelector('#adResults').getAttribute('aria-busy'), 'false');
   const beforeUser = reads.length;

@@ -431,7 +431,7 @@
           `<button type="button" data-person-search="${esc(prefix + ":" + value)}" title="${esc(value)}">${esc(label)}</button>`,
       )
       .join("");
-    return `<div class="card usercard atlas-person" data-ad-kind="user" data-ad-identity="${esc(user.user_name || user.email || "")}"><div class="avatar">${esc(
+    return `<div class="card usercard atlas-person" ${AtlasContext.attributes("user", user)} tabindex="0"><div class="avatar">${esc(
       name
         .split(/\s+/)
         .slice(0, 2)
@@ -805,27 +805,166 @@
   };
 })();
 
-// Shared directory context action for person cards and viewer machine records.
+// Context actions share exact record identities across console, map and viewers.
 window.AtlasGroups = {
-  open(kind, identity) {
-    if(window.AtlasAD) return AtlasAD.show(kind,identity);
-    const url='/installer?'+new URLSearchParams({command:'ad-open',adkind:kind,adidentity:identity||''});
-    if(!window.AtlasDesktop?.navigate(url)) location.assign(url);
+  open(kind, identity, action = "groups") {
+    if (window.AtlasAD) return AtlasAD.show(kind, identity, true, action);
+    const url = "/installer?" + new URLSearchParams({command: "ad-open", adkind: kind, adidentity: identity || "", adaction: action});
+    if (!window.AtlasDesktop?.navigate(url)) location.assign(url);
   }
 };
-(()=>{
- let menu;
- const close=()=>{menu?.remove();menu=null;};
- document.addEventListener('contextmenu',e=>{
-  const item=e.target.closest('[data-ad-identity]');if(!item)return;
-  e.preventDefault();e.stopPropagation();close();
-  menu=document.createElement('div');menu.className='atlas-ad-context';menu.setAttribute('role','menu');
-  const button=document.createElement('button');button.type='button';button.textContent='See groups';button.setAttribute('role','menuitem');
-  button.onclick=()=>{close();AtlasGroups.open(item.dataset.adKind,item.dataset.adIdentity);};menu.append(button);document.body.append(menu);
-  const box=menu.getBoundingClientRect();menu.style.left=Math.max(8,Math.min(e.clientX,innerWidth-box.width-8))+'px';menu.style.top=Math.max(8,Math.min(e.clientY,innerHeight-box.height-8))+'px';button.focus();
- });
- document.addEventListener('pointerdown',e=>{if(menu&&!menu.contains(e.target))close();});
- document.addEventListener('keydown',e=>{if(e.key==='Escape'||e.key==='Tab')close();});
+window.AtlasContext = (() => {
+  let menu, origin;
+  const bindings = new WeakMap();
+  let handlers = {};
+  const attribute = (key, value) => value == null || value === "" ? "" : ` data-context-${key}="${AtlasUI.esc(value)}"`;
+  function attributes(kind, record) {
+    const identity = kind === "user" ? record.user_name || record.user_id || record.email || "" : record.name || record.machine_name || "";
+    const ad = kind === "user" || AtlasUI.supportsWindows(record);
+    return `data-atlas-context="${kind}"${ad ? ` data-ad-kind="${kind === "user" ? "user" : "computer"}" data-ad-identity="${AtlasUI.esc(identity)}"` : ""}` + attribute("identity", identity) + (kind === "user" ?
+      attribute("person", /^id:\d+$/.test(record.canonical_key || "") ? record.canonical_key : /^\d+$/.test(String(record.id ?? "")) ? "id:" + record.id : "") +
+      attribute("name", record.full_name || record.name) + attribute("domain", AtlasUI.domainAccount(record)) + attribute("email", record.email) +
+      attribute("department", record.department) + attribute("location", record.location) + attribute("manager", record.manager) : "");
+  }
+  function navigate(params) {
+    const url = "/installer?" + new URLSearchParams(params);
+    if (!window.AtlasDesktop?.navigate(url)) location.assign(url);
+  }
+  function search(term) {
+    return handlers.search ? handlers.search(term) : navigate({lookup: term});
+  }
+  async function copy(value, label) {
+    if (!value) return;
+    try {
+      await navigator.clipboard.writeText(String(value));
+      if (typeof window.toast === "function") window.toast(label + " copied");
+    } catch {
+      const {body} = AtlasUI.dialog("Copy " + label.toLowerCase());
+      const field = document.createElement("textarea");
+      field.readOnly = true;field.value = String(value);field.setAttribute("aria-label", label);
+      body.append(field);field.focus();field.select();
+    }
+  }
+  function groupActions(kind, identity, available = true) {
+    return [
+      ["ad-groups", "See groups", "groups"],
+      ["ad-compare", "Compare groups…", "compare"],
+      ["ad-properties", "Account health & properties", "properties"],
+      ["ad-export", "Export groups to CSV", "export"],
+      ["ad-summary", "Copy AD support summary", "summary"],
+    ].map(([id, label, action]) => ({id, label, section: "Active Directory", navigate: true,
+      disabled: !available || !identity || ((!!window.AtlasReadOnly || document.querySelector('meta[name="atlas-mode"]')?.content === "viewer") && action !== "groups"),
+      reason: !available ? "Windows computer accounts only" : !identity ? "No AD account supplied" : "Live Active Directory requires local Admin",
+      run: () => AtlasGroups.open(kind, identity, action)}));
+  }
+  function userActions(item) {
+    const d = item.dataset, identity = d.adIdentity || d.contextIdentity || "", key = d.contextPerson || d.person;
+    const summary = ["Atlas · stored user record", d.contextName || identity,
+      ...[["Account", identity], ["Domain account", d.contextDomain], ["Email", d.contextEmail], ["Department", d.contextDepartment], ["Office", d.contextLocation], ["Manager", d.contextManager]]
+        .filter(([, value]) => value).map(([label, value]) => label + ": " + value), "From imported directory data; not a live sign-in check."].join("\n");
+    return [
+      ...groupActions("user", identity),
+      {id: "user-devices", label: "Assigned devices & desks", section: "Inventory", disabled: !key, reason: "Open the full user record first", navigate: true,
+        run: () => handlers.openPerson ? handlers.openPerson(key) : navigate({person: key})},
+      ...[["manager", "Find manager", "user"], ["department", "Find teammates", "department"], ["location", "People in the same office", "location"]]
+        .map(([field, label, prefix]) => ({id: "user-" + field, label, section: "Inventory", disabled: !d["context" + field[0].toUpperCase() + field.slice(1)], navigate: true,
+          reason: "Not supplied in this record", run: () => search(prefix + ":" + d["context" + field[0].toUpperCase() + field.slice(1)])})),
+      ...[["copy-account", "Copy account", identity], ["copy-domain", "Copy domain account", d.contextDomain || (identity ? AtlasUI.domainAccount({user_name: identity}) : "")], ["copy-email", "Copy email", d.contextEmail], ["copy-user-report", "Copy stored support summary", summary]]
+        .map(([id, label, value]) => ({id, label, section: "Copy", disabled: !value, reason: "Not supplied in this record", run: () => copy(value, label.replace(/^Copy /, ""))})),
+    ];
+  }
+  function inventory(machine) {
+    const {body} = AtlasUI.dialog("Inventory · " + machine.name);
+    body.innerHTML = AtlasUI.machineBadges(machine) + AtlasUI.machineDetails(machine, {open: true});
+  }
+  function deviceActions(machine) {
+    const name = machine.name || machine.machine_name || "";
+    return [
+      ...groupActions("computer", name, AtlasUI.supportsWindows(machine)),
+      {id: "inventory", label: "View inventory details", section: "Inventory", run: () => inventory(machine)},
+      ...[["copy", "Copy device identity", name], ["copy-asset", "Copy asset tag", machine.asset_tag], ["copy-serial", "Copy serial number", machine.serial_number || machine.serial], ["report", "Copy stored inventory report", AtlasUI.machineReport(machine)]]
+        .map(([id, label, value]) => ({id, label, section: "Copy", disabled: !value, reason: "Not supplied in this record", run: () => copy(value, label.replace(/^Copy /, ""))})),
+    ];
+  }
+  function close(restore = false) {
+    menu?.remove();menu = null;
+    if (restore && origin?.isConnected) origin.focus({preventScroll: true});
+    origin = null;
+  }
+  function open(event, actions, anchor, title) {
+    event.preventDefault();event.stopPropagation();close();
+    origin = anchor;
+    menu = document.createElement("div");menu.className = "atlas-ad-context";
+    menu.setAttribute("role", "menu");menu.setAttribute("aria-label", title || "Record actions");
+    const heading = document.createElement("div");heading.className = "atlas-context-title";heading.textContent = title || "Record actions";menu.append(heading);
+    let section;
+    for (const action of actions) {
+      if (action.section !== section) {
+        section = action.section;
+        const label = document.createElement("div");label.className = "atlas-context-section";label.setAttribute("role", "presentation");label.textContent = section || "Actions";menu.append(label);
+      }
+      const button = document.createElement("button");button.type = "button";button.tabIndex = -1;button.dataset.cmd = action.id;
+      button.setAttribute("role", "menuitem");button.textContent = action.label;button.disabled = !!action.disabled;
+      if (action.disabled) button.title = action.reason || "Unavailable";
+      button.onclick = async () => {
+        close();
+        if (action.navigate) anchor?.closest("dialog[open]")?.close();
+        try {await action.run();} catch (error) {
+          if (typeof window.toast === "function") window.toast(error.message);
+          else AtlasUI.dialog("Action unavailable").body.textContent = error.message;
+        }
+      };
+      menu.append(button);
+    }
+    // Menus opened inside a modal must be in that modal's top layer.
+    (anchor?.closest("dialog[open]") || document.body).append(menu);
+    const bounds = menu.getBoundingClientRect(), anchorBounds = anchor?.getBoundingClientRect();
+    const keyboard = event.type === "keydown" || (!event.clientX && !event.clientY);
+    const x = keyboard ? anchorBounds?.left || 8 : event.clientX;
+    const y = keyboard ? anchorBounds?.bottom || 8 : event.clientY;
+    menu.style.left = Math.max(8, Math.min(x, innerWidth - bounds.width - 8)) + "px";
+    menu.style.top = Math.max(8, Math.min(y, innerHeight - bounds.height - 8)) + "px";
+    const enabled = () => [...menu.querySelectorAll("button:not(:disabled)")];
+    menu.onkeydown = e => {
+      const buttons = enabled(), current = buttons.indexOf(document.activeElement);
+      let next;
+      if (e.key === "ArrowDown") next = (current + 1) % buttons.length;
+      if (e.key === "ArrowUp") next = (current - 1 + buttons.length) % buttons.length;
+      if (e.key === "Home") next = 0;
+      if (e.key === "End") next = buttons.length - 1;
+      if (next !== undefined && buttons.length) {
+        e.preventDefault();e.stopPropagation();buttons[next].focus({preventScroll: true});buttons[next].scrollIntoView({block: "nearest"});
+      }
+    };
+    const first = enabled()[0];
+    first?.focus({preventScroll: true});
+    first?.scrollIntoView({block: "nearest"});
+    return menu;
+  }
+  function fromEvent(event) {
+    const item = event.composedPath().find(node => node?.matches?.("[data-ad-identity], [data-atlas-context]"));
+    if (!item) return;
+    const record = bindings.get(item);
+    const device = item.dataset.adKind === "computer" || item.dataset.atlasContext === "device";
+    const actions = record?.actions || (device ? deviceActions({name: item.dataset.adIdentity || item.dataset.contextIdentity, model_category: item.dataset.adIdentity ? "Computer" : "Mobile Device - Handheld"}) : userActions(item));
+    open(event, actions, item, "Actions for " + (record?.name || item.dataset.contextName || item.dataset.adIdentity || item.dataset.contextIdentity));
+  }
+  document.addEventListener("contextmenu", fromEvent);
+  document.addEventListener("pointerdown", e => {if (menu && !menu.contains(e.target)) close();});
+  document.addEventListener("keydown", e => {
+    if (menu && (e.key === "Escape" || e.key === "Tab")) {if (e.key === "Escape") e.preventDefault();close(e.key === "Escape");return;}
+    if (!menu && (e.key === "ContextMenu" || (e.key === "F10" && e.shiftKey))) fromEvent(e);
+  });
+  document.addEventListener("scroll", e => {if (menu && !menu.contains(e.target)) close();}, true);
+  window.addEventListener("resize", () => close());
+  window.addEventListener("blur", () => close());
+  return {attributes, groupActions, userActions, deviceActions, inventory, copy, navigate, open, close,
+    configure: value => {handlers = value;},
+    bindDevice: (node, machine, extra = []) => {
+      node.dataset.atlasContext = "device";
+      if (!node.hasAttribute("tabindex")) node.tabIndex = 0;
+      bindings.set(node, {name: machine.name, actions: [...deviceActions(machine), ...extra]});
+    }};
 })();
 
 /* An on-demand index of original controls: no background scans or cloned handlers. */

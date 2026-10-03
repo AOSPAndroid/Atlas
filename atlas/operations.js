@@ -140,32 +140,15 @@ export function createOperations({
             health(g, target);
           }),
       );
-    host()
-      .querySelectorAll(".ops-machine")
-      .forEach(
-        (card) =>
-          (card.oncontextmenu = (e) => {
-            e.preventDefault();
-            const input = card.querySelector("input");
-            const m = current.machines[+input.value];
-            const { element, body } = AtlasUI.dialog("Actions for " + m.name);
-            for (const [label, action] of [
-              ["See groups", () => AtlasGroups.open("computer",m.name)],
-              ["View specifications", () => window.AtlasHealth.specs(m.name)],
-              ["Enable Remote Registry", () => openRemoteRegistry(m.name)],
-            ]) {
-              const button = document.createElement("button");
-              button.textContent = label;
-              button.disabled = !AtlasUI.supportsWindows(m);
-              if (button.disabled) button.title = "Windows tools require a PC";
-              button.onclick = () => {
-                element.close();
-                action();
-              };
-              body.append(button);
-            }
-          }),
-      );
+    host().querySelectorAll(".ops-machine").forEach(card => {
+      const m = current.machines[Number(card.querySelector("input").value)], windows = AtlasUI.supportsWindows(m);
+      AtlasContext.bindDevice(card, m, [
+        {id: "specs", label: "View specifications", section: "Remote support", disabled: !windows, reason: "Windows tools require a PC", run: () => window.AtlasHealth.specs(m.name)},
+        {id: "remote-registry", label: "Enable Remote Registry…", section: "Remote support", disabled: !windows, reason: "Windows tools require a PC", run: () => openRemoteRegistry(m.name)},
+        {id: "admin", label: "Open Remote Admin", section: "Remote support", disabled: !windows, reason: "Windows tools require a PC", navigate: true, run: () => AtlasContext.navigate({machine: m.name, command: "admin"})},
+        {id: "deploy", label: "Deploy software…", section: "Deployment", disabled: !windows, reason: "Windows tools require a PC", navigate: true, run: () => AtlasContext.navigate({machine: m.name, command: "deploy"})},
+      ]);
+    });
     let filterTimer;
     q("#ops-package-filter").oninput = () => {
       clearTimeout(filterTimer);
@@ -200,7 +183,7 @@ export function createOperations({
           .slice(0, 30)
           .map(
             (u, i) =>
-              `<button class="ops-user-result" data-ad-kind="user" data-ad-identity="${esc(u.user_name || u.email || "")}" data-link-user="${i}"><b>${esc(u.full_name || u.name)}</b><span>${esc(u.user_name || u.user_id)} · ${esc(u.email)}</span><span>${esc(u.department || u.business_unit || "Team not recorded")} · ${esc(u.location || "Office not recorded")}</span><small>${current.desk.kind === "desk" ? "Use this name and account" : "Confirm as desk & use this account"}</small></button>`,
+              `<button class="ops-user-result" ${AtlasContext.attributes("user", u)} data-link-user="${i}"><b>${esc(u.full_name || u.name)}</b><span>${esc(u.user_name || u.user_id)} · ${esc(u.email)}</span><span>${esc(u.department || u.business_unit || "Team not recorded")} · ${esc(u.location || "Office not recorded")}</span><small>${current.desk.kind === "desk" ? "Use this name and account" : "Confirm as desk & use this account"}</small></button>`,
           )
           .join("")
       : '<p class="ops-muted">No exact match. Search the directory above.</p>';

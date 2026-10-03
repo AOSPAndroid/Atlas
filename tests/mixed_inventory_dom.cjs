@@ -33,7 +33,7 @@ for(const readonly of [false,true]){
  else{
   assert(phone.querySelector('input').disabled,'A phone is not a deployment target');
   phone.querySelector('.ops-machine').dispatchEvent(new w.MouseEvent('contextmenu',{bubbles:true,cancelable:true}));
-  const dialog=w.document.querySelector('.atlas-dialog');assert(dialog);assert([...dialog.querySelectorAll('.atlas-dialog-body button')].every(b=>b.disabled));dialog.close();
+  const menu=w.document.querySelector('.atlas-ad-context');assert(menu);for(const cmd of ['ad-groups','ad-compare','specs','remote-registry','admin','deploy'])assert(menu.querySelector(`[data-cmd=${cmd}]`).disabled,cmd);assert(!menu.querySelector('[data-cmd=inventory]').disabled);assert(!menu.querySelector('[data-cmd=copy]').disabled);w.AtlasContext.close();
  }
  assert(requests.every(([url])=>!/machine-health|active-directory|remote-registry|deploy/.test(url)));
  assert.equal(f.errors.length,0,f.errors.join('\n'));w.close();
