@@ -74,9 +74,14 @@ async function loadModule(file,context,cache=new Map()){
    assert(palette.dialog.open);palette.close();assert.equal(palette.root.activeElement,trigger);
   }
   assert(allRequests.every(url=>/^\/api\/(search\?|palette\/person\/)/.test(url)),'search only requests directory data; no AI or machine scans');
+  for(const [id, update] of Object.entries(registry.namespace.DATABASE_UPDATES)){
+   assert.equal(registry.namespace.commandUrl(id),'/manage-database#'+update.section);
+   const command=registry.namespace.COMMANDS.find(c=>c.id===id);assert(command && !command.viewer && !command.requiresTarget);
+   await palette.open();type('> '+command.title);assert.equal(options()[0].querySelector('.palette-kind').textContent,'Action');key('Enter');await sleep(0);assert.deepEqual(calls.pop(),['command',id]);
+  }
   assert.throws(()=>registry.namespace.commandUrl('assistant'));
   assert.throws(()=>registry.namespace.commandUrl('reboot-now'));
-  for(const command of registry.namespace.COMMANDS){const url=registry.namespace.commandUrl(command.id,'PC & 1');assert.equal(new URL(url,w.location.href).searchParams.get('machine'),command.id==='knowledge'||command.id.startsWith('kb-')?null:'PC & 1');}
+  for(const command of registry.namespace.COMMANDS){const url=registry.namespace.commandUrl(command.id,'PC & 1');assert.equal(new URL(url,w.location.href).searchParams.get('machine'),command.id==='knowledge'||command.id.startsWith('kb-')||Object.hasOwn(registry.namespace.DATABASE_UPDATES,command.id)?null:'PC & 1');}
   w.close();
  }
  assert.deepEqual(results[0],results[1]);assert.equal(styles[0],styles[1]);await checkCombinedResults();console.log('PASS: identical search-only commands/styles, no AI UI or requests, keyboard selection, focus, identity-safe merged people/desks, fresh map resolution, console person routing, ambiguous/unlinked fallback, explicit desk navigation, stale response protection, shortcut isolation and URL allowlist.');

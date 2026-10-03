@@ -46,6 +46,10 @@ const settle = () => new Promise(r => setTimeout(r, 40));
   for(const [url,options] of [['/api/performance/TESTPC',{}],['/api/deploy',{method:'POST'}],['/api/psexec/run',{method:'POST'}],['https://other.test/api/health',{}]])
     await assert.rejects(w.AtlasClient.request(url,options),/elevated/);
   await run('runSharedCommand("deploy")');
+  for (const id of ['update-users', 'update-devices', 'update-packages', 'update-floorplans']) {
+    await run('runSharedCommand("' + id + '")');
+    assert.equal(w.location.pathname, '/installer', 'Read-only update commands cannot navigate to Admin');
+  }
   await run('runSharedCommand("catalogue")');await settle();assert(d.querySelector('.atlas-catalogue'));
   assert(d.querySelector('#catalog-status').textContent.includes('Windows Admin'));
   assert(requests.every(([url,method])=>method==='GET' && /^\/api\/(health|master\/status|palette\/desks)$/.test(url)),JSON.stringify(requests));

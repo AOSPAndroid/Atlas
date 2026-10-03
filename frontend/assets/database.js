@@ -228,6 +228,16 @@
         .join("")
     );
   }
+  // Direct updater commands focus the matching workflow without opening a file dialog.
+  function focusUploadSection() {
+    const section = document.getElementById(location.hash.slice(1));
+    if (!section?.classList.contains("atlas-upload-section")) return;
+    section.tabIndex = -1;
+    section.focus({ preventScroll: true });
+    section.scrollIntoView({ block: "start", behavior: "instant" });
+  }
+  window.addEventListener("hashchange", focusUploadSection);
+  focusUploadSection();
   // Loading counts and history must not disable uploads. Mutation requests
   // acquire a session lazily and recover on the next click after expiry.
   controls();

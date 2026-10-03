@@ -1475,6 +1475,11 @@ body.atlas-database li {
 body.atlas-database :is(#history, #message, #source, #warnings) {
   overflow-wrap: anywhere;
 }
+body.atlas-upload-workflows .atlas-upload-section:target {
+  border-color: var(--atlas-accent);
+  box-shadow: 0 0 0 1px var(--atlas-accent);
+  scroll-margin-top: var(--atlas-space-4);
+}
 body.atlas-upload-workflows .atlas-upload-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

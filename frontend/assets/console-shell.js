@@ -25,8 +25,12 @@ function page(id) {
     window.AtlasDiagnostics?.stop("Stopped — left Remote Admin");
   $$(".page,nav button").forEach((x) => x.classList.remove("active"));
   $("#" + id).classList.add("active");
-  $(`[data-page="${id}"]`).classList.add("active");
-  $("#pageTitle").textContent = $(`[data-page="${id}"] .nav-label`).textContent;
+  const navigation = $(`[data-page="${id}"]`);
+  navigation?.classList.add("active");
+  $("#pageTitle").textContent =
+    navigation?.querySelector(".nav-label")?.textContent ||
+    $("#" + id).getAttribute("aria-label") ||
+    id;
   document.querySelectorAll("nav [data-page]").forEach((b) => {
     if (b.dataset.page === id) b.setAttribute("aria-current", "page");
     else b.removeAttribute("aria-current");

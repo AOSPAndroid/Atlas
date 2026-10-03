@@ -4,6 +4,8 @@ Open **Packages** in the IT console sidebar, search **Packages** in the command 
 
 In **Database → Package data**, choose the ServiceNow `.csv`, click **Validate and preview**, review the counts, then **Back up and save package data**.
 
+In Admin, `Ctrl+K` → **Update package data** opens this upload section directly. **Update users**, **Update devices**, and **Update floor plans** also open their upload sections. Users and devices share one complete workbook containing both tabs; these shortcuts do not import or save anything automatically.
+
 | Export header | Atlas field |
 | --- | --- |
 | `name` | Short Package Name (required) |

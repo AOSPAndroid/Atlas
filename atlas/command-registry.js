@@ -55,8 +55,38 @@ const viewerCommands = new Set(["ad-browser","ad-support-summary","daas","vdi","
   "animations",
   "shortcuts",
 ]);
+// Add future data uploads here; their command and direct route share this definition.
+export const DATABASE_UPDATES = Object.freeze({
+  "update-users": {
+    section: "directory-import",
+    title: "Update users",
+    detail: "Upload the complete users and devices workbook (both tabs)",
+    keywords: "update users user database import upload excel workbook directory",
+  },
+  "update-devices": {
+    section: "directory-import",
+    title: "Update devices",
+    detail: "Upload the complete users and devices workbook (both tabs)",
+    keywords: "update devices machines computers laptops phones assets database import upload excel workbook",
+  },
+  "update-packages": {
+    section: "package-data-import",
+    title: "Update package data",
+    detail: "Upload the ServiceNow CSV with package states and ownership",
+    keywords: "update packages package data metadata status live packaging csv import upload",
+  },
+  "update-floorplans": {
+    section: "floorplan-import",
+    title: "Update floor plans",
+    detail: "Upload bulk seating changes, desk assignments or moves",
+    keywords: "update floorplan floor plans seating desks moves bulk import upload excel",
+  },
+});
 // The single command catalogue used by the map and IT console.
 export const COMMANDS = [
+  ...Object.entries(DATABASE_UPDATES).map(([id, update]) => [
+    id, update.title, update.detail, update.keywords,
+  ]),
   ["packages", "Packages", "Browse package states, ownership and source coverage", "package packages live packaging progress epp requester packager status metadata"],
   ['ad-browser','AD directory browser','Browse OUs, users, computers, group members and properties','ad browse directory ou tree search group members'],
   ['ad-open','See AD groups','Open an exact directory account','ad membership groups'],
@@ -317,6 +347,7 @@ export const COMMANDS = [
   viewer: viewerCommands.has(id),
 }));
 export const MAP_COMMANDS = new Set([
+  ...Object.keys(DATABASE_UPDATES),
   "vlans",
   "contacts",
   "atlas",
@@ -331,6 +362,7 @@ export const MAP_COMMANDS = new Set([
 ]);
 export function commandUrl(id, target = "") {
   if (!COMMANDS.some((c) => c.id === id)) throw Error("Unknown Atlas command");
+  if (Object.hasOwn(DATABASE_UPDATES, id)) return "/manage-database#" + DATABASE_UPDATES[id].section;
   const query = new URLSearchParams({ command: id });
   if (target && id !== "knowledge" && !id.startsWith("kb-")) query.set("machine", target);
   return (MAP_COMMANDS.has(id) ? "/" : "/installer") + "?" + query;

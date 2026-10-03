@@ -14,7 +14,7 @@ const preview = {id: 'stage-one', source: 'emea.xlsx', report: {
 (async () => {
   const startup = deferred(), upload = deferred(), requests = [];
   let sessions = 0, previews = 0, applications = 0, statusCalls = 0;
-  const f = await fixture({html: 'frontend/database.html', url: 'http://localhost/manage-database', fetch: async (url, options = {}) => {
+  const f = await fixture({html: 'frontend/database.html', url: 'http://localhost/manage-database#directory-import', fetch: async (url, options = {}) => {
     requests.push({url, options});
     if (url === '/api/database/status') {
       if (++statusCalls === 1) return startup.promise;
@@ -42,6 +42,12 @@ const preview = {id: 'stage-one', source: 'emea.xlsx', report: {
   w.HTMLElement.prototype.getClientRects = function() {return this.closest('[hidden]') ? [] : [{}]};
   for (const file of ['database.js']) run(fs.readFileSync(path.join(root, 'frontend/assets', file), 'utf8'));
   await sleep(50);
+  assert.equal(w.document.activeElement, get('directory-import'), 'The users/devices shortcut focuses its upload section');
+  for (const id of ['package-data-import', 'floorplan-import']) {
+    w.location.hash = id; await sleep(20);
+    assert.equal(w.document.activeElement, get(id), 'Other update shortcuts focus their upload sections');
+  }
+  assert.equal(sessions + previews + applications, 0, 'Opening upload sections never starts an import');
   assert(!get('validate').disabled, 'Slow status loading does not disable validation');
   assert(!w.document.querySelector('.atlas-edge-panel'), 'Upload workflows never move into floating controls');
   assert(get('preview').hidden, 'Confirmation remains hidden before a valid preview');
