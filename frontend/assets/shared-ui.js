@@ -240,6 +240,8 @@
     phone: '<rect x="6" y="2" width="12" height="20" rx="2"/><path d="M10 5h4m-3 14h2"/>',
     bulk: '<path d="M5 4h14v4H5zM5 10h14v4H5zM5 16h14v4H5z"/>',
     history: '<path d="M4 12a8 8 0 1 0 2.3-5.7L4 8.6M4 4v4.6h4.6M12 7v5l3 2"/>',
+    copy: '<rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/>',
+    check: '<path d="m5 12 4 4L19 6"/>',
   };
   function icon(name) {
     const paths = iconPaths[name];
@@ -378,10 +380,6 @@
       ["Account", user.user_name || user.user_id],
       ["Domain account", domainAccount(user)],
       ["Email", user.email],
-      ["Department", user.department],
-      ["Office", user.location],
-      ["Job title", user.job_role || user.job_title],
-      ["Manager", user.manager],
     ];
     const supplied = (value) =>
       value !== null && value !== undefined && String(value).trim() !== "";
@@ -391,6 +389,15 @@
       loginDate = exportDate(user.last_login),
       lastLogin = loginTime || loginDate;
     const sections = [
+      [
+        "Profile",
+        [
+          ["Department", user.department],
+          ["Office", user.location],
+          ["Job title", user.job_role || user.job_title],
+          ["Manager", user.manager],
+        ],
+      ],
       [
         "Organisation",
         [
@@ -430,18 +437,20 @@
         rows.filter(([, value]) => supplied(value)),
       ])
       .filter(([, rows]) => rows.length);
+    const copyButton = (label, value, text = "") =>
+      `<button type="button" class="atlas-person-copy" data-person-copy="${esc(value)}" data-copy-label="${esc(label)}" aria-label="Copy ${esc(label.toLowerCase())}" title="Copy ${esc(label.toLowerCase())}">${icon("copy")}${icon("check")}${text ? `<span>${esc(text)}</span>` : ""}</button>`;
     const fields = (rows) =>
       rows
         .filter(([, value]) => supplied(value))
         .map(
           ([key, value]) =>
-            `<span${key === "Domain account" ? ' class="domain-account-fact"' : ""}>${esc(key)}<b>${esc(value)}</b></span>`,
+            `<div class="atlas-person-field${key === "Domain account" ? " domain-account-fact" : ""}"><span class="atlas-person-field-label">${esc(key)}</span><b>${esc(value)}</b>${copyButton(key, value)}</div>`,
         )
         .join("");
     const grouped = sections
       .map(
         ([title, rows]) =>
-          `<section><h3>${esc(title)}</h3><dl>${rows.map(([label, value]) => `<div><dt>${esc(label)}</dt><dd>${esc(value)}</dd></div>`).join("")}</dl>${title === "Account activity" ? '<p class="atlas-person-source">From the directory export, not a live sign-in check.</p>' : ""}</section>`,
+          `<section><h3>${esc(title)}</h3><dl>${rows.map(([label, value]) => `<div class="atlas-person-detail-row"><dt>${esc(label)}</dt><dd>${esc(value)}</dd>${value === "Not supplied" ? "" : copyButton(label, value)}</div>`).join("")}</dl>${title === "Account activity" ? '<p class="atlas-person-source">From the directory export, not a live sign-in check.</p>' : ""}</section>`,
       )
       .join("");
     const related = [
@@ -455,13 +464,17 @@
           `<button type="button" data-person-search="${esc(prefix + ":" + value)}" title="${esc(value)}">${esc(label)}</button>`,
       )
       .join("");
-    return `<div class="card usercard atlas-person" ${AtlasContext.attributes("user", user)} tabindex="0"><div class="avatar">${esc(
+    const summary = [["Name", name], ...facts, ...sections.flatMap(([, rows]) => rows)]
+      .filter(([, value]) => supplied(value) && value !== "Not supplied")
+      .map(([label, value]) => `${label}: ${value}`).join("\n");
+    const context = [user.department, user.location].filter(supplied).join(" · ");
+    return `<div class="card usercard atlas-person atlas-person-profile" ${AtlasContext.attributes("user", user)} tabindex="0"><div class="avatar" aria-hidden="true">${esc(
       name
         .split(/\s+/)
         .slice(0, 2)
         .map((s) => s[0])
         .join(""),
-    )}</div><div><h2>${esc(name)}</h2><div class="facts">${fields(facts)}</div><details class="details atlas-person-details"><summary>User details</summary><div class="atlas-person-detail-sections">${grouped}</div>${related ? `<div class="atlas-person-related" role="group" aria-label="Related people">${related}</div>` : ""}${exportButton("user", user.canonical_key)}</details></div></div>`;
+    )}</div><div class="atlas-person-content"><div class="atlas-person-heading"><div class="atlas-person-identity"><h2>${esc(name)}</h2>${context ? `<p class="atlas-person-context">${esc(context)}</p>` : ""}</div><div class="atlas-person-quick-copy" role="group" aria-label="Quick copy">${copyButton("Name", name, "Name")}${copyButton("Summary", summary, "Summary")}</div></div><div class="facts atlas-person-accounts">${fields(facts)}</div><details class="details atlas-person-details"><summary>User details</summary><div class="atlas-person-detail-sections">${grouped}</div>${related ? `<div class="atlas-person-related" role="group" aria-label="Related people">${related}</div>` : ""}${exportButton("user", user.canonical_key)}</details><span class="atlas-person-feedback" role="status" aria-live="polite"></span></div></div>`;
   }
   function exportDate(value) {
     if (value === null || value === undefined || String(value).trim() === "")
@@ -589,6 +602,29 @@
   document.addEventListener(
     "click",
     async (event) => {
+      const quickCopy = event.target.closest?.("[data-person-copy]");
+      if (quickCopy) {
+        event.stopPropagation();
+        if (quickCopy.dataset.copyPending) return;
+        quickCopy.dataset.copyPending = "true";
+        clearTimeout(quickCopy.atlasCopyTimer);
+        delete quickCopy.dataset.copyState;
+        const label = quickCopy.dataset.copyLabel,
+          feedback = quickCopy.closest(".atlas-person")?.querySelector(".atlas-person-feedback");
+        try {
+          const value = quickCopy.atlasCopyValue?.() ?? quickCopy.dataset.personCopy;
+          const copied = await AtlasContext.copy(value, label);
+          if (feedback) feedback.textContent = copied ? label + " copied" : "Select the text to copy " + label.toLowerCase();
+          if (copied) {
+            clearTimeout(quickCopy.atlasCopyTimer);
+            quickCopy.dataset.copyState = "copied";
+            quickCopy.atlasCopyTimer = setTimeout(() => delete quickCopy.dataset.copyState, 1800);
+          }
+        } finally {
+          delete quickCopy.dataset.copyPending;
+        }
+        return;
+      }
       const related = event.target.closest?.("[data-person-search]");
       if (related) {
         event.stopPropagation();
@@ -860,15 +896,19 @@ window.AtlasContext = (() => {
     return handlers.search ? handlers.search(term) : navigate({lookup: term});
   }
   async function copy(value, label) {
-    if (!value) return;
+    if (value === null || value === undefined || String(value) === "") return false;
     try {
       await navigator.clipboard.writeText(String(value));
       if (typeof window.toast === "function") window.toast(label + " copied");
+      return true;
     } catch {
       const {body} = AtlasUI.dialog("Copy " + label.toLowerCase());
+      const instruction = document.createElement("p");
+      instruction.textContent = "Select the text below and use Copy (Ctrl+C or ⌘C).";
       const field = document.createElement("textarea");
       field.readOnly = true;field.value = String(value);field.setAttribute("aria-label", label);
-      body.append(field);field.focus();field.select();
+      body.append(instruction, field);field.focus();field.select();
+      return false;
     }
   }
   function groupActions(kind, identity, available = true) {

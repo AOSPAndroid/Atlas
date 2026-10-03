@@ -162,34 +162,8 @@ function renderKyc() {
   select.setAttribute("aria-label", "Show groups for " + (u.user_name || u.name));
   select.onclick = () => window.AtlasAD?.show("user", u.user_name || u.email || "");
   title.replaceChildren(select);
-  const details = $("#kyc .atlas-person-details"), facts = $("#kyc .facts");
-  const summary = document.createElement("p");
-  summary.className = "workspace-user-summary";
-  summary.textContent = [u.user_name, u.email].filter(Boolean).join(" · ");
-  title.after(summary);
-  const context = [u.department, u.location].filter(Boolean).join(" · ");
-  if (context) {
-    const row = document.createElement("p");
-    row.className = "workspace-user-context";
-    row.textContent = context;
-    summary.after(row);
-  }
-  details.append(facts);
-  const bar = document.createElement("div");
-  bar.className = "copybar";
-  for (const [label, value] of [
-    ["Copy account", u.user_name],
-    ["Copy domain account", AtlasUI.domainAccount(u)],
-    ["Copy email", u.email],
-    ["Copy name", u.full_name || u.name],
-    ["Copy summary", supportSummary()],
-  ]) {
-    const button = document.createElement("button");
-    button.textContent = label;
-    button.onclick = () => copy(value, label.replace("Copy ", ""));
-    bar.append(button);
-  }
-  details.append(bar);
+  // Resolve the support summary on click so a newly selected PC is included.
+  $("#kyc [data-copy-label='Summary']").atlasCopyValue = () => supportSummary();
   applyCompactWorkspace();
   window.AtlasSelection?.refresh();
 }

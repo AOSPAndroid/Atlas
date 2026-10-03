@@ -1931,8 +1931,6 @@ body.atlas-console #workspace .usercard .avatar { width:28px; height:28px; borde
 body.atlas-console #workspace .usercard h2 { margin:0; font-size:13px; }
 body.atlas-console #workspace :is(.workspace-user-select,.workspace-machine-select) { display:flex; justify-content:flex-start; width:100%; padding:0; border:0; background:none; color:var(--atlas-text); min-height:24px; height:auto; font:600 12px/1.4 var(--atlas-font); text-align:left; overflow-wrap:anywhere; }
 body.atlas-console #workspace :is(.workspace-user-select,.workspace-machine-select):hover { color:var(--atlas-accent); text-decoration:underline; }
-body.atlas-console #workspace .workspace-user-summary { font-size:11px; overflow-wrap:anywhere; margin:2px 0; color:var(--atlas-muted); }
-body.atlas-console #workspace .workspace-user-context { font-size:11px; overflow-wrap:anywhere; margin:2px 0; color:var(--atlas-muted); }
 body.atlas-console #workspace :is(.atlas-person-details,.atlas-machine-details) { margin:2px 0 0; }
 body.atlas-console #workspace summary { padding:2px 0; font-size:11px; }
 body.atlas-console #workspace .machinegrid { display:flex; flex-direction:column; gap:4px; max-height:min(48vh,420px); overflow:auto; padding:2px; }
@@ -2159,3 +2157,42 @@ body.atlas-console .package-detail { min-width: 0; padding: 8px; margin: 0; font
 .package-detail dt { color: var(--muted); }
 .package-detail dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 @media (max-width: 850px) { .package-browser-layout { grid-template-columns: minmax(0, 1fr); } .package-table-scroll { max-height: 55vh; } }
+
+/* Shared user profile: identities stay visible; secondary fields expand in place. */
+body .atlas-person.atlas-person-profile .atlas-person-content { min-width:0; }
+body .atlas-person-profile .atlas-person-heading { display:flex; align-items:center; justify-content:space-between; gap:6px; margin-bottom:6px; }
+body .atlas-person-profile .atlas-person-identity { min-width:0; flex:1; }
+body .atlas-person-profile .atlas-person-identity h2 { margin:0; font-size:13px; line-height:1.4; overflow-wrap:anywhere; }
+body .atlas-person-profile .atlas-person-context { margin:2px 0 0; color:var(--atlas-muted); font:11px/1.4 var(--atlas-font); overflow-wrap:anywhere; }
+body .atlas-person-profile .atlas-person-quick-copy { display:flex; align-items:center; gap:4px; flex:none; }
+body .atlas-person.atlas-person-profile .atlas-person-copy { display:inline-flex; align-items:center; justify-content:center; gap:4px; flex:none; min-width:26px; width:auto; min-height:26px; height:26px; padding:3px 5px; margin:0; border:1px solid var(--atlas-line); border-radius:var(--atlas-control-radius); color:var(--atlas-muted); background:var(--atlas-surface); font:500 11px/1 var(--atlas-font); cursor:pointer; }
+body .atlas-person-profile .atlas-person-copy .atlas-icon { width:13px; height:13px; flex:none; }
+body .atlas-person-profile .atlas-person-copy .atlas-icon:last-of-type { display:none; }
+body .atlas-person-profile .atlas-person-copy[data-copy-state="copied"] { color:var(--atlas-success); border-color:var(--atlas-success); }
+body .atlas-person-profile .atlas-person-copy[data-copy-state="copied"] .atlas-icon:first-of-type { display:none; }
+body .atlas-person-profile .atlas-person-copy[data-copy-state="copied"] .atlas-icon:last-of-type { display:block; }
+body .atlas-person-profile .atlas-person-copy:hover { color:var(--atlas-accent); border-color:var(--atlas-accent); background:var(--atlas-surface-subtle); }
+body .atlas-person-profile .atlas-person-copy:focus-visible { outline:2px solid var(--atlas-focus); outline-offset:2px; }
+body .atlas-person.atlas-person-profile .atlas-person-accounts { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr)); gap:4px; margin:0 0 6px; }
+body .atlas-person-profile .atlas-person-field { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:2px 6px; align-items:center; padding:5px 6px; border:1px solid var(--atlas-line); border-radius:var(--atlas-control-radius); background:var(--atlas-surface-subtle); min-width:0; }
+body .atlas-person.atlas-person-profile .atlas-person-field-label { grid-column:1; font:10px/1.3 var(--atlas-font); color:var(--atlas-muted); }
+body .atlas-person.atlas-person-profile .atlas-person-field b { grid-column:1; font:600 12px/1.4 var(--atlas-font); min-width:0; overflow-wrap:anywhere; }
+body .atlas-person-profile .atlas-person-field > button { grid-column:2; grid-row:1 / 3; }
+body .atlas-person-profile .atlas-person-detail-sections { grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr)); gap:6px; }
+body .atlas-person-profile .atlas-person-detail-sections > section { padding:6px; background:var(--atlas-surface-subtle); border-radius:var(--atlas-control-radius); }
+body .atlas-person-profile .atlas-person-detail-sections h3 { margin:0 0 4px; font:600 11px/1.4 var(--atlas-font); }
+body .atlas-person-profile .atlas-person-detail-sections dl { display:grid; gap:0; margin:0; }
+body .atlas-person-profile .atlas-person-detail-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:1px 6px; align-items:center; padding:4px 0; border-top:1px solid var(--atlas-line); }
+body .atlas-person-profile .atlas-person-detail-row dt { grid-column:1; font:10px/1.3 var(--atlas-font); }
+body .atlas-person-profile .atlas-person-detail-row dd { grid-column:1; margin:0; font:12px/1.4 var(--atlas-font); white-space:pre-wrap; }
+body .atlas-person-profile .atlas-person-detail-row > button { grid-column:2; grid-row:1 / 3; }
+body .atlas-person-profile .atlas-person-source { font:10px/1.4 var(--atlas-font); margin:4px 0 0; }
+body .atlas-person-profile .atlas-person-related { gap:4px; margin-top:6px; }
+body .atlas-person-profile .atlas-person-feedback { position:absolute; width:1px; height:1px; padding:0; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+@media(max-width:600px) {
+  body .atlas-person-profile .atlas-person-heading { flex-wrap:wrap; align-items:start; }
+  body .atlas-person-profile .atlas-person-identity { flex-basis:100%; }
+}
+@media(pointer:coarse) {
+  body .atlas-person.atlas-person-profile .atlas-person-copy { min-width:42px; min-height:42px; height:42px; padding:6px; }
+}
