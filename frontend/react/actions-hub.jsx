@@ -70,8 +70,10 @@ export function ActionsHub() {
     setOpen(value);
   };
   useEffect(() => {
+    if (open) search.current?.focus({ preventScroll: true });
+  }, [open]);
+  useEffect(() => {
     if (!open) return;
-    search.current?.focus({ preventScroll: true });
     const escape = (event) => {
       if (event.key === "Escape" && !document.querySelector("dialog[open]")) {
         event.preventDefault();
@@ -92,14 +94,21 @@ export function ActionsHub() {
     if (title) observer.observe(title, { childList: true, subtree: true });
     const target = document.getElementById("barTarget");
     if (target) observer.observe(target, { childList: true, subtree: true });
+    const account = document.getElementById("adSelection");
+    if (account) observer.observe(account, { childList: true, subtree: true });
+    const onInput = (event) => {
+      if (event.target.id === context.targetField) refresh();
+    };
+    document.addEventListener("input", onInput);
     document.addEventListener("keydown", escape);
     window.addEventListener("hashchange", changed);
     return () => {
       observer.disconnect();
       document.removeEventListener("keydown", escape);
+      document.removeEventListener("input", onInput);
       window.removeEventListener("hashchange", changed);
     };
-  }, [open, context.title, context.target, refresh]);
+  }, [open, context.title, context.target, context.targetField, refresh]);
   const activate = (entry) => {
     const ok = activateControl(entry, () => setOpen(false));
     if (!ok) {

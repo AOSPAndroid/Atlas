@@ -25,6 +25,9 @@ const settle=()=>new Promise(r=>setTimeout(r,40));
  // A disabled original cannot be activated through a previously enabled React card.
  await open();await filter('Safe simulated action');d.getElementById('safe-action').disabled=true;click(d.querySelector('[data-tool-id="safe-action"]'));await settle();assert.equal(calls,1);assert(d.querySelector('[data-tool-id="safe-action"]').disabled);
  d.getElementById('pageTitle').textContent='Active Directory';await settle();assert(!d.querySelector('.atlas-tools-body'),'Navigation closes the island');
+ d.getElementById('workspace').classList.remove('active');d.getElementById('admin').classList.add('active');d.getElementById('pageTitle').textContent='Remote Admin';d.getElementById('barTarget').textContent='OLD-PC';d.getElementById('adminPc').value='MANUAL-PC';
+ await open();assert(d.querySelector('.atlas-tools-context-label').textContent.includes('MANUAL-PC'));
+ const pc=d.getElementById('adminPc');pc.focus();pc.value='CHANGED-PC';pc.dispatchEvent(new w.Event('input',{bubbles:true}));await settle();assert(d.querySelector('.atlas-tools-context-label').textContent.includes('CHANGED-PC'));assert.equal(d.activeElement,pc,'Context refresh never steals field focus');
  assert.deepEqual(f.errors,[]);w.dispatchEvent(new w.Event('pagehide'));w.close();
  console.log('PASS: actual React/Motion/Radix bundle mounts once, morphs inline, filters actions/fields, retains original handlers and focus, handles Escape, rejects changed restrictions, and closes on navigation without network');
 })().catch(e=>{console.error(e);process.exitCode=1});

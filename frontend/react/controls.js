@@ -43,8 +43,13 @@ export function collectControls(document) {
       const contextNode = node.closest(
         "tr, article, .machine-card, .panel, section",
       );
+      const workspaceTarget = node.closest("#targetBar")
+        ? document.getElementById("barTarget")?.textContent
+        : "";
       const context = (
-        contextNode?.querySelector("h2,h3,h4,th,td")?.textContent || ""
+        workspaceTarget
+          ? "Workspace target · " + workspaceTarget
+          : contextNode?.querySelector("h2,h3,h4,th,td")?.textContent || ""
       )
         .trim()
         .replace(/\s+/g, " ")
@@ -69,11 +74,22 @@ export function activateControl(entry, beforeActivate) {
   return true;
 }
 export function pageContext(document) {
+  const page = document.querySelector(".page.active")?.id;
+  const field = document.getElementById(
+    page === "admin"
+      ? "adminPc"
+      : page === "active-directory"
+        ? "adIdentity"
+        : "",
+  );
   return {
     title:
       document.getElementById("pageTitle")?.textContent ||
       (document.querySelector("body.atlas-map") ? "Office map" : "Database"),
-    target: document.getElementById("barTarget")?.textContent || "",
+    target: field
+      ? field.value.trim()
+      : document.getElementById("barTarget")?.textContent || "",
+    targetField: field?.id || "",
     readonly:
       document.querySelector('meta[name="atlas-mode"]')?.content === "viewer",
   };
