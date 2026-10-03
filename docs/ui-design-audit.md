@@ -1,5 +1,13 @@
 # Atlas UI consistency audit — 30 September 2026
 
+## Shared UI polish — 3 October 2026
+
+- Queue, Deployments and Tools share the page heading in normal document flow. Mobile controls form an aligned row; selecting a machine adds the Deployment control below it. Tools expands within the heading without adding an empty row when closed. Workspace and Active Directory remain separate.
+- Shared control heights, icon alignment, dialog headings, selected-machine borders and table headers are consistent. Group names use readable 12 px text. Upload file selectors and their action buttons align at the bottom; status text wraps naturally. Users/devices, floor-plan changes and package data occupy three columns on wide screens, two on medium screens and one on narrow screens.
+- Map and Workspace empty states give short, actionable instructions. Floor-plan label geometry and Draw.io controls are unchanged.
+- Chromium checks passed all seven console pages at 390, 600, 768, 1000 and 1366 px in Admin, Demo and the prepared Preview: no document overflow or toolbar overlap, matching toolbar heights, working drawers, Tools expansion/Escape, and Knowledge Base navigation. Map, Desktop iframe and 42 px touch controls passed. CPU checks covered 100 process rows, local filter/sort, correct thread PID, a bounded 128-core partial scan, and read-only scan restrictions using simulated responses. On the same desktop CPU fixture, the first process row moved from 717 px to 674 px; the summary remains 75 px tall.
+- Shared assets are synced to the prepared Preview; all 358 JSON snapshot assets and the seed database are preserved. Live publication still awaits the existing public/owner-private audience decision.
+
 ## Shared rules
 
 `frontend/assets/design-system.css` is loaded last by Map, IT Console, Manage Database, Desktop and utility entry points. Existing compact overrides were moved out of atlas-shell.css into this shared layer.

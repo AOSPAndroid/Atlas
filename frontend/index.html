@@ -90,6 +90,23 @@
         <div>
           <h1 id="pageTitle">Workspace</h1>
         </div>
+        <div class="console-page-actions" aria-label="Deployment controls">
+          <button id="deploymentsToggle" class="deployments-toggle">
+            Deployments <span id="deploymentsCount">0</span>
+          </button>
+          <button id="queueToggle" class="queue-toggle">
+            Queue <span id="queueCount">0</span>
+          </button>
+          <button
+            id="deploymentToggle"
+            class="deployment-toggle"
+            aria-controls="deploymentPanel"
+            aria-expanded="false"
+            hidden
+          >
+            Deployment
+          </button>
+        </div>
       </div>
       <div id="targetBar" class="targetbar hidden">
         <b id="barTarget"></b><span id="barState"></span
@@ -149,7 +166,7 @@
           <div id="kyc"></div>
           <div id="machines"></div>
           <div class="lookup-empty">
-            <h3>Your next support session starts here</h3>
+            <h3>Find a user or machine</h3>
             <p>
               Look up a colleague to see their linked machines, or search for a
               hostname directly.
@@ -300,15 +317,6 @@
             <div id="adResults"></div>
           </div>
         </section>
-      <button
-        id="deploymentToggle"
-        class="deployment-toggle"
-        aria-controls="deploymentPanel"
-        aria-expanded="false"
-        hidden
-      >
-        Deployment
-      </button>
       <section id="admin" class="page" aria-label="Remote Admin">
         <div class="panel performance-panel">
           <div class="performance-heading">
@@ -817,11 +825,6 @@ Ready. Choose a command and click Run.</pre>
         <p class="empty">No ongoing deployments</p>
       </div>
     </aside>
-    <button id="deploymentsToggle" class="deployments-toggle">
-      Deployments <span id="deploymentsCount">0</span></button
-    ><button id="queueToggle" class="queue-toggle">
-      Queue <span id="queueCount">0</span>
-    </button>
     <div id="shortcutHelp" class="shortcut-help hidden">
       <div class="shortcut-help-box">
         <div class="shortcut-help-head">

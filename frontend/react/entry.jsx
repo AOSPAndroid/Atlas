@@ -21,7 +21,7 @@ function install() {
   const heading = main.querySelector(
     ":scope > .console-page-heading, :scope > .map-heading, :scope > header",
   );
-  if (heading) heading.after(host);
+  if (heading) heading.append(host);
   else main.prepend(host);
   const root = createRoot(host);
   root.render(<ActionsHub />);
