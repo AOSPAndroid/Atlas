@@ -248,23 +248,40 @@ body.atlas-console :is(.action-widget, .reboot-card) {
   margin: 6px 0;
   border-radius: 9px;
 }
-body.atlas-console .console-sidebar nav {
-  gap: 2px;
+/* Operations navigation uses one icon and label column on desktop. */
+body.atlas-console .console-sidebar .nav-section {
+  margin:0 0 6px; padding:2px 8px; font-size:10px; font-weight:600;
+  letter-spacing:.08em; color:var(--atlas-muted);
 }
+body.atlas-console .console-sidebar nav { gap:3px; }
 body.atlas-console .console-sidebar nav button[data-page] {
-  display: grid;
-  grid-template-columns: 22px minmax(0, 1fr) 22px;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  text-align: center;
+  position:relative; display:grid; grid-template-columns:22px minmax(0,1fr);
+  align-items:center; justify-content:center; gap:8px; min-height:32px;
+  padding:4px 8px; border:1px solid transparent; border-radius:7px;
+  background:transparent; color:var(--atlas-text); box-shadow:none;
+  font-size:12px; font-weight:500; line-height:1.35; text-align:left;
 }
 body.atlas-console .console-sidebar nav .nav-icon {
-  display: grid;
-  place-items: center;
+  display:grid; place-items:center; width:22px; height:22px;
+  border-radius:5px; background:var(--atlas-surface-subtle); color:var(--atlas-muted);
 }
-body.atlas-console .console-sidebar nav .nav-label {
-  min-width: 0;
+body.atlas-console .console-sidebar nav .nav-icon .atlas-icon { width:16px; height:16px; }
+body.atlas-console .console-sidebar nav .nav-label { min-width:0; font-size:12px; }
+body.atlas-console .console-sidebar nav button[data-page]:hover {
+  background:var(--atlas-surface-subtle); border-color:var(--atlas-line);
+}
+body.atlas-console .console-sidebar nav button[data-page]:is(.active,[aria-current="page"]) {
+  background:#eaf5fa; border-color:#cde5ef; color:var(--atlas-accent); font-weight:650; box-shadow:none;
+}
+body.atlas-console .console-sidebar nav button[data-page]:is(.active,[aria-current="page"]) .nav-icon {
+  background:var(--atlas-accent); color:white;
+}
+body.atlas-console .console-sidebar nav button[data-page]:focus-visible {
+  outline:2px solid var(--atlas-focus); outline-offset:1px;
+}
+body.atlas-console .console-sidebar nav :is([data-page="admin"],[data-page="history"]) { margin-top:6px; }
+body.atlas-console .console-sidebar nav :is([data-page="admin"],[data-page="history"])::before {
+  content:""; position:absolute; left:8px; right:8px; top:-5px; height:1px; background:var(--atlas-line);
 }
 /* Selected context stays in the fixed sidebar, clear of the working area. */
 body.atlas-console .selection-context { border-top:1px solid var(--atlas-line); padding-top:6px; font-size:11px; }
@@ -310,14 +327,20 @@ body.atlas-console.knowledge-open { grid-template-columns:var(--atlas-sidebar-wi
 body.atlas-console.knowledge-open > .console-sidebar { display:flex; }
 body.atlas-console.knowledge-open > main { grid-column:2; }
 @media (max-width: 760px) {
+  body.atlas-console .console-sidebar nav { grid-auto-rows:1fr; }
   body.atlas-console .console-sidebar nav button[data-page] {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns:minmax(0,1fr); justify-items:center; align-content:center;
+    min-height:54px; padding:5px 3px; gap:4px; text-align:center;
   }
+  body.atlas-console .console-sidebar nav .nav-label { font-size:11px; }
+  body.atlas-console .console-sidebar nav :is([data-page="admin"],[data-page="history"]) { margin-top:0; }
+  body.atlas-console .console-sidebar nav :is([data-page="admin"],[data-page="history"])::before { display:none; }
   body.atlas-console #selectionCaption { display:block; margin-top:4px; font-weight:400; overflow-wrap:anywhere; }
   body.atlas-console #selectionSummary { grid-template-columns:repeat(2,minmax(0,1fr)); }
   body.atlas-console.knowledge-open > main { grid-column:auto; }
 }
 @media (max-width:480px) { body.atlas-console #selectionSummary { grid-template-columns:minmax(0,1fr); } }
+@media (pointer:coarse) { body.atlas-console .console-sidebar nav button[data-page] { min-height:42px; } }
 @media (pointer:coarse) { body.atlas-console #selectionSummary :is(.selection-name,.selection-scan), body.atlas-console .selection-context > summary { min-height:42px; } }
 body.atlas-console .console-page-heading p {
   margin: 2px 0;
