@@ -53,13 +53,16 @@
     const r = data.report;
     $("source").textContent = data.source;
     $("summary").textContent =
-      `${r.unique.toLocaleString()} unique short names · ${r.added.toLocaleString()} new · ${r.changed.toLocaleString()} updated · ${r.unchanged.toLocaleString()} unchanged · ${r.retained.toLocaleString()} existing records retained`;
+      `${(r.rows ?? r.unique).toLocaleString()} source rows · ${r.unique.toLocaleString()} unique short names · ${r.added.toLocaleString()} new · ${r.changed.toLocaleString()} updated · ${r.unchanged.toLocaleString()} unchanged · ${r.retained.toLocaleString()} existing records retained`;
     $("coverage").textContent = r.source_available
       ? `${r.matched.toLocaleString()} matched to ${r.source_packages.toLocaleString()} source folders · ${r.metadata_only.toLocaleString()} metadata only · ${r.ambiguous.toLocaleString()} ambiguous names`
       : r.note +
         " Source coverage will be checked when the folder is connected.";
     $("warnings").textContent = [
-      r.duplicates ? `${r.duplicates} identical duplicate rows collapsed.` : "",
+      r.duplicates
+        ? `${r.duplicates.toLocaleString()} duplicate rows reconciled automatically; ${(r.conflicting_duplicates || 0).toLocaleString()} differing records. Newest valid updated record wins, otherwise the last CSV row.`
+        : "",
+      "All original rows and columns are preserved.",
       r.extra_columns.length
         ? "Additional columns are retained: " + r.extra_columns.join(", ")
         : "",
@@ -69,6 +72,13 @@
     ]
       .filter(Boolean)
       .join(" ");
+    $("duplicates").hidden = !(r.duplicate_examples || []).length;
+    $("duplicate-examples").textContent = (r.duplicate_examples || [])
+      .map(
+        (row) =>
+          `${row.short_name} · ${row.rows.toLocaleString()} rows · selected row ${row.selected_row.toLocaleString()} (${row.selection === "latest_updated" ? "newest updated record" : "last CSV row"})`,
+      )
+      .join("\n");
     $("examples").textContent = r.examples
       .map(
         (row) =>

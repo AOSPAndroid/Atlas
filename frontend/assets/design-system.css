@@ -1713,6 +1713,10 @@ body.atlas-database .atlas-import-controls input[type="checkbox"] {
   min-height: 0;
   margin: 0;
 }
+body.atlas-database .atlas-import-controls > .atlas-import-review {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
 body.atlas-database .atlas-import-controls > :is(p, progress, .row) {
   grid-column: 1 / -1;
   min-width: 0;

@@ -5,6 +5,7 @@ import io
 import json
 import sqlite3
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -18,6 +19,14 @@ import package_data_api as api
 HEADERS = ['u_display_name', 'name', 'u_barclays_correlation_id', 'u_package_sub_state', 'u_requester', 'assigned_to', 'u_domain', 'u_build', 'sys_created_on', 'custom_note']
 
 
+def raw_extract(headers, rows):
+    text = io.StringIO(newline='')
+    writer = csv.writer(text)
+    writer.writerow(headers)
+    writer.writerows(rows)
+    return text.getvalue().encode('utf-8-sig')
+
+
 def extract(rows, encoding='utf-8-sig', delimiter=','):
     text = io.StringIO(newline='')
     writer = csv.writer(text, delimiter=delimiter); writer.writerow(HEADERS)
@@ -28,7 +37,7 @@ def extract(rows, encoding='utf-8-sig', delimiter=','):
 
 def seed(con, rows, source='old.csv'):
     parsed, _ = data.parse_csv(extract(rows))
-    columns = ['name_key', *data.FIELDS, 'raw_json', 'source', 'imported_at']
+    columns = ['name_key', *data.FIELDS, 'raw_json', 'source_rows_json', 'source', 'imported_at']
     for row in parsed.values():
         row = {**row, 'source': source, 'imported_at': '2026-10-02'}
         con.execute(f"insert into package_data({','.join(columns)}) values({','.join('?' for _ in columns)})", tuple(row[c] for c in columns))
@@ -54,14 +63,112 @@ class PackageParsing(unittest.TestCase):
         self.assertEqual(rows['ixexample']['state'], '')
         self.assertEqual(rows['ixexample']['packager'], 'Operator')
 
-    def test_identical_duplicates_collapse_conflicts_block(self):
-        text = extract([('ixExample', 'Live'), ('ixExample', 'Live')])
-        rows, report = data.parse_csv(text)
-        self.assertEqual(len(rows), 1); self.assertEqual(report['duplicates'], 1)
-        with self.assertRaisesRegex(ValueError, 'Conflicting duplicate'):
-            data.parse_csv(extract([('ixExample', 'Live'), ('IXEXAMPLE', 'Work in Progress')]))
-        with self.assertRaisesRegex(ValueError, 'Conflicting duplicate'):
-            data.parse_csv(text.replace(b'Additional value\r\n', b'Different value\r\n', 1))
+    def test_repeated_variants_and_case_space_names_are_imported_without_cleanup(self):
+        headers = ['name', 'state', 'custom_note']
+        cells = [['ixExample', 'Live', 'First'],
+                 [' IXEXAMPLE ', 'Live', 'First'],
+                 ['ixExample', 'Work in Progress', 'Different'],
+                 ['ixexample', 'Live', 'First']]
+        rows, report = data.parse_csv(raw_extract(headers, cells))
+        self.assertEqual(list(rows), ['ixexample'])
+        self.assertEqual(rows['ixexample']['state'], 'Live', 'Last row wins without an update timestamp, even when it repeats a prior variant')
+        self.assertEqual(report['rows'], 4)
+        self.assertEqual(report['duplicates'], 3)
+        self.assertEqual(report['identical_duplicates'], 2)
+        self.assertEqual(report['conflicting_duplicates'], 1)
+        self.assertEqual(report['duplicate_names'], 1)
+        source = json.loads(rows['ixexample']['source_rows_json'])
+        self.assertEqual(source, {'headers': headers,
+                                 'rows': [{'row': i + 2, 'cells': row} for i, row in enumerate(cells)],
+                                 'selected_row': 5, 'selection': 'last_row'})
+        self.assertEqual(json.loads(rows['ixexample']['raw_json']), dict(zip(headers, cells[-1])))
+        self.assertEqual(report['duplicate_examples'], [{'short_name': 'ixexample', 'rows': 4, 'selected_row': 5, 'selection': 'last_row'}])
+
+    def test_extra_column_conflicts_and_blank_winning_fields_remain_whole_rows(self):
+        headers = ['name', 'state', 'assigned_to', 'custom_note']
+        cells = [['ixExample', 'Live', 'First Packager', 'Original'],
+                 ['ixExample', 'Live', 'First Packager', 'Only extra column changed'],
+                 ['ixExample', '', '', 'Final']]
+        rows, report = data.parse_csv(raw_extract(headers, cells))
+        winner = rows['ixexample']
+        self.assertEqual(winner['state'], '')
+        self.assertEqual(winner['packager'], '', 'Do not merge earlier nonblank values into the winning record')
+        self.assertEqual(report['conflicting_duplicates'], 2)
+        self.assertEqual(report['identical_duplicates'], 0)
+        self.assertEqual(json.loads(winner['raw_json']), dict(zip(headers, cells[-1])))
+        self.assertEqual([r['cells'] for r in json.loads(winner['source_rows_json'])['rows']], cells)
+
+    def test_original_headers_whitespace_and_multiline_cell_line_numbers_are_retained(self):
+        headers = [' Name ', 'Package State', ' Original note ']
+        cells = [[' ixExample ', ' Live ', ' first\nsecond '], ['IXEXAMPLE', 'Work in Progress', ' untouched ']]
+        rows, _ = data.parse_csv(raw_extract(headers, cells))
+        source = json.loads(rows['ixexample']['source_rows_json'])
+        self.assertEqual(source['headers'], headers)
+        self.assertEqual(source['rows'], [{'row': 3, 'cells': cells[0]}, {'row': 4, 'cells': cells[1]}])
+        self.assertEqual(source['selected_row'], 4)
+        self.assertEqual(json.loads(rows['ixexample']['raw_json']), dict(zip(headers, cells[1])))
+
+    def test_update_header_aliases_choose_newest_whole_row_not_last_or_live(self):
+        for alias in ('sys_updated_on', 'updated_on', 'Updated', 'Updated on'):
+            with self.subTest(alias=alias):
+                headers = ['name', 'state', 'assigned_to', alias]
+                cells = [['ixExample', 'Work in Progress', 'New Packager', '05/10/2026 09:32'],
+                         ['ixExample', 'Live', 'Old Packager', '2026-10-01T20:00:00Z'],
+                         ['ixExample', 'Live', 'Undated Packager', '']]
+                rows, _ = data.parse_csv(raw_extract(headers, cells))
+                winner = rows['ixexample']
+                self.assertEqual(winner['state'], 'Work in Progress')
+                self.assertEqual(winner['packager'], 'New Packager')
+                self.assertEqual(json.loads(winner['raw_json']), dict(zip(headers, cells[0])))
+                self.assertEqual(json.loads(winner['source_rows_json'])['selected_row'], 2)
+                self.assertEqual(json.loads(winner['source_rows_json'])['selection'], 'latest_updated')
+
+    def test_equal_instants_choose_last_dated_record_and_invalid_dates_do_not_replace_it(self):
+        headers = ['name', 'state', 'sys_updated_on']
+        cells = [['ixExample', 'Live', '2026-10-05T08:00:00Z'],
+                 ['ixExample', 'Work in Progress', '2026-10-05T10:00:00+02:00'],
+                 ['ixExample', '', 'not a date']]
+        rows, _ = data.parse_csv(raw_extract(headers, cells))
+        self.assertEqual(rows['ixexample']['state'], 'Work in Progress')
+        source = json.loads(rows['ixexample']['source_rows_json'])
+        self.assertEqual(source['selected_row'], 3)
+        self.assertEqual(source['selection'], 'latest_updated')
+
+    def test_no_valid_update_date_uses_last_record_without_created_date_or_live_priority(self):
+        for update_values in (('', ''), ('bad timestamp', 'not available')):
+            with self.subTest(update_values=update_values):
+                headers = ['name', 'state', 'sys_updated_on', 'sys_created_on']
+                cells = [['ixExample', 'Live', update_values[0], '2026-10-05T12:00:00Z'],
+                         ['ixExample', 'Work in Progress', update_values[1], '2020-01-01T00:00:00Z']]
+                rows, _ = data.parse_csv(raw_extract(headers, cells))
+                self.assertEqual(rows['ixexample']['state'], 'Work in Progress')
+                self.assertEqual(rows['ixexample']['created'], cells[-1][-1])
+                self.assertEqual(json.loads(rows['ixexample']['source_rows_json'])['selection'], 'last_row')
+
+    def test_duplicate_examples_are_bounded_while_every_name_and_source_row_survives(self):
+        cells = [[f'ixExample{i}', state] for i in range(25) for state in ('Live', 'Work in Progress')]
+        rows, report = data.parse_csv(raw_extract(['name', 'state'], cells))
+        self.assertEqual(len(rows), 25)
+        self.assertEqual(report['duplicates'], 25)
+        self.assertEqual(report['conflicting_duplicates'], 25)
+        self.assertEqual(report['duplicate_names'], 25)
+        self.assertEqual(len(report['duplicate_examples']), 20)
+        self.assertEqual(sum(len(json.loads(row['source_rows_json'])['rows']) for row in rows.values()), 50)
+
+    def test_twenty_thousand_same_name_rows_preserve_all_data_without_quadratic_processing(self):
+        cells = [['ixExample', 'Work in Progress', f'Original row {i}'] for i in range(20000)]
+        start = time.monotonic()
+        rows, report = data.parse_csv(raw_extract(['name', 'state', 'custom_note'], cells))
+        elapsed = time.monotonic() - start
+        self.assertLess(elapsed, 10, 'The supported 20,000-row extract should not repeatedly serialize all prior duplicates')
+        self.assertEqual(report['rows'], 20000)
+        self.assertEqual(report['duplicates'], 19999)
+        self.assertEqual(report['conflicting_duplicates'], 19999)
+        source = json.loads(rows['ixexample']['source_rows_json'])
+        self.assertEqual(len(source['rows']), 20000)
+        self.assertEqual(source['rows'][0]['cells'], cells[0])
+        self.assertEqual(source['rows'][-1]['cells'], cells[-1])
+        self.assertEqual(source['selected_row'], 20001)
 
     def test_invalid_headers_rows_paths_and_empty_uploads(self):
         bad = [b'', b'name,state\n', b'display_name,state\nA,Live\n', b'name,name,state\nA,A,Live\n',
@@ -90,6 +197,8 @@ class PackageBrowsing(unittest.TestCase):
             self.assertFalse(items['data:ixbuilding']['source_present'])
             self.assertFalse(items['repo:ixcollision']['metadata_present'])
             self.assertNotIn('raw_json', items['repo:ixExample'])
+            self.assertNotIn('source_rows_json', items['repo:ixExample'])
+            self.assertNotIn('source_rows_json', items['data:ixbuilding'])
             self.assertEqual(data.browse(con, repo, state='Work in Progress')['total'], 1)
             self.assertEqual(data.browse(con, repo, term='EPP123', coverage='matched')['total'], 1)
             self.assertEqual(data.browse(con, repo, coverage='source-only')['total'], 2)
@@ -122,6 +231,28 @@ class PackageBrowsing(unittest.TestCase):
             self.assertFalse(result['source_available']); self.assertEqual(result['total'], 1)
             self.assertEqual(result['items'][0]['coverage'], 'metadata-only')
 
+    def test_legacy_package_table_migration_preserves_data_and_readonly_browsing_never_migrates(self):
+        with fixture_connect(':memory:') as con:
+            columns = ['name_key', *data.FIELDS, 'raw_json', 'source', 'imported_at']
+            con.execute('create table package_data(' + ','.join(column + ' text not null' for column in columns) + ', primary key(name_key))')
+            parsed, _ = data.parse_csv(extract([('ixLegacy', 'Live')]))
+            original = {**parsed['ixlegacy'], 'source': 'legacy.csv', 'imported_at': '2026-10-01'}
+            con.execute(f"insert into package_data({','.join(columns)}) values({','.join('?' for _ in columns)})", tuple(original[column] for column in columns))
+            con.commit()
+            con.execute('pragma query_only=on')
+            before = con.execute('pragma table_info(package_data)').fetchall()
+            result = data.browse(con)
+            self.assertEqual(result['items'][0]['state'], 'Live')
+            self.assertNotIn('source_rows_json', result['items'][0])
+            self.assertEqual(con.execute('pragma table_info(package_data)').fetchall(), before, 'Demo must not change an older database schema')
+            con.execute('pragma query_only=off')
+            data.initialize(con)
+            data.initialize(con)
+            stored = data.load(con)['ixlegacy']
+            self.assertEqual({column: stored[column] for column in columns}, {column: original[column] for column in columns})
+            self.assertEqual(json.loads(stored['source_rows_json']), {})
+            self.assertEqual(sum(row[1] == 'source_rows_json' for row in con.execute('pragma table_info(package_data)')), 1)
+
 
 class PackageImport(unittest.TestCase):
     def setUp(self):
@@ -143,7 +274,10 @@ class PackageImport(unittest.TestCase):
         self.client.close(); self.patch.stop(); self.temp.cleanup()
 
     def preview(self, rows):
-        response = self.client.post('/api/package-data/import/preview', content=extract(rows), headers=self.headers)
+        return self.preview_content(extract(rows))
+
+    def preview_content(self, content):
+        response = self.client.post('/api/package-data/import/preview', content=content, headers=self.headers)
         self.assertEqual(response.status_code, 200, response.text)
         return response.json()
 
@@ -190,6 +324,58 @@ class PackageImport(unittest.TestCase):
             self.assertEqual(self.client.get('/api/package-data?' + query).status_code, 422)
         self.assertEqual(self.client.post('/api/package-data/import/preview', content=b'name,state\nA,Live,extra\n', headers=self.headers).status_code, 400)
 
+    def test_raw_duplicates_survive_apply_backup_and_retained_records_without_touching_source(self):
+        headers = ['name', 'state', 'assigned_to', 'extra_original_column']
+        cells = [['ixExample', 'Live', 'Previous Packager', ' preserved '],
+                 [' IXEXAMPLE ', 'Work in Progress', '', 'Second original value']]
+        preview = self.preview_content(raw_extract(headers, cells))
+        self.assertEqual(preview['report']['duplicates'], 1)
+        self.assertEqual(preview['report']['conflicting_duplicates'], 1)
+        self.assertEqual(preview['report']['matched'], 1)
+        saved = self.apply(preview)
+        self.assertEqual(saved.status_code, 200, saved.text)
+        with fixture_connect(self.db) as con:
+            original = data.load(con)['ixexample']
+            self.assertEqual(original['state'], 'Work in Progress')
+            self.assertEqual(original['packager'], '')
+            self.assertEqual(json.loads(original['raw_json']), dict(zip(headers, cells[-1])))
+            self.assertEqual(json.loads(original['source_rows_json']), {
+                'headers': headers, 'rows': [{'row': 2, 'cells': cells[0]}, {'row': 3, 'cells': cells[1]}],
+                'selected_row': 3, 'selection': 'last_row'})
+        next_preview = self.preview([('ixOther', 'Live')])
+        self.assertEqual(next_preview['report']['retained'], 1)
+        saved = self.apply(next_preview)
+        self.assertEqual(saved.status_code, 200, saved.text)
+        with gzip.open(self.root / 'backups' / saved.json()['backup'], 'rt', encoding='utf-8') as backup:
+            backed_up = json.load(backup)['packages']
+        self.assertEqual(backed_up, [original], 'Package backup must preserve all original duplicate rows, not only the displayed winner')
+        with fixture_connect(self.db) as con:
+            self.assertEqual(data.load(con)['ixexample'], original, 'Names missing from a later extract retain their raw rows and import date')
+            self.assertEqual(con.execute('select name from users').fetchone()[0], 'Stored Person')
+            self.assertEqual(con.execute('select revision from package_catalog').fetchone()[0], 2)
+        for item in self.client.get('/api/package-data').json()['items']:
+            self.assertNotIn('raw_json', item)
+            self.assertNotIn('source_rows_json', item, 'Normal browsing must not send potentially large duplicate-row payloads')
+        self.assertEqual((self.repo / 'ixExample' / 'setup_i.ps1').read_text(), 'exit 0')
+
+    def test_raw_only_change_invalidates_staged_preview_and_leaves_database_unchanged(self):
+        self.assertEqual(self.apply(self.preview([('ixExample', 'Live')])).status_code, 200)
+        pending = self.preview([('ixExample', 'Work in Progress')])
+        with fixture_connect(self.db) as con:
+            stored = data.load(con)['ixexample']
+            source = json.loads(stored['source_rows_json'])
+            source['rows'][0]['cells'][-1] = 'Concurrent raw-only correction'
+            con.execute('update package_data set source_rows_json=? where name_key=?', (json.dumps(source), 'ixexample'))
+        backups_before = sorted(path.name for path in (self.root / 'backups').iterdir())
+        response = self.apply(pending)
+        self.assertEqual(response.status_code, 409, response.text)
+        with fixture_connect(self.db) as con:
+            current = data.load(con)['ixexample']
+            self.assertEqual(current['state'], 'Live')
+            self.assertEqual(json.loads(current['source_rows_json']), source)
+            self.assertEqual(con.execute('select count(*) from package_data_imports').fetchone()[0], 1)
+        self.assertEqual(sorted(path.name for path in (self.root / 'backups').iterdir()), backups_before)
+
     def test_failed_commit_rolls_back_all_rows_and_preserves_preview(self):
         preview = self.preview([('ixFirst', 'Live'), ('ixFail', 'Live')])
         with fixture_connect(self.db) as con:
@@ -215,7 +401,10 @@ class PackageImport(unittest.TestCase):
             finally: con.close()
         with patch.object(viewer, 'connect', connect), patch.object(data.os, 'scandir', side_effect=AssertionError('Demo must not enumerate package source')):
             with TestClient(viewer.app) as client:
-                self.assertEqual(client.get('/api/package-data').json()['total'], 1)
+                result = client.get('/api/package-data').json()
+                self.assertEqual(result['total'], 1)
+                self.assertNotIn('raw_json', result['items'][0])
+                self.assertNotIn('source_rows_json', result['items'][0])
                 self.assertEqual(client.post('/api/package-data/import/preview').status_code, 403)
                 self.assertEqual(client.post('/api/package-data/import/apply/test').status_code, 403)
 

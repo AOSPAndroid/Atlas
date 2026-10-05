@@ -5,6 +5,7 @@ import io
 import json
 import os
 from collections import Counter
+from datetime import datetime, timezone
 
 FIELDS = {
     'short_name': ('name', 'short package name', 'short_package_name'),
@@ -17,12 +18,15 @@ FIELDS = {
     'build': ('u_build', 'build'),
     'created': ('sys_created_on', 'created', 'created on'),
 }
+SOURCE_FIELDS = ('raw_json', 'source_rows_json')
+UPDATED_HEADERS = ('sys_updated_on', 'updated_on', 'updated', 'updated on')
 SCHEMA = '''
 create table if not exists package_data(
  name_key text primary key, short_name text not null, display_name text not null,
  package_id text not null, state text not null, requester text not null,
  packager text not null, domain text not null, build text not null, created text not null,
- raw_json text not null, source text not null, imported_at text not null);
+ raw_json text not null, source text not null, imported_at text not null,
+ source_rows_json text not null default '{}');
 create table if not exists package_data_imports(
  id text primary key, at text not null, source text not null, report text not null, backup text not null);
 '''
@@ -35,18 +39,42 @@ def name_key(value):
 
 def initialize(con):
     con.executescript(SCHEMA)
+    columns = {row[1] for row in con.execute('pragma table_info(package_data)')}
+    if 'source_rows_json' not in columns:
+        con.execute("alter table package_data add column source_rows_json text not null default '{}'")
 
 
-def load(con):
+def load(con, *, include_source=True):
     if not con.execute("select 1 from sqlite_master where type='table' and name='package_data'").fetchone():
         return {}
-    cursor = con.execute('select * from package_data order by name_key')
+    columns = '*' if include_source else ','.join(['name_key', *FIELDS, 'source', 'imported_at'])
+    cursor = con.execute(f'select {columns} from package_data order by name_key')
     columns = [c[0] for c in cursor.description]
     return {row[0]: dict(zip(columns, row)) for row in cursor}
 
 
 def fingerprint(rows):
     return hashlib.sha256(json.dumps(rows, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+
+
+def updated_rank(value):
+    """Only an explicit update time can outrank CSV order; creation is not an update."""
+    value = value.strip()
+    if not value:
+        return None
+    try:
+        date = datetime.fromisoformat(value.replace('Z', '+00:00'))
+    except ValueError:
+        date = None
+        for fmt in ('%d/%m/%Y %H:%M:%S', '%d/%m/%Y %H:%M', '%d/%m/%Y'):
+            try:
+                date = datetime.strptime(value, fmt)
+                break
+            except ValueError:
+                pass
+        if date is None:
+            return None
+    return (date.replace(tzinfo=timezone.utc) if date.tzinfo is None else date).timestamp()
 
 
 def parse_csv(data):
@@ -78,7 +106,9 @@ def parse_csv(data):
                 mapping[field] = matches[0]
         if not {'short_name', 'state'} <= mapping.keys():
             raise ValueError('CSV needs name (Short Package Name) and u_package_sub_state (Package State) headers.')
-        rows = {}; duplicates = 0; row_count = 0
+        updated_columns = [i for i, h in enumerate(normalized) if h in UPDATED_HEADERS]
+        rows = {}; sources = {}; ranks = {}; signatures = {}
+        duplicates = 0; identical_duplicates = 0; row_count = 0
         for cells in reader:
             if not any(c.strip() for c in cells):
                 continue
@@ -96,18 +126,40 @@ def parse_csv(data):
             key = name_key(short)
             row['name_key'] = key
             row['raw_json'] = json.dumps(dict(zip(headers, cells)), ensure_ascii=False)
+            rank = next((rank for i in updated_columns if (rank := updated_rank(cells[i])) is not None), None)
+            signature_cells = list(cells)
+            signature_cells[mapping['short_name']] = key
+            signature = hashlib.sha256(json.dumps(signature_cells, ensure_ascii=False).encode()).digest()
             if key in rows:
-                # Case/space variants with identical values can safely collapse; conflicts cannot.
-                prior = rows[key]
-                prior_cells = json.loads(prior['raw_json'])
-                if any(prior_cells[h].strip() != cells[i].strip() for i, h in enumerate(headers) if i != mapping['short_name']):
-                    raise ValueError(f'Conflicting duplicate short package name at row {reader.line_num}: {short}. Resolve it before importing.')
                 duplicates += 1
+                identical_duplicates += signature in signatures[key]
             else:
+                sources[key] = {'headers': headers, 'rows': []}
+                signatures[key] = set()
+            signatures[key].add(signature)
+            sources[key]['rows'].append({'row': reader.line_num, 'cells': cells})
+            old_rank = ranks.get(key)
+            if key not in rows or old_rank is None or (rank is not None and rank >= old_rank):
+                # Select a whole record, including blanks; never mix states or owners across rows.
                 rows[key] = row
+                ranks[key] = rank
+                sources[key].update(selected_row=reader.line_num,
+                                    selection='latest_updated' if rank is not None else 'last_row')
         if not rows:
             raise ValueError('CSV contains no package rows.')
+        duplicate_examples = []
+        duplicate_names = 0
+        for key, row in rows.items():
+            source = sources[key]
+            row['source_rows_json'] = json.dumps(source, ensure_ascii=False, separators=(',', ':'))
+            if len(source['rows']) > 1:
+                duplicate_names += 1
+                if len(duplicate_examples) < 20:
+                    duplicate_examples.append({'short_name': row['short_name'], 'rows': len(source['rows']),
+                                               'selected_row': source['selected_row'], 'selection': source['selection']})
         return rows, {'rows': row_count, 'unique': len(rows), 'duplicates': duplicates,
+                      'identical_duplicates': identical_duplicates, 'conflicting_duplicates': duplicates - identical_duplicates,
+                      'duplicate_names': duplicate_names, 'duplicate_examples': duplicate_examples,
                       'columns': headers, 'extra_columns': [h for i, h in enumerate(headers) if i not in mapping.values()]}
     except (csv.Error, StopIteration) as error:
         raise ValueError('Invalid or empty package CSV: ' + str(error)) from error
@@ -130,7 +182,8 @@ def join_metadata(folders, metadata):
 
 
 def browse(con, repo=None, *, term='', state='', coverage='', offset=0, limit=100):
-    metadata = load(con)
+    # Browsing needs operational fields, not every preserved CSV row.
+    metadata = load(con, include_source=False)
     folders, available, note = repository_names(repo)
     counts = Counter(name_key(f) for f in folders)
     manual = {}

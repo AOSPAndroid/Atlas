@@ -94,7 +94,7 @@ def register(app, wmi, check_token):
                 # A package-only backup avoids copying a global directory database.
                 with gzip.open(backup, 'wt', encoding='utf-8') as archive:
                     json.dump({'schema': 1, 'at': at, 'packages': list(existing.values())}, archive, ensure_ascii=False)
-                columns = ['name_key', *data.FIELDS, 'raw_json', 'source', 'imported_at']
+                columns = ['name_key', *data.FIELDS, *data.SOURCE_FIELDS, 'source', 'imported_at']
                 update = ','.join(f'{c}=excluded.{c}' for c in columns if c != 'name_key')
                 sql = f"insert into package_data({','.join(columns)}) values({','.join('?' for _ in columns)}) on conflict(name_key) do update set {update}"
                 for row in value['rows'].values():

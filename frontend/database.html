@@ -378,6 +378,11 @@
             Updates the short names supplied. Existing metadata absent from this
             extract is kept; SharePoint remains the package source.
           </p>
+          <p>
+            Upload the raw export. Repeated short names are reconciled using the
+            newest updated record, or the last CSV row when no update date is
+            supplied. Every original row is preserved.
+          </p>
           <p id="package-data-status" role="status">
             Loading package import status…
           </p>
@@ -409,6 +414,10 @@
               <p id="package-data-summary"></p>
               <p id="package-data-coverage"></p>
               <p id="package-data-warnings"></p>
+              <details id="package-data-duplicates" hidden>
+                <summary>Automatically resolved short names (up to 20)</summary>
+                <pre id="package-data-duplicate-examples"></pre>
+              </details>
               <details>
                 <summary>Example short names and states</summary>
                 <pre id="package-data-examples"></pre>
@@ -445,7 +454,10 @@
               <code>assigned_to</code>, <code>u_domain</code>,
               <code>u_build</code> and <code>sys_created_on</code>.
               Display-label headers are accepted too. Extra columns are
-              retained. CSV limit: 10 MB / 20,000 rows.
+              retained. <code>sys_updated_on</code> or <code>Updated</code>, when
+              supplied, determines which repeated record is selected. Creation
+              date and package state do not determine priority.
+              CSV limit: 10 MB / 20,000 rows.
             </p>
           </details>
           <a class="atlas-return" href="/installer?command=packages"
