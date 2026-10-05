@@ -6,7 +6,7 @@ const response = (data, status = 200) => ({ok: status < 400, status, json: async
 (async () => {
  let finish, saves = 0, previews = 0, statuses = 0;
  const delayed = new Promise(resolve => finish = resolve);
- const preview = {id:'package-stage',source:'package.csv',report:{rows:2003,unique:2000,added:1900,changed:50,unchanged:50,retained:100,source_available:true,matched:1500,source_packages:8000,metadata_only:499,ambiguous:1,duplicates:3,conflicting_duplicates:2,duplicate_examples:[{short_name:'ixExample',rows:4,selected_row:3096,selection:'last_row'}],extra_columns:[],examples:[{short_name:'ixExample',state:'Work in Progress',package_id:'EPP123',packager:'Operator'}]}};
+ const preview = {id:'package-stage',source:'package.csv',report:{rows:2003,unique:2000,added:1900,changed:50,unchanged:50,retained:100,source_available:true,matched:1500,source_packages:8000,metadata_only:499,ambiguous:1,duplicates:3,conflicting_duplicates:2,duplicate_examples:[{short_name:'ixExample',rows:4,selected_row:3096,selection:'last_row'}],unmatched_rows:2,unmatched_records:2,unmatched_examples:[{row:15238,short_name:'',package_id:'EPP-RAW',reason:'missing_short_name'},{row:15239,short_name:'../ixExample',package_id:'EPP-PATH',reason:'non_folder_name'}],extra_columns:[],examples:[{short_name:'ixExample',state:'Work in Progress',package_id:'EPP123',packager:'Operator'}]}};
  const f = await fixture({html:'frontend/database.html',url:'http://localhost/manage-database',fetch:async (url, options={}) => {
    assert(!url.startsWith('/api/database/'), 'Package workflow never calls directory APIs');
    if(url==='/api/session')return response({token:'test'});
@@ -29,6 +29,8 @@ const response = (data, status = 200) => ({ok: status < 400, status, json: async
  finish(response(preview));await work;assert(!get('review').hidden && !get('apply').disabled);assert.match(get('summary').textContent,/100 existing records retained/);assert.match(get('coverage').textContent,/1,500 matched to 8,000/);
  assert.match(get('summary').textContent,/2,003 source rows/);assert.match(get('warnings').textContent,/3 duplicate rows reconciled automatically; 2 differing records/);assert.match(get('warnings').textContent,/All original rows and columns are preserved/);
  assert(!get('duplicates').hidden);assert.match(get('duplicate-examples').textContent,/ixExample · 4 rows · selected row 3,096 \(last CSV row\)/);
+ assert.match(get('summary').textContent,/2,000 package records/);assert.match(get('warnings').textContent,/2 rows with missing or unusual short names imported as metadata only \(2 records\)/);
+ assert(!get('unmatched').hidden);assert.match(get('unmatched-examples').textContent,/Row 15,238 · EPP-RAW · Short name not supplied · Metadata only/);assert.match(get('unmatched-examples').textContent,/\.\.\/ixExample · Original short name kept/);
  assert(d.getElementById('preview').hidden,'Package preview never opens directory replacement controls');
  await get('apply').onclick();assert.match(get('message').textContent,/Preview expired/);assert(!get('apply').disabled,'A failed save remains retryable');
  select('replacement.csv');assert(get('review').hidden && get('apply').disabled,'Changing the CSV invalidates the prior preview');

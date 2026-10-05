@@ -71,7 +71,7 @@ def register_atlas(app):
   if not source['available']:source['error']='Repository unavailable. Check Settings and OneDrive sync.'
   with wmi.db() as c:
    metadata={r['folder']:dict(r) for r in c.execute('select * from package_catalog where repository=?',(repo,))}
-   imported=load(c)
+   imported=load(c,include_source=False)
   # Enumerate once, without recursive scans. Filtering includes saved display names and versions.
   try:names=sorted([p.name for p in wmi.REPO.iterdir() if p.is_dir()],key=str.casefold) if source['available'] else []
   except OSError:names=[];source['error']='Cannot read repository';source['available']=False
@@ -90,7 +90,7 @@ def register_atlas(app):
   root=wmi.package_root(folder)
   with wmi.db() as c:
    row=c.execute('select * from package_catalog where repository=? and folder=?',(str(wmi.REPO.resolve()),root.name)).fetchone()
-   imported=load(c)
+   imported=load(c,include_source=False)
   names,_,_=repository_names(wmi.REPO)
   info=join_metadata(names,imported).get(root.name)
   metadata=dict(row) if row else {'folder':root.name,'display_name':root.name,'version':'','revision':0}

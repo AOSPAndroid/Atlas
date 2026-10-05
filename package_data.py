@@ -20,6 +20,7 @@ FIELDS = {
 }
 SOURCE_FIELDS = ('raw_json', 'source_rows_json')
 UPDATED_HEADERS = ('sys_updated_on', 'updated_on', 'updated', 'updated on')
+RAW_PREFIX = '/atlas-raw/'
 SCHEMA = '''
 create table if not exists package_data(
  name_key text primary key, short_name text not null, display_name text not null,
@@ -35,6 +36,35 @@ create table if not exists package_data_imports(
 def name_key(value):
     # Deliberately no punctuation, version or prefix normalization.
     return value.strip().casefold()
+
+
+def matching_issue(short):
+    if not short:
+        return 'missing_short_name'
+    if len(short) > 200 or short in ('.', '..') or any(c in '/\\<>:"|?*' or ord(c) < 32 for c in short):
+        return 'non_folder_name'
+    return ''
+
+
+def record_key(row, headers, cells):
+    """Separate raw metadata identity from a real SharePoint folder name."""
+    short = row['short_name']
+    if not matching_issue(short):
+        return name_key(short)
+    if short:
+        identity = ('literal_name', name_key(short))
+    else:
+        sys_id = next((cells[i].strip() for i, h in enumerate(headers)
+                       if h.strip().casefold() == 'sys_id' and cells[i].strip()), '')
+        if sys_id:
+            identity = ('sys_id', sys_id.casefold())
+        elif row['package_id']:
+            identity = ('package_id', row['package_id'].casefold())
+        else:
+            identity = ('original_row', dict(zip((h.strip().casefold() for h in headers), cells)))
+    # '/' cannot occur in a directory entry name, so raw keys cannot match a source folder.
+    digest = hashlib.sha256(json.dumps(identity, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+    return RAW_PREFIX + digest
 
 
 def initialize(con):
@@ -89,7 +119,7 @@ def parse_csv(data):
         dialect = csv.Sniffer().sniff(text[:65536], delimiters=',;\t')
     except csv.Error:
         dialect = csv.excel
-    reader = csv.reader(io.StringIO(text, newline=''), dialect=dialect, strict=True)
+    reader = csv.reader(io.StringIO(text, newline=''), dialect=dialect, strict=True, skipinitialspace=False)
     try:
         headers = next(reader)
         if not headers or len(headers) > 100:
@@ -120,10 +150,7 @@ def parse_csv(data):
             if any(len(c) > 4096 or '\x00' in c for c in cells):
                 raise ValueError(f'CSV row {reader.line_num} has an invalid or oversized cell.')
             row = {field: cells[mapping[field]].strip() if field in mapping else '' for field in FIELDS}
-            short = row['short_name']
-            if not short or len(short) > 200 or any(c in short for c in '/\\\r\n') or short in ('.', '..'):
-                raise ValueError(f'CSV row {reader.line_num} needs a valid short package name, not a path.')
-            key = name_key(short)
+            key = record_key(row, headers, cells)
             row['name_key'] = key
             row['raw_json'] = json.dumps(dict(zip(headers, cells)), ensure_ascii=False)
             rank = next((rank for i in updated_columns if (rank := updated_rank(cells[i])) is not None), None)
@@ -135,6 +162,8 @@ def parse_csv(data):
                 identical_duplicates += signature in signatures[key]
             else:
                 sources[key] = {'headers': headers, 'rows': []}
+                if key.startswith(RAW_PREFIX):
+                    sources[key]['matching_issue'] = matching_issue(row['short_name'])
                 signatures[key] = set()
             signatures[key].add(signature)
             sources[key]['rows'].append({'row': reader.line_num, 'cells': cells})
@@ -149,9 +178,16 @@ def parse_csv(data):
             raise ValueError('CSV contains no package rows.')
         duplicate_examples = []
         duplicate_names = 0
+        unmatched_examples = []
+        unmatched_rows = 0; unmatched_records = 0
         for key, row in rows.items():
             source = sources[key]
             row['source_rows_json'] = json.dumps(source, ensure_ascii=False, separators=(',', ':'))
+            if key.startswith(RAW_PREFIX):
+                unmatched_rows += len(source['rows']); unmatched_records += 1
+                if len(unmatched_examples) < 20:
+                    unmatched_examples.append({'row': source['selected_row'], 'short_name': row['short_name'],
+                                               'package_id': row['package_id'], 'reason': source['matching_issue']})
             if len(source['rows']) > 1:
                 duplicate_names += 1
                 if len(duplicate_examples) < 20:
@@ -160,6 +196,8 @@ def parse_csv(data):
         return rows, {'rows': row_count, 'unique': len(rows), 'duplicates': duplicates,
                       'identical_duplicates': identical_duplicates, 'conflicting_duplicates': duplicates - identical_duplicates,
                       'duplicate_names': duplicate_names, 'duplicate_examples': duplicate_examples,
+                      'unmatched_rows': unmatched_rows, 'unmatched_records': unmatched_records,
+                      'unmatched_examples': unmatched_examples,
                       'columns': headers, 'extra_columns': [h for i, h in enumerate(headers) if i not in mapping.values()]}
     except (csv.Error, StopIteration) as error:
         raise ValueError('Invalid or empty package CSV: ' + str(error)) from error
@@ -205,9 +243,12 @@ def browse(con, repo=None, *, term='', state='', coverage='', offset=0, limit=10
     for key, data in metadata.items():
         if key not in matched:
             items.append({**data, 'id': 'data:' + key, 'folder': '', 'version': '',
-                          'display_name': data['display_name'] or data['short_name'],
+                          'display_name': data['display_name'] or data['short_name'] or data['package_id'] or 'Unnamed package',
                           'coverage': 'metadata-only', 'source_present': False, 'metadata_present': True,
                           'ambiguous': counts[key] > 1})
+            if key.startswith(RAW_PREFIX):
+                items[-1]['metadata_note'] = ('Short name not supplied; original record preserved.' if not data['short_name']
+                                             else 'Original short name preserved; no source folder match.')
     stats = {'source_packages': len(folders), 'metadata_packages': len(metadata), 'matched': len(matched),
              'source_only': sum(i['coverage'] == 'source-only' for i in items),
              'metadata_only': len(metadata) - len(matched),
@@ -218,7 +259,7 @@ def browse(con, repo=None, *, term='', state='', coverage='', offset=0, limit=10
              and (not coverage or i['coverage'] == coverage)
              and (not query or any(query in str(i.get(f, '')).casefold() for f in
                   ('short_name', 'display_name', 'package_id', 'state', 'requester', 'packager', 'domain', 'build')))]
-    items.sort(key=lambda i: (i['short_name'].casefold(), i['id']))
+    items.sort(key=lambda i: ((i['short_name'] or i['display_name']).casefold(), i['id']))
     total = len(items)
     for item in items:
         item.pop('raw_json', None)

@@ -53,7 +53,7 @@
     const r = data.report;
     $("source").textContent = data.source;
     $("summary").textContent =
-      `${(r.rows ?? r.unique).toLocaleString()} source rows · ${r.unique.toLocaleString()} unique short names · ${r.added.toLocaleString()} new · ${r.changed.toLocaleString()} updated · ${r.unchanged.toLocaleString()} unchanged · ${r.retained.toLocaleString()} existing records retained`;
+      `${(r.rows ?? r.unique).toLocaleString()} source rows · ${r.unique.toLocaleString()} package records · ${r.added.toLocaleString()} new · ${r.changed.toLocaleString()} updated · ${r.unchanged.toLocaleString()} unchanged · ${r.retained.toLocaleString()} existing records retained`;
     $("coverage").textContent = r.source_available
       ? `${r.matched.toLocaleString()} matched to ${r.source_packages.toLocaleString()} source folders · ${r.metadata_only.toLocaleString()} metadata only · ${r.ambiguous.toLocaleString()} ambiguous names`
       : r.note +
@@ -63,6 +63,9 @@
         ? `${r.duplicates.toLocaleString()} duplicate rows reconciled automatically; ${(r.conflicting_duplicates || 0).toLocaleString()} differing records. Newest valid updated record wins, otherwise the last CSV row.`
         : "",
       "All original rows and columns are preserved.",
+      r.unmatched_rows
+        ? `${r.unmatched_rows.toLocaleString()} rows with missing or unusual short names imported as metadata only (${r.unmatched_records.toLocaleString()} records).`
+        : "",
       r.extra_columns.length
         ? "Additional columns are retained: " + r.extra_columns.join(", ")
         : "",
@@ -76,13 +79,20 @@
     $("duplicate-examples").textContent = (r.duplicate_examples || [])
       .map(
         (row) =>
-          `${row.short_name} · ${row.rows.toLocaleString()} rows · selected row ${row.selected_row.toLocaleString()} (${row.selection === "latest_updated" ? "newest updated record" : "last CSV row"})`,
+          `${row.short_name || row.package_id || "Short name not supplied"} · ${row.rows.toLocaleString()} rows · selected row ${row.selected_row.toLocaleString()} (${row.selection === "latest_updated" ? "newest updated record" : "last CSV row"})`,
+      )
+      .join("\n");
+    $("unmatched").hidden = !(r.unmatched_examples || []).length;
+    $("unmatched-examples").textContent = (r.unmatched_examples || [])
+      .map(
+        (row) =>
+          `Row ${row.row.toLocaleString()} · ${row.short_name || row.package_id || "Unnamed package"} · ${row.reason === "missing_short_name" ? "Short name not supplied" : "Original short name kept"} · Metadata only`,
       )
       .join("\n");
     $("examples").textContent = r.examples
       .map(
         (row) =>
-          `${row.short_name} · ${row.state || "State not supplied"} · ${row.package_id || "No package ID"} · ${row.packager || "No packager"}`,
+          `${row.short_name || "Short name not supplied"} · ${row.state || "State not supplied"} · ${row.package_id || "No package ID"} · ${row.packager || "No packager"}`,
       )
       .join("\n");
     $("review").hidden = false;
@@ -109,7 +119,7 @@
         throw Error("Choose a package CSV file.");
       if (file.size > 10 * 1024 * 1024)
         throw Error("Package CSV exceeds 10 MB.");
-      message("Validating short names and comparing package metadata…");
+      message("Reading the raw export and comparing package metadata…");
       show(
         await api("/api/package-data/import/preview", {
           method: "POST",

@@ -36,7 +36,11 @@ def extract(rows, encoding='utf-8-sig', delimiter=','):
 
 
 def seed(con, rows, source='old.csv'):
-    parsed, _ = data.parse_csv(extract(rows))
+    seed_content(con, extract(rows), source)
+
+
+def seed_content(con, content, source='old.csv'):
+    parsed, _ = data.parse_csv(content)
     columns = ['name_key', *data.FIELDS, 'raw_json', 'source_rows_json', 'source', 'imported_at']
     for row in parsed.values():
         row = {**row, 'source': source, 'imported_at': '2026-10-02'}
@@ -170,9 +174,91 @@ class PackageParsing(unittest.TestCase):
         self.assertEqual(source['rows'][-1]['cells'], cells[-1])
         self.assertEqual(source['selected_row'], 20001)
 
-    def test_invalid_headers_rows_paths_and_empty_uploads(self):
+    def test_raw_names_accept_paths_unusual_characters_and_overlong_values_without_rewriting(self):
+        names = ['../ixExample', './ixExample', '/ixExample', 'ixExample/child', r'ixExample\child',
+                 '.', '..', 'x' * 201, 'x' * 4096, '<package>', 'name>package', 'name:package', 'name"package',
+                 'name|package', 'name?package', 'name*package', 'name\x01package', 'name\npackage', 'name\rpackage']
+        headers = ['name', 'state', 'custom_note']
+        cells = [[name, 'Live', ' Original value '] for name in names]
+        rows, report = data.parse_csv(raw_extract(headers, cells))
+        self.assertEqual(report['rows'], len(names))
+        self.assertEqual(report['unique'], len(names))
+        self.assertEqual(report['unmatched_rows'], len(names))
+        self.assertEqual(report['unmatched_records'], len(names))
+        self.assertTrue(all(key.startswith('/atlas-raw/') for key in rows))
+        preserved = {row['short_name']: row for row in rows.values()}
+        self.assertEqual(set(preserved), set(names))
+        for name, original_cells in zip(names, cells):
+            with self.subTest(name=name):
+                row = preserved[name]
+                self.assertEqual(json.loads(row['raw_json']), dict(zip(headers, original_cells)))
+                source = json.loads(row['source_rows_json'])
+                self.assertEqual(source['headers'], headers)
+                self.assertEqual(source['rows'][0]['cells'], original_cells)
+                self.assertEqual(source['matching_issue'], 'non_folder_name')
+
+    def test_raw_literal_duplicates_reconcile_by_name_and_have_bounded_unmatched_examples(self):
+        headers = ['name', 'state']
+        cells = [[' ./ixExample ', 'Live'], ['./IXEXAMPLE', 'Work in Progress']]
+        cells += [[f'../ixExtra{i}', 'Live'] for i in range(25)]
+        rows, report = data.parse_csv(raw_extract(headers, cells))
+        self.assertEqual(report['unmatched_rows'], 27)
+        self.assertEqual(report['unmatched_records'], 26)
+        self.assertEqual(len(report['unmatched_examples']), 20)
+        self.assertEqual(report['duplicates'], 1)
+        selected = next(row for row in rows.values() if row['short_name'] == './IXEXAMPLE')
+        self.assertEqual(selected['state'], 'Work in Progress')
+        source = json.loads(selected['source_rows_json'])
+        self.assertEqual(len(source['rows']), 2)
+        self.assertEqual(source['selected_row'], 3)
+        self.assertEqual(source['matching_issue'], 'non_folder_name')
+        self.assertEqual(report['unmatched_examples'][0], {'row': 3, 'short_name': './IXEXAMPLE', 'package_id': '', 'reason': 'non_folder_name'})
+
+    def test_blank_names_use_sys_id_then_package_id_without_collapsing_unrelated_records(self):
+        headers = ['name', 'state', 'u_barclays_correlation_id', ' SYS_ID ', 'sys_updated_on']
+        cells = [['', 'Live', 'EPP_SHARED', 'sys-alpha', '2026-10-04'],
+                 ['', 'Work in Progress', 'EPP_CHANGED', 'sys-alpha', '2026-10-05'],
+                 ['', 'Live', 'EPP_SHARED', 'sys-beta', '2026-10-04'],
+                 ['', 'Live', 'EPP_SHARED', '', '2026-10-04'],
+                 ['', 'Work in Progress', 'epp_shared', '', '2026-10-05']]
+        rows, report = data.parse_csv(raw_extract(headers, cells))
+        self.assertEqual(len(rows), 3)
+        self.assertEqual(report['duplicates'], 2)
+        self.assertEqual(report['unmatched_rows'], 5)
+        self.assertEqual(report['unmatched_records'], 3)
+        sources = [json.loads(row['source_rows_json']) for row in rows.values()]
+        self.assertEqual(sorted(len(source['rows']) for source in sources), [1, 2, 2])
+        self.assertTrue(all(source['matching_issue'] == 'missing_short_name' for source in sources))
+        reversed_rows, _ = data.parse_csv(raw_extract(headers, list(reversed(cells))))
+        self.assertEqual(set(reversed_rows), set(rows), 'Identified records remain stable when the export is reordered')
+        self.assertEqual({key: row['state'] for key, row in reversed_rows.items()}, {key: row['state'] for key, row in rows.items()})
+
+    def test_blank_names_without_identifiers_keep_distinct_original_rows_and_stable_header_order(self):
+        headers = ['name', 'state', 'custom_note']
+        cells = [['', 'Live', 'One'], ['', 'Live', 'Two'], ['', 'Live', 'One'], [' ', 'Live', 'One']]
+        rows, report = data.parse_csv(raw_extract(headers, cells))
+        self.assertEqual(len(rows), 3, 'Only exact repeated rows may collapse when no package identity is supplied')
+        self.assertEqual(report['duplicates'], 1)
+        self.assertEqual(report['identical_duplicates'], 1)
+        self.assertEqual(sum(len(json.loads(row['source_rows_json'])['rows']) for row in rows.values()), 4)
+        reordered, _ = data.parse_csv(raw_extract(['CUSTOM_NOTE', ' STATE ', ' Name '], [[note, state, name] for name, state, note in reversed(cells)]))
+        self.assertEqual(set(rows), set(reordered), 'Anonymous keys depend on normalized headers and original values, not CSV column/row order')
+
+    def test_typed_raw_identities_cannot_collide_with_package_names_or_other_identifier_types(self):
+        headers = ['name', 'state', 'package_id', 'sys_id']
+        rows, _ = data.parse_csv(raw_extract(headers, [['', 'Live', '', 'EPP123'], ['', 'Live', 'EPP123', '']]))
+        self.assertEqual(len(rows), 2, 'A ServiceNow sys_id and a package ID with the same text identify separate records')
+        first_key = next(iter(rows))
+        combined, _ = data.parse_csv(raw_extract(headers, [['', 'Live', '', 'EPP123'], [first_key, 'Live', '', ''], ['ixExample', 'Live', '', '']]))
+        self.assertEqual(len(combined), 3)
+        self.assertIn(first_key, combined)
+        self.assertIn('ixexample', combined)
+        literal = next(row for row in combined.values() if row['short_name'] == first_key)
+        self.assertNotEqual(literal['name_key'], first_key, 'A literal name resembling an internal key must not overwrite an anonymous record')
+
+    def test_invalid_headers_structural_rows_and_empty_uploads(self):
         bad = [b'', b'name,state\n', b'display_name,state\nA,Live\n', b'name,name,state\nA,A,Live\n',
-               b'name,state\nA,Live,extra\n', b'name,state\n../A,Live\n', b'name,state\n,Live\n',
+               b'name,state\nA,Live,extra\n',
                b'name,state\nA,"unterminated\n', b'name,state\nA\x00,Live\n']
         for text in bad:
             with self.subTest(text=text), self.assertRaises(ValueError): data.parse_csv(text)
@@ -180,9 +266,54 @@ class PackageParsing(unittest.TestCase):
     def test_bounded_upload_and_row_count(self):
         with self.assertRaisesRegex(ValueError, '10 MB'): data.parse_csv(b'x' * (10 * 1024 * 1024 + 1))
         with self.assertRaisesRegex(ValueError, '20,000'): data.parse_csv(('name,state\n' + ''.join(f'p{i},Live\n' for i in range(20001))).encode())
+        with self.assertRaisesRegex(ValueError, 'oversized cell'):
+            data.parse_csv(raw_extract(['name', 'state'], [['x' * 4097, 'Live']]))
 
 
 class PackageBrowsing(unittest.TestCase):
+    def test_raw_records_are_browsable_with_useful_labels_but_never_gain_a_package_folder(self):
+        long_name = 'x' * 201
+        headers = ['name', 'state', 'display_name', 'package_id']
+        cells = [['ixExample', 'Live', 'Real application', 'EPP_REAL'],
+                 ['./ixExample', 'Work in Progress', 'Friendly metadata record', 'EPP_PATH'],
+                 ['../ixExample', 'Live', '', 'EPP_PARENT'],
+                 [r'C:\ixExample', 'Live', '', 'EPP_DRIVE'],
+                 [long_name, 'Live', '', 'EPP_LONG'],
+                 ['', 'Live', '', 'EPP_BLANK'],
+                 ['', 'Work in Progress', '', '']]
+        with fixture_connect(':memory:') as con:
+            data.initialize(con)
+            seed_content(con, raw_extract(headers, cells))
+            with patch.object(data, 'repository_names', return_value=(['ixExample', long_name], True, '')):
+                result = data.browse(con)
+                self.assertEqual(result['stats']['matched'], 1)
+                self.assertEqual(result['stats']['metadata_packages'], 7)
+                self.assertEqual(result['stats']['metadata_only'], 6)
+                self.assertEqual(result['stats']['source_only'], 1)
+                self.assertEqual(result['total'], 8)
+                source_item = next(item for item in result['items'] if item['id'] == 'repo:ixExample')
+                self.assertEqual(source_item['state'], 'Live')
+                self.assertFalse(source_item.get('metadata_note'))
+                raw = [item for item in result['items'] if item['id'].startswith('data:/atlas-raw/')]
+                self.assertEqual(len(raw), 6)
+                for item in raw:
+                    self.assertEqual(item['folder'], '')
+                    self.assertFalse(item['source_present'])
+                    self.assertTrue(item['metadata_present'])
+                    self.assertEqual(item['coverage'], 'metadata-only')
+                    self.assertTrue(item['metadata_note'])
+                    self.assertNotIn('raw_json', item)
+                    self.assertNotIn('source_rows_json', item)
+                self.assertEqual(next(item for item in raw if item['package_id'] == 'EPP_PATH')['display_name'], 'Friendly metadata record')
+                self.assertEqual(next(item for item in raw if item['package_id'] == 'EPP_BLANK')['display_name'], 'EPP_BLANK')
+                self.assertEqual(next(item for item in raw if not item['package_id'])['display_name'], 'Unnamed package')
+                self.assertEqual(next(item for item in raw if item['package_id'] == 'EPP_LONG')['short_name'], long_name)
+                self.assertEqual(data.browse(con, term='EPP_BLANK')['total'], 1)
+                self.assertEqual(data.browse(con, coverage='metadata-only')['total'], 6)
+                joined = data.join_metadata(['ixExample', long_name], data.load(con))
+                self.assertEqual(joined['ixExample']['state'], 'Live')
+                self.assertIsNone(joined[long_name], 'An overlong literal remains metadata only even if an identically named folder is enumerated')
+
     def test_exact_name_union_filters_ambiguity_and_missing_metadata(self):
         with tempfile.TemporaryDirectory() as temp, fixture_connect(':memory:') as con:
             repo = Path(temp)
@@ -376,6 +507,73 @@ class PackageImport(unittest.TestCase):
             self.assertEqual(con.execute('select count(*) from package_data_imports').fetchone()[0], 1)
         self.assertEqual(sorted(path.name for path in (self.root / 'backups').iterdir()), backups_before)
 
+    def test_path_at_csv_row_15238_imports_unchanged_and_survives_package_backup(self):
+        headers = ['name', 'state', 'package_id', 'original_note']
+        cells = [['ixExample', 'Live', 'EPP_REAL', 'Real source package']]
+        cells += [[f'ixPackage{i:05}', 'Live', f'EPP{i}', 'Stored metadata'] for i in range(15235)]
+        cells += [['../ixExample', 'Work in Progress', 'EPP_PATH', ' Raw original path value '],
+                  ['', 'Live', 'EPP_BLANK', 'Original blank short name']]
+        preview = self.preview_content(raw_extract(headers, cells))
+        self.assertEqual(preview['report']['rows'], 15238)
+        self.assertEqual(preview['report']['unique'], 15238)
+        self.assertEqual(preview['report']['unmatched_rows'], 2)
+        self.assertEqual(preview['report']['unmatched_records'], 2)
+        self.assertEqual(preview['report']['matched'], 1)
+        self.assertEqual(preview['report']['unmatched_examples'][0], {
+            'row': 15238, 'short_name': '../ixExample', 'package_id': 'EPP_PATH', 'reason': 'non_folder_name'})
+        saved = self.apply(preview)
+        self.assertEqual(saved.status_code, 200, saved.text)
+        with fixture_connect(self.db) as con:
+            stored = data.load(con)
+            self.assertEqual(len(stored), len(cells))
+            raw_path = next(row for row in stored.values() if row['package_id'] == 'EPP_PATH')
+            self.assertEqual(json.loads(raw_path['raw_json']), dict(zip(headers, cells[-2])))
+            source = json.loads(raw_path['source_rows_json'])
+            self.assertEqual(source['rows'], [{'row': 15238, 'cells': cells[-2]}])
+            self.assertEqual(source['matching_issue'], 'non_folder_name')
+            self.assertEqual(sum(len(json.loads(row['source_rows_json'])['rows']) for row in stored.values()), len(cells))
+        result = self.client.get('/api/package-data', params={'term': 'EPP_PATH'}).json()
+        self.assertEqual(result['total'], 1)
+        self.assertFalse(result['items'][0]['source_present'])
+        self.assertEqual(result['items'][0]['folder'], '')
+        self.assertEqual(self.client.get('/api/package-data', params={'coverage': 'matched'}).json()['items'][0]['state'], 'Live')
+        next_preview = self.preview([('ixOther', 'Live')])
+        self.assertEqual(next_preview['report']['retained'], 15238)
+        saved = self.apply(next_preview)
+        self.assertEqual(saved.status_code, 200, saved.text)
+        with gzip.open(self.root / 'backups' / saved.json()['backup'], 'rt', encoding='utf-8') as backup:
+            packages = json.load(backup)['packages']
+        self.assertEqual(len(packages), len(cells))
+        archived = next(row for row in packages if row['package_id'] == 'EPP_PATH')
+        self.assertEqual(archived, raw_path)
+        self.assertEqual((self.repo / 'ixExample' / 'setup_i.ps1').read_text(), 'exit 0')
+
+    def test_identified_and_anonymous_raw_reimports_keep_keys_without_making_new_records(self):
+        headers = ['name', 'state', 'package_id', 'sys_id', 'extra_note']
+        cells = [['', 'Live', 'EPP1', 'sys-alpha', 'A'],
+                 ['', 'Work in Progress', 'EPP2', '', 'B'],
+                 ['', 'Live', '', '', 'C'],
+                 ['./ixExample', 'Live', '', '', 'D']]
+        saved = self.apply(self.preview_content(raw_extract(headers, cells)))
+        self.assertEqual(saved.status_code, 200, saved.text)
+        with fixture_connect(self.db) as con:
+            original_keys = set(data.load(con))
+        preview = self.preview_content(raw_extract(headers, list(reversed(cells))))
+        self.assertEqual(preview['report']['added'], 0)
+        self.assertEqual(preview['report']['unchanged'], 4)
+        self.assertEqual(preview['report']['after'], 4)
+        self.assertEqual(self.apply(preview).status_code, 200)
+        changed_cells = [['', 'Work in Progress', 'EPP_NEW', 'sys-alpha', 'Changed']]
+        preview = self.preview_content(raw_extract(headers, changed_cells))
+        self.assertEqual(preview['report']['added'], 0, 'Stable sys_id remains the identity when package metadata changes')
+        self.assertEqual(preview['report']['changed'], 1)
+        self.assertEqual(preview['report']['retained'], 3)
+        self.assertEqual(self.apply(preview).status_code, 200)
+        with fixture_connect(self.db) as con:
+            current = data.load(con)
+            self.assertEqual(set(current), original_keys)
+            self.assertEqual(next(row for row in current.values() if row['package_id'] == 'EPP_NEW')['state'], 'Work in Progress')
+
     def test_failed_commit_rolls_back_all_rows_and_preserves_preview(self):
         preview = self.preview([('ixFirst', 'Live'), ('ixFail', 'Live')])
         with fixture_connect(self.db) as con:
@@ -390,7 +588,8 @@ class PackageImport(unittest.TestCase):
 
     def test_demo_reads_metadata_but_cannot_import_or_scan_share(self):
         from backend import viewer
-        self.apply(self.preview([('ixExample', 'Live')]))
+        self.apply(self.preview_content(raw_extract(['name', 'state', 'package_id'],
+                                                  [['ixExample', 'Live', 'EPP_REAL'], ['', 'Live', 'EPP_BLANK'], ['../ixExample', 'Live', 'EPP_PATH']])))
         # The fixture lacks directory schema; use an explicit read-only connection.
         from contextlib import contextmanager
         @contextmanager
@@ -402,9 +601,12 @@ class PackageImport(unittest.TestCase):
         with patch.object(viewer, 'connect', connect), patch.object(data.os, 'scandir', side_effect=AssertionError('Demo must not enumerate package source')):
             with TestClient(viewer.app) as client:
                 result = client.get('/api/package-data').json()
-                self.assertEqual(result['total'], 1)
-                self.assertNotIn('raw_json', result['items'][0])
-                self.assertNotIn('source_rows_json', result['items'][0])
+                self.assertEqual(result['total'], 3)
+                for item in result['items']:
+                    self.assertNotIn('raw_json', item)
+                    self.assertNotIn('source_rows_json', item)
+                    self.assertFalse(item['source_present'])
+                self.assertEqual(next(item for item in result['items'] if item['package_id'] == 'EPP_BLANK')['display_name'], 'EPP_BLANK')
                 self.assertEqual(client.post('/api/package-data/import/preview').status_code, 403)
                 self.assertEqual(client.post('/api/package-data/import/apply/test').status_code, 403)
 

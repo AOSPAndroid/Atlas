@@ -215,7 +215,7 @@ export function Packages() {
                             onClick={() => setSelected(item)}
                           >
                             <strong>{item.display_name}</strong>
-                            <code>{item.short_name}</code>
+                            <code>{item.short_name || "Short name not supplied"}</code>
                           </button>
                         </td>
                         <td>
@@ -284,7 +284,10 @@ export function Packages() {
                       ×
                     </button>
                   </div>
-                  <code>{selected.short_name}</code>
+                  <code>{selected.short_name || "Short name not supplied"}</code>
+                  {selected.metadata_note && (
+                    <p className="package-source-note">{selected.metadata_note}</p>
+                  )}
                   <p>
                     <StateBadge state={selected.state} />{" "}
                     <span className="package-coverage">

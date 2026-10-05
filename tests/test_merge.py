@@ -143,6 +143,26 @@ class MergedAtlas(unittest.TestCase):
   from package_catalog import inspect_package
   self.assertFalse(inspect_package(pkg,limit=1)['complete'])
 
+ def test_11a_catalog_enrichment_excludes_raw_records_and_source_payloads(self):
+  import package_data as data
+  rows,_=data.parse_csv(b'name,state,custom_note\nExample,Live,Original one\nExample,Live,Original two\n../Example,Work in Progress,Keep literal path\n')
+  columns=['name_key',*data.FIELDS,*data.SOURCE_FIELDS,'source','imported_at']
+  with atlas_store.connect() as c:
+   data.initialize(c)
+   for row in rows.values():
+    item={**row,'source':'fictional.csv','imported_at':'2026-10-05'}
+    c.execute(f"insert or replace into package_data({','.join(columns)}) values({','.join('?' for _ in columns)})",tuple(item[column] for column in columns))
+  response=self.client.get('/api/catalog/details',params={'folder':'Example'})
+  self.assertEqual(response.status_code,200,response.text)
+  info=response.json()['package_data'];self.assertEqual(info['state'],'Live')
+  for field in data.SOURCE_FIELDS:self.assertNotIn(field,info)
+  catalog=self.client.get('/api/catalog').json()['items']
+  self.assertEqual([row['folder'] for row in catalog],['Example'])
+  self.assertEqual(catalog[0]['state'],'Live')
+  raw=self.client.get('/api/package-data',params={'term':'../Example'}).json()['items']
+  self.assertEqual(len(raw),1);self.assertEqual(raw[0]['folder'],'');self.assertFalse(raw[0]['source_present'])
+  self.assertEqual(self.client.get('/api/catalog/details',params={'folder':'../Example'}).status_code,400)
+
  def test_12_refresh_backup_preserves_catalogue_and_paris(self):
   from refresh_directory import apply_refresh
   with m.db() as c:
