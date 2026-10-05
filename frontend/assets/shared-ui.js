@@ -507,6 +507,7 @@
           ["Model", machine.model_id],
           ["Device category", machine.model_category],
           ["Asset tag", machine.asset_tag],
+          ["Export CI", String(machine.source_ci || "").toUpperCase() !== String(machine.name || machine.machine_name || "").toUpperCase() ? machine.source_ci : ""],
           ["Asset display name", machine.display_name],
           ["Device location", machine.device_location],
           ["Serial number", machine.serial_number],
@@ -659,7 +660,7 @@
         if (!response.ok)
           throw Error(data.detail || "Export fields unavailable");
         if (!element.open) return;
-        body.innerHTML = `<h3>${esc(data.name)}</h3><p>${esc(data.original_cells ? `${data.source} · ${data.sheet} · row ${data.row}` : "Stored directory fields. Refresh the directory export to retain original cells and any additional columns.")}</p>${data.restricted_columns ? "<p>Additional export columns are available in the admin version.</p>" : ""}<label>Find a field<input type="search" aria-label="Find an export field" placeholder="Name or value…"></label><p class="atlas-export-count" role="status"></p><div class="atlas-export-fields"></div><button type="button" class="atlas-export-copy">Copy all fields</button>`;
+        body.innerHTML = `<h3>${esc(data.name)}</h3><p>${esc(data.original_cells ? `${data.source} · ${data.sheet} · row ${data.row}${data.source_rows > 1 ? ` · selected from ${data.source_rows} retained source rows` : ""}` : "Stored directory fields. Refresh the directory export to retain original cells and any additional columns.")}</p>${data.restricted_columns ? "<p>Additional export columns are available in the admin version.</p>" : ""}<label>Find a field<input type="search" aria-label="Find an export field" placeholder="Name or value…"></label><p class="atlas-export-count" role="status"></p><div class="atlas-export-fields"></div><button type="button" class="atlas-export-copy">Copy all fields</button>`;
         const valueOf = (field) => {
           const value = field.stored_value ?? field.value;
           return [
@@ -727,9 +728,9 @@
       .toUpperCase()
       .split(".")[0];
     const text = [machine.model_category, machine.model_id, machine.sys_class_name].filter(Boolean).join(" ").toLowerCase();
-    if (text.includes("iphone") || name.startsWith("IPHONE-")) return "iphone";
-    if (/\b(ipad|tablet)\b/.test(text) || name.startsWith("IPAD-")) return "tablet";
-    if (/mobile device|handheld|android|\b(phone|smartphone)\b/.test(text)) return "phone";
+    if (text.includes("iphone") || name === "IPHONE" || name.startsWith("IPHONE-")) return "iphone";
+    if (/\b(ipad|tablet)\b/.test(text) || ["IPAD", "TABLET"].includes(name) || /^(IPAD|TABLET)-/.test(name)) return "tablet";
+    if (/mobile device|handheld|android|\b(phone|smartphone)\b/.test(text) || name === "PHONE" || name.startsWith("PHONE-")) return "phone";
     if (/\b(macbook|imac|mac mini|mac pro)\b/.test(text)) return "mac";
     if (/\b(laptop|notebook|latitude|thinkpad|elitebook|zbook|probook)\b/.test(text)) return "laptop";
     // The K belongs to PWMK, not the country prefix (e.g. NYK).

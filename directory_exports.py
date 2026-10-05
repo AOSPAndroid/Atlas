@@ -62,6 +62,8 @@ def schema(con):
     # Individual statements preserve the caller's transaction (no executescript).
     con.execute('create table if not exists directory_export_sheets(sheet text primary key,kind text not null,source_file text not null,headers text not null,populated text not null,row_count integer not null,linked_count integer not null)')
     con.execute('create table if not exists directory_export_rows(sheet text not null,row_number integer not null,entity_key text not null,cells text not null,primary key(sheet,row_number))')
+    if 'selected' not in {r[1] for r in con.execute('pragma table_info(directory_export_rows)')}:
+        con.execute('alter table directory_export_rows add column selected integer not null default 0')
     con.execute('create index if not exists ix_export_entity on directory_export_rows(entity_key,sheet)')
 
 
@@ -70,13 +72,17 @@ def copy_archive(source, target):
     for table in reversed(TABLES):
         target.execute('delete from '+table)
     if exists(source):
-        for table, count in ((TABLES[0], 7), (TABLES[1], 4)):
-            target.executemany('insert into '+table+' values ('+','.join('?' for _ in range(count))+')',
-                               (tuple(row) for row in source.execute('select * from '+table)))
+        target.executemany('insert into directory_export_sheets values (?,?,?,?,?,?,?)',
+                           (tuple(row) for row in source.execute('select * from directory_export_sheets')))
+        selected='selected' if 'selected' in {r[1] for r in source.execute('pragma table_info(directory_export_rows)')} else '0'
+        target.executemany('insert into directory_export_rows(sheet,row_number,entity_key,cells,selected) values (?,?,?,?,?)',
+                           (tuple(row) for row in source.execute('select sheet,row_number,entity_key,cells,'+selected+' from directory_export_rows')))
 
 
-def capture(con, path):
-    from directory_workbook import workbook_parts, iter_rows, canonical_header, clean, norm
+def capture(con, path, *, selection_table=None):
+    from directory_workbook import workbook_parts, iter_rows, directory_columns, directory_data, user_identity, norm
+    from device_inventory import inventory_identity
+    if selection_table not in (None,'directory_import_sources'):raise ValueError('Unknown import selection table')
     schema(con)
     for sheet, part in workbook_parts(path):
         kind = sheet_kind(sheet)
@@ -87,7 +93,7 @@ def capture(con, path):
                         (sheet, kind, path.name, '[]', '[]', 0, 0))
             continue
         _, headers = first
-        mapped = [field_map(kind).get(canonical_header(h), ('', ''))[0] for h in headers]
+        columns=directory_columns(kind,headers)
         populated = [0] * len(headers)
         row_count = linked_count = 0
         for number, row in rows:
@@ -97,15 +103,18 @@ def capture(con, path):
                 headers.extend('' for _ in range(len(row)-len(headers)))
                 populated.extend(0 for _ in range(len(headers)-len(populated)))
             cells = list(row)  # Positional arrays preserve duplicate/blank headers.
-            d = {column: clean(row[i]) if i < len(row) else '' for i, column in enumerate(mapped) if column}
+            d = directory_data(columns,row)
             key = ''
             if kind == 'user':
-                key = next((prefix+norm(d.get(column)) for prefix, column in
-                            (('uid:', 'user_id'), ('email:', 'email'), ('name:', 'full_name')) if d.get(column)), '')
-            elif kind == 'machine' and d.get('machine_name'):
-                key = 'machine:'+norm(d['machine_name'])
-            con.execute('insert into directory_export_rows values(?,?,?,?)',
-                        (sheet, number, key, json.dumps(cells, ensure_ascii=False, separators=(',', ':'))))
+                key = user_identity(d)
+            elif kind == 'machine':
+                name,_=inventory_identity(d,number)
+                if name:key='machine:'+norm(name)
+            values=(sheet,number,key,json.dumps(cells,ensure_ascii=False,separators=(',',':')))
+            if selection_table:
+                con.execute('insert into directory_export_rows(sheet,row_number,entity_key,cells,selected) values(?,?,?,?,coalesce((select row_number=? from directory_import_sources where kind=? and entity_key=?),0))',values+(number,kind,key))
+            else:
+                con.execute('insert into directory_export_rows(sheet,row_number,entity_key,cells) values(?,?,?,?)',values)
             row_count += 1
             linked_count += bool(key)
             for i, value in enumerate(cells):
@@ -165,7 +174,8 @@ def _record(con, kind, key, *, include_unmapped):
     data = dict(row)
     name = data['full_name' if kind == 'user' else 'machine_name']
     if exists(con):
-        archived = con.execute('select s.sheet,s.source_file,s.headers,r.row_number,r.cells from directory_export_rows r join directory_export_sheets s on s.sheet=r.sheet where r.entity_key=? and s.kind=? order by r.row_number limit 1',
+        selected='r.selected desc,' if 'selected' in {r[1] for r in con.execute('pragma table_info(directory_export_rows)')} else ''
+        archived = con.execute('select s.sheet,s.source_file,s.headers,r.row_number,r.cells from directory_export_rows r join directory_export_sheets s on s.sheet=r.sheet where r.entity_key=? and s.kind=? order by '+selected+'r.row_number limit 1',
                                (key if kind == 'user' else 'machine:'+key, kind)).fetchone()
         if archived:
             sheet, source, headers, number, cells = archived
@@ -175,7 +185,8 @@ def _record(con, kind, key, *, include_unmapped):
                 field['value'] = cells[i] if i < len(cells) else ''
                 field['stored_value'] = data.get(field['field']) if field['field'] else None
             visible = [field for field in fields if include_unmapped or field['field']]
-            return {'name': name, 'source': source, 'sheet': sheet, 'row': number,
+            row_count=con.execute('select count(*) from directory_export_rows where sheet=? and entity_key=?',(sheet,key if kind=='user' else 'machine:'+key)).fetchone()[0]
+            return {'name': name, 'source': source, 'sheet': sheet, 'row': number, 'source_rows':row_count,
                     'original_cells': True, 'fields': visible, 'restricted_columns': len(fields)-len(visible)}
     return {'name': name, 'source': 'Stored directory', 'original_cells': False,
             'fields': [{'header': source, 'label': label, 'field': column, 'value': data.get(column, '')}

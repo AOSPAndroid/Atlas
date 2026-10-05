@@ -45,6 +45,8 @@ def validate_pc(pc):
    c.row_factory=sqlite3.Row
    if c.execute("select 1 from sqlite_master where type='table' and name='machines'").fetchone():
     row=c.execute('select * from machines where machine_name_norm=?',(pc.lower(),)).fetchone()
+    if not row and c.execute("select 1 from pragma_table_info('machines') where name='source_ci'").fetchone():
+     row=c.execute('select * from machines where lower(source_ci)=? limit 1',(pc.lower(),)).fetchone()
     if row:record=dict(row)
  if not supports_windows(record):raise HTTPException(400,'This device is inventory only. Windows deployment and remote tools require a PC.')
  return pc

@@ -10,6 +10,7 @@ const counts = {before: 1, after: 2, added: 1, removed: 0, changed: 0, added_exa
 const preview = {id: 'stage-one', source: 'emea.xlsx', report: {
   users: counts, machines: counts, relationships: counts,
   warnings: [], unlinked_machine_references: 0, missing_desk_accounts: [],
+  import_resolution: {user: {duplicate_rows: 2}, machine: {duplicate_rows: 3}, mobile_identity_rows: 4},
 }};
 (async () => {
   const startup = deferred(), upload = deferred(), requests = [];
@@ -83,6 +84,8 @@ const preview = {id: 'stage-one', source: 'emea.xlsx', report: {
   await get('validate').onclick(); assert.equal(previews, 1, 'Repeated clicks never duplicate an upload');
   upload.resolve(response(preview)); await pending; await sleep(40);
   assert(!get('preview').hidden && !get('full').closest('[hidden]'), 'Successful validation opens inline review controls');
+  assert.match(get('changes').textContent,/5 duplicate rows consolidated/);
+  assert.match(get('changes').textContent,/4 mobile rows identified/);
   assert(get('apply').disabled);
   get('full').checked = true; get('full').onchange(); assert(get('apply').disabled);
   get('confirm').value = 'APPLY'; get('confirm').oninput(); assert(!get('apply').disabled);

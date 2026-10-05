@@ -21,6 +21,7 @@ SEARCH_FIELDS.update({
  'infrastructure': ('machine', 'infrastructure_itsi'), 'assigned': ('machine', 'assigned_to'),
  'type': ('machine', 'device_kind'), 'asset_state': ('machine', 'install_status'),
  'device_location': ('machine', 'device_location'),
+ 'source_ci': ('machine', 'source_ci'),
  'last_user': ('machine', 'last_logon_user'), 'description': ('machine', 'short_description'),
  'team': ('user', 'department'), 'business': ('user', 'business_unit'),
  'organisation': ('user', 'organisational_unit'), 'office': ('user', 'location'),
@@ -64,10 +65,15 @@ def search_directory(c,term:str):
   condition='name_norm=? or lower(serial_number)=? or lower(correlation_id)=?'
   parameters=(q.rstrip('.'),q,q)
   if asset_column:condition+=' or lower(asset_tag)=?';parameters+=(q,)
+  source_ci=c.execute("select 1 from pragma_table_info('machines') where name='source_ci'").fetchone()
+  if source_ci:condition+=' or lower(source_ci)=?';parameters+=(q,)
   machines=c.execute('select * from legacy_machines where '+condition+' order by name limit 100',parameters).fetchall()
  if not users and not machines:
   if prefix!='machine':users=c.execute("select * from legacy_users where user_name_norm like ? escape '\\' or name_norm like ? escape '\\' or email_norm like ? escape '\\' or lower(brid) like ? escape '\\' order by name,id limit 100",(like,like,like,like)).fetchall()
-  if prefix not in ('user','email','name','brid'):machines=c.execute("select * from legacy_machines where name_norm like ? escape '\\' order by name limit 100",(like,)).fetchall()
+  if prefix not in ('user','email','name','brid'):
+   condition="name_norm like ? escape '\\'";parameters=(like,)
+   if source_ci:condition+=" or lower(source_ci) like ? escape '\\'";parameters+=(like,)
+   machines=c.execute('select * from legacy_machines where '+condition+' order by name limit 100',parameters).fetchall()
  return {'users':[dict(x) for x in users],'machines':[dict(x) for x in machines]}
 
 

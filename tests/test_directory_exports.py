@@ -112,13 +112,14 @@ class ExportTests(unittest.TestCase):
             with self.assertRaises(RuntimeError): merge_directory(self.db, older)
         self.assertEqual(before, [tuple(r) for r in c.execute('select * from directory_export_rows')])
 
-    def test_duplicate_mapped_headers_rejected_without_replacing_database(self):
-        before = self.db.read_bytes()
+    def test_duplicate_mapped_headers_coalesced_with_original_cells_retained(self):
         self.sheets['Users'][0].append('business_unit')
         self.sheets['Users'][1].append('Conflicting')
         workbook(self.xlsx, self.sheets)
-        with self.assertRaisesRegex(ValueError, 'duplicate columns'): build(self.xlsx, self.db)
-        self.assertEqual(self.db.read_bytes(), before)
+        build(self.xlsx,self.db)
+        c=self.connect()
+        self.assertEqual(c.execute('select business_unit from users').fetchone()[0],'Technology')
+        self.assertEqual(exports.record(c,'user','uid:u1')['fields'][-1]['value'],'Conflicting')
 
     def test_admin_archive_download_and_legacy_fallback(self):
         from fastapi import FastAPI
@@ -184,15 +185,9 @@ class ExportTests(unittest.TestCase):
             self.assertEqual(data['restricted_columns'],0)
             self.assertEqual(client.post('/api/database/preview',content=self.xlsx.read_bytes()).status_code,403)
 
-    def test_new_sheet_aliases_reject_ambiguous_sheets_headers_and_duplicate_identities(self):
+    def test_unreadable_or_empty_extracts_preserve_the_existing_directory(self):
         cases=[]
         sheets=device_sheets();sheets['computers']=[['name'],['ANOTHERPC']];cases.append((sheets,'Multiple machine worksheets'))
-        for header in ['name','model_id']:
-            sheets=device_sheets();sheets['devices'][0].append(header)
-            for row in sheets['devices'][1:]:row.append('conflicting')
-            cases.append((sheets,'duplicate columns'))
-        sheets=device_sheets();sheets['devices'][2][3]=' TESTPC-1 ';cases.append((sheets,'duplicate identity'))
-        sheets=device_sheets();sheets['users'][2][0]=' U1 ';cases.append((sheets,'duplicate identity'))
         sheets=device_sheets();sheets['devices'][0][3]='asset_identifier';cases.append((sheets,'ci or name'))
         sheets=device_sheets()
         for row in sheets['devices'][1:]:row[3]=''

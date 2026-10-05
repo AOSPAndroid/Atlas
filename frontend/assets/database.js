@@ -118,6 +118,10 @@
         return `<article><b>${esc(k)}</b><p>${x.before.toLocaleString()} → ${x.after.toLocaleString()}</p><p>+${x.added} added · −${x.removed} removed${x.changed !== undefined ? " · " + x.changed + " changed" : ""}</p></article>`;
       })
       .join("");
+    const resolution=d.report.import_resolution || {};
+    const duplicates=(resolution.user?.duplicate_rows || 0)+(resolution.machine?.duplicate_rows || 0);
+    if (duplicates || resolution.mobile_identity_rows)
+      $("changes").insertAdjacentHTML("beforeend",`<article><h3>Extract handled automatically</h3><p>${duplicates.toLocaleString()} duplicate rows consolidated · ${(resolution.mobile_identity_rows || 0).toLocaleString()} mobile rows identified by hardware ID or source row.</p><p>Every original row and column is retained. Separate phones stay separate.</p></article>`);
     if (d.report.coverage)
       $("changes").insertAdjacentHTML(
         "beforeend",
@@ -135,6 +139,7 @@
         added_machines: d.report.machines.added_examples,
         removed_machines: d.report.machines.removed_examples,
         missing_desk_accounts: d.report.missing_desk_accounts,
+        duplicate_records: resolution,
       },
       null,
       2,

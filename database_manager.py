@@ -52,6 +52,14 @@ def compare(target,candidate):
   result['warnings']=[f'{t}: more than 10% of existing records disappear.' for t in ('users','machines') if result[t]['removed']>result[t]['before']*.1]
   result['unlinked_machine_references']=b.execute("select count(*) from machines m where (trim(coalesce(assigned_to,''))<>'' or trim(coalesce(last_logon_user,''))<>'') and not exists(select 1 from assignments a where a.machine_id=m.id)").fetchone()[0]
   result['coverage']=directory_exports.coverage(b)
+  resolution=b.execute("select value from metadata where key in ('import_resolution','directory.import_resolution') order by case key when 'directory.import_resolution' then 0 else 1 end limit 1").fetchone()
+  result['import_resolution']=json.loads(resolution[0]) if resolution else {}
+  for kind,label in (('user','Users'),('machine','Devices')):
+   summary=result['import_resolution'].get(kind,{})
+   if summary.get('conflicting_rows'):
+    result['warnings'].append(f"{label}: {summary['conflicting_rows']:,} duplicate rows had different values; the newest record-updated date wins, otherwise the last row wins. All original rows are retained.")
+  if result['import_resolution'].get('mobile_without_identifiers'):
+   result['warnings'].append(f"{result['import_resolution']['mobile_without_identifiers']:,} mobile rows have no unique CI, serial or asset tag; kept as separate inventory records using source row IDs.")
   result['devices_without_hostnames']=sum(s['rows']-s['linked'] for s in result['coverage']['sheets'] if s['kind']=='machine')
   if result['devices_without_hostnames']:
    result['warnings'].append(f"{result['devices_without_hostnames']:,} device rows have no ci/name hostname; retained in the export archive, excluded from searchable machines.")
@@ -117,7 +125,7 @@ def register_database_manager(app,wmi,check_token):
     coverage=directory_exports.coverage(c)
     yield json.dumps({'type':'coverage',**coverage},ensure_ascii=False)+'\n'
     if coverage['original_cells']:
-     for sheet,number,key,cells in c.execute('select * from directory_export_rows order by sheet,row_number'):
+     for sheet,number,key,cells in c.execute('select sheet,row_number,entity_key,cells from directory_export_rows order by sheet,row_number'):
       yield json.dumps({'type':'row','sheet':sheet,'row':number,'key':key,'cells':json.loads(cells)},ensure_ascii=False)+'\n'
     else:
      c.row_factory=sqlite3.Row

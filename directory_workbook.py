@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Read directory workbooks and build validated import candidates."""
-import argparse, os, re, shutil, sqlite3, zipfile, uuid
+import argparse, hashlib, json, os, re, shutil, sqlite3, zipfile, uuid
 from identity_links import rebuild_links
 import xml.etree.ElementTree as ET
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 NS='{http://schemas.openxmlformats.org/spreadsheetml/2006/main}'
@@ -71,7 +71,6 @@ def iter_rows(path,target,raw=False):
                 if sheet_data is not None:sheet_data.remove(e)
 
 def canonical_header(v):return re.sub(r'[^a-z0-9]+','_',norm(v)).strip('_')
-def rowdict(headers,row):return {headers[i]:clean(row[i]) if i<len(row) else '' for i in range(len(headers))}
 
 def directory_parts(path):
     from directory_exports import sheet_kind
@@ -84,26 +83,64 @@ def directory_parts(path):
     if not {'user','machine'}<=parts.keys():raise ValueError('Include users and devices worksheets (Users and computers are also supported).')
     return parts
 
-def directory_rows(path,kind,sheet,part):
+def directory_columns(kind, headers):
     from directory_exports import field_map
+    mapping=field_map(kind)
+    columns=[(i,canonical_header(h),mapping.get(canonical_header(h),(canonical_header(h),''))[0]) for i,h in enumerate(headers)]
+    # A devices export may include both its CI and its asset display name.
+    # Prefer CI, then coalesce nonempty aliases without changing the original cells.
+    return sorted(columns,key=lambda x:({'machine_name':0,'ci':1,'name':2}.get(x[1],3) if x[2]=='machine_name' else 0,x[0]))
+
+def directory_data(columns, row):
+    data={}
+    for index,header,field in columns:
+        value=clean(row[index]) if index<len(row) else ''
+        if not data.get(field):data[field]=value
+    return data
+
+def user_identity(data):
+    return next((prefix+norm(data.get(field)) for prefix,field in
+                 (('uid:','user_id'),('email:','email'),('name:','full_name')) if clean(data.get(field))), '')
+
+def directory_rows(path,kind,sheet,part):
     rows=iter_rows(path,part);first=next(rows,None)
     if first is None:raise ValueError(f'{sheet}: worksheet is empty.')
-    mapping=field_map(kind)
-    headers=[mapping.get(canonical_header(h),(canonical_header(h),''))[0] for h in first[1]]
-    known=[h for h in headers if h in {v[0] for v in mapping.values()}]
-    if len(known)!=len(set(known)):raise ValueError(f'{sheet}: duplicate columns map to the same directory field.')
+    columns=directory_columns(kind,first[1]);headers={field for _,_,field in columns}
     required={'user_id','full_name','email'} if kind=='user' else {'machine_name'}
-    if not required<=set(headers):
+    if not required<=headers:
         expected='user_name, name and email' if kind=='user' else 'ci or name (machine hostname)'
         raise ValueError(f'{sheet}: missing identity columns; include {expected}.')
-    seen=set()
     for number,row in rows:
-        data=rowdict(headers,row)
-        value=norm(data.get('user_id') or data.get('email') or data.get('full_name')) if kind=='user' else norm(data.get('machine_name'))
-        if value:
-            if value in seen:raise ValueError(f'{sheet}: duplicate identity {value} at row {number}. Remove duplicate rows and validate again.')
-            seen.add(value)
-        yield data
+        yield number,directory_data(columns,row)
+
+def updated_rank(data):
+    value=clean(data.get('updated_on') or data.get('sys_updated_on'))
+    if not value:return None
+    value=excel_date(value)
+    try:
+        date=datetime.fromisoformat(value.replace('Z','+00:00'))
+    except ValueError:
+        date=None
+        for fmt in ('%d/%m/%Y %H:%M:%S','%d/%m/%Y %H:%M','%d/%m/%Y'):
+            try:date=datetime.strptime(value,fmt);break
+            except ValueError:pass
+        if date is None:return None
+    return date.replace(tzinfo=timezone.utc).timestamp() if date.tzinfo is None else date.timestamp()
+
+def select_import_row(con,kind,key,number,data,values,stats):
+    """Use the newest dated row, then the last source row; never combine assignments."""
+    rank=updated_rank(data)
+    digest=hashlib.sha256(json.dumps(values,ensure_ascii=False,separators=(',',':')).encode()).hexdigest()
+    previous=con.execute('select row_number,updated,signature from directory_import_sources where kind=? and entity_key=?',(kind,key)).fetchone()
+    if previous:
+        stats['duplicate_rows']+=1
+        if digest!=previous[2]:
+            stats['conflicting_rows']+=1
+            if len(stats['examples'])<20:stats['examples'].append({'identity':key,'rows':[previous[0],number]})
+        old_rank=previous[1]
+        if old_rank is not None and (rank is None or old_rank>rank):return False
+    con.execute('insert or replace into directory_import_sources values(?,?,?,?,?)',(kind,key,number,rank,digest))
+    return True
 
 def schema(c):
     c.executescript('''
@@ -134,16 +171,20 @@ def build(src,out):
     c=sqlite3.connect(candidate)
     try:
         schema(c)
+        c.execute('create temp table directory_import_sources(kind text,entity_key text,row_number integer,updated real,signature text,primary key(kind,entity_key)) without rowid')
+        stats={kind:{'duplicate_rows':0,'conflicting_rows':0,'examples':[]} for kind in ('user','machine')}
+        stats['mobile_identity_rows']=0;stats['mobile_without_identifiers']=0
         parts=directory_parts(src)
         # Users
         from directory_exports import capture
         user_count=0
-        for d in directory_rows(src,'user',*parts['user']):
+        for number,d in directory_rows(src,'user',*parts['user']):
             uid=clean(d.get('user_id'));email=clean(d.get('email'));name=clean(d.get('full_name'))
             if not (uid or email or name):continue
-            key=('uid:'+norm(uid)) if uid else ('email:'+norm(email)) if email else ('name:'+norm(name))
+            key=user_identity(d)
             vals=(key,uid,norm(uid),name,norm(name),email,norm(email),d.get('organisational_unit',''),d.get('business_unit',''),excel_date(d.get('start_date','')),d.get('manager',''),d.get('location',''),excel_date(d.get('last_login','')),d.get('job_role',''),d.get('job_type',''),d.get('employee_number',''),d.get('department',''),d.get('last_login_time',''))
-            c.execute('insert into users(canonical_key,user_id,user_id_norm,full_name,full_name_norm,email,email_norm,organisational_unit,business_unit,start_date,manager,location,last_login,job_role,job_type,employee_number,department,last_login_time) values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) on conflict(canonical_key) do update set user_id=excluded.user_id,user_id_norm=excluded.user_id_norm,full_name=excluded.full_name,full_name_norm=excluded.full_name_norm,email=excluded.email,email_norm=excluded.email_norm,organisational_unit=excluded.organisational_unit,business_unit=excluded.business_unit,start_date=excluded.start_date,manager=excluded.manager,location=excluded.location,last_login=excluded.last_login,job_role=excluded.job_role,job_type=excluded.job_type,employee_number=excluded.employee_number,department=excluded.department,last_login_time=excluded.last_login_time',vals)
+            if select_import_row(c,'user',key,number,d,vals,stats['user']):
+                c.execute('insert into users(canonical_key,user_id,user_id_norm,full_name,full_name_norm,email,email_norm,organisational_unit,business_unit,start_date,manager,location,last_login,job_role,job_type,employee_number,department,last_login_time) values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) on conflict(canonical_key) do update set user_id=excluded.user_id,user_id_norm=excluded.user_id_norm,full_name=excluded.full_name,full_name_norm=excluded.full_name_norm,email=excluded.email,email_norm=excluded.email_norm,organisational_unit=excluded.organisational_unit,business_unit=excluded.business_unit,start_date=excluded.start_date,manager=excluded.manager,location=excluded.location,last_login=excluded.last_login,job_role=excluded.job_role,job_type=excluded.job_type,employee_number=excluded.employee_number,department=excluded.department,last_login_time=excluded.last_login_time',vals)
             user_count+=1
             if user_count%5000==0:c.commit()
         c.commit()
@@ -153,23 +194,26 @@ def build(src,out):
             for typ,val in [('user_id',uid),('email',email),('name',name),('employee_number',employee)]:
                 if clean(val):c.execute('insert or ignore into user_aliases(user_id_ref,alias_type,alias_value,alias_norm) values(?,?,?,?)',(ref,typ,val,norm(val)))
         # Machines
-        from device_inventory import ASSET_COLUMNS
+        from device_inventory import ASSET_COLUMNS,inventory_identity
         machine_columns = 'machine_name,machine_name_norm,infrastructure_itsi,sys_class_name,operational_status,correlation_id,serial_number,manufacturer,model_id,short_description,updated_on,last_discovered,discovery_source,assigned_to,last_logon_user,' + ','.join(ASSET_COLUMNS)
-        machine_sql = 'insert into machines('+machine_columns+') values('+','.join('?' for _ in range(15+len(ASSET_COLUMNS)))+')'
+        machine_sql = 'insert into machines('+machine_columns+') values('+','.join('?' for _ in range(15+len(ASSET_COLUMNS)))+') on conflict(machine_name_norm) do update set '+','.join(column+'=excluded.'+column for column in machine_columns.split(',') if column!='machine_name_norm')
         machine_count=0
-        for d in directory_rows(src,'machine',*parts['machine']):
-            name=clean(d.get('machine_name')).upper()
+        for number,d in directory_rows(src,'machine',*parts['machine']):
+            name,identity_source=inventory_identity(d,number)
             if not name:continue
+            if identity_source!='hostname':stats['mobile_identity_rows']+=1
+            if identity_source=='row':stats['mobile_without_identifiers']+=1
             values=(name,norm(name),d.get('infrastructure_itsi',''),d.get('sys_class_name',''),d.get('operational_status',''),d.get('correlation_id','').upper(),re.sub(r'\s+',' ',d.get('serial_number','')).strip(),normalise_vendor(d.get('manufacturer','')),re.sub(r'\s+',' ',d.get('model_id','')).strip(),d.get('short_description',''),excel_date(d.get('updated_on','')),excel_date(d.get('last_discovered','')),d.get('discovery_source',''),d.get('assigned_to',''),d.get('last_logon_user',''))
-            values += tuple(excel_date(d.get(column,'')) if column in ('last_used','assigned_at') else d.get(column,'') for column in ASSET_COLUMNS)
-            c.execute(machine_sql,values)
+            values += tuple(clean(d.get('machine_name')) if column=='source_ci' else excel_date(d.get(column,'')) if column in ('last_used','assigned_at') else d.get(column,'') for column in ASSET_COLUMNS)
+            if select_import_row(c,'machine','machine:'+norm(name),number,d,values,stats['machine']):
+                c.execute(machine_sql,values)
             machine_count+=1
             if machine_count%5000==0:c.commit()
         if not user_count or not machine_count:raise ValueError('Empty user or device extract refused. The existing directory was not changed.')
         links=rebuild_links(c)
-        capture(c,src)
+        capture(c,src,selection_table='directory_import_sources')
         print('Relationship matching:',links)
-        c.executemany('insert into metadata(key,value) values(?,?)',[('schema_version','3'),('created_at',datetime.now().isoformat(sep=' ',timespec='seconds')),('source_file',src.name)])
+        c.executemany('insert into metadata(key,value) values(?,?)',[('schema_version','3'),('created_at',datetime.now().isoformat(sep=' ',timespec='seconds')),('source_file',src.name),('import_resolution',json.dumps(stats))])
         c.commit();check=c.execute('pragma integrity_check').fetchone()[0]
         counts={t:c.execute(f'select count(*) from {t}').fetchone()[0] for t in ('users','machines','assignments','user_aliases')};c.close()
         if check!='ok':raise RuntimeError(check)

@@ -94,7 +94,9 @@
           <h2>Users &amp; devices</h2>
           <p>
             Upload one Excel workbook with <b>users</b> and <b>devices</b> tabs.
-            Preview the changes, then back up and apply.
+            Keep the extract as exported. Atlas handles duplicate records and
+            identifies phones by their serial number or asset tag. Preview the
+            changes, then back up and apply.
           </p>
           <p class="atlas-import-notice">
             <b>Complete snapshot:</b> users and devices omitted from this
@@ -165,7 +167,9 @@
               work.
             </p>
             <p>
-              Devices without a ci/name hostname stay in the export archive.
+              Mobile devices with generic or empty CI names remain searchable
+              using their hardware identifiers. PCs without a ci/name hostname
+              stay in the export archive.
               Unassigned devices with a hostname remain searchable and usable.
             </p>
             <a class="atlas-return" href="/api/excel-templates/directory"
