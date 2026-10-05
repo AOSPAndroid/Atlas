@@ -237,7 +237,9 @@
     'active-directory': '<rect x="8" y="2" width="8" height="5" rx="1"/><path d="M12 7v5M4 16v-4h16v4"/><rect x="1" y="16" width="6" height="5" rx="1"/><rect x="9" y="16" width="6" height="5" rx="1"/><rect x="17" y="16" width="6" height="5" rx="1"/>',
     psexec: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3m6 0h4"/>',
     admin: '<path d="M4 5h16v11H4zM8 20h8M12 16v4"/>',
+    laptop: '<rect x="5" y="4" width="14" height="11" rx="1"/><path d="m5 15-3 5h20l-3-5M9 17h6"/>',
     phone: '<rect x="6" y="2" width="12" height="20" rx="2"/><path d="M10 5h4m-3 14h2"/>',
+    tablet: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M11 18h2"/>',
     bulk: '<path d="M5 4h14v4H5zM5 10h14v4H5zM5 16h14v4H5z"/>',
     history: '<path d="M4 12a8 8 0 1 0 2.3-5.7L4 8.6M4 4v4.6h4.6M12 7v5l3 2"/>',
     copy: '<rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/>',
@@ -752,19 +754,20 @@
     const ownership = owned
       ? (assigned ? "Assigned to " + assigned : "Assigned relationship in inventory") + (machine.assigned_at ? " · " + exportDate(machine.assigned_at) : "")
       : "No assignee supplied in the export";
-    const entries = [
+    const status = [
       [labels[kind] || "Device", "kind", labels[kind] || "Device"],
       [owned ? "Assigned" : "Unassigned", owned ? "assigned" : "unassigned", ownership],
     ];
     if (machine.install_status)
-      entries.push([machine.install_status, "asset-state", "Asset state from the export: " + machine.install_status]);
-    entries.push(["Last used: " + (date(machine.last_used) || "—"), "last-used", "Last used in the export: " + (exportDate(machine.last_used) || "Not supplied")]);
+      status.push([machine.install_status, "asset-state", "Asset state from the export: " + machine.install_status]);
+    const history = [["Last used: " + (date(machine.last_used) || "—"), "last-used", "Last used in the export: " + (exportDate(machine.last_used) || "Not supplied")]];
     const logon = machine.logon_relationship !== undefined ? !!Number(machine.logon_relationship) : !!machine.last_logon_user;
     if (logon)
-      entries.push(["Last logged-on", "logon", "Inventory relationship" + (machine.last_logon_user ? ": " + machine.last_logon_user : "") + "; not a live sign-in check"]);
-    return '<div class="atlas-device-badges" aria-label="Stored device information">' + entries.map(([label, style, title]) =>
+      history.push(["Last logged-on", "logon", "Inventory relationship" + (machine.last_logon_user ? ": " + machine.last_logon_user : "") + "; not a live sign-in check"]);
+    const render = entries => entries.map(([label, style, title]) =>
       `<span class="atlas-device-badge ${style}" title="${esc(title)}">${esc(label)}</span>`
-    ).join("") + '</div>';
+    ).join("");
+    return '<div class="atlas-device-badges" aria-label="Stored device information"><div class="atlas-device-status">' + render(status) + '</div><div class="atlas-device-history">' + render(history) + '</div></div>';
   }
   function machineFilters(host) {
     if (!host || host.querySelector(":scope > .atlas-machine-filters")) return;
@@ -774,32 +777,37 @@
       ["all", "All"],
       ["desktop", "Desktops"],
       ["laptop", "Laptops"],
-      ["iphone", "iPhones"],
-      ["phone", "Phones"],
-      ["tablet", "Tablets"],
+      ["mobile", "Mobile"],
       ["mac", "Macs"],
       ["vdi", "VDI"],
       ["kiosk", "Kiosks"],
       ["other", "Other"],
     ];
+    const mobile = new Set(["iphone", "phone", "tablet"]);
+    const filterKind = row => mobile.has(row.dataset.machineKind)
+      ? "mobile" : row.dataset.machineKind;
+    const counts = new Map();
+    for (const row of rows) {
+      const kind = filterKind(row);
+      counts.set(kind, (counts.get(kind) || 0) + 1);
+    }
     const bar = document.createElement("div");
     bar.className = "atlas-machine-filters";
     bar.innerHTML =
-      '<div role="group" aria-label="Filter machine types"></div><small aria-live="polite"></small>';
-    const group = bar.firstElementChild,
-      status = bar.lastElementChild;
+      '<div class="atlas-machine-filter-heading"><strong>Linked devices</strong><small aria-live="polite"></small></div><div role="group" aria-label="Filter machine types"></div>';
+    const group = bar.querySelector('[role="group"]'),
+      status = bar.querySelector("small");
     const selected = new Set();
     const empty = document.createElement("p");
     empty.className = "atlas-machine-filter-empty";
-    empty.textContent =
-      "No devices match these filters. Choose All to show every linked device.";
+    empty.textContent = "No devices match these filters.";
     empty.hidden = true;
     host.prepend(bar);
     host.append(empty);
     const update = () => {
       for (const row of rows)
         row.hidden =
-          selected.size > 0 && !selected.has(row.dataset.machineKind);
+          selected.size > 0 && !selected.has(filterKind(row));
       for (const button of group.children)
         button.setAttribute(
           "aria-pressed",
@@ -808,7 +816,9 @@
             : selected.has(button.dataset.kind),
         );
       const count = rows.filter((row) => !row.hidden).length;
-      status.textContent = `${count} of ${rows.length} devices · Select one or more types`;
+      status.textContent = count === rows.length
+        ? `${rows.length} linked ${rows.length === 1 ? "device" : "devices"}`
+        : `${count} of ${rows.length} shown`;
       empty.hidden = count > 0;
       for (const section of host.querySelectorAll(".ops-machine-group")) {
         const visible = [
@@ -823,12 +833,16 @@
       const count =
         kind === "all"
           ? rows.length
-          : rows.filter((row) => row.dataset.machineKind === kind).length;
-      if (!count && !["all", "desktop", "vdi", "kiosk"].includes(kind)) continue;
+          : counts.get(kind) || 0;
+      if (!count && !["all", "desktop", "laptop", "mobile"].includes(kind)) continue;
       const button = document.createElement("button");
       button.type = "button";
       button.dataset.kind = kind;
-      button.textContent = `${label} (${count})`;
+      const name = document.createElement("span"), total = document.createElement("span");
+      name.className = "atlas-filter-label";name.textContent = label;
+      total.className = "atlas-filter-count";total.textContent = count;
+      button.append(name, total);
+      button.setAttribute("aria-label", `${label}, ${count} ${count === 1 ? "device" : "devices"}`);
       button.disabled = !count;
       button.title =
         kind === "other"

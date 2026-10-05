@@ -136,9 +136,70 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
   assert(filterHost.querySelector('[data-machine="0"]').classList.contains('selected'));
   press('other');assert.deepEqual(visible(),[4,5]);
   assert.equal(calls.length,networkBefore,'Filtering performs no fetch or remote scan');
+  const filters=()=>[...filterHost.querySelectorAll('.atlas-machine-filters [data-kind]')];
+  const countFor=kind=>filterHost.querySelector('[data-kind="'+kind+'"] .atlas-filter-count').textContent;
+  const summary=()=>filterHost.querySelector('.atlas-machine-filter-heading small').textContent;
+  assert.equal(filterHost.querySelector('.atlas-machine-filter-heading strong').textContent,'Linked devices');
+  assert.equal(summary(),'2 of 6 shown');
+  for(const kind of ['all','desktop','laptop','mobile'])assert(filterHost.querySelector('[data-kind="'+kind+'"]'));
+  const zeroMobile=filterHost.querySelector('[data-kind="mobile"]');
+  assert(zeroMobile.disabled,'Mobile stays visible, clearly unavailable for a PC-only result');
+  assert.equal(zeroMobile.querySelector('.atlas-filter-label').textContent,'Mobile');
+  assert.equal(countFor('mobile'),'0');assert.equal(zeroMobile.getAttribute('aria-label'),'Mobile, 0 devices');
+  zeroMobile.click();assert.deepEqual(visible(),[4,5]);
+  assert(filterHost.querySelector('[data-kind="laptop"]').disabled);
+  assert(!filterHost.querySelector('[data-kind="mac"]'),'Absent optional kinds do not add zero-count filters');
+  for(const kind of ['iphone','phone','tablet'])assert(!filterHost.querySelector('[data-kind="'+kind+'"]'));
+  // Mobile aggregates real inventory kinds and inferred iPhone/Android/tablet
+  // records without changing identities, order or the existing Windows target.
+  const mixed=[
+    {name:'GBRPWMF123',device_kind:'desktop',model_category:'Computer',model_id:'Dell Precision 3660'},
+    {name:'LAPTOP-A',model_category:'Laptop',model_id:'Dell Latitude 7450'},
+    {name:'LAPTOP-B',device_kind:'laptop',model_id:'Lenovo ThinkPad'},
+    {name:'IPHONE-SERIAL-EXAMPLE123',device_kind:'iphone',model_category:'Mobile Device - Handheld',model_id:'APPLE iPhone 13'},
+    {name:'CORP-ANDROID',model_category:'Mobile Device - Handheld',model_id:'Samsung Android phone'},
+    {name:'CORP-TABLET',model_category:'Mobile Device - Handheld',model_id:'Samsung Android tablet'},
+  ];
+  f.run('S.machines='+JSON.stringify(mixed)+';renderMachines()');
+  const mixedCalls=calls.length, originalRows=[...filterHost.querySelectorAll('[data-machine]')];
+  assert.deepEqual(filters().map(button=>button.dataset.kind),['all','desktop','laptop','mobile']);
+  assert.deepEqual(filters().map(button=>button.querySelector('.atlas-filter-count').textContent),['6','1','2','3']);
+  assert.equal(filterHost.querySelector('[data-kind="mobile"]').getAttribute('aria-label'),'Mobile, 3 devices');
+  assert.equal(summary(),'6 linked devices');
+  assert.deepEqual(originalRows.map(row=>row.dataset.machineKind),['desktop','laptop','laptop','iphone','phone','tablet']);
+  assert(originalRows[0].classList.contains('selected'));
+  press('mobile');assert.deepEqual(visible(),[3,4,5]);assert.equal(summary(),'3 of 6 shown');
+  assert.equal(filterHost.querySelector('[data-kind="all"]').getAttribute('aria-pressed'),'false');
+  assert.equal(filterHost.querySelector('[data-kind="mobile"]').getAttribute('aria-pressed'),'true');
+  press('desktop');assert.deepEqual(visible(),[0,3,4,5]);assert.equal(summary(),'4 of 6 shown');
+  press('mobile');assert.deepEqual(visible(),[0]);
+  press('desktop');assert.deepEqual(visible(),[0,1,2,3,4,5]);assert.equal(summary(),'6 linked devices');
+  assert.equal(filterHost.querySelector('[data-kind="all"]').getAttribute('aria-pressed'),'true','Deselecting the final type resets All');
+  press('laptop');press('mobile');assert.deepEqual(visible(),[1,2,3,4,5]);
+  press('all');assert.deepEqual(visible(),[0,1,2,3,4,5]);
+  assert.equal(filterHost.querySelector('[data-kind="mobile"]').getAttribute('aria-pressed'),'false');
+  for(const [index,row] of [...filterHost.querySelectorAll('[data-machine]')].entries())assert.equal(row,originalRows[index]);
+  assert.equal(f.run('S.machines.map(m=>m.name).join(",")'),mixed.map(machine=>machine.name).join(','));
+  assert.equal(f.run('S.target'),'GBRPWMF123');
+  assert.equal(calls.length,mixedCalls,'Mixed device filtering remains local');
+  for(const machine of mixed.slice(3))assert(!w.AtlasUI.supportsWindows(machine));
+  assert.equal(w.AtlasUI.machineKind({name:'UNRECOGNIZABLE',device_kind:'tablet'}),'tablet','Backend device-kind flags are authoritative');
+  // Inline metadata groups retain badges, escaped export values and provenance.
+  const metadata=doc.createElement('div'),assignee='A "Quoted" <script>alert(1)</script> & Co';
+  metadata.innerHTML=w.AtlasUI.machineBadges({...mixed[3],assigned_to:assignee,assigned_at:'46296',install_status:'In Use <test>',last_used:'46297.5',last_logon_user:'alice',logon_relationship:1});
+  assert.equal(metadata.querySelector('.atlas-device-status .kind').textContent,'iPhone');
+  assert.equal(metadata.querySelector('.atlas-device-status .assigned').textContent,'Assigned');
+  assert(metadata.querySelector('.assigned').title.includes(assignee));
+  assert.equal(metadata.querySelector('.atlas-device-status .asset-state').textContent,'In Use <test>');
+  assert.equal(metadata.querySelector('.atlas-device-status').querySelectorAll('.atlas-device-badge').length,3);
+  assert.equal(metadata.querySelector('.atlas-device-history').querySelectorAll('.atlas-device-badge').length,2);
+  assert.equal(metadata.querySelector('.atlas-device-history .last-used').textContent,'Last used: 2026-10-02');
+  assert(metadata.querySelector('.last-used').title.includes('2026-10-02 12:00:00'));
+  assert(metadata.querySelector('.atlas-device-history .logon').title.includes('not a live sign-in check'));
+  assert(!metadata.querySelector('script,test'));
   for(const name of ['GBRPWMK1','PARPWMK2','NYKPWMK3','SGPPWMK4','nykpwmk5.example.test'])
     assert.equal(w.AtlasUI.machineKind({name}),'kiosk');
   assert.equal(w.AtlasUI.machineKind({name:'NYKPLM1'}),'other','K in country code is not a kiosk');
   assert.equal(f.errors.length,0,f.errors.join('\n'));w.close();
-  console.log('PASS: grouped user details, no legacy placeholders or duplicate devices, domain copy, manager/team/office search, unchanged target, modal protection, clean person switching and mapped-person palette lookups staying in the Console Workspace');
+  console.log('PASS: grouped user details, domain copy, manager/team/office search, modal protection, mapped-person palette lookup, aggregate Mobile filters with unchanged target/order and no remote calls, zero-count primary filters and escaped device metadata');
 })().catch(error=>{console.error(error);process.exit(1);});

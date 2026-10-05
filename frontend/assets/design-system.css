@@ -305,8 +305,8 @@ body.atlas-console .selection-meta dd { min-width:0; margin:0; overflow-wrap:any
 body.atlas-console .selection-device-facts p { font-size:12px; line-height:1.35; margin:0 0 4px; overflow-wrap:anywhere; }
 body.atlas-console .selection-device-facts small { display:block; color:var(--atlas-muted); overflow-wrap:anywhere; }
 body.atlas-console .selection-device-facts .atlas-device-badges { margin:6px 0; padding:0 0 6px; border-bottom:1px solid var(--atlas-line); gap:4px; }
-body.atlas-console .selection-device-facts .atlas-device-badge { font-size:11px; padding:1px 3px; }
-body.atlas-console .selection-device-facts .atlas-device-badge.assigned { color:var(--atlas-success); background:#edf7f2; border-color:#d5e8de; }
+body.atlas-console .selection-device-facts .atlas-device-badge { font-size:11px; padding:0; }
+body.atlas-console .selection-device-facts .atlas-device-badge.assigned { color:var(--atlas-text); background:transparent; border:0; }
 body.atlas-console .selection-device-facts :is(.atlas-device-badge.last-used,.atlas-device-badge.logon) { justify-content:flex-start; flex-basis:100%; border:0; padding:0; background:transparent; color:var(--atlas-muted); }
 body.atlas-console .selection-health-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:4px; }
 body.atlas-console .selection-health-grid > div { display:flex; flex-direction:column; justify-content:space-between; gap:3px; min-height:39px; padding:4px; border:1px solid var(--atlas-line); border-radius:5px; background:var(--atlas-surface-subtle); overflow-wrap:anywhere; line-height:1.3; }
@@ -346,9 +346,18 @@ body.atlas-console .console-page-heading p {
   margin: 2px 0;
   font-size: 12px;
 }
-body.atlas-console .atlas-machine-filters {
-  margin: 6px 0 8px;
-}
+/* Device filters read as one control, with counts separate from their labels. */
+body .atlas-machine-filters { margin:8px 0 6px; }
+body .atlas-machine-filter-heading { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:4px 8px; margin:0 0 5px; }
+body .atlas-machine-filter-heading :is(b,strong) { color:var(--atlas-text); font-size:12px; font-weight:650; }
+body .atlas-machine-filter-heading small { margin:0; color:var(--atlas-muted); font-size:11px; font-weight:400; }
+body .atlas-machine-filters [role="group"] { display:flex; flex-wrap:wrap; align-items:center; gap:3px; padding:3px; border:1px solid var(--atlas-line); border-radius:7px; background:var(--atlas-surface-subtle); }
+body .atlas-machine-filters button { display:inline-flex; align-items:center; justify-content:center; gap:7px; min-height:28px; height:auto; padding:4px 9px; margin:0; border:1px solid transparent; border-radius:5px; background:transparent; color:var(--atlas-muted); box-shadow:none; font-size:12px; line-height:1.4; white-space:nowrap; }
+body .atlas-machine-filters button:hover:not(:disabled) { background:var(--atlas-surface); color:var(--atlas-text); }
+body .atlas-machine-filters button[aria-pressed="true"] { border-color:#c5dce7; background:var(--atlas-surface); color:var(--atlas-accent); box-shadow:0 1px 2px #163c5010; font-weight:600; }
+body .atlas-machine-filters button:disabled { opacity:.55; }
+body .atlas-filter-count { font-size:11px; font-weight:500; opacity:.8; font-variant-numeric:tabular-nums; }
+@media (pointer:coarse) { body .atlas-machine-filters button { min-height:36px; } }
 body .atlas-header-actions {
   gap: 3px;
 }
@@ -1941,26 +1950,38 @@ body.atlas-console #workspace :is(.atlas-person-details,.atlas-machine-details) 
 body.atlas-console #workspace summary { padding:2px 0; font-size:11px; }
 /* Fit up to two cards using the lookup width, including Desktop app windows. */
 body.atlas-console #workspace .machinegrid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,max(240px,calc((100% - 6px)/2))),1fr)); align-items:start; gap:6px; max-height:none; overflow:visible; padding:2px; }
-body.atlas-console #workspace .workspace-machine-row { display:grid; grid-template-columns:minmax(0,1fr) auto; align-content:start; gap:0 6px; width:100%; flex:0 0 auto; box-sizing:border-box; margin:0; padding:6px 8px; }
+body.atlas-console #workspace .workspace-machine-row { display:grid; grid-template-columns:minmax(0,1fr) auto; align-content:start; gap:0 6px; width:100%; flex:0 0 auto; box-sizing:border-box; margin:0; padding:7px 9px; border-color:var(--atlas-line); background:var(--atlas-surface); box-shadow:none; }
+body.atlas-console #workspace .workspace-machine-row:hover { border-color:#afcad7; }
 body.atlas-console #workspace .workspace-machine-row.selected {
-  box-shadow: inset 3px 0 0 var(--atlas-accent);
+  background:#f2f9fc; border-color:#8fbfcf; box-shadow:inset 3px 0 0 var(--atlas-accent);
 }
 body.atlas-console #workspace .workspace-machine-row h3 { grid-row:1; grid-column:1; margin:0; font-size:12px; }
+body.atlas-console #workspace .workspace-machine-select { align-items:center; gap:6px; }
+body.atlas-console #workspace .workspace-device-icon { display:grid; place-items:center; flex:0 0 24px; width:24px; height:24px; border-radius:5px; color:var(--atlas-accent); background:var(--atlas-surface-subtle); }
+body.atlas-console #workspace .workspace-device-icon .atlas-icon { width:16px; height:16px; }
+body.atlas-console #workspace .workspace-device-name { min-width:0; overflow-wrap:anywhere; }
 body.atlas-console #workspace .workspace-machine-row .state { grid-row:2; grid-column:1; font-size:10px; margin:0; }
-body.atlas-console #workspace .workspace-machine-row .copyhost { position:static; grid-row:1; grid-column:2; min-height:22px; padding:1px 5px; font-size:10px; align-self:start; }
+body.atlas-console #workspace .workspace-machine-row .copyhost { position:static; display:inline-flex; align-items:center; justify-content:center; gap:4px; grid-row:1; grid-column:2; min-height:24px; padding:2px 6px; border-radius:5px; font-size:11px; font-weight:500; align-self:start; }
+body.atlas-console #workspace .workspace-machine-row .copyhost .atlas-icon { width:12px; height:12px; }
 body.atlas-console #workspace .atlas-relationships { grid-row:2; grid-column:2; gap:3px; margin:0; align-self:center; }
 body.atlas-console #workspace .atlas-relation { font-size:10px!important; padding:1px 4px!important; }
 
-/* Asset badges keep ownership and export dates visible across directory surfaces. */
-.atlas-device-badges { display:flex; flex-wrap:wrap; align-items:center; gap:4px; margin:4px 0; min-width:0; }
-.atlas-device-badge { display:inline-flex; align-items:center; justify-content:center; padding:1px 5px; border:1px solid var(--line); border-radius:4px; font-size:11px; line-height:1.5; color:var(--text); background:var(--panel); overflow-wrap:anywhere; max-width:100%; box-sizing:border-box; }
-.atlas-device-badge.kind { font-weight:600; }
-.atlas-device-badge.unassigned,.atlas-device-badge.last-used { color:var(--muted); }
+/* Stored asset status and usage dates are text, not competing tiny controls. */
+.atlas-device-badges { display:grid; gap:2px; margin:4px 0; min-width:0; }
+.atlas-device-status,.atlas-device-history { display:flex; flex-wrap:wrap; align-items:center; gap:3px 8px; min-width:0; }
+.atlas-device-badge { display:inline-flex; align-items:center; justify-content:flex-start; padding:0; border:0; border-radius:0; font-size:11px; line-height:1.5; color:var(--atlas-text); background:transparent; overflow-wrap:anywhere; max-width:100%; box-sizing:border-box; }
+.atlas-device-badge.kind { font-weight:600; color:var(--atlas-accent); }
+.atlas-device-status .atlas-device-badge + .atlas-device-badge::before { content:""; flex:0 0 1px; width:1px; height:10px; margin-right:8px; background:var(--atlas-line); }
+.atlas-device-badge.unassigned,.atlas-device-history .atlas-device-badge { color:var(--atlas-muted); }
 .atlas-device-note { color:var(--muted); font-size:11px; margin:3px 0; }
-body.atlas-console #workspace .workspace-machine-row .workspace-device-model { grid-column:1/-1; grid-row:2; margin:2px 0; font-size:11px; color:var(--muted); overflow-wrap:anywhere; }
-body.atlas-console #workspace .workspace-machine-row .atlas-device-badges { grid-column:1/-1; grid-row:3; margin:2px 0; }
+body.atlas-console #workspace .workspace-machine-row .workspace-device-model { display:flex; flex-wrap:wrap; gap:2px 8px; grid-column:1/-1; grid-row:2; margin:4px 0 3px; font-size:12px; color:var(--atlas-text); overflow-wrap:anywhere; line-height:1.4; }
+body.atlas-console #workspace .workspace-device-model-name { min-width:0; }
+body.atlas-console #workspace .workspace-device-asset { color:var(--atlas-muted); font-size:11px; }
+body.atlas-console #workspace .workspace-machine-row .atlas-device-badges { grid-column:1/-1; grid-row:3; margin:2px 0 4px; }
 body.atlas-console #workspace .workspace-machine-row .atlas-device-note { grid-column:1/-1; grid-row:4; }
-body.atlas-console #workspace .workspace-machine-row .atlas-machine-details { grid-column:1/-1; }
+body.atlas-console #workspace .workspace-machine-row .atlas-machine-details { grid-column:1/-1; margin:0; padding-top:4px; border-top:1px solid var(--atlas-line); }
+body.atlas-console #workspace .workspace-machine-row .atlas-machine-details > summary { color:var(--atlas-muted); }
+body.atlas-console #workspace .workspace-machine-row .atlas-machine-details > summary:hover { color:var(--atlas-accent); }
 body.atlas-console #workspace .atlas-machine-details { grid-column:1/-1; }
 body.atlas-console #workspace .deployment-panel { position:static; width:100%; max-height:none; padding:8px; margin-top:0; border-radius:var(--atlas-panel-radius); box-shadow:none; box-sizing:border-box; }
 body.atlas-console #workspace .deployment-panel .head { align-items:center; }

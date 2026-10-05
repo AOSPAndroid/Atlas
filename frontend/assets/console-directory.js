@@ -170,7 +170,7 @@ function renderKyc() {
 function renderMachines() {
   if (!S.machines.length) return ($("#machines").innerHTML = "");
   $("#machines").innerHTML =
-    `<small>LINKED DEVICES · ${S.machines.length}</small><div class=machinegrid>${S.machines.map((m, i) => `<div class="card machine ${m.name === (S.selectedDevice || S.target) ? "selected" : ""}" data-machine-kind="${AtlasUI.machineKind(m)}" data-machine="${i}"><button class=copyhost data-host="${i}">Copy</button><h3>${esc(m.name)}</h3><p class="workspace-device-model">${esc(m.model_id || m.model_category || "Model not supplied")}${m.asset_tag ? " · " + esc(m.asset_tag) : ""}</p>${AtlasUI.supportsWindows(m) ? "" : '<p class="atlas-device-note">Inventory only · Windows tools require a PC.</p>'}<div class=facts><span>Match<b>${esc(m.match_type || "Device identity")}</b></span><span>Inventory discovered<b>${esc(m.last_discovered || "Not supplied")}</b></span><span>Record updated<b>${esc(m.updated_on || "Not supplied")}</b></span>${m.operational_status ? `<span>Inventory status<b>${esc(m.operational_status)}</b></span>` : ""}</div></div>`).join("")}</div>`;
+    `<div class=machinegrid>${S.machines.map((m, i) => `<div class="card machine ${m.name === (S.selectedDevice || S.target) ? "selected" : ""}" data-machine-kind="${AtlasUI.machineKind(m)}" data-machine="${i}"><button class=copyhost data-host="${i}" aria-label="Copy device identity for ${esc(m.name)}">${AtlasUI.icon("copy")}<span>Copy</span></button><h3>${esc(m.name)}</h3><p class="workspace-device-model"><span class="workspace-device-model-name">${esc(m.model_id || m.model_category || "Model not supplied")}</span>${m.asset_tag ? '<span class="workspace-device-asset">Asset: ' + esc(m.asset_tag) + '</span>' : ""}</p>${AtlasUI.supportsWindows(m) ? "" : '<p class="atlas-device-note">Inventory only · Windows tools require a PC.</p>'}<div class=facts><span>Match<b>${esc(m.match_type || "Device identity")}</b></span><span>Inventory discovered<b>${esc(m.last_discovered || "Not supplied")}</b></span><span>Record updated<b>${esc(m.updated_on || "Not supplied")}</b></span>${m.operational_status ? `<span>Inventory status<b>${esc(m.operational_status)}</b></span>` : ""}</div></div>`).join("")}</div>`;
   $$("[data-machine]").forEach(
     (x) =>
       (x.onclick = () =>
@@ -201,7 +201,13 @@ function renderMachines() {
     const details = card.querySelector(".atlas-machine-details"), facts = card.querySelector(".facts");
     details.append(facts);
     const heading = card.querySelector("h3"), choose = document.createElement("button");
-    choose.type = "button";choose.className = "workspace-machine-select";choose.textContent = m.name;
+    choose.type = "button";choose.className = "workspace-machine-select";
+    const symbol = document.createElement("span"), name = document.createElement("span");
+    symbol.className = "workspace-device-icon";
+    const kind = AtlasUI.machineKind(m);
+    symbol.innerHTML = AtlasUI.icon(kind === "laptop" ? "laptop" : kind === "tablet" ? "tablet" : ["iphone", "phone"].includes(kind) ? "phone" : "admin");
+    name.className = "workspace-device-name";name.textContent = m.name;
+    choose.append(symbol, name);
     choose.setAttribute("aria-label", AtlasUI.supportsWindows(m) ? "Select machine " + m.name : "Select inventory device " + m.name);
     heading.replaceChildren(choose);
     card.classList.add("workspace-machine-row");
