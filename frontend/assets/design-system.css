@@ -1923,7 +1923,9 @@ body.atlas-console #workspace.active {
   gap:8px; align-items:start;
 }
 body.atlas-console #workspace > .atlas-access-note { grid-column:1/-1; margin:0; }
-body.atlas-console #workspace .lookup-column { max-height:calc(100dvh - 168px); overflow:auto; scrollbar-gutter:stable; padding:8px; border:1px solid var(--atlas-line); border-radius:var(--atlas-panel-radius); background:var(--atlas-surface); }
+/* Menus use viewport placement and the browser top layer where available. */
+body.atlas-console .toolmenu-content { position:fixed; inset:auto; margin:0; min-width:min(230px,calc(100vw - 16px)); max-width:calc(100vw - 16px); max-height:calc(100dvh - 16px); overflow-y:auto; overscroll-behavior:contain; }
+body.atlas-console #workspace .lookup-column { max-height:none; overflow:visible; scrollbar-gutter:auto; padding:8px; border:1px solid var(--atlas-line); border-radius:var(--atlas-panel-radius); background:var(--atlas-surface); }
 body.atlas-console #workspace :is(.lookup-heading,.searchbox) { margin:0 0 6px; }
 body.atlas-console #workspace .lookup-heading h2 { font-size:13px; }
 body.atlas-console #workspace .searchbox { display:grid; grid-template-columns:minmax(0,1fr); gap:8px; margin-bottom:8px; }
@@ -1937,7 +1939,8 @@ body.atlas-console #workspace :is(.workspace-user-select,.workspace-machine-sele
 body.atlas-console #workspace :is(.workspace-user-select,.workspace-machine-select):hover { color:var(--atlas-accent); text-decoration:underline; }
 body.atlas-console #workspace :is(.atlas-person-details,.atlas-machine-details) { margin:2px 0 0; }
 body.atlas-console #workspace summary { padding:2px 0; font-size:11px; }
-body.atlas-console #workspace .machinegrid { display:flex; flex-direction:column; gap:4px; max-height:min(48vh,420px); overflow:auto; padding:2px; }
+/* Fit up to two cards using the lookup width, including Desktop app windows. */
+body.atlas-console #workspace .machinegrid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,max(240px,calc((100% - 6px)/2))),1fr)); align-items:start; gap:6px; max-height:none; overflow:visible; padding:2px; }
 body.atlas-console #workspace .workspace-machine-row { display:grid; grid-template-columns:minmax(0,1fr) auto; align-content:start; gap:0 6px; width:100%; flex:0 0 auto; box-sizing:border-box; margin:0; padding:6px 8px; }
 body.atlas-console #workspace .workspace-machine-row.selected {
   box-shadow: inset 3px 0 0 var(--atlas-accent);
@@ -1977,7 +1980,6 @@ body.atlas-console .atlas-health-mini > span { background:var(--atlas-surface-su
 body.atlas-console .atlas-health-mini .warning { color:var(--atlas-warning); background:#fff3da; }
 body.atlas-console #healthLine .atlas-health-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
 @media(min-width:1440px) {
-  body.atlas-console #workspace .machinegrid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-items:stretch; }
   body.atlas-console #workspace .atlas-health-mini { grid-template-columns:repeat(4,minmax(0,1fr)); }
 }
 body.atlas-console .workspace-directory { min-width:0; }

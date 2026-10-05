@@ -158,6 +158,14 @@ function bindQueueControls() {
   window.addEventListener("resize", () =>
     $("#machineMenu").classList.add("hidden"),
   );
+  document.addEventListener(
+    "scroll",
+    (event) => {
+      const menu = $("#machineMenu");
+      if (!menu.contains(event.target)) menu.classList.add("hidden");
+    },
+    true,
+  );
 }
 function statusAccent(value) {
   const text = String(value ?? "")
@@ -381,33 +389,81 @@ function bindConsolePolish() {
     .querySelectorAll(".nav-icon")
     .forEach((el) => el.setAttribute("aria-hidden", "true"));
   const menus = [...document.querySelectorAll(".toolmenu")];
+  function closeMenu(m) {
+    const content = m.querySelector(".toolmenu-content");
+    m.classList.remove("menu-open");
+    m.querySelector(".toolmenu-btn").setAttribute("aria-expanded", "false");
+    if (content.hasAttribute("popover")) {
+      try {
+        content.hidePopover();
+      } catch {}
+    }
+  }
   function closeMenus() {
-    menus.forEach((m) => {
-      m.classList.remove("menu-open");
-      m.querySelector(".toolmenu-btn").setAttribute("aria-expanded", "false");
-    });
+    menus.forEach(closeMenu);
+  }
+  function openMenu(m) {
+    closeMenus();
+    const trigger = m.querySelector(".toolmenu-btn"),
+      content = m.querySelector(".toolmenu-content"),
+      gap = 8,
+      separation = 4,
+      width = window.innerWidth,
+      height = window.innerHeight;
+    m.classList.add("menu-open");
+    trigger.setAttribute("aria-expanded", "true");
+    // A native manual popover escapes stacking contexts without moving the
+    // content away from its existing action and keyboard event handlers.
+    if (content.hasAttribute("popover")) {
+      try {
+        content.showPopover();
+      } catch {
+        content.removeAttribute("popover");
+      }
+    }
+    content.style.left = content.style.top = gap + "px";
+    content.style.maxWidth = Math.max(0, width - gap * 2) + "px";
+    content.style.maxHeight = Math.max(0, height - gap * 2) + "px";
+    content.scrollTop = 0;
+    const anchor = trigger.getBoundingClientRect(),
+      initial = content.getBoundingClientRect(),
+      below = Math.max(0, height - gap - anchor.bottom - separation),
+      above = Math.max(0, anchor.top - gap - separation),
+      useBelow = initial.height <= below || below >= above;
+    content.style.maxHeight = (useBelow ? below : above) + "px";
+    const bounds = content.getBoundingClientRect(),
+      left = anchor.right - bounds.width,
+      top = useBelow
+        ? anchor.bottom + separation
+        : anchor.top - separation - bounds.height;
+    content.style.left =
+      Math.max(gap, Math.min(left, width - bounds.width - gap)) + "px";
+    content.style.top =
+      Math.max(gap, Math.min(top, height - bounds.height - gap)) + "px";
   }
   menus.forEach((m) => {
     const trigger = m.querySelector(".toolmenu-btn"),
       content = m.querySelector(".toolmenu-content");
     content.id = m.id + "-content";
+    if (
+      typeof content.showPopover === "function" &&
+      typeof content.hidePopover === "function"
+    )
+      content.setAttribute("popover", "manual");
     trigger.setAttribute("aria-controls", content.id);
     trigger.setAttribute("aria-expanded", "false");
     trigger.addEventListener("click", () => {
       const open = !m.classList.contains("menu-open");
-      closeMenus();
-      if (open) {
-        m.classList.add("menu-open");
-        trigger.setAttribute("aria-expanded", "true");
-      }
+      if (open) openMenu(m);
+      else closeMenu(m);
     });
     trigger.addEventListener("keydown", (e) => {
       if (e.key === "ArrowDown") {
         e.preventDefault();
-        closeMenus();
-        m.classList.add("menu-open");
-        trigger.setAttribute("aria-expanded", "true");
-        content.querySelector("button")?.focus();
+        openMenu(m);
+        content
+          .querySelector('button:not(:disabled):not([aria-disabled="true"])')
+          ?.focus({ preventScroll: true });
       }
     });
     content.addEventListener("click", (e) => {
@@ -415,16 +471,26 @@ function bindConsolePolish() {
     });
     m.addEventListener("focusout", () =>
       queueMicrotask(() => {
-        if (!m.contains(document.activeElement)) {
-          m.classList.remove("menu-open");
-          trigger.setAttribute("aria-expanded", "false");
-        }
+        if (!m.contains(document.activeElement)) closeMenu(m);
       }),
     );
+    content.addEventListener("toggle", (e) => {
+      if (e.newState === "closed") closeMenu(m);
+    });
   });
   document.addEventListener("click", (e) => {
     if (!e.target.closest(".toolmenu")) closeMenus();
   });
+  document.addEventListener(
+    "scroll",
+    (e) => {
+      const open = menus.find((m) => m.classList.contains("menu-open"));
+      if (open && !open.querySelector(".toolmenu-content").contains(e.target))
+        closeMenus();
+    },
+    true,
+  );
+  window.addEventListener("resize", closeMenus);
   const panels = [
     ...document.querySelectorAll(
       "#queueDrawer,#deploymentsDrawer,#softwareDrawer",
