@@ -1362,7 +1362,9 @@ body .services-table-wrap small {
   color: var(--atlas-muted);
   font-size: 11px;
 }
-body #serviceStopDialog {
+body .services-row-actions { display:flex; align-items:center; justify-content:flex-start; gap:4px; }
+body .services-row-actions button { display:inline-flex; align-items:center; justify-content:center; min-height:28px; padding:3px 7px; font-size:11px; line-height:1.4; }
+body #serviceControlDialog {
   width: 450px;
 }
 body

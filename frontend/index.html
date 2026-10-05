@@ -902,8 +902,8 @@ Ready. Choose a command and click Run.</pre>
         Choose a target and list its services.
       </p>
       <p class="services-help">
-        Stop requests affect the selected service. Dependent services and startup
-        settings are preserved.
+        Start stopped services, or stop and restart running services. Actions
+        affect the selected service; startup settings are unchanged.
       </p>
       <div
         class="services-table-wrap"
@@ -918,7 +918,7 @@ Ready. Choose a command and click Run.</pre>
               <th scope="col">Status</th>
               <th scope="col">Startup</th>
               <th scope="col">PID</th>
-              <th scope="col">Action</th>
+              <th scope="col">Actions</th>
             </tr>
           </thead>
           <tbody id="servicesBody"></tbody>
@@ -926,19 +926,19 @@ Ready. Choose a command and click Run.</pre>
       </div>
     </dialog>
     <dialog
-      id="serviceStopDialog"
+      id="serviceControlDialog"
       class="atlas-dialog"
-      aria-labelledby="serviceStopTitle"
-      aria-describedby="serviceStopQuestion serviceStopWarning"
+      aria-labelledby="serviceControlTitle"
+      aria-describedby="serviceControlQuestion serviceControlWarning"
     >
-      <h2 id="serviceStopTitle">Stop service?</h2>
-      <p id="serviceStopQuestion"></p>
-      <p id="serviceStopWarning">
+      <h2 id="serviceControlTitle">Stop service?</h2>
+      <p id="serviceControlQuestion"></p>
+      <p id="serviceControlWarning">
         Applications using this service may stop working.
       </p>
       <div class="row">
-        <button id="cancelServiceStop" autofocus>Cancel</button
-        ><button id="confirmServiceStop" class="danger">Stop service</button>
+        <button id="cancelServiceControl" autofocus>Cancel</button
+        ><button id="confirmServiceControl" class="danger">Stop service</button>
       </div>
     </dialog>
     <aside id="softwareDrawer" class="software-drawer">

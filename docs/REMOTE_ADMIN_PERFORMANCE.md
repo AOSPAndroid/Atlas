@@ -73,9 +73,11 @@ Both quick actions require confirmation and work without a performance scan. The
 
 Choose **List services** in the target toolbar to load a compact, searchable inventory. Each row shows the display name, Windows service name, status, startup mode and PID. Search matches names, status and startup mode; **Refresh** explicitly reloads the selected target. Selecting a machine or opening Remote Admin starts no service query.
 
-Choose **Stop…** on a running or paused service and confirm its name and target. Atlas rechecks the service configuration and Windows stop permission, calls `Win32_Service.StopService()` and waits up to ten seconds to verify `Stopped`. A pending stop, access denial or running dependents is reported without claiming success or retrying automatically; refresh the list before another attempt. Atlas preserves startup settings, does not cascade to dependent services and does not kill a shared service-host PID. Core Windows and remote administration services are protected on the server.
+Each row offers **Start**, **Stop…** and **Restart…** where the current service state permits them. Start runs a stopped service without changing its startup mode. Stop and Restart ask you to confirm the exact service and target. Disabled services cannot be started or restarted; core Windows and remote administration services cannot be stopped or restarted.
 
-Demo and hosted Preview display the controls but cannot query or stop live services. Changing the target clears the list and cancels an open stop confirmation; results from the previous machine cannot appear on the new target.
+Atlas rechecks the service configuration and Windows permissions before control. Stop verifies `Stopped`; Start verifies `Running`. Restart verifies `Stopped` before issuing Start, then verifies `Running`. Control requests have a 60-second transport timeout. A failed restart can leave the service stopped, which Atlas reports explicitly. Pending, denied and changed-service outcomes are shown without claiming success or retrying automatically; use **Refresh** before another attempt. Verified results update the row so you can start a service you just stopped. Atlas preserves startup settings, does not force dependent services to stop and does not kill a shared service-host PID.
+
+Demo and hosted Preview display the controls but cannot query or control live services. Changing the target clears the list and cancels an open confirmation; results from the previous machine cannot appear on the new target.
 
 ## Implementation and validation
 
