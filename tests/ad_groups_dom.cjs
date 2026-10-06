@@ -1,6 +1,7 @@
 const fs=require('fs'),assert=require('assert/strict'),{JSDOM}=require('jsdom');
 (async()=>{
  const w=new JSDOM(fs.readFileSync('frontend/index.html','utf8'),{runScripts:'outside-only',url:'http://localhost/installer'}).window;
+ let copied;Object.defineProperty(w.navigator,'clipboard',{value:{writeText:async text=>{copied=text;}}});
  w.S={target:'PC01',user:{user_name:'alice'}};w.page=()=>{};let calls=0,blob;
  const group=(name,dn=name)=>({name,dn:'CN='+dn,description:'Trading access <important>, '+name,scope:'Global',category:'Security',membership:'Direct'});
  const a={details:{Account:'alice'},groups:[group('APP_Paris'),group('APP_London'),group('=SUM(1,2)')],warnings:[],membership_note:'Direct and primary'};
@@ -10,6 +11,12 @@ const fs=require('fs'),assert=require('assert/strict'),{JSDOM}=require('jsdom');
  await w.document.querySelector('#adForm').onsubmit({preventDefault(){}});
  const root=w.document.querySelector('#adResults'),search=root.querySelector('[aria-label="Filter AD groups"]'),mode=root.querySelector('[aria-label="Group name match"]');
  assert(root.querySelector('.ad-group-description').textContent.includes('Trading access <important>'));assert(!root.querySelector('important'));
+ let opened;w.AtlasAD.browseMembers=(dn,server)=>{opened={dn,server};};
+ const first=root.querySelector('.ad-groups tbody tr');const groupName=first.querySelector('.ad-object-link').textContent;
+ await first.querySelector('[aria-label^="Copy "]').onclick();assert.equal(copied,groupName);
+ first.querySelector('.ad-object-link').click();assert(opened.dn.startsWith('CN='));
+ first.dispatchEvent(new w.MouseEvent('contextmenu',{bubbles:true,clientX:10,clientY:10}));
+ const menu=w.document.querySelector('.atlas-ad-context');assert(menu.textContent.includes('See members'));menu.querySelectorAll('button')[1].click();assert(!w.document.querySelector('.atlas-ad-context'));
  function filter(m,t,n){mode.value=m;search.value=t;search.oninput();assert.equal(root.querySelectorAll('.ad-groups tbody tr').length,n)}
  filter('ends','PARIS',1);filter('starts','app_',2);filter('exact','APP_London',1);filter('excludes','APP',1);filter('contains','',3);
  root.querySelector('[aria-label="Compare AD object"]').value='bob';await root.querySelector('form').onsubmit({preventDefault(){}});

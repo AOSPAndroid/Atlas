@@ -1,3 +1,35 @@
+// Group actions keep the exact DN and server captured from the displayed result.
+window.AtlasADRows = (() => {
+ let menu;
+ const close=()=>{menu?.remove();menu=null;};
+ function button(label,fn){const b=document.createElement('button');b.type='button';b.textContent=label;b.onclick=fn;return b;}
+ function attach(row,nameCell,actions,object,server,open){
+  const isGroup=object.kind==='group';
+  const caption=isGroup?'See members':'See groups';
+  const invoke=()=>{if(!window.AtlasReadOnly)return open();};
+  const link=button(object.name,invoke);link.className='ad-object-link';link.disabled=!!window.AtlasReadOnly;
+  link.title=caption+' · '+object.name;nameCell.replaceChildren(link);
+  const copy=button('Copy',async()=>{
+   const text=object.name;
+   try{await navigator.clipboard.writeText(text);copy.textContent='Copied';setTimeout(()=>copy.textContent='Copy',1500);}
+   catch{actions.querySelector('input')?.remove();const input=document.createElement('input');input.readOnly=true;input.value=text;input.setAttribute('aria-label','Copy group name manually');actions.append(input);input.focus();input.select();}
+  });
+  copy.setAttribute('aria-label','Copy '+object.name);
+  if(isGroup)actions.append(copy);
+  const view=button(caption,invoke);view.disabled=!!window.AtlasReadOnly;actions.append(view);
+  row.addEventListener('contextmenu',event=>{
+   event.preventDefault();event.stopPropagation();close();
+   menu=document.createElement('div');menu.className='atlas-ad-context';menu.setAttribute('role','menu');
+   if(isGroup){const c=button('Copy group name',()=>{close();copy.click();});c.setAttribute('role','menuitem');menu.append(c);}
+   const v=button(caption,()=>{close();invoke();});v.disabled=!!window.AtlasReadOnly;v.setAttribute('role','menuitem');menu.append(v);
+   document.body.append(menu);const box=menu.getBoundingClientRect();menu.style.left=Math.max(8,Math.min(event.clientX,innerWidth-box.width-8))+'px';menu.style.top=Math.max(8,Math.min(event.clientY,innerHeight-box.height-8))+'px';menu.querySelector('button:not(:disabled)')?.focus();
+  });
+ }
+ document.addEventListener('pointerdown',e=>{if(menu&&!menu.contains(e.target))close();});
+ document.addEventListener('keydown',e=>{if(e.key==='Escape'||e.key==='Tab')close();});
+ window.addEventListener('hashchange',close);window.addEventListener('resize',close);
+ return {attach};
+})();
 (() => {
   const by = (id) => document.getElementById("ad" + id);
   if (!by("Form")) return;
@@ -174,6 +206,7 @@
       const b = new Map((secondary?.groups || []).map((g) => [key(g), g]));
       rows = [...new Set([...a.keys(), ...b.keys()])].map((k) => ({
         ...(a.get(k) || b.get(k)),
+        sourceServer: a.has(k) ? by("Server").value.trim() : server.value.trim(),
         firstMembership: a.get(k)?.membership || "",
         secondMembership: b.get(k)?.membership || "",
         presence: secondary
@@ -214,12 +247,14 @@
       const table = el('table');
       table.setAttribute('aria-label','AD group memberships');
       const head=el('thead'), header=el('tr');
-      for(const text of ['Group','Membership', ...(secondary?['Comparison']:[]),'Description']){const th=el('th',text);th.scope='col';header.append(th);}
+      for(const text of ['Group','Membership', ...(secondary?['Comparison']:[]),'Description','Actions']){const th=el('th',text);th.scope='col';header.append(th);}
       head.append(header);table.append(head);const body=el('tbody');table.append(body);
       for (const g of rows) {
         const row=el('tr'),name=el('td'),description=el('td');
+        const actions=el('td');actions.className='ad-row-actions';
+        AtlasADRows.attach(row,name,actions,{...g,kind:'group'},g.sourceServer,()=>AtlasAD.browseMembers(g.dn,g.sourceServer));
         const detail=el('details');detail.className='ad-group-record';
-        const summary=el('summary');summary.append(el('strong',g.name));detail.append(summary);
+        const summary=el('summary');summary.append(el('strong','Group details'));detail.append(summary);
         const properties=el('dl');
         for(const [label,value] of [['Description',g.description==null?'Description unavailable':g.description||'No description recorded'],['Directory path',g.dn],['Scope',g.scope],['Category',g.category]])properties.append(el('dt',label),el('dd',value||'Unavailable'));
         detail.append(properties);name.append(detail);
@@ -227,7 +262,7 @@
         description.textContent=g.description==null?'Description unavailable':g.description||'No description recorded';description.title=description.textContent;
         row.append(name,el('td',secondary?`${g.firstMembership||'—'} / ${g.secondMembership||'—'}`:g.membership));
         if(secondary)row.append(el('td',{both:'In both',first:'Only first object',second:'Only second object'}[g.presence]));
-        row.append(description);body.append(row);
+        row.append(description,actions);body.append(row);
       }
       if(rows.length)list.append(table);else list.append(el('p','No matching groups.'));
       download.disabled = !rows.length;
@@ -480,8 +515,13 @@
    for(const item of data.items){
     const row=make('tr'),name=make('td',item.name+(item.account?' · '+item.account:'')),kind=make('td',item.kind),dn=make('td',item.dn),actions=make('td');
     if(['organizationalUnit','container','domainDNS'].includes(item.kind))actions.append(control('Open',()=>load({base:item.dn,operation:'children',server:payload.server})));
-    if(['user','computer'].includes(item.kind))actions.append(control('See groups',()=>{document.getElementById('adServer').value=payload.server;AtlasAD.show(item.kind,item.guid||item.account||item.name);document.getElementById('adForm').scrollIntoView({block:'start'});}));
-    if(item.kind==='group')actions.append(control('Members',()=>load({operation:'members',base:item.dn,server:payload.server})));
+    if(['user','computer','group'].includes(item.kind)){
+     actions.className='ad-row-actions';
+     AtlasADRows.attach(row,name,actions,item,payload.server,()=>{
+      if(item.kind==='group')return AtlasAD.browseMembers(item.dn,payload.server);
+      document.getElementById('adServer').value=payload.server;AtlasAD.show(item.kind,item.guid||item.account||item.name);document.getElementById('adForm').scrollIntoView({block:'start'});
+     });
+    }
     actions.append(control('Properties',()=>load({operation:'details',base:item.dn,server:payload.server})));
     row.append(name,kind,make('td',item.description||'—'),dn,actions);body.append(row);
    }
@@ -491,6 +531,7 @@
   }catch(error){status.textContent=error.message;current=null;parent='';}
   finally{busy=false;host.removeAttribute('aria-busy');for(const n of tools.elements)n.disabled=!!window.AtlasReadOnly;back.disabled=!history.length||!!window.AtlasReadOnly;up.disabled=!parent||!!window.AtlasReadOnly;}
  }
+ window.AtlasAD.browseMembers=(dn,server='')=>{if(window.AtlasReadOnly)return;page('active-directory');host.open=true;tools.elements.server.value=server;host.scrollIntoView({block:'start'});return load({operation:'members',base:dn,server});};
  tools.onsubmit=e=>{e.preventDefault();load({operation:'search',base:current?.server===tools.elements.server.value.trim()?(['members','details'].includes(current?.operation)?parent:current?.base)||'':''});};
  host.querySelector('[data-root]').onclick=()=>load({operation:'children',base:''});
  back.onclick=()=>{const previous=history.pop();if(previous)return load(previous,false);};

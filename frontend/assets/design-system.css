@@ -2248,3 +2248,7 @@ body .atlas-person-profile .atlas-person-feedback { position:absolute; width:1px
 @media(pointer:coarse) {
   body .atlas-person.atlas-person-profile .atlas-person-copy { min-width:42px; min-height:42px; height:42px; padding:6px; }
 }
+body.atlas-console .ad-row-actions { min-width:130px; }
+body.atlas-console .ad-row-actions button { margin:2px; }
+body.atlas-console button.ad-object-link { background:none; border:0; padding:0; height:auto; min-height:24px; text-align:left; white-space:normal; overflow-wrap:anywhere; font-weight:600; color:var(--atlas-accent,#007da5); }
+body.atlas-console button.ad-object-link:hover { text-decoration:underline; }

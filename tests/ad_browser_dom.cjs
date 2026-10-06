@@ -16,7 +16,7 @@ const fs=require('fs'),assert=require('assert/strict'),{JSDOM}=require('jsdom');
  const button=text=>[...host.querySelectorAll('button')].find(b=>b.textContent===text);
  await button('Open').onclick();assert.equal(requests.at(-1).base,'OU=Paris,DC=test');
  await host.querySelector('[data-more]').onclick();assert.equal(requests.at(-1).limit,400);
- await button('Members').onclick();assert.equal(requests.at(-1).operation,'members');
+ await button('See members').onclick();assert.equal(requests.at(-1).operation,'members');
  let selected;w.AtlasAD.show=(...args)=>selected=args;button('See groups').onclick();assert.equal(selected[0],'computer');assert.equal(selected[1],'12345678-1234-1234-1234-123456789012');
  w.AtlasReadOnly=true;const n=requests.length;await host.querySelector('[data-root]').onclick();assert.equal(requests.length,n);
  w.close();console.log('PASS: directory navigation, members, incremental results, exact-object group lookup and read-only guard');
