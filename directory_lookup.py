@@ -30,7 +30,7 @@ SEARCH_FIELDS.update({
 })
 
 def exact_users(c,value):
- q=' '.join(value.strip().split()).casefold();login=q.rsplit('\\',1)[-1]
+ q=' '.join(value.strip().split()).lower();login=q.rsplit('\\',1)[-1]
  # Resolve Windows X-number logins without rewriting the original export ID.
  # Keep both matches if an export contains separate G and X records.
  exported_login = re.sub(r'^x(?=[0-9]+$)', 'g', login)
@@ -56,7 +56,7 @@ def search_directory(c,term:str):
  if ':' in text and text.split(':',1)[0].lower() in ('machine','user','email','name','brid'):
   prefix,text=text.split(':',1);prefix=prefix.lower();text=text.strip()
  if not text:return {'users':[],'machines':[]}
- q=text.casefold();like='%'+q.replace('\\','\\\\').replace('%','\\%').replace('_','\\_')+'%'
+ q=text.lower();like='%'+q.replace('\\','\\\\').replace('%','\\%').replace('_','\\_')+'%'
  users=[] if prefix=='machine' else exact_users(c,text)
  machines=[]
  if prefix not in ('user','email','name','brid'):

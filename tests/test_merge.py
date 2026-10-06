@@ -1,4 +1,6 @@
 """Shared database tests. All deployment workers are stubbed; no remote actions run."""
+from sqlite_fixture import isolate_backend_database
+isolate_backend_database()
 import json,sqlite3,sys,tempfile,unittest
 from pathlib import Path
 from unittest.mock import patch

@@ -3,6 +3,7 @@ import json
 import re
 import threading
 import unicodedata
+from functools import wraps
 from directory_lookup import linked_machines
 
 
@@ -14,6 +15,19 @@ _indexes = {}
 _lock = threading.Lock()
 
 
+def read_snapshot(fn):
+    """Keep names, IDs and relationship evidence on one directory generation."""
+    @wraps(fn)
+    def wrapped(c, *args, **kwargs):
+        c.execute('savepoint desk_directory_read')
+        try:
+            return fn(c, *args, **kwargs)
+        finally:
+            c.execute('release desk_directory_read')
+    return wrapped
+
+
+@read_snapshot
 def resolve_person(c, desk):
     if desk['occupancy'] == 'vacant':
         return [], 'unassigned'
@@ -25,7 +39,7 @@ def resolve_person(c, desk):
     if len(key.split()) < 2:
         return [], 'unmatched'
     path = c.execute('pragma database_list').fetchone()[2]
-    stamp = tuple(c.execute("select key,value from metadata where key in ('directory.created_at','created_at') order by key").fetchall())
+    stamp = tuple(c.execute("select key,value from metadata where key in ('directory.generation','generation','directory.created_at','created_at') order by key").fetchall())
     cache_key = (path or id(c), tuple(tuple(row) for row in stamp))
     with _lock:
         index = _indexes.get(cache_key)
@@ -42,6 +56,7 @@ def resolve_person(c, desk):
     return people, method
 
 
+@read_snapshot
 def desk_context(c, desk):
     candidates, method = resolve_person(c, desk)
     person = candidates[0] if len(candidates)==1 else None
@@ -67,6 +82,7 @@ def desk_context(c, desk):
     return {'desk':desk,'user':person,'candidates':candidates,'match_method':method,'machines':machines}
 
 
+@read_snapshot
 def people_desks(c, people, suggestions=True):
     """Resolve a batch against one directory snapshot without per-person queries.
 
@@ -122,6 +138,7 @@ def palette_search(c, result):
     return {**result, 'users': users}
 
 
+@read_snapshot
 def machine_context(c, computer):
     """Stored inventory and identity evidence only; never contacts a machine."""
     machine = c.execute('select * from legacy_machines where name_norm=?', (computer.casefold().rstrip('.'),)).fetchone()

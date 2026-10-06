@@ -5,7 +5,7 @@
   const uid=()=>crypto.randomUUID(),clone=v=>JSON.parse(JSON.stringify(v));
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const blank=()=>({id:uid(),title:'Untitled diagram',notes:'',xml:EMPTY,revision:0});
-  let root,frame,doc=blank(),initialized=false,loaded=false,ready=false,dirty=false,saving=false,serial=0,timer,loadTimer,library=[];
+  let root,frame,doc=blank(),initialized=false,loaded=false,ready=false,dirty=false,saving=false,serial=0,documentSwitch=0,timer,loadTimer,library=[];
   const pending=new Map(),q=s=>root.querySelector(s),viewer=()=>!!window.AtlasReadOnly;
   const status=s=>{if(root)q('#kbStatus').textContent=s;};
   function validateXML(xml){
@@ -73,7 +73,19 @@
     if(!viewer()){await save(false);if(!dirty)return true;}
     return confirm('This draft has not been saved. Download it first to keep your work. Discard this draft and continue?');
   }
-  function setDocument(data){clearTimeout(timer);doc=data;dirty=false;serial++;q('#kbTitle').value=doc.title;q('#kbNotes').value=doc.notes;loadEditor();renderLibrary();status(viewer()?'Draft · download to keep your work':doc.revision?'Saved in local Admin database':'New document');}
+  async function openDocument(id){
+    const version=++documentSwitch,previous=doc;
+    let editSerial=serial;
+    const current=(checkEdits=true)=>version===documentSwitch&&doc===previous&&(!checkEdits||serial===editSerial);
+    try{
+      if(!await leaveDraft()||!current(false))return;
+      editSerial=serial;
+      const data=await AtlasClient.request('/api/knowledge/'+id);
+      if(!current())return;
+      setDocument({...validate(data),id:data.id,revision:data.revision});
+    }catch(e){if(current())status(e.message);}
+  }
+  function setDocument(data){documentSwitch++;clearTimeout(timer);doc=data;dirty=false;serial++;q('#kbTitle').value=doc.title;q('#kbNotes').value=doc.notes;loadEditor();renderLibrary();status(viewer()?'Draft · download to keep your work':doc.revision?'Saved in local Admin database':'New document');}
   async function refreshLibrary(){if(viewer()){library=[];renderLibrary();return;}try{library=(await AtlasClient.request('/api/knowledge')).documents;renderLibrary();}catch(e){status('Library unavailable · '+e.message);}}
   function renderLibrary(){const term=q('#kbSearch').value.toLowerCase();q('#kbDocuments').innerHTML=library.filter(d=>d.title.toLowerCase().includes(term)).map(d=>`<button data-doc="${esc(d.id)}" class="${doc.id===d.id?'current':''}"><strong>${esc(d.title)}</strong><small>${new Date(d.updated).toLocaleDateString()}</small></button>`).join('')||`<p>${viewer()?'Open a file or start a draft. Download your work before closing.':'No saved documents yet.'}</p>`;}
   function download(value,mime,extension){const link=document.createElement('a'),url=URL.createObjectURL(new Blob([value],{type:mime}));link.href=url;link.download=(doc.title.replace(/[^\p{L}\p{N} _-]/gu,'').trim()||'Atlas diagram').slice(0,100)+extension;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
@@ -93,7 +105,8 @@
     if(name==='import'){q('#kbImport').click();return;}
     if(name==='copy-document'){if(saving)throw Error('Wait for saving to finish.');if(ready)await capture();const copy={...clone(doc),id:uid(),revision:0,title:(doc.title+' — copy').slice(0,180)};setDocument(copy);changed();return;}
     if(name==='new'||name.startsWith('template-')){
-      if(!await leaveDraft())return;const next=blank();
+      const version=++documentSwitch,previous=doc;
+      if(!await leaveDraft()||version!==documentSwitch||doc!==previous)return;const next=blank();
       if(name==='template-flow'){next.title='Incident triage';next.notes='Report received → Check connectivity?\nCheck connectivity? → [Yes] Check application\nCheck connectivity? → [No] Check cable / Wi-Fi\nCheck application → Record resolution\nCheck cable / Wi-Fi → Record resolution';}
       if(name==='template-network'){next.title='Office network';next.notes='Internet → Firewall\nFirewall → Core switch\nCore switch → User VLAN\nCore switch → Printer VLAN\nCore switch → Wireless access points';}
       if(next.notes)next.xml=AtlasKnowledgeConverter.toXml(AtlasKnowledgeConverter.fromNotes(next.notes));setDocument(next);changed();return;
@@ -120,7 +133,7 @@
     <div class="kb-editor-bar"><span id="kbEditorStatus" role="status">Loading bundled Draw.io…</span><button data-kb="fit">Fit diagram</button><button data-kb="reload">Reload editor</button></div><div id="kbEditorHost"></div><div class="kb-status"><span>Draw.io runs locally · no external diagram service</span><span id="kbStatus" role="status"></span></div></div>
     <aside class="kb-details"><section class="kb-notes"><h3>Notes & runbook</h3><textarea id="kbNotes" aria-label="Knowledge notes" maxlength="100000" placeholder="Write your notes here…&#10;&#10;User reports issue → Check ping?&#10;Check ping? → [Yes] Check application&#10;Check ping? → [No] Check network"></textarea><button data-kb="convert" class="primary">Notes → diagram</button><small>Local conversion: steps, indented bullets, or A → B connections. End a decision with ?. Add → [Yes] for connector labels. Creates editable Draw.io shapes; existing diagrams are kept separate.</small></section><section><h3>Quick actions</h3><button data-kb="layers">Layers</button> <button data-kb="format">Format panel</button><p>Use Ctrl K for Draw.io commands, including adding shapes, connecting two selected shapes, undo, redo and export.</p><p>Files stay in Atlas. Open existing .drawio files here; use Atlas JSON to include your notes.</p></section></aside></div><input id="kbImport" type="file" accept=".json,.drawio,.xml" hidden>`;
     window.addEventListener('message',event=>receive(event).catch(e=>status(e.message)));
-    root.addEventListener('click',e=>{const button=e.target.closest('[data-kb]');if(button){action(button.dataset.kb).catch(e=>status(e.message));button.closest('details')?.removeAttribute('open');}const row=e.target.closest('[data-doc]');if(row)(async()=>{if(!await leaveDraft())return;const data=await AtlasClient.request('/api/knowledge/'+row.dataset.doc);setDocument({...validate(data),id:data.id,revision:data.revision});})().catch(e=>status(e.message));});
+    root.addEventListener('click',e=>{const button=e.target.closest('[data-kb]');if(button){action(button.dataset.kb).catch(e=>status(e.message));button.closest('details')?.removeAttribute('open');}const row=e.target.closest('[data-doc]');if(row)openDocument(row.dataset.doc);});
     const paths={new:'M12 4v16M4 12h16',save:'M4 3h13l3 3v15H4zM7 3v6h9V3M7 21v-8h10v8',import:'M12 16V3m-4 4 4-4 4 4M4 14v7h16v-7',fit:'M9 3H3v6m12-6h6v6M3 15v6h6m12-6v6h-6',reload:'M20 8a8 8 0 1 0 0 8M20 2v6h-6',focus:'M3 9V3h6m6 0h6v6M3 15v6h6m6 0h6v-6',export:'M12 3v13m-4-4 4 4 4-4M4 17v4h16v-4',notes:'M5 3h14v18H5zM8 8h8M8 12h8M8 16h5'};
     root.querySelectorAll('button[data-kb]').forEach(button=>{const name=button.dataset.kb;const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('aria-hidden','true');svg.classList.add('kb-icon');const path=document.createElementNS(svg.namespaceURI,'path');path.setAttribute('d',paths[name] || (name.includes('export')||name==='drawio'||name==='svg'||name==='png'?paths.export:paths.notes));svg.append(path);button.prepend(svg);});
     q('#kbSearch').oninput=renderLibrary;

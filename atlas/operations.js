@@ -20,7 +20,9 @@ export function createOperations({
     target = "",
     job = null,
     timer = null,
-    packageVersion = 0,
+    catalogVersion = 0,
+    scriptVersion = 0,
+    previewVersion = 0,
     submitting = false,
     packageDetails = null,
     userSearchVersion = 0;
@@ -158,6 +160,7 @@ export function createOperations({
     q("#ops-action").onchange = () => loadScripts(g);
     q("#ops-mode").onchange = updateDeploy;
     q("#ops-script").onchange = () => {
+      previewVersion++;
       q("#ops-script-content").hidden = true;
       updateDeploy();
     };
@@ -252,12 +255,12 @@ export function createOperations({
     );
   }
   async function loadPackages(g) {
-    const v = ++packageVersion;
+    const v = ++catalogVersion;
     if (!valid(g)) return;
     const term = host().querySelector("#ops-package-filter").value;
     try {
       const d = await api("/api/catalog?term=" + encodeURIComponent(term));
-      if (!valid(g) || v !== packageVersion) return;
+      if (!valid(g) || v !== catalogVersion) return;
       host().querySelector("#ops-package").innerHTML =
         d.items
           .map(
@@ -273,7 +276,7 @@ export function createOperations({
           (d.repository || "Check the package repository in Settings.");
       await loadScripts(g);
     } catch (e) {
-      if (valid(g)) toast(e.message);
+      if (valid(g) && v === catalogVersion) toast(e.message);
     }
   }
   let detailsVersion = 0;
@@ -307,7 +310,8 @@ export function createOperations({
     const q = (s) => host().querySelector(s),
       pkg = q("#ops-package").value,
       action = q("#ops-action").value,
-      v = ++packageVersion;
+      v = ++scriptVersion;
+    previewVersion++;
     refreshPackageDetails(g, pkg);
     q("#ops-script").innerHTML = '<option value="">Loading…</option>';
     q("#ops-script-content").hidden = true;
@@ -323,14 +327,14 @@ export function createOperations({
           "&action=" +
           encodeURIComponent(action),
       );
-      if (!valid(g) || v !== packageVersion) return;
+      if (!valid(g) || v !== scriptVersion) return;
       q("#ops-script").innerHTML =
         d.scripts
           .map((s) => `<option value="${esc(s)}">${esc(s)}</option>`)
           .join("") || '<option value="">No matching script</option>';
       updateDeploy();
     } catch (e) {
-      if (valid(g)) toast(e.message);
+      if (valid(g) && v === scriptVersion) toast(e.message);
     }
   }
   function updateDeploy() {
@@ -372,7 +376,8 @@ export function createOperations({
     const q = (s) => host().querySelector(s),
       pkg = q("#ops-package").value,
       script = q("#ops-script").value,
-      action = q("#ops-action").value;
+      action = q("#ops-action").value,
+      v = ++previewVersion;
     if (!pkg || !script) return;
     try {
       const d = await api(
@@ -383,11 +388,18 @@ export function createOperations({
           "&action=" +
           action,
       );
-      if (!valid(g) || q("#ops-script").value !== script) return;
+      if (
+        !valid(g) ||
+        v !== previewVersion ||
+        q("#ops-package").value !== pkg ||
+        q("#ops-action").value !== action ||
+        q("#ops-script").value !== script
+      )
+        return;
       q("#ops-script-content").textContent = d.content;
       q("#ops-script-content").hidden = false;
     } catch (e) {
-      toast(e.message);
+      if (valid(g) && v === previewVersion) toast(e.message);
     }
   }
   async function deploy(g) {

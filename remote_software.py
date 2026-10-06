@@ -6,6 +6,7 @@ GUID=re.compile(r'^\{[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}
 ROOT=Path(__file__).resolve().parent
 
 class UnknownOutcome(RuntimeError):pass
+class ReportedFailure(RuntimeError):pass
 
 def split_executable(command):
     """Accept local .exe registrations, never evaluate them through cmd/PowerShell."""
@@ -71,23 +72,31 @@ def remote_call(wmi,pc,plan=None,include_cache=False,include_appx=False,timeout=
         (share/'plan.json').write_text(json.dumps(plan),encoding='utf-8');command+=' -PlanPath "'+folder+'\\plan.json"'
     if include_cache:command+=' -IncludeCache'
     if include_appx:command+=' -IncludeAppx'
-    pid=wmi.wmi_create(pc,command);deadline=time.monotonic()+timeout;result=share/'result.json'
-    while time.monotonic()<deadline:
-        if result.is_file():
-            data=json.loads(result.read_text(encoding='utf-8-sig'))
-            if not data.get('ok'):raise RuntimeError(data.get('error') or 'Remote operation failed.')
-            data['operation_folder']=folder;data['pid']=pid
-            return data
-        try:running=wmi.wmi_running(pc,pid)
-        except Exception as e:raise UnknownOutcome(f'Monitoring lost after starting PID {pid}: {e}. Inspect {folder} before retrying.') from e
-        if not running:
-            # Final file may need a brief SMB visibility grace period.
-            for _ in range(5):
-                if result.is_file():break
-                time.sleep(.2)
-            if not result.is_file():raise UnknownOutcome(f'Remote process exited without a result. Check {folder}; do not assume success or retry automatically.')
-        time.sleep(1)
-    raise UnknownOutcome(f'Monitoring timed out. The remote process may still be running (PID {pid}). Check {folder} before further actions.')
+    pid=wmi.wmi_create(pc,command)
+    try:
+        deadline=time.monotonic()+timeout;result=share/'result.json'
+        while time.monotonic()<deadline:
+            if result.is_file():
+                data=json.loads(result.read_text(encoding='utf-8-sig'))
+                if not isinstance(data,dict) or type(data.get('ok')) is not bool:
+                    raise ValueError('Invalid remote result record')
+                if not data['ok']:raise ReportedFailure(data.get('error') or 'Remote operation failed.')
+                if plan is not None and type(data.get('exit_code')) is not int:
+                    raise ValueError('Remote mutation result lacks an integer exit code')
+                data['operation_folder']=folder;data['pid']=pid
+                return data
+            running=wmi.wmi_running(pc,pid)
+            if not running:
+                # Final file may need a brief SMB visibility grace period.
+                for _ in range(5):
+                    if result.is_file():break
+                    time.sleep(.2)
+                if not result.is_file():raise UnknownOutcome(f'Remote process exited without a result. Check {folder}; do not assume success or retry automatically.')
+            time.sleep(1)
+        raise UnknownOutcome(f'Monitoring timed out. The remote process may still be running (PID {pid}). Check {folder} before further actions.')
+    except (UnknownOutcome,ReportedFailure):raise
+    except Exception as e:
+        raise UnknownOutcome(f'Monitoring lost after starting PID {pid}: {e}. Inspect {folder} before retrying.') from e
 
 def verdict(result,kind,action='Uninstall'):
     ec=str(result.get('exit_code','unknown'))
@@ -174,6 +183,7 @@ def register_remote_software(app,wmi,check_token):
         if not guard.acquire(blocking=False):raise HTTPException(409,'Another deployment or uninstall is active on this target.')
         job=uuid.uuid4().hex
         try:
+            wmi.job_service.target_ready(plan['pc'])
             wmi.history_create(job,plan['pc'],plan['item']['Name'],plan['action'],plan['command'],'remote-uninstall')
             wmi.jobs[job]={'state':'queued','target':plan['pc'],'events':[]}
             with mutex:plans.pop(body['plan'],None)

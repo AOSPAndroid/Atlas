@@ -1,5 +1,6 @@
 """Build or refresh the shared database without replacing desk records/history."""
-import argparse,json,sqlite3
+import argparse,json,os,sqlite3,uuid
+from contextlib import closing
 from pathlib import Path
 ROOT=Path(__file__).resolve().parent
 TABLES=('users','user_aliases','machines','assignments')
@@ -7,10 +8,12 @@ TABLES=('users','user_aliases','machines','assignments')
 def connect(path):
  c=sqlite3.connect(path,timeout=20,uri=True);c.row_factory=sqlite3.Row;return c
 
-def merge_directory(target,source):
+def merge_directory(target,source,*,before_merge=None,after_merge=None):
+ """Replace directory data; callbacks share its locked, atomic transaction."""
  src=connect(Path(source).resolve().as_uri()+'?mode=ro');dst=connect(target)
  try:
   dst.execute('begin immediate')
+  if before_merge:before_merge(dst)
   from device_inventory import ensure_asset_columns
   ensure_asset_columns(dst)
   for table in reversed(TABLES):dst.execute('delete from '+table)
@@ -20,9 +23,17 @@ def merge_directory(target,source):
    if not set(columns)<=known:raise ValueError('Incompatible directory schema')
    sql='insert into '+table+'('+','.join(columns)+') values ('+','.join('?' for _ in columns)+')'
    dst.executemany(sql,(tuple(r) for r in src.execute('select * from '+table)))
-  for k,v in src.execute('select key,value from metadata'):dst.execute('insert or replace into metadata values(?,?)',('directory.'+k,v))
+  metadata=dict(src.execute('select key,value from metadata'))
+  # Backups contain both the original seed metadata and the current directory.
+  # Prefer the latter once; never copy unrelated Atlas state into this namespace.
+  dst.execute("delete from metadata where key like 'directory.%'")
+  for key in ('schema_version','created_at','source_file','import_resolution'):
+   value=metadata.get('directory.'+key,metadata.get(key))
+   if value is not None:dst.execute('insert into metadata values(?,?)',('directory.'+key,value))
+  dst.execute('insert into metadata values(?,?)',('directory.generation',uuid.uuid4().hex))
   from directory_exports import copy_archive
   copy_archive(src,dst)
+  if after_merge:after_merge(dst)
   dst.commit()
  except:dst.rollback();raise
  finally:src.close();dst.close()
@@ -40,17 +51,27 @@ def build(target,master,history):
  import atlas_store
  target=Path(target)
  if target.exists():raise FileExistsError('Shared database already exists. Use --refresh-directory or --atlas-db.')
- src=sqlite3.connect(Path(master).resolve().as_uri()+'?mode=ro',uri=True);dest=sqlite3.connect(target)
- try:src.backup(dest)
- finally:src.close();dest.close()
- con=connect(target);old=connect(Path(history).resolve().as_uri()+'?mode=ro')
+ target.parent.mkdir(parents=True,exist_ok=True)
+ candidate=target.with_name('.'+target.name+'.'+uuid.uuid4().hex+'.building')
+ original_db=atlas_store.DB
  try:
-  schema=old.execute("select sql from sqlite_master where name='deployments'").fetchone()[0];con.execute(schema)
-  rows=old.execute('select * from deployments').fetchall()
-  if rows:con.executemany('insert into deployments values('+','.join('?' for _ in rows[0])+')',[tuple(r) for r in rows])
-  atlas_schema(con);con.commit()
- finally:con.close();old.close()
- atlas_store.DB=target;atlas_store.initialize()
+  with closing(sqlite3.connect(Path(master).resolve().as_uri()+'?mode=ro',uri=True)) as src,closing(sqlite3.connect(candidate)) as dest:src.backup(dest)
+  with closing(connect(candidate)) as con,closing(connect(Path(history).resolve().as_uri()+'?mode=ro')) as old:
+   row=old.execute("select sql from sqlite_master where type='table' and name='deployments'").fetchone()
+   if not row:raise ValueError('Deployment history database has no deployments table')
+   con.execute(row[0])
+   rows=old.execute('select * from deployments').fetchall()
+   if rows:con.executemany('insert into deployments values('+','.join('?' for _ in rows[0])+')',[tuple(r) for r in rows])
+   atlas_schema(con);con.commit()
+  atlas_store.DB=candidate;atlas_store.initialize()
+  with closing(connect(candidate.resolve().as_uri()+'?mode=ro')) as con:
+   if con.execute('pragma integrity_check').fetchone()[0]!='ok':raise ValueError('Shared database failed integrity check')
+  # Publish atomically without overwriting a target created by another process.
+  if os.name=='nt':os.rename(candidate,target)
+  else:os.link(candidate,target);candidate.unlink()
+ finally:
+  atlas_store.DB=original_db
+  for suffix in ('','-wal','-shm','-journal'):Path(str(candidate)+suffix).unlink(missing_ok=True)
 
 def import_atlas(target,source):
  import atlas_store,hashlib
@@ -91,7 +112,8 @@ def import_atlas(target,source):
  finally:con.close()
 
 if __name__=='__main__':
- p=argparse.ArgumentParser();p.add_argument('--db',type=Path,default=ROOT/'office_atlas.db');p.add_argument('--master',type=Path);p.add_argument('--history',type=Path);p.add_argument('--atlas-db',type=Path);p.add_argument('--refresh-directory',type=Path);a=p.parse_args()
+ from runtime_paths import database_path
+ p=argparse.ArgumentParser();p.add_argument('--db',type=Path,default=database_path());p.add_argument('--master',type=Path);p.add_argument('--history',type=Path);p.add_argument('--atlas-db',type=Path);p.add_argument('--refresh-directory',type=Path);a=p.parse_args()
  if a.atlas_db:print(import_atlas(a.db,a.atlas_db))
  elif a.refresh_directory:merge_directory(a.db,a.refresh_directory);print('Directory refreshed; desks and deployment history preserved.')
  elif a.master and a.history:build(a.db,a.master,a.history);print('Shared database built.')

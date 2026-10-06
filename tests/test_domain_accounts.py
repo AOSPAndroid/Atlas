@@ -1,4 +1,6 @@
 """Windows logins are derived without changing imported identity records."""
+from sqlite_fixture import isolate_backend_database
+isolate_backend_database()
 import sqlite3
 import tempfile
 import unittest

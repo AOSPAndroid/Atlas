@@ -8,6 +8,8 @@ from pathlib import Path
 
 NS='{http://schemas.openxmlformats.org/spreadsheetml/2006/main}'
 REL='{http://schemas.openxmlformats.org/officeDocument/2006/relationships}'
+MAX_COLUMNS=16384
+MAX_ROWS=1048576
 from contextvars import ContextVar
 from functools import wraps
 _STRINGS=ContextVar('atlas_workbook_strings',default=None)
@@ -27,8 +29,12 @@ def excel_date(v):
         d=datetime(1899,12,30)+timedelta(days=float(v));return d.isoformat(sep=' ',timespec='seconds')
     except:return clean(v)
 def col_idx(ref):
+    match=re.fullmatch(r'([A-Z]{1,3})([1-9][0-9]{0,6})',ref if ref is not None else 'A1')
+    if not match or int(match[2])>MAX_ROWS:
+        raise ValueError('Invalid Excel cell reference; use A1 through XFD1048576.')
     n=0
-    for ch in re.match(r'[A-Z]+',ref or 'A1').group():n=n*26+ord(ch)-64
+    for ch in match[1]:n=n*26+ord(ch)-64
+    if n>MAX_COLUMNS:raise ValueError('Excel cells cannot extend beyond column XFD.')
     return n-1
 
 def workbook_parts(path):
@@ -54,20 +60,29 @@ def iter_rows(path,target,raw=False):
     with zipfile.ZipFile(path) as z:
         ss=shared_strings(z,str(path))
         with z.open(target) as f:
-            sheet_data=None
+            sheet_data=None;previous_row=0
             for event,e in ET.iterparse(f,events=('start','end')):
                 if event=='start' and e.tag==NS+'sheetData':sheet_data=e
                 if event!='end' or e.tag!=NS+'row':continue
-                cells={}
+                row_ref=e.attrib.get('r')
+                if row_ref is None:number=previous_row+1
+                elif not re.fullmatch(r'[1-9][0-9]{0,6}',row_ref):
+                    raise ValueError('Invalid Excel row reference.')
+                else:number=int(row_ref)
+                if not 1<=number<=MAX_ROWS:raise ValueError('Excel rows cannot extend beyond 1048576.')
+                previous_row=number;cells={};previous_column=-1
                 for c in e.findall(NS+'c'):
-                    i=col_idx(c.attrib.get('r','A1'));k=c.attrib.get('t');v=c.find(NS+'v');val=''
+                    ref=c.attrib.get('r')
+                    i=col_idx(ref) if ref is not None else previous_column+1
+                    if i>=MAX_COLUMNS:raise ValueError('Excel cells cannot extend beyond column XFD.')
+                    previous_column=i;k=c.attrib.get('t');v=c.find(NS+'v');val=''
                     if k=='inlineStr':val=''.join(t.text or '' for t in c.iter(NS+'t'))
                     elif v is not None and v.text is not None:val=ss[int(v.text)] if k=='s' else v.text
                     cells[i]=val if raw else clean(val)
                 if cells:
                     row=['']*(max(cells)+1)
                     for i,v in cells.items():row[i]=v
-                    yield int(e.attrib.get('r','0')),row
+                    yield number,row
                 if sheet_data is not None:sheet_data.remove(e)
 
 def canonical_header(v):return re.sub(r'[^a-z0-9]+','_',norm(v)).strip('_')
@@ -213,7 +228,7 @@ def build(src,out):
         links=rebuild_links(c)
         capture(c,src,selection_table='directory_import_sources')
         print('Relationship matching:',links)
-        c.executemany('insert into metadata(key,value) values(?,?)',[('schema_version','3'),('created_at',datetime.now().isoformat(sep=' ',timespec='seconds')),('source_file',src.name),('import_resolution',json.dumps(stats))])
+        c.executemany('insert into metadata(key,value) values(?,?)',[('schema_version','3'),('created_at',datetime.now().isoformat(sep=' ',timespec='seconds')),('generation',uuid.uuid4().hex),('source_file',src.name),('import_resolution',json.dumps(stats))])
         c.commit();check=c.execute('pragma integrity_check').fetchone()[0]
         counts={t:c.execute(f'select count(*) from {t}').fetchone()[0] for t in ('users','machines','assignments','user_aliases')};c.close()
         if check!='ok':raise RuntimeError(check)

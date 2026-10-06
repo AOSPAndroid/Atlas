@@ -81,11 +81,7 @@ function installPackagePicker() {
     select = $("#pkg");
   picker.addEventListener("toggle", () => {
     if (picker.open && !packageChoice) {
-      packageChoice = {
-        folder: select.value,
-        options: select.innerHTML,
-        search: $("#pkgSearch").value,
-      };
+      packageChoice = true;
       $("#pkgSearch").focus({ preventScroll: true });
       if (!select.options.length && !packageBusy) packages();
     } else if (!picker.open && packageChoice) cancelPackageChoice();
@@ -301,7 +297,9 @@ function poll(id, target = S.target) {
     (data) => {
       const failure = ["failed", "interrupted", "unknown"].includes(data.state);
       $("#deploymentState").textContent = String(
-        data.events.some((e) => e.pid) ? "launched" : (data.state || "running"),
+        !AtlasClient.terminal.has(data.state) && data.events.some((e) => e.pid)
+          ? "launched"
+          : (data.state || "running"),
       ).replace(/^./, (letter) => letter.toUpperCase());
       $("#deploymentState").className = statusAccent(data.state);
       $("#deploymentMessage").textContent = data.events.at(-1)?.message || "";
@@ -511,14 +509,15 @@ function exportCsv() {
       k.join(","),
       ...S.rows.map((r) =>
         k
-          .map((x) => '"' + String(r[x] ?? "").replace(/"/g, '""') + '"')
+          .map((x) => AtlasUI.csvCell(r[x]))
           .join(","),
       ),
     ].join("\n"),
     a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([csv]));
+  a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
   a.download = "bulk.csv";
   a.click();
+  URL.revokeObjectURL(a.href);
 }
 async function openTargetTool(tool) {
   if (!S.target) return toast("Select a target");
@@ -842,7 +841,7 @@ function exportSoftwareCsv() {
     headers.join(","),
     ...rows.map((row) =>
       headers
-        .map((h) => '"' + String(row[h] || "").replace(/"/g, '""') + '"')
+        .map((h) => AtlasUI.csvCell(row[h]))
         .join(","),
     ),
   ].join("\n");

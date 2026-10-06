@@ -82,8 +82,8 @@ def register(app, wmi, check_token):
             raise HTTPException(409, 'Package preview expired or was replaced. Validate the CSV again.')
         at = datetime.now(timezone.utc).isoformat()
         import_id = uuid.uuid4().hex
-        backups = Path(__file__).parent / 'backups'
-        backups.mkdir(exist_ok=True)
+        backups = Path(wmi.MASTER_DB).resolve().parent / 'backups'
+        backups.mkdir(parents=True, exist_ok=True)
         backup = backups / ('package-data-' + import_id + '.json.gz')
         try:
             with connect() as con:

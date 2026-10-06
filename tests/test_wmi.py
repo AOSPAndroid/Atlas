@@ -1,4 +1,6 @@
 """No remote Windows commands are executed by this suite."""
+from sqlite_fixture import isolate_backend_database
+isolate_backend_database()
 import base64,json,sqlite3,sys,tempfile,unittest,uuid
 from pathlib import Path
 from unittest.mock import patch
@@ -187,7 +189,8 @@ class Regression(unittest.TestCase):
    self.assertEqual(self.client.post('/api/services/stop',json={'computer':'TESTPC','name':'TestService'}).status_code,422)
    self.assertEqual(self.client.post('/api/services/stop',headers={'Origin':'https://other.example'},json=payload).status_code,403)
    remote.assert_not_called()
-  with patch.object(app,'ps',return_value=json.dumps({'ok':True,'computer':'TESTPC','name':'TestService','outcome':'stopped','state':'Stopped'})) as remote:
+  item={'name':'TestService','display_name':'Test Service','identity':'a'*64,'state':'Stopped','start_mode':'Auto','pid':0,'can_start':True,'start_reason':'','can_stop':False,'stop_reason':'Service is not running','can_restart':False,'restart_reason':'Service is not running'}
+  with patch.object(app,'ps',return_value=json.dumps({'ok':True,'computer':'TESTPC','name':'TestService','outcome':'stopped','state':'Stopped','item':item})) as remote:
    response=self.client.post('/api/services/stop',json=payload);self.assertEqual(response.status_code,200);self.assertEqual(response.json()['state'],'Stopped')
    self.assertIn("-Action 'stop'",remote.call_args.args[0])
   with patch.object(app,'ps',side_effect=RuntimeError('WMI unreachable')):

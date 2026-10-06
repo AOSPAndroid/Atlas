@@ -1,3 +1,5 @@
+from sqlite_fixture import isolate_backend_database
+isolate_backend_database()
 import unittest
 from fastapi.testclient import TestClient
 from backend import main,viewer

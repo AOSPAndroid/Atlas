@@ -18,7 +18,7 @@ def run(*args, env):
 def main():
     with tempfile.TemporaryDirectory(prefix='atlas-tests-') as tmp:
         db = Path(tmp) / 'fixture.db'
-        source = sqlite3.connect((ROOT / 'office_atlas.db').as_uri() + '?mode=ro', uri=True)
+        source = sqlite3.connect((ROOT / 'office_atlas.db').as_uri() + '?mode=ro&immutable=1', uri=True)
         dest = sqlite3.connect(db)
         source.backup(dest)
         source.close()

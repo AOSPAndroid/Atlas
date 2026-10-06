@@ -1,4 +1,6 @@
 """Isolated seating UI fixture. No WMI workers or remote operations."""
+from sqlite_fixture import isolate_backend_database
+isolate_backend_database()
 import sys,tempfile
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))

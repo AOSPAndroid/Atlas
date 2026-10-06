@@ -6,6 +6,8 @@ Atlas helps support staff investigate a slow machine from the IT console using o
 
 All four views share the target toolbar, scan controls and process filter. The scan-state label distinguishes unscanned targets, active scans, stored snapshots and failed refreshes. **Where to look**, processor/disk details and GPU engine activity expand on demand; process counts show how many rows are visible out of the recorded total.
 
+Ping, preflight, mini health and reboot monitoring test IPv4 echo replies. Windows can return a successful command exit code for a gateway's "Destination host unreachable" response; Atlas requires an actual reply with a TTL. A missing IPv4 reply does not prove the machine is powered off: ICMP may be blocked, or the host may be reachable only over IPv6. WMI and share checks report their availability separately.
+
 ## Copy diagnostics to work Copilot
 
 Use **Copy diagnostics** and **Open Copilot** in Current selection or the Remote Admin heading. Copy prepares a troubleshooting prompt with the selected inventory, available health readings, cached performance snapshots and any slowness capture. It includes measurement times, missing readings and collection limits, and does not run another scan. Current selection uses its selected user/device; Remote Admin uses its target field, which can differ from the Workspace selection.

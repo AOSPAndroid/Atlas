@@ -15,6 +15,8 @@ Start opens Admin and Demo in the selected layout. Both editions share local ser
 
 **[Database update guide](docs/database-update-guide.md)** covers imports, backups, recovery, seating and hosted Preview updates.
 
+**[Latest code audit](docs/code-audit-2026-10-06.md)** records the confirmed fixes, regression coverage and large-directory measurements.
+
 ## Choose your Atlas edition
 
 - **[Classic Atlas](Classic-Atlas/README.md)** — normal Atlas layout, with Admin, Demo and Preview folders.

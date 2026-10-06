@@ -1,4 +1,6 @@
 """Mixed asset imports, old databases and Windows action boundaries."""
+from sqlite_fixture import isolate_backend_database
+isolate_backend_database()
 import sqlite3
 import tempfile
 import unittest

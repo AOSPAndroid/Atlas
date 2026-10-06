@@ -12,7 +12,7 @@ from starlette.concurrency import run_in_threadpool
 import atlas_store as store
 from desk_moves import snapshot
 from directory_workbook import workbook_parts, iter_rows, canonical_header
-from identity_links import key, identifier
+from identity_links import key, identifier, login_keys
 from atlas_store import ClosingConnection
 
 NS = '{http://schemas.openxmlformats.org/spreadsheetml/2006/main}'
@@ -66,7 +66,7 @@ def account_index(c):
         users[canonical]={'account':login or email or canonical,'name':name}
         for value in (canonical,login,email,employee):
             if key(value): index[key(value)].add(canonical)
-        if identifier(login): index[identifier(login)].add(canonical)
+        for alias in login_keys(login):index[alias].add(canonical)
     return index, users
 
 def occupied(r):

@@ -7,7 +7,9 @@
     submitting = false,
     sending = false,
     unwatch = null,
-    opened = false;
+    opened = false,
+    transcriptRequest = 0,
+    listRequest = 0;
   const finished = (s) =>
     ["complete", "failed", "stopped", "timed_out"].includes(s);
   const request = (url, body) =>
@@ -51,6 +53,7 @@
     controls();
   }
   function follow(data) {
+    transcriptRequest++;
     unwatch?.();
     show(data);
     if (finished(data.state)) return;
@@ -76,7 +79,16 @@
     );
   }
   async function refreshSessions(restore = true) {
-    const rows = await request("/api/psexec/runs");
+    const turn = restore ? ++transcriptRequest : transcriptRequest,
+      listing = ++listRequest;
+    let rows;
+    try {
+      rows = await request("/api/psexec/runs");
+    } catch (error) {
+      if (turn === transcriptRequest && listing === listRequest) throw error;
+      return;
+    }
+    if (turn !== transcriptRequest || listing !== listRequest) return;
     const select = get("Sessions"),
       previous = current?.id || "";
     select.replaceChildren(
@@ -93,7 +105,12 @@
         (rows.some((r) => r.id === previous) ? previous : rows[0]?.id);
       if (id) {
         select.value = id;
-        follow(await request("/api/psexec/runs/" + id));
+        try {
+          const data = await request("/api/psexec/runs/" + id);
+          if (turn === transcriptRequest && select.value === id) follow(data);
+        } catch (error) {
+          if (turn === transcriptRequest && select.value === id) throw error;
+        }
       } else {
         unwatch?.();
         current = null;
@@ -116,6 +133,7 @@
       payload.confirmation = answer.trim();
     }
     submitting = true;
+    transcriptRequest++;
     controls();
     get("TerminalMessage").textContent = "";
     get("RunStatus").textContent =
@@ -191,14 +209,17 @@
         "Finish the active session before switching transcripts.";
       return;
     }
-    const id = get("Sessions").value;
+    const id = get("Sessions").value, turn = ++transcriptRequest;
     if (!id) return;
     try {
-      follow(await request("/api/psexec/runs/" + id));
+      const data = await request("/api/psexec/runs/" + id);
+      if (turn === transcriptRequest && get("Sessions").value === id) follow(data);
     } catch (e) {
-      get("TerminalMessage").textContent = e.message;
+      if (turn === transcriptRequest && get("Sessions").value === id)
+        get("TerminalMessage").textContent = e.message;
     }
   };
+  window.addEventListener("pagehide", () => { transcriptRequest++; listRequest++; });
   window.AtlasPsExecTerminal = {
     review(payload, command) {
       review = payload;

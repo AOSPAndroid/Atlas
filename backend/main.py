@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from backend import __version__
 from directory_lookup import exact_users, linked_machines, search_directory, prepare_views
+from reboot_monitor import has_echo_reply
 
 ROOT=Path(__file__).resolve().parent.parent
 WEB=ROOT/'frontend'
@@ -164,6 +165,7 @@ def _deploy_worker(j,p):
   validate_deployment(p);pc=p.computer;job_service.target_ready(pc);jobs[j]['target']=pc;pkg=Path(p.folder).name
   guard=target_lock(pc);acquired=guard.acquire(blocking=False)
   if not acquired:raise RuntimeError('Another deployment or cleanup is active on this target')
+  job_service.target_ready(pc)
   remote=rf'{REMOTE_ROOT}\{pkg}\{p.script}'
   emit(j,'Validating target access','running');history_update(j,state='running')
   if not os.path.isdir(unc(pc)):raise RuntimeError('Target administrative share is unavailable')
@@ -179,6 +181,7 @@ def _deploy_worker(j,p):
  except Exception as e:
   state='launched' if launched else 'failed'
   if launched:job_service.unresolved.add(pc)
+  if launched:jobs[j]['recovery_required']=True
   emit(j,'Launched' if launched else str(e),state,log=[str(e)] if launched else [])
   try:history_update(j,state=state,finished=time.strftime('%Y-%m-%d %H:%M:%S'),details=str(e))
   except Exception:logging.exception('Could not persist failed deployment')
@@ -227,6 +230,8 @@ async def local_only(request:Request,call_next):
   return JSONResponse({'detail':'Local access only'},status_code=403)
  if request.url.hostname not in ('127.0.0.1','localhost','::1'):
   return JSONResponse({'detail':'Invalid host'},status_code=403)
+ if request.url.path.startswith('/api/') and request.headers.get('sec-fetch-site')=='cross-site':
+  return JSONResponse({'detail':'Cross-site API requests are not allowed'},status_code=403)
  origin=request.headers.get('origin')
  if origin and origin != str(request.base_url).rstrip('/'):
   return JSONResponse({'detail':'Cross-origin requests are not allowed'},status_code=403)
@@ -234,6 +239,9 @@ async def local_only(request:Request,call_next):
  # Assets keep conditional caching, but every navigation must check for updates.
  # Otherwise a new shared card can run alongside an older cached console script.
  response.headers['Cache-Control']='no-store' if request.url.path.startswith('/api/') else 'no-cache'
+ response.headers['Content-Security-Policy']="frame-ancestors 'self'"
+ response.headers['X-Frame-Options']='SAMEORIGIN'
+ response.headers['X-Content-Type-Options']='nosniff'
  return response
 @app.get('/api/health')
 def health():
@@ -292,7 +300,7 @@ def scripts(package:str,action:str='Install'):
  return {'scripts':sorted(str(x.relative_to(root)) for x in root.rglob('*') if x.is_file() and root in x.resolve().parents and x.suffix.lower() in ('.ps1','.vbs') and x.stem.lower().endswith(suffix))}
 @app.get('/api/preflight/{pc}')
 def preflight(pc:str):
- pc=validate_pc(pc);checks={'ping':run(['ping.exe','-n','1','-w','1200',pc],False).returncode==0,'c_share':os.path.isdir(unc(pc))}
+ pc=validate_pc(pc);checks={'ping':has_echo_reply(run(['ping.exe','-4','-n','1','-w','1200',pc],False,timeout=5)),'c_share':os.path.isdir(unc(pc))}
  try:checks['wmi']=ps(f'[bool](Get-WmiObject -ComputerName {quote(pc)} Win32_OperatingSystem -EA Stop)').lower()=='true'
  except:checks['wmi']=False
  return checks
@@ -319,7 +327,7 @@ def bulk_job(j:str):
 def history(limit:int=100):
  with hist_db() as c:return [dict(x) for x in c.execute('select * from deployments order by started desc limit ?', (max(1,min(limit,500)),))]
 @app.get('/api/ping/{pc}')
-def ping(pc:str):return {'online':run(['ping.exe','-n','1','-w','1200',validate_pc(pc)],False).returncode==0}
+def ping(pc:str):return {'online':has_echo_reply(run(['ping.exe','-4','-n','1','-w','1200',validate_pc(pc)],False,timeout=5))}
 @app.get('/api/access/{pc}')
 def access(pc:str):return {'available':os.path.isdir(unc(pc))}
 @app.get('/api/overview/{pc}')
@@ -443,7 +451,9 @@ def package_folder_info(pc:str):
 def cleanup_package_folder(pc:str):
     pc=validate_pc(pc);job_service.target_ready(pc);guard=target_lock(pc)
     if not guard.acquire(blocking=False):raise HTTPException(409,"A deployment is active on this target")
-    try:return _cleanup_package_folder(pc)
+    try:
+        job_service.target_ready(pc)
+        return _cleanup_package_folder(pc)
     finally:guard.release()
 
 def _cleanup_package_folder(pc:str):
@@ -468,14 +478,16 @@ def _queue_worker(queue_id,items):
  q=queue_jobs[queue_id];q['state']='running';job_service.save(queue_id,queue=True)
  try:
   for index,item in enumerate(items):
-   row=q['items'][index]
-   if row['state'] in TERMINAL:continue
-   if q.get('cancel_requested'):
-    q['state']='cancelled';return
-   if q.get('pause_requested'):
-    q['state']='paused';return
-   row['state']='running';child=uuid.uuid4().hex
-   jobs[child]={'state':'queued','target':item.computer,'events':[]};row['job']=child;job_service.save(queue_id,queue=True)
+   # Claim the next item atomically with Pause/Cancel waiting. Once claimed it is current.
+   with lock:
+    row=q['items'][index]
+    if row['state'] in TERMINAL:continue
+    if q.get('cancel_requested'):
+     q['state']='cancelled';return
+    if q.get('pause_requested'):
+     q['state']='paused';return
+    row['state']='running';child=uuid.uuid4().hex
+    jobs[child]={'state':'queued','target':item.computer,'events':[]};row['job']=child;job_service.save(queue_id,queue=True)
    try:
     history_create(child,item.computer,Path(item.folder).name,item.action,item.script,item.mode)
     deploy_worker(child,item)
@@ -554,7 +566,7 @@ def acknowledge_recovery(pc:str,body:dict):
  with lock:
   job_service.acknowledge(pc)
   for key,data in list(jobs.items()):
-   if data.get('state') in ('unknown','interrupted'):
+   if data.get('state') in ('unknown','interrupted') or data.get('recovery_required'):
     if data.get('target')==pc:data['recovery_acknowledged']=True
     data.setdefault('acknowledged_targets',[]).append(pc);job_service.save(key)
   for key,data in list(queue_jobs.items()):

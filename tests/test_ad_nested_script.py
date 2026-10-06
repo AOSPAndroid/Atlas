@@ -1,10 +1,16 @@
-import json, subprocess, unittest, shutil
+import json, subprocess, unittest, shutil, os
 from pathlib import Path
 
 class DirectoryScriptTests(unittest.TestCase):
  def run_fixture(self, kind='user', broken=False, expiry='134050464000000000', shell='pwsh'):
   if not shutil.which(shell):self.skipTest(shell+' is not installed')
   source=Path('scripts/active_directory.ps1').read_text(encoding='utf8')
+  if os.name!='nt':
+   # AD providers below are fictional. Linux also needs a fictional report operator;
+   # WindowsIdentity is Windows-only, and this replacement never reaches production.
+   operator='[System.Security.Principal.WindowsIdentity]::GetCurrent().Name'
+   self.assertEqual(source.count(operator),1,'Operator reporting boundary changed; review the fixture')
+   source=source.replace(operator,"'FIXTURE\\Operator'",1)
   mock=r'''
 $kind='KIND';$identity='fixture';$server='dc.test';$broken=BROKEN
 function Get-Module { 'fixture' }
@@ -26,7 +32,10 @@ function Get-ADGroup {
 '''.replace('KIND',kind).replace('BROKEN','$true' if broken else '$false').replace('134050464000000000',expiry)
   r=subprocess.run([shell,'-NoProfile','-NonInteractive','-Command',mock+'\n'+source],capture_output=True,text=True,timeout=15)
   self.assertEqual(r.returncode,0,r.stderr)
-  return json.loads(r.stdout)
+  data=json.loads(r.stdout)
+  self.assertNotIn('error',data,'Mocked directory script failed: '+str(data.get('error','')))
+  if os.name!='nt':self.assertEqual(data['operator'],r'FIXTURE\Operator')
+  return data
  def test_nested_cycle_and_primary_parent(self):
   data=self.run_fixture();groups={g['name']:g['membership'] for g in data['groups']}
   self.assertEqual(groups,{'A':'Direct','B':'Nested','C':'Nested','Primary':'Primary'})

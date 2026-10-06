@@ -11,6 +11,12 @@ from fastapi import HTTPException
 ACTIVE = {'requesting', 'waiting_offline', 'waiting_online'}
 
 
+def has_echo_reply(result):
+    """Windows IPv4 ping succeeds only with an actual echo reply, not an ICMP error."""
+    output = getattr(result, 'stdout', '') or ''
+    return result.returncode == 0 and isinstance(output, str) and bool(re.search(r'\bTTL\s*=\s*\d+\b', output, re.I))
+
+
 def ping_once(computer):
     # A Windows ping can return zero for "destination unreachable". Require TTL.
     try:
@@ -19,7 +25,7 @@ def ping_once(computer):
                                 creationflags=0x08000000 if os.name == 'nt' else 0)
     except subprocess.TimeoutExpired:
         return False, 'Ping timed out'
-    reply = result.returncode == 0 and bool(re.search(r'\bTTL\s*=', result.stdout, re.I))
+    reply = has_echo_reply(result)
     lines = [line.strip() for line in result.stdout.splitlines() if line.strip()]
     line = next((line for line in lines if re.search(r'\bTTL\s*=', line, re.I)), None)
     return reply, line or 'No echo reply'

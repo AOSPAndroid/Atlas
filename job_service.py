@@ -49,7 +49,7 @@ class JobService:
             body = json.dumps(data)
             with self.connect() as c:
                 c.execute('insert or replace into operation_state values(?,?,?,?)', (key, 'queue' if queue else 'job', body, data['updated']))
-                if data.get('state') in ('unknown', 'interrupted') and not data.get('recovery_acknowledged'):
+                if (data.get('state') in ('unknown', 'interrupted') or data.get('recovery_required')) and not data.get('recovery_acknowledged'):
                     targets = [data.get('target')] + [r.get('target') or r.get('machine') for r in data.get('items', data.get('results', []))]
                     pending = [t for t in targets if t and t not in data.get('acknowledged_targets', [])]
                     self.unresolved.update(pending)
@@ -74,7 +74,7 @@ class JobService:
                 data.setdefault('events', []).append({'message':'Atlas restarted. Inspect the target and history before starting new work.'})
                 targets = [data.get('target')] + [r.get('target') or r.get('machine') for r in data.get('items',data.get('results',[]))]
                 self.unresolved.update(t for t in targets if t)
-            if data.get('state') in ('unknown','interrupted') and not data.get('recovery_acknowledged'):
+            if (data.get('state') in ('unknown','interrupted') or data.get('recovery_required')) and not data.get('recovery_acknowledged'):
                 targets=[data.get('target')]+[r.get('target') or r.get('machine') for r in data.get('items',data.get('results',[]))]
                 self.unresolved.update(t for t in targets if t and t not in data.get('acknowledged_targets',[]))
             (self.queues if kind=='queue' else self.jobs)[key] = data

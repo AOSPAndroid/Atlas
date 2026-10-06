@@ -7,12 +7,12 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from database_manager import compare, register_database_manager
+from database_manager import register_database_manager
 from device_inventory import inventory_identity, supports_windows
 from directory_exports import record, copy_archive
 from directory_lookup import linked_machines, prepare_views, search_directory
 from directory_workbook import build
-from merge_data import atlas_schema, merge_directory
+from merge_data import atlas_schema
 from test_directory_exports import device_sheets, workbook
 
 

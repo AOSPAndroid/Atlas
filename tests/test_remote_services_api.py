@@ -1,4 +1,6 @@
 """Local service routes use a simulated transport; no Windows service is changed."""
+from sqlite_fixture import isolate_backend_database
+isolate_backend_database()
 import json
 import sqlite3
 import tempfile

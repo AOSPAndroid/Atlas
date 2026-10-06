@@ -1,4 +1,6 @@
 """Local UI fixture; never executes WMI, PsTools or deploys software."""
+from sqlite_fixture import isolate_backend_database
+isolate_backend_database()
 import sys,tempfile,sqlite3,json,subprocess
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1];sys.path.insert(0,str(ROOT))

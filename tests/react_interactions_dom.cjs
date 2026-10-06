@@ -5,6 +5,7 @@ const settle=()=>new Promise(r=>setTimeout(r,40));
 (async()=>{
  const f=await fixture({fetch:async()=>{throw Error('The tools island must never fetch a service')}});
  const {w,run}=f,d=w.document;
+ const style=d.createElement('style');style.textContent=fs.readFileSync('frontend/assets/design-system.css','utf8');d.head.append(style);
  w.ResizeObserver=class{observe(){} unobserve(){} disconnect(){}};
  w.HTMLElement.prototype.getClientRects=function(){return this.closest('[hidden], .page:not(.active)')?[]:[{}]};
  w.HTMLElement.prototype.getBoundingClientRect=function(){return{x:0,y:0,left:0,top:0,right:200,bottom:30,width:200,height:30}};
@@ -22,6 +23,15 @@ const settle=()=>new Promise(r=>setTimeout(r,40));
  await filter('Safe simulated action');click(d.querySelector('[data-tool-id="safe-action"]'));await settle();assert.equal(calls,1);assert(!d.querySelector('.atlas-tools-body'));
  await open();const fields=[...d.querySelectorAll('[role="tab"]')].find(n=>n.textContent==='Fields');click(fields);await settle();await filter('Fixture field');click(d.querySelector('[data-tool-id="fixture-field"]'));await settle();assert.equal(d.activeElement.id,'fixture-field');assert(!d.querySelector('.atlas-tools-body'));
  await open();d.querySelector('[aria-label="Find a tool or field"]').dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}));await settle();assert(!d.querySelector('.atlas-tools-body'));assert.equal(d.activeElement.getAttribute('aria-label'),'Open tools');
+ // Keyboard focus can reopen the Radix tooltip after Escape. Its fixed
+ // positioned wrapper must remain transparent to clicks on nearby commands.
+ d.activeElement.blur();d.querySelector('[aria-label="Open tools"]').focus();await settle();
+ const tooltip=d.querySelector('.atlas-tools-tooltip');assert(tooltip,'actual Radix tooltip is mounted on keyboard focus');
+ const wrapper=tooltip.closest('[data-radix-popper-content-wrapper]');assert(wrapper,'actual tooltip owns a positioned Radix wrapper');
+ assert.equal(w.getComputedStyle(tooltip).pointerEvents,'none');
+ assert.equal(w.getComputedStyle(wrapper).pointerEvents,'none','tooltip wrapper cannot block adjacent command controls');
+ const interactive=d.createElement('div');interactive.setAttribute('data-radix-popper-content-wrapper','');interactive.innerHTML='<button>Interactive popover action</button>';d.body.append(interactive);
+ assert.notEqual(w.getComputedStyle(interactive).pointerEvents,'none','interactive popovers retain pointer input');interactive.remove();
  // A disabled original cannot be activated through a previously enabled React card.
  await open();await filter('Safe simulated action');d.getElementById('safe-action').disabled=true;click(d.querySelector('[data-tool-id="safe-action"]'));await settle();assert.equal(calls,1);assert(d.querySelector('[data-tool-id="safe-action"]').disabled);
  d.getElementById('pageTitle').textContent='Active Directory';await settle();assert(!d.querySelector('.atlas-tools-body'),'Navigation closes the island');

@@ -1,4 +1,6 @@
 """Fictional package metadata and disposable databases; no package execution."""
+from sqlite_fixture import isolate_backend_database
+isolate_backend_database()
 import csv
 import gzip
 import io

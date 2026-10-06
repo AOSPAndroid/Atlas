@@ -172,30 +172,36 @@
     el("softwarePreview").hidden = true;
     el("softwareActionDialog").showModal();
   }
-  async function poll(job) {
-    try {
-      const data = await request("/api/software-tools/jobs/" + job);
-      el("softwareActionLog").textContent =
-        data.events.map((e) => `[${e.time || ""}] ${e.message}`).join("\n") ||
-        "Queued…";
-      if (!["complete", "failed", "cancelled"].includes(data.state)) {
-        setTimeout(() => poll(job), 1500);
-        return;
-      }
-      softwareState.software.delete(selected.pc);
+  function poll(job) {
+    const pc = selected.pc;
+    let failures = 0;
+    const finish = () => {
+      softwareState.software.delete(pc);
       activeJob = null;
       working = false;
-      controls();
-      el("softwareActionLog").textContent +=
-        "\nRefresh the software list before another action.";
       selected = null;
-    } catch (e) {
-      el("softwareActionLog").textContent +=
-        "\nMonitoring unavailable: " +
-        e.message +
-        ". Check deployment history; the remote action may still be running.";
-      setTimeout(() => poll(job), 5000);
-    }
+      controls();
+    };
+    return AtlasClient.watch("console-software-action", "/api/software-tools/jobs/" + job,
+      data => {
+        failures = 0;
+        el("softwareActionLog").textContent =
+          data.events.map(e => `[${e.time || ""}] ${e.message}`).join("\n") || "Queued…";
+        if (AtlasClient.terminal.has(data.state)) {
+          finish();
+          el("softwareActionLog").textContent += `\nState: ${data.state}. Refresh the software list before another action.`;
+        }
+      }, {
+        onError: error => {
+          failures++;
+          el("softwareActionLog").textContent =
+            `Monitoring unavailable: ${error.message}. Check deployment history; the remote action may still be running.`;
+          if (failures >= 8) {
+            finish();
+            el("softwareActionLog").textContent += "\nMonitoring stopped after eight failed attempts. Refresh inventory only after checking the operation state.";
+          }
+        },
+      });
   }
   document.addEventListener("DOMContentLoaded", () => {
     el("adminSoftware").onclick = () =>

@@ -370,6 +370,13 @@
           "'": "&#39;",
         })[c],
     );
+  function csvCell(value) {
+    let text = String(value ?? "");
+    // CSV quoting preserves delimiters; an apostrophe also keeps spreadsheet
+    // formula prefixes and leading control whitespace literal when imported.
+    if (/^\s*[=+@-]/.test(text) || /^[\t\r\n]/.test(text)) text = "'" + text;
+    return '"' + text.replace(/"/g, '""') + '"';
+  }
   function domainAccount(user) {
     const login = String(
       user?.login_id || user?.user_name || user?.user_id || "",
@@ -867,6 +874,7 @@
     machineBadges,
     machineFilters,
     esc,
+    csvCell,
     person,
     domainAccount,
     machineDetails,
@@ -1054,6 +1062,9 @@ window.AtlasContext = (() => {
 (() => {
   function install() {
     if (window.AtlasInteractions?.ready || document.querySelector('.atlas-reachable-toggle') || !document.querySelector('main')) return;
+    // The Desktop shell already owns window/dock controls. App and utility
+    // documents keep their own action indexes inside their browsing context.
+    if (document.body?.classList.contains('atlas-desktop') && document.getElementById('desktopArea')) return;
     const toggle = document.createElement('button');
     toggle.className = 'atlas-reachable-toggle'; toggle.type = 'button';
     toggle.textContent = 'Actions'; toggle.setAttribute('aria-expanded', 'false');

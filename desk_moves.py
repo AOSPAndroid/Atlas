@@ -88,7 +88,7 @@ def export_workbook(db,layout="previous"):
  return out.getvalue()
 
 def register_desk_moves(app,wmi,check_token,busy):
- staged={};root=Path(__file__).parent
+ staged={};root=Path(wmi.MASTER_DB).resolve().parent
  @app.get('/api/desk-moves/export')
  def export(layout:str="previous"):
   if layout not in ("previous","official"):raise HTTPException(400,"Choose official or previous layout")

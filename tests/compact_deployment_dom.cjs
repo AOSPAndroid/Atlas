@@ -57,7 +57,10 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 15));
             resolve(
               reply({
                 state,
-                events: [{ time: "12:00", message: "SIMULATED " + state }],
+                events: [
+                  { time: "11:59", message: "SIMULATED process launch", pid: 1234 },
+                  { time: "12:00", message: "SIMULATED " + state },
+                ],
               }),
             );
         });
@@ -241,7 +244,7 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 15));
   run("S.target='PC-A';syncDeploymentPanel()");
   assert(!doc.querySelector("#deploymentProgress").hidden);
   assert.equal(doc.querySelector("#deploymentJobTarget").textContent, "PC-A");
-  assert.equal(doc.querySelector("#deploymentState").textContent, "Failed");
+  assert.equal(doc.querySelector("#deploymentState").textContent, "Failed", "the final failure takes precedence over an earlier PID event");
   assert(doc.querySelector("#deploymentLog").open);
   assert.match(doc.querySelector("#log").textContent, /SIMULATED failed/);
   run("clearLookup()");

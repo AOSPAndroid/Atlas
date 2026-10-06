@@ -19,13 +19,19 @@ def prepare(source,candidate):
  if not result['users'] or not result['machines']:raise ValueError('Empty user or machine extract refused. The live database was not changed.')
  return result
 
-def apply_refresh(target,candidate,backup_folder):
+def apply_refresh(target,candidate,backup_folder,*,before_merge=None,after_merge=None):
  target=Path(target);backup_folder=Path(backup_folder);backup_folder.mkdir(parents=True,exist_ok=True)
  backup=backup_folder/('office_atlas_before_directory_'+datetime.now().strftime('%Y%m%d_%H%M%S_%f')+'.db')
- src=sqlite3.connect(target.resolve().as_uri()+'?mode=ro',uri=True,factory=ClosingConnection);dst=sqlite3.connect(backup,factory=ClosingConnection)
- try:src.backup(dst)
- finally:src.close();dst.close()
- merge_directory(target,candidate);return backup
+ def backup_current(con):
+  if before_merge:before_merge(con)
+  # The merge owns a write reservation: another writer cannot change the
+  # reviewed database between this consistent backup and the replacement.
+  src=sqlite3.connect(target.resolve().as_uri()+'?mode=ro',uri=True,factory=ClosingConnection);dst=sqlite3.connect(backup,factory=ClosingConnection)
+  try:src.backup(dst)
+  finally:src.close();dst.close()
+ def finish(con):
+  if after_merge:after_merge(con,backup)
+ merge_directory(target,candidate,before_merge=backup_current,after_merge=finish);return backup
 
 def main():
  p=argparse.ArgumentParser(description=__doc__);p.add_argument('--source',type=Path,default=ROOT/'database040926.xlsx');p.add_argument('--check-only',action='store_true');args=p.parse_args()
@@ -41,7 +47,7 @@ def main():
   if args.check_only:return
   if input('Have all active jobs finished, and is this the complete intended directory snapshot? Type APPLY to continue: ').strip()!='APPLY':
    print('Cancelled. The shared database was not changed.');return
-  backup=apply_refresh(target,candidate,ROOT/'backups')
+  backup=apply_refresh(target,candidate,target.parent/'backups')
   print('Directory refreshed. Backup:',backup);print('Run Start-Office-Atlas.bat, then Review mappings to check missing links.')
 if __name__=='__main__':
  try:main()

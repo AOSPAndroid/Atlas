@@ -1,3 +1,5 @@
+from sqlite_fixture import isolate_backend_database
+isolate_backend_database()
 import tempfile
 import time
 import unittest

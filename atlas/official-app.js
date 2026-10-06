@@ -781,20 +781,31 @@ function renderDetail() {
   };
   if ($("#move-person")) $("#move-person").onclick = () => moveDialog(r);
   if ($("#vacate")) $("#vacate").onclick = () => vacateDesk(r);
+  const historyHost = $("#history-list"),
+    historyDeskId = r.id;
+  let historyVersion = 0;
+  const historyIsCurrent = () =>
+    selected?.id === historyDeskId &&
+    historyHost.isConnected &&
+    $("#history-list") === historyHost;
   $("#history").onclick = async () => {
     if (!databaseReady) return toast("History is available in the Python app");
+    const version = ++historyVersion;
     try {
-      const response = await fetch("/api/history/" + encodeURIComponent(r.id));
+      const response = await fetch(
+        "/api/history/" + encodeURIComponent(historyDeskId),
+      );
       if (!response.ok) throw Error("History unavailable");
       const result = await response.json();
-      $("#history-list").innerHTML = result.history
+      if (version !== historyVersion || !historyIsCurrent()) return;
+      historyHost.innerHTML = result.history
         .map(
           (h) =>
             `<p><b>${esc(h.action)}</b><br>${esc(new Date(h.at).toLocaleString())}<br>${esc(h.before?.name || "—")} → ${esc(h.after.name)}<details><summary>Record changes</summary><pre style="white-space:pre-wrap">${esc(JSON.stringify({ before: h.before, after: h.after }, null, 2))}</pre></details></p>`,
         )
         .join("");
     } catch (e) {
-      toast(e.message);
+      if (version === historyVersion && historyIsCurrent()) toast(e.message);
     }
   };
   $("#map-previous").onclick = async () => {

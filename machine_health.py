@@ -2,6 +2,7 @@
 import json,threading,time
 from datetime import datetime,timezone
 from fastapi import HTTPException
+from reboot_monitor import has_echo_reply
 
 # Fixed PowerShell queries. Host names are validated and quoted by the existing transport.
 QUERIES={
@@ -35,7 +36,7 @@ class HealthChecks:
         try:
             if not self.slots.acquire(timeout=.2):return self.result(pc,metric,'unavailable',None,'Health service busy; refresh shortly')
             try:
-                if metric=='ping':data={'available':self.wmi.run(['ping.exe','-n','1','-w','1200',pc],False,timeout=5).returncode==0}
+                if metric=='ping':data={'available':has_echo_reply(self.wmi.run(['ping.exe','-4','-n','1','-w','1200',pc],False,timeout=5))}
                 else:
                     script="$ErrorActionPreference='Stop';$pc="+self.wmi.quote(pc)+"; & {"+QUERIES[metric]+"} | ConvertTo-Json -Depth 5 -Compress"
                     data=json.loads(self.wmi.ps(script,timeout=18))

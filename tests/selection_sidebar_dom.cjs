@@ -54,6 +54,10 @@ const settle = () => new Promise(resolve => setTimeout(resolve, 25));
   assert(side.textContent.includes('PC-B'));assert(!side.textContent.includes('Intel'));assert(side.querySelector('.selection-readings').textContent.includes('Not scanned'));
   const beforePhone = count();run("setTarget('IPHONE-EXAMPLE')");await settle();assert.equal(count(),beforePhone);
   assert.equal(run('S.target'),'');assert(side.querySelector('.selection-scan').hidden);assert(side.textContent.includes('Inventory device'));assert(!side.textContent.includes('80.0 GiB'));
+  assert.equal(d.querySelector('#adminPc').value,'');
+  for (const id of ['refreshProcesses','diagnoseSlowness','adminServices','refreshServices'])
+    assert(d.getElementById(id).disabled, id+' disables immediately for an inventory-only device');
+  assert.equal(d.querySelector('#servicesTarget').textContent,'No target','target-change listeners observe the cleared Admin field');
   w.AtlasReadOnly = {reason:'Read-only fixture'};run("setTarget('PC-B')");await settle();const beforeReadOnly=count();
   assert(side.querySelector('.selection-scan').disabled);side.querySelector('.selection-scan').click();assert.equal(count(),beforeReadOnly);assert(side.textContent.includes('live health requires Admin'));
   run('clearLookup()');await settle();assert(!side.querySelector('.selection-empty').hidden);assert(side.querySelector('.selection-machine').hidden);assert(side.querySelector('.selection-user').hidden);

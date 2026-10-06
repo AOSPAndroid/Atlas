@@ -1,3 +1,5 @@
+from sqlite_fixture import isolate_backend_database
+isolate_backend_database()
 import unittest,sqlite3,tempfile,json,hashlib,os
 from pathlib import Path
 from unittest.mock import patch,Mock

@@ -1,4 +1,6 @@
 """Export retention, scope and refresh atomicity, using synthetic workbooks."""
+from sqlite_fixture import isolate_backend_database
+isolate_backend_database()
 import json
 import sqlite3
 import tempfile

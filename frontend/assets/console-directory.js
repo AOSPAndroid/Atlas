@@ -10,9 +10,9 @@ function setTarget(pc, status = "", quick = true) {
     window.AtlasPsExec?.syncTarget("");
     window.AtlasDiagnostics?.stop("Selected an inventory device");
     AtlasHealth.cancel($("#healthLine"));
+    $("#adminPc").value = "";
     invalidateProcesses();
     syncDeploymentPanel();
-    $("#adminPc").value = "";
     $("#deployTarget").textContent = "Select a PC";
     $("#targetBar").classList.add("hidden");
     $("#healthLine").classList.add("hidden");

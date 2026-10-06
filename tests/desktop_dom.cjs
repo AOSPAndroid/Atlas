@@ -19,6 +19,12 @@ Object.defineProperty(d.querySelector("#desktopArea"), "clientHeight", {
 });
 w.AtlasUI = { motion: { isReduced: () => true } };
 w.confirm = () => false;
+const fallback = fs.readFileSync(root + "shared-ui.js", "utf8")
+  .split('/* An on-demand index')[1].replace(/^.*?\*\//s, '');
+w.eval(fallback);
+d.dispatchEvent(new w.Event('DOMContentLoaded'));
+assert.equal(d.querySelector('.atlas-action-fallback'), null,
+  'Desktop shell uses its window controls without a duplicate, clipped action index');
 w.eval(fs.readFileSync(root + "desktop.js", "utf8"));
 const click = (s) => d.querySelector(s).click(),
   win = (id) => d.querySelector(`[data-app-window="${id}"]`);
@@ -131,6 +137,16 @@ assert.equal(w.localStorage.getItem('atlas-layout'),'desktop');
 w.confirm=()=>true;exitDesktop();
 assert.equal(w.localStorage.getItem('atlas-layout'),'classic','palette exit remembers classic layout');
 w.close();
+for (const [file, route] of [["desktop-utility.html", "/assets/desktop-utility.html?app=notes"], ["../index.html", "/installer?atlasWindow=workspace"]]) {
+  const app = new JSDOM(fs.readFileSync(root + file, "utf8"), {
+    url: "http://127.0.0.1:8771" + route, runScripts: "outside-only",
+  });
+  app.window.eval(fallback);
+  app.window.document.dispatchEvent(new app.window.Event('DOMContentLoaded'));
+  assert(app.window.document.querySelector('.atlas-action-fallback'),
+    'utility and embedded app documents retain their own action index');
+  app.window.close();
+}
 console.log(
   "PASS: lazy apps, retained frames, drag/resize, saved geometry, minimize, snap/reset, single-window and compact modes, rejected foreign messages",
 );

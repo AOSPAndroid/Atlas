@@ -10,13 +10,16 @@ import directory_exports
 
 def fingerprint(path):
  with sqlite3.connect(path,factory=ClosingConnection) as c:
-  h=hashlib.sha256()
-  for t in ('users','machines','assignments','desk_user_links'):
-   for row in c.execute('select * from '+t+' order by 1'):h.update(repr(row).encode())
-  if directory_exports.exists(c):
-   for t in directory_exports.TABLES:
-    for row in c.execute('select * from '+t+' order by 1,2'):h.update(repr(row).encode())
-  return h.hexdigest()
+  return fingerprint_connection(c)
+
+def fingerprint_connection(c):
+ h=hashlib.sha256()
+ for t in ('users','machines','assignments','desk_user_links'):
+  for row in c.execute('select * from '+t+' order by 1'):h.update(repr(tuple(row)).encode())
+ if directory_exports.exists(c):
+  for t in directory_exports.TABLES:
+   for row in c.execute('select * from '+t+' order by 1,2'):h.update(repr(tuple(row)).encode())
+ return h.hexdigest()
 
 def compare_rows(before, after, *, key=lambda row: row):
  """Merge ordered unique keys, retaining at most 20 examples per side."""
@@ -176,13 +179,14 @@ def register_database_manager(app,wmi,check_token):
   if not s:raise HTTPException(409,'Preview expired or was replaced. Validate the file again.')
   if body.get('confirmation')!='APPLY' or body.get('full_snapshot') is not True:raise HTTPException(400,'Confirm the complete intended directory snapshot and type APPLY.')
   if busy():raise HTTPException(409,'Active jobs or queues must finish first.')
-  if fingerprint(wmi.MASTER_DB)!=s['fingerprint']:raise HTTPException(409,'Directory or account links changed. Prepare a fresh preview.')
-  backup=apply_refresh(wmi.MASTER_DB,s['candidate'],root/'backups')
   from datetime import datetime,timezone
   at=datetime.now(timezone.utc).isoformat()
-  with sqlite3.connect(wmi.MASTER_DB,factory=ClosingConnection) as c:
+  def validate_current(c):
+   if fingerprint_connection(c)!=s['fingerprint']:raise HTTPException(409,'Directory or account links changed. Prepare a fresh preview.')
+  def record_import(c,backup):
    c.execute('insert into directory_import_history values(?,?,?,?,?)',(uuid.uuid4().hex,at,s['source'],str(backup),json.dumps(s['report'])))
    c.execute('insert or replace into metadata values(?,?)',('directory.created_at',at))
+  backup=apply_refresh(wmi.MASTER_DB,s['candidate'],Path(wmi.MASTER_DB).parent/'backups',before_merge=validate_current,after_merge=record_import)
   del staged[stage_id];shutil.rmtree(s['folder'],ignore_errors=True)
   return {'ok':True,'backup':backup.name,'counts':counts(wmi.MASTER_DB)}
 

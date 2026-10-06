@@ -1,4 +1,6 @@
 """Palette merging uses verified desk identities, never names from a result page."""
+from sqlite_fixture import isolate_backend_database
+isolate_backend_database()
 import copy
 import json
 import sqlite3
@@ -93,7 +95,8 @@ class PaletteIdentityTests(unittest.TestCase):
         self.assertEqual(len(enriched['users']), 12)
         self.assertTrue(all(user['palette_desks'] == [] for user in enriched['users'][:10]))
         self.assertTrue(all('palette_desks' not in user for user in enriched['users'][10:]))
-        self.assertLessEqual(len(statements), 3, 'enrichment must batch directory and desk reads')
+        reads = [statement for statement in statements if statement.lstrip().lower().startswith('select')]
+        self.assertLessEqual(len(reads), 3, 'enrichment must batch directory and desk reads')
         self.assertTrue(all(new is not old for new, old in zip(enriched['users'], original['users'])))
 
     def test_global_user_without_a_candidate_desk_skips_directory_name_scan(self):

@@ -8,6 +8,15 @@ def key(value):
 def identifier(value):
     return key(value).rsplit('\\', 1)[-1]
 
+def login_keys(value):
+    """Derived Windows logins are aliases; separate exported identities stay ambiguous."""
+    normalized=key(value);account=identifier(value)
+    aliases={normalized,account}-{''}
+    if re.fullmatch(r'g[0-9]+',account):
+        windows='x'+account[1:];aliases.add(windows)
+        if '\\' in normalized:aliases.add(normalized.rsplit('\\',1)[0]+'\\'+windows)
+    return aliases
+
 def build_index(c):
     index = defaultdict(set)
     for row in c.execute('select id,user_id,email,employee_number,full_name from users'):
@@ -15,8 +24,7 @@ def build_index(c):
         for value in (login, email, employee, name):
             normalized = key(value)
             if normalized: index[normalized].add(uid)
-        account = identifier(login)
-        if account: index[account].add(uid)
+        for alias in login_keys(login):index[alias].add(uid)
     for uid, value in c.execute("select user_id_ref,alias_norm from user_aliases where alias_type != 'name'"):
         normalized = key(value)
         if normalized: index[normalized].add(uid)
