@@ -127,8 +127,13 @@ class Runner:
                 j['truncated'] = True
             j['output'] = output[-self.limit:]
 
+    prepare = staticmethod(prepare)
+    catalogue = CATALOGUE
+    session_label = 'PsExec'
+    stop_notice = 'Local PsExec session ended. The remote command may still be running; inspect the target before retrying.'
+
     def start(self, p):
-        item, target, args, readable = prepare(p)
+        item, target, args, readable = self.prepare(p)
         key = str(p.id)
         fingerprint = p.model_dump_json()
         with self.lock:
@@ -137,10 +142,10 @@ class Runner:
                     raise HTTPException(409, 'This run ID already belongs to another command')
                 return self.snapshot(key)
             if any(j['state'] not in TERMINAL for j in self.jobs.values()):
-                raise HTTPException(409, 'A PsExec session is already running. Finish or stop it first.')
+                raise HTTPException(409, f'A {self.session_label} session is already running. Finish or stop it first.')
             status = self.preflight(args[0])
             if not status.get('elevated', False):
-                raise HTTPException(403, 'Run Atlas from an elevated Windows account to use PsTools.')
+                raise HTTPException(403, f'Run Atlas from an elevated Windows account to use {self.session_label}.')
             if not status['exists']:
                 raise HTTPException(400, 'Tool not found on the Atlas host: ' + args[0])
             # Expire completed transcripts only; never lose an active handle.
@@ -184,7 +189,7 @@ class Runner:
                     pass
             reader = threading.Thread(target=read, daemon=True, name='atlas-psexec-output')
             reader.start()
-            deadline = time.monotonic() + (self.shell_timeout if j['interactive'] else CATALOGUE[j['template']].get('timeout_seconds',self.timeout))
+            deadline = time.monotonic() + (self.shell_timeout if j['interactive'] else self.catalogue[j['template']].get('timeout_seconds',self.timeout))
             while process.poll() is None:
                 if j['_stop'].wait(.1):
                     state = 'stopped'
@@ -193,11 +198,11 @@ class Runner:
                     state = 'timed_out'
                     break
             else:
-                state = 'complete' if process.returncode in CATALOGUE[j['template']].get('success_exit_codes',[0]) else 'failed'
+                state = 'complete' if process.returncode in self.catalogue[j['template']].get('success_exit_codes',[0]) else 'failed'
             if state in ('stopped', 'timed_out'):
                 if process.poll() is None:
                     process.kill()
-                self.append(key, '\nAtlas > Local PsExec session ended. The remote command may still be running; inspect the target before retrying.\n')
+                self.append(key, '\nAtlas > ' + self.stop_notice + '\n')
             process.wait(timeout=5)
             reader.join(timeout=3)
             with self.lock:

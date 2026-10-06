@@ -677,6 +677,8 @@ from atlas_api import register_atlas
 register_atlas(app)
 from psexec_runner import register as register_psexec
 register_psexec(app,validate_pc)
+from local_terminal import register as register_terminal
+register_terminal(app)
 
 # Independent live health results; retains the application's local-only middleware.
 from machine_health import register_machine_health

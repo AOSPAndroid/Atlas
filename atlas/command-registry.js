@@ -36,6 +36,7 @@ const viewerCommands = new Set(["ad-browser","ad-support-summary","daas","vdi","
   "bulk",
   "history",
   "active-directory",
+  "terminal",
   "psexec",
   "catalogue",
   "packages",
@@ -213,6 +214,7 @@ export const COMMANDS = [
     "Review recent operations",
     "history results",
   ],
+  ["terminal", "Terminal & PowerShell ISE", "Open the local command console and script editor", "terminal powershell ise cmd script console"],
   [
     "psexec",
     "PsTools / PsExec",

@@ -69,6 +69,7 @@
             <span class="nav-icon">◷</span
             ><span class="nav-label">History</span>
           </button>
+          <button data-page="terminal"><span class="nav-icon">&gt;_</span><span class="nav-label">Terminal</span></button>
           <button data-page="psexec">
             <span class="nav-icon" aria-hidden="true">&gt;_</span
             ><span class="nav-label">PsTools</span>
@@ -643,6 +644,16 @@
         </div>
       </section>
 
+<section id="terminal" class="page" aria-label="Terminal &amp; PowerShell ISE">
+ <div class="card atlas-terminal">
+ <div class="term-toolbar"><strong>Terminal &amp; PowerShell ISE</strong><span id="termStatus" role="status">Ready</span></div>
+ <p>Runs on the Atlas host using the Windows account running Atlas. Each run starts a fresh process; variables and directory changes do not persist. Maximum run time: 15 minutes.</p>
+ <div class="term-toolbar"><label>Mode <select id="termMode"><option value="command">Terminal</option><option value="script">PowerShell ISE · script editor</option></select></label><label id="termShellLabel">Shell <select id="termShell"><option value="powershell">PowerShell</option><option value="cmd">Command Prompt</option></select></label><button id="termImport">Open .ps1</button><input id="termFile" type="file" accept=".ps1" hidden><button id="termSave">Save .ps1</button></div>
+ <label for="termCode">Command / script</label><textarea id="termCode" rows="5" spellcheck="false" placeholder="Get-Date" aria-label="Command or PowerShell script"></textarea>
+ <div class="term-toolbar"><button id="termRun" class="primary">Run</button><button id="termSelection">Run selection</button><button id="termStop" disabled>Stop</button><button id="termReconnect">Reconnect</button><button id="termCopy">Copy output</button><button id="termClear">Clear output</button><span>Ctrl+Enter · Run</span></div>
+ <p id="termMessage" role="status"></p><pre id="termOutput" tabindex="0" aria-label="Terminal output"></pre>
+ </div>
+</section>
 <section id="psexec" class="page" aria-label="PsTools command workbench">
         <div class="px-intro">
           <div>
@@ -1071,6 +1082,7 @@ Ready. Choose a command and click Run.</pre>
     <script src="/assets/console-psexec.js"></script>
 <script src="/assets/active-directory.js"></script>
     <script src="/assets/psexec-terminal.js"></script>
+    <script src="/assets/local-terminal.js"></script>
     <script src="/assets/action-widgets.js"></script>
     <script src="/assets/reboot-monitor.js"></script>
     <script src="/assets/knowledge-converter.js"></script>

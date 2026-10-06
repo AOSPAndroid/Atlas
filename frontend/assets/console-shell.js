@@ -41,6 +41,7 @@ function page(id) {
   if (id === "knowledge") window.AtlasKnowledge?.open();
   if (id === "history") loadDeploymentHistory();
   if (id === "packages") window.dispatchEvent(new CustomEvent("atlas:packages-open"));
+  if (id === "terminal") window.AtlasTerminal?.open();
   if (id === "psexec") window.AtlasPsExec?.open();
   if (id === "active-directory") window.AtlasAD?.open();
   if (id === "bulk" && !bulkCatalogueLoaded && !bulkBusy) bulkPackages();
@@ -744,6 +745,7 @@ async function runSharedCommand(id) {
     admin: () => page("admin"),
     bulk: () => page("bulk"),
     history: () => page("history"),
+    terminal: () => page("terminal"),
     psexec: () => page("psexec"),
     active: () => openDeploymentMonitor("active"),
     recent: () => openDeploymentMonitor("recent"),
