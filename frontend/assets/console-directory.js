@@ -257,6 +257,7 @@ function installSelectionSidebar() {
     const record = S.machines.find(m => String(m.name || "").toUpperCase() === pc) || {name: pc};
     const windows = !!S.target && AtlasUI.supportsWindows(record), host = $("#healthLine");
     person.hidden = !user; device.hidden = !pc; empty.hidden = !!user || !!pc;
+    window.AtlasCopilot?.refresh();
     text(caption, [user?.full_name || user?.name || user?.user_name, pc].filter(Boolean).join(" · "));
     if (user) {
       const name = user.full_name || user.name || user.user_name || "Selected user";

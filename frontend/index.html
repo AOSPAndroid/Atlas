@@ -78,6 +78,16 @@
       <div class="console-sidebar-content">
         <details id="selectionContext" class="selection-context" open>
           <summary>Current selection <span id="selectionCaption"></span></summary>
+          <div class="copilot-tools selection-copilot-tools" data-diagnostics-context="selection" role="group" aria-label="Copilot diagnostic tools">
+            <div class="copilot-buttons">
+              <button type="button" data-copy-diagnostics data-atlas-icon="copy" disabled>Copy diagnostics</button>
+              <button type="button" data-open-copilot data-atlas-icon="external" title="Open Microsoft 365 Copilot in a companion window beside Atlas">Open Copilot</button>
+              <button type="button" data-reopen-copilot data-atlas-icon="external" hidden>Reopen Copilot</button>
+              <a href="https://m365.cloud.microsoft/chat/" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer" data-copilot-link data-atlas-icon="external" hidden>Open chat in tab</a>
+            </div>
+            <small data-diagnostics-status role="status">Select a user or device to copy diagnostics.</small>
+            <small data-copilot-status role="status" hidden></small>
+          </div>
           <div id="selectionSummary"></div>
         </details>
         <details class="sidebar-status">
@@ -332,7 +342,16 @@
                 Choose a target, then run a scan. Each view keeps its last result.
               </p>
             </div>
-            <span class="pill">On-demand scans</span>
+            <div class="copilot-tools" data-diagnostics-context="admin" role="group" aria-label="Copilot diagnostic tools">
+              <div class="copilot-buttons">
+                <button type="button" data-copy-diagnostics data-atlas-icon="copy" disabled>Copy diagnostics</button>
+                <button type="button" data-open-copilot data-atlas-icon="external" title="Open Microsoft 365 Copilot in a companion window beside Atlas">Open Copilot</button>
+                <button type="button" data-reopen-copilot data-atlas-icon="external" hidden>Reopen Copilot</button>
+                <a href="https://m365.cloud.microsoft/chat/" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer" data-copilot-link data-atlas-icon="external" hidden>Open chat in tab</a>
+              </div>
+              <small data-diagnostics-status role="status">Enter a target to copy diagnostics.</small>
+              <small data-copilot-status role="status" hidden></small>
+            </div>
           </div>
           <div class="admin-tools">
             <label class="admin-target-field" for="adminPc">
@@ -1059,6 +1078,7 @@ Ready. Choose a command and click Run.</pre>
     <script src="/assets/console-shell.js"></script>
     <script src="/assets/remote-software.js"></script>
     <script src="/assets/remote-services.js"></script>
+    <script src="/assets/copilot-diagnostics.js"></script>
   <script type="module" src="/assets/atlas-interactions.js" data-atlas-interactions></script>
   </body>
 </html>

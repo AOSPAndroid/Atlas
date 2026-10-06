@@ -322,6 +322,27 @@ body.atlas-console .selection-specs dd { min-width:0; margin:0; overflow-wrap:an
 body.atlas-console :is(.selection-checked,.selection-note,.selection-empty) { color:var(--atlas-muted); font-size:11px; line-height:1.4; margin:6px 0; overflow-wrap:anywhere; }
 body.atlas-console #selectionSummary .selection-scan { width:100%; min-height:28px; margin:0; border-radius:5px; font-size:11px; color:var(--atlas-accent); background:#edf6fa; }
 body.atlas-console .selection-context [hidden] { display:none!important; }
+body.atlas-console .copilot-tools { display:grid; gap:4px; min-width:0; }
+body.atlas-console .copilot-tools [hidden] { display:none!important; }
+body.atlas-console .copilot-buttons { display:flex; flex-wrap:wrap; align-items:center; gap:4px; }
+body.atlas-console .copilot-buttons :is(button,a) {
+  display:inline-flex; align-items:center; justify-content:center; gap:4px;
+  min-height:var(--atlas-control-height); margin:0; padding:4px 7px;
+  border:1px solid var(--atlas-line); border-radius:var(--atlas-control-radius);
+  background:var(--atlas-surface); color:var(--atlas-text);
+  font:500 11px/1.35 var(--atlas-font); text-align:center; text-decoration:none;
+}
+body.atlas-console .copilot-buttons [data-open-copilot] { background:var(--atlas-surface-subtle); color:var(--atlas-accent); }
+body.atlas-console .copilot-buttons :is(button:enabled,a):hover { border-color:var(--atlas-accent); background:#eaf4f8; }
+body.atlas-console .copilot-buttons :is(button,a):focus-visible { outline:2px solid var(--atlas-focus); outline-offset:2px; }
+body.atlas-console .copilot-buttons .atlas-icon { width:14px; height:14px; flex-shrink:0; }
+body.atlas-console .copilot-tools :is([data-diagnostics-status],[data-copilot-status]) { color:var(--atlas-muted); font-size:11px; font-weight:400; line-height:1.35; letter-spacing:normal; text-transform:none; overflow-wrap:anywhere; max-width:280px; }
+body.atlas-console .selection-copilot-tools { margin:0 0 6px; padding:6px 0; border-bottom:1px solid var(--atlas-line); }
+body.atlas-console .selection-copilot-tools .copilot-buttons { flex-direction:column; align-items:stretch; }
+body.atlas-console .performance-heading > .copilot-tools { margin-left:auto; }
+body.atlas-console .performance-heading > :first-child { min-width:0; }
+@media (max-width:640px) { body.atlas-console .performance-heading > .copilot-tools { width:100%; margin-left:0; } }
+@media (pointer:coarse) { body.atlas-console .copilot-buttons :is(button,a) { min-height:42px; } }
 body.atlas-console .console-sidebar .sidebar-status { margin-top:6px; }
 body.atlas-console.knowledge-open { grid-template-columns:var(--atlas-sidebar-width) minmax(0,1fr); }
 body.atlas-console.knowledge-open > .console-sidebar { display:flex; }

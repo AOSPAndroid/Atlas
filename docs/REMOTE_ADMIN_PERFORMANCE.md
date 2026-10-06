@@ -6,6 +6,14 @@ Atlas helps support staff investigate a slow machine from the IT console using o
 
 All four views share the target toolbar, scan controls and process filter. The scan-state label distinguishes unscanned targets, active scans, stored snapshots and failed refreshes. **Where to look**, processor/disk details and GPU engine activity expand on demand; process counts show how many rows are visible out of the recorded total.
 
+## Copy diagnostics to work Copilot
+
+Use **Copy diagnostics** and **Open Copilot** in Current selection or the Remote Admin heading. Copy prepares a troubleshooting prompt with the selected inventory, available health readings, cached performance snapshots and any slowness capture. It includes measurement times, missing readings and collection limits, and does not run another scan. Current selection uses its selected user/device; Remote Admin uses its target field, which can differ from the Workspace selection.
+
+Open Copilot opens the [Microsoft 365 work chat](https://m365.cloud.microsoft/chat/) in a companion window while Atlas stays open. Further clicks focus that window when the browser permits. Microsoft blocks embedding its page and sign-in inside Atlas, so this is a separate browser window. Sign in with your work account and paste the copied text. Atlas does not submit the prompt or put diagnostic data in the link. Replies stay in Copilot; no Copilot API or agent is required. If the browser denies clipboard access, Atlas selects the report in a manual copy dialog. Demo and Preview can copy stored inventory, while live readings remain available only in Admin.
+
+Window placement depends on your browser. If pop-ups are blocked, Atlas shows a manual chat link; it does not silently open another tab. If sign-in isolates the window and Atlas cannot focus it again, switch to the existing Copilot window or explicitly choose **Reopen Copilot**. For both pages in one browser window, Edge's **Split screen** can display Atlas alongside your work Copilot; Atlas cannot activate that browser feature itself.
+
 ## Which button should I use?
 
 | Button / view | What you get | When to use it |

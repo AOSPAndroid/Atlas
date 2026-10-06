@@ -365,8 +365,10 @@
         .join("")}</tbody></table></div>
       ${[...new Set([...errors, ...samples.flatMap((s) => s.warnings)])].map((message) => `<p class="muted">${esc(message)}</p>`).join("")}</details>`;
   }
-  function report() {
-    if (!capture || capture.computer !== adminComputer()) return "";
+  function report(pc = adminComputer()) {
+    const computer = String(pc || "").trim().toUpperCase();
+    if (!computer || !capture ||
+      String(capture.computer || "").trim().toUpperCase() !== computer) return "";
     const findings = analyze(capture.samples);
     return [
       `${capture.computer} — Slowness capture`,
@@ -393,6 +395,24 @@
       ]),
     ].join("\n");
   }
+  function snapshot(pc) {
+    const computer = String(pc || "").trim().toUpperCase();
+    const matching = computer && capture &&
+      String(capture.computer || "").trim().toUpperCase() === computer;
+    const last = matching ? capture.samples.at(-1) : null;
+    return {
+      computer,
+      state: !matching ? "not_scanned" : capture.active ? "running"
+        : capture.errors.length ? "failed"
+          : capture.reason === "Capture complete" ? "complete" : "stopped",
+      startedAt: matching ? capture.startedAt : null,
+      checkedAt: typeof last?.checked_at === "string" &&
+        Number.isFinite(Date.parse(last.checked_at)) ? last.checked_at : null,
+      sampleCount: matching ? capture.samples.length : 0,
+      reason: matching ? capture.reason || "" : "",
+      report: matching ? report(computer) : "",
+    };
+  }
   window.AtlasDiagnostics = {
     isRunning: () => !!capture?.active,
     start,
@@ -400,6 +420,7 @@
     clear,
     analyze,
     report,
+    snapshot,
     probePolicy,
   };
   $("#diagnoseSlowness").onclick = start;

@@ -201,7 +201,10 @@
             el.textContent = "Unavailable";
             el.title = e.name === "AbortError" ? "Check timed out" : e.message;
             el.dataset.state = "unavailable";
-            snapshots.get(host).metrics[key] = { state: "unavailable" };
+            snapshots.get(host).metrics[key] = {
+              state: "unavailable",
+              error: el.title,
+            };
           }
         } finally {
           if (current()) updateMini(host, pc);
@@ -331,6 +334,45 @@
       .map(([label, metric, value]) => ({label, text: value(metric.data || {}), checkedAt: metric.checked_at || ""}))
       .filter(row => row.text);
   }
+  // Read the current cache only; copying diagnostics must never start a scan.
+  function snapshot(host, pc) {
+    const computer = String(pc || "").trim().toUpperCase();
+    const cached = snapshots.get(host);
+    const matching = computer &&
+      String(cached?.pc || "").trim().toUpperCase() === computer;
+    const controller = active.get(host);
+    const checking = !!(matching && cached.state === "checking" &&
+      controller && !controller.signal.aborted);
+    const metrics = Object.entries(labels).map(([key, label]) => {
+      const metric = matching ? cached.metrics[key] : null;
+      const state = metric
+        ? metric.state === "ready" ? "ready" : "unavailable"
+        : checking && cached.checkingKeys?.includes(key)
+          ? "checking" : "not_scanned";
+      const checkedAt = typeof metric?.checked_at === "string" &&
+        Number.isFinite(Date.parse(metric.checked_at)) ? metric.checked_at : null;
+      return {
+        key,
+        label,
+        state,
+        checkedAt,
+        text: state === "ready" ? format(key, metric.data || {})
+          : state === "checking" ? "Checking…"
+            : state === "unavailable" ? "Unavailable" : "Not scanned",
+        ...(state === "ready"
+          ? {data: JSON.parse(JSON.stringify(metric.data || {}))} : {}),
+        ...(metric?.error ? {error: String(metric.error)} : {}),
+      };
+    });
+    return {
+      computer,
+      state: checking ? "checking"
+        : metrics.some(metric => metric.state === "ready") ? "ready"
+          : metrics.some(metric => metric.state === "unavailable")
+            ? "unavailable" : "not_scanned",
+      metrics,
+    };
+  }
   window.AtlasHealth = {
     mount,
     quick,
@@ -342,5 +384,6 @@
     report,
     compact,
     specifications,
+    snapshot,
   };
 })();

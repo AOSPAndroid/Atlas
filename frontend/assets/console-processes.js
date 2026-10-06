@@ -28,7 +28,8 @@ const performanceViews = {
   },
 };
 const performanceCache = new Map(),
-  performanceErrors = new Map();
+  performanceErrors = new Map(),
+  performanceErrorTargets = new Map();
 let activePerformance = "overview",
   performanceInFlight = null;
 let processSnapshot = null,
@@ -53,6 +54,7 @@ function invalidateProcesses() {
   performanceInFlight = null;
   performanceCache.clear();
   performanceErrors.clear();
+  performanceErrorTargets.clear();
   $("#cpuProcessScope").value = "all";
   $("#cpuProcessSort").value = "cpu";
   $("#adminUtility").replaceChildren();
@@ -167,8 +169,11 @@ function acceptPerformanceSnapshot(computer, kind, raw) {
         ? { summary: previous.data.summary, checked: previous.checked }
         : null,
   });
+  // Map order records acceptance order without inventing a measurement time.
+  performanceCache.delete(kind);
   performanceCache.set(kind, snapshot);
   performanceErrors.delete(kind);
+  performanceErrorTargets.delete(kind);
   if (kind === activePerformance && computer === adminComputer()) {
     closeProcessSelection();
     processSnapshot = snapshot;
@@ -180,6 +185,47 @@ function acceptPerformanceSnapshot(computer, kind, raw) {
   }
   return snapshot;
 }
+// Detached, target-specific cached data for manual diagnostic handoffs.
+window.AtlasPerformance = {
+  snapshot(pc) {
+    const computer = String(pc || "").trim().toUpperCase();
+    const views = [];
+    let latestKind = null;
+    for (const [kind, cached] of performanceCache) {
+      if (!computer || String(cached.computer || "").trim().toUpperCase() !== computer)
+        continue;
+      const checkedAt = typeof cached.data.checked_at === "string" &&
+        Number.isFinite(Date.parse(cached.data.checked_at))
+          ? cached.data.checked_at : null;
+      const error = performanceErrorTargets.get(kind) === computer
+        ? performanceErrors.get(kind) : null;
+      views.push({
+        computer,
+        kind,
+        checkedAt,
+        data: JSON.parse(JSON.stringify(cached.data)),
+        ...(error ? {error} : {}),
+      });
+      latestKind = kind;
+    }
+    for (const [kind, error] of performanceErrors) {
+      if (!computer || performanceErrorTargets.get(kind) !== computer ||
+        views.some(view => view.kind === kind)) continue;
+      views.push({computer, kind, checkedAt: null, data: null, error});
+    }
+    const scanningKind = computer && performanceInFlight?.computer === computer
+      ? performanceInFlight.kind : null;
+    return {
+      computer,
+      state: scanningKind ? "checking"
+        : views.some(view => view.error) ? "failed"
+          : latestKind ? "ready" : "not_scanned",
+      scanningKind,
+      views,
+      latestKind,
+    };
+  },
+};
 async function admin(kind) {
   const pc = adminComputer();
   if (!pc) return toast("Enter a computer first");
@@ -214,6 +260,7 @@ async function admin(kind) {
   const current = () => request.current() && pc === adminComputer();
   performanceInFlight = scan;
   performanceErrors.delete(kind);
+  performanceErrorTargets.delete(kind);
   updatePerformanceControls();
   try {
     const data = await api(
@@ -227,6 +274,7 @@ async function admin(kind) {
         kind,
         `Scan failed: ${error.message}${performanceCache.has(kind) ? " · Showing the previous scan." : ""}`,
       );
+      performanceErrorTargets.set(kind, pc);
       toast(error.message);
     }
   } finally {
@@ -803,6 +851,7 @@ async function terminateProcess(payload, question, snapshot) {
       if (result.count) {
         performanceCache.clear();
         performanceErrors.clear();
+        performanceErrorTargets.clear();
         if (snapshot && snapshot === processSnapshot)
           await admin(snapshot.kind);
         else selectPerformanceView(activePerformance);
