@@ -2,6 +2,12 @@
 
 Classic and Desktop share one local database. Import once to update both Admin layouts and the local Demo. Hosted Preview uses a separately published snapshot.
 
+## Updating Atlas itself
+
+Run **[Update-Atlas.bat](../Update-Atlas.bat)** from the existing installation to update application code while preserving its data and settings. Git for Windows and access to the GitHub repository are required. Finish active work first. The first run converts a ZIP folder in place after backing it up; future runs update that checkout. You do not need to reimport users, devices, packages or Citrix VDI records just because Atlas was updated.
+
+See [Updating Atlas](updating-atlas.md) for prerequisites, backup and recovery details, `--check`, and updating without starting services. The import instructions below change database content separately from an application update.
+
 ## Data locations
 
 - Live database: `data/office_atlas.db` after first launch. `ATLAS_DB_PATH` overrides this when configured.
@@ -51,7 +57,7 @@ This does not apply changes. Do not run a direct CLI refresh concurrently with s
 
 In **Manage Database > Import history**, choose **Restore directory before this import** and review the staged comparison before applying. This restores the directory while preserving current seating and deployment history; it is not a full application rollback.
 
-**Back up .db** downloads a consistent SQLite snapshot. Keep one before updating Atlas itself. Preserve `data/` (including its backups), any older installation-level `backups/` directory and `config.json` when moving to a new checkout. Never replace your runtime database with the distributed seed. Use Atlas's backup feature rather than copying a running SQLite database as an ordinary file.
+**Back up .db** downloads a consistent SQLite snapshot. Keep one before manually changing application files; `Update-Atlas.bat` creates backups as part of its update. Preserve the entire `data/` directory (including its backups and `knowledge.sqlite3`), any older installation-level `backups/` directory, local configuration and `config.json` when moving to a new checkout. Never replace your runtime database with the distributed seed. Use Atlas's backup feature rather than copying a running SQLite database as an ordinary file.
 
 ## Seating updates
 

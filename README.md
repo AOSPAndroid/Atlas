@@ -15,6 +15,8 @@ Start opens Admin and Demo in the selected layout. Both editions share local ser
 
 **[Database update guide](docs/database-update-guide.md)** covers imports, backups, recovery, seating and hosted Preview updates.
 
+**[Update-Atlas.bat](Update-Atlas.bat)** updates this installation from GitHub while preserving its data and settings. Install Git for Windows once, finish active jobs, then run it from your existing Atlas folder. [Update instructions](docs/updating-atlas.md) cover ZIP installations, backups and checks.
+
 **[Latest code audit](docs/code-audit-2026-10-06.md)** records the confirmed fixes, regression coverage and large-directory measurements.
 
 ## Choose your Atlas edition
@@ -79,7 +81,7 @@ These are screenshots of the Atlas renderer using **entirely fictional floors an
 
 **Normal startup: `Start-Office-Atlas.bat`.** Dependency installation is needed for the first setup, after changing Python, or when an update changes `requirements.txt`.
 
-Git and Node.js are not needed to run the downloaded application. The download includes the application, maps and initial directory database. Application installers used for deployment stay in your separate package repository. Atlas automatically looks for the synced **EPP_PACKAGE_REPO_BetaPackages - BetaPackages** SharePoint folder in business OneDrive; no repository setting is needed when that folder is available. Sync the SharePoint shortcut through OneDrive before deploying.
+Git and Node.js are not needed to run the downloaded application. Git for Windows is required to use `Update-Atlas.bat` for future updates. The download includes the application, maps and initial directory database. Application installers used for deployment stay in your separate package repository. Atlas automatically looks for the synced **EPP_PACKAGE_REPO_BetaPackages - BetaPackages** SharePoint folder in business OneDrive; no repository setting is needed when that folder is available. Sync the SharePoint shortcut through OneDrive before deploying.
 
 This is a normal project tree containing Python source, browser assets, floor plans, templates and tests. No TXT-to-Python extraction is needed.
 
@@ -190,7 +192,9 @@ The default package repository is the synced **EPP_PACKAGE_REPO_BetaPackages - B
 
 Leave `package_repository` blank in `config.json` (as in `config.example.json`), or omit `config.json`, to use automatic detection. An explicit repository saved through admin **Settings** takes precedence; `WMI_PACKAGE_REPO` overrides both. These defaults do not sign in to SharePoint or create its OneDrive shortcut. Local configuration, logs, process records and SQLite journal files are ignored by Git.
 
-The database and floor plans were already part of this private repository's embedded package and are now ordinary files. Keep the repository private. The launcher copies the distributed `office_atlas.db` seed into ignored `data/office_atlas.db` once, preserving existing records with SQLite backup. Subsequent launches keep that runtime database. Stop both servers and back up `data/office_atlas.db` before updating; preserve the `data` directory and `config.json` when moving to a fresh checkout. Set `ATLAS_DB_PATH` to use another existing Atlas database. Direct backend development uses the runtime database if present, otherwise the root seed. Use the admin database manager for supported directory refreshes.
+To update application code, finish active jobs and run **[Update-Atlas.bat](Update-Atlas.bat)** from this existing folder. It backs up the installation, preserves local data/configuration, and converts a downloaded ZIP folder into a Git checkout on its first run. Later updates require a clean tracked source tree and fast-forward history. Install Git for Windows and verify access to the GitHub repository first; no user/device reimport is needed. [Updating Atlas](docs/updating-atlas.md) explains the process and `--check` / `--no-start` options.
+
+The launcher copies the distributed `office_atlas.db` seed into ignored `data/office_atlas.db` only once, using SQLite backup. Subsequent launches keep the runtime database. Set `ATLAS_DB_PATH` to use another existing Atlas database. Preserve the entire `data/` directory, backups and `config.json` if moving to another checkout; never replace live records with the repository seed. Use the admin database manager for supported directory refreshes.
 
 See [IT operations and imports](docs/operations.md) for deployment modes, software repair/uninstall, directory replacement, seating Excel sync and backup workflows.
 
