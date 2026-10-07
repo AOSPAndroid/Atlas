@@ -36,13 +36,13 @@ class RawExtractTests(unittest.TestCase):
         sheets['devices']=[headers,first,second,list(first),['','','Mobile Device - Handheld','','APPLE iPhone 15','','In Stock','SER-STOCK','','Phone','Paris']]
         c=self.load(sheets)
         self.assertEqual(c.execute('select count(*) from machines').fetchone()[0],3)
-        self.assertEqual([r['name'] for r in linked_machines(c,1)],['IPHONE-SERIAL-SER-ONE'])
-        self.assertEqual([r['name'] for r in linked_machines(c,2)],['IPHONE-SERIAL-SER-TWO'])
+        self.assertEqual([r['name'] for r in linked_machines(c,1)],['INVENTORY-SERIAL:RAW-SER-ONE'])
+        self.assertEqual([r['name'] for r in linked_machines(c,2)],['INVENTORY-SERIAL:RAW-SER-TWO'])
         unassigned=search_directory(c,'serial:SER-STOCK')['machines'][0]
-        self.assertEqual(unassigned['name'],'IPHONE-SERIAL-SER-STOCK');self.assertEqual(unassigned['windows_remote_supported'],0)
+        self.assertEqual(unassigned['name'],'INVENTORY-SERIAL:RAW-SER-STOCK');self.assertEqual(unassigned['windows_remote_supported'],0)
         self.assertFalse(supports_windows(unassigned))
         self.assertEqual(len(search_directory(c,'source_ci:iphone')['machines']),2)
-        fields=record(c,'machine','iphone-serial-ser-one')
+        fields=record(c,'machine','inventory-serial:raw-ser-one')
         self.assertEqual(fields['source_rows'],2);self.assertEqual(fields['row'],4)
         self.assertEqual([f['value'] for f in fields['fields']],first)
         archived=[json.loads(r[0]) for r in c.execute("select cells from directory_export_rows where sheet='devices' order by row_number")]
@@ -127,7 +127,7 @@ class RawExtractTests(unittest.TestCase):
             result=client.post('/api/database/apply/'+preview['id'],json={'confirmation':'APPLY','full_snapshot':True})
             self.assertEqual(result.status_code,200,result.text)
             backup=self.root/'backups'/result.json()['backup'];self.assertTrue(backup.is_file())
-            data=client.get('/api/directory/record',params={'kind':'machine','key':'iphone-serial-ser-1'}).json()
+            data=client.get('/api/directory/record',params={'kind':'machine','key':'inventory-serial:raw-ser-1'}).json()
             self.assertEqual(data['source_rows'],2);self.assertEqual(data['row'],6)
             archive=[json.loads(line) for line in client.get('/api/database/export-archive').text.splitlines()]
             self.assertEqual(sum(r.get('type')=='row' and r.get('sheet')=='devices' for r in archive),5)

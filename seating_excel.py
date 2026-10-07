@@ -12,7 +12,7 @@ from starlette.concurrency import run_in_threadpool
 import atlas_store as store
 from desk_moves import snapshot
 from directory_workbook import workbook_parts, iter_rows, canonical_header
-from identity_links import key, identifier, login_keys
+from identity_links import key, build_index, candidates
 from atlas_store import ClosingConnection
 
 NS = '{http://schemas.openxmlformats.org/spreadsheetml/2006/main}'
@@ -32,7 +32,8 @@ def layout_records(c, layout):
 def stamp(c, layout):
     records, links = layout_records(c, layout)
     users = c.execute('select canonical_key,user_id,email,employee_number,full_name from users order by canonical_key').fetchall()
-    return hashlib.sha256(json.dumps([records, sorted(links.items()), users],sort_keys=True).encode()).hexdigest()
+    aliases = list(c.execute('select user_id_ref,alias_type,alias_value,alias_norm from user_aliases order by user_id_ref,alias_type,alias_norm')) if c.execute("select 1 from sqlite_master where name='user_aliases' and type='table'").fetchone() else []
+    return hashlib.sha256(json.dumps([records, sorted(links.items()), users, aliases],sort_keys=True).encode()).hexdigest()
 
 def read_sheet(path):
     with zipfile.ZipFile(path) as z:
@@ -61,12 +62,9 @@ def read_sheet(path):
         return rows
 
 def account_index(c):
-    index=defaultdict(set); users={}
+    index=build_index(c,canonical=True,include_names=False); users={}
     for canonical,login,email,employee,name in c.execute('select canonical_key,user_id,email,employee_number,full_name from users'):
         users[canonical]={'account':login or email or canonical,'name':name}
-        for value in (canonical,login,email,employee):
-            if key(value): index[key(value)].add(canonical)
-        for alias in login_keys(login):index[alias].add(canonical)
     return index, users
 
 def occupied(r):
@@ -88,7 +86,7 @@ def plan_sheet(c, rows, layout='official', complete=False):
         if status=='vacant' and (name or account): errors.append(f'{prefix}: a vacant desk must have blank Name and Account.'); continue
         link=None
         if account:
-            found=index.get(key(account),set()) or index.get(identifier(account),set())
+            found=candidates(index,account,allow_names=False)
             # Keep an existing unavailable canonical link when round-tripping an export.
             if not found and account==links.get(d): link=account; warnings.append(f'{d}: linked account is no longer in the directory.')
             elif len(found)!=1: errors.append(f'{prefix}: account {account} is unknown or ambiguous. Refresh the directory or correct Account.'); continue

@@ -6,7 +6,7 @@ def _key(machine):
     if machine.get('vdi_key'):
         return machine['vdi_key']
     name = str(machine.get('name') or machine.get('machine_name') or '').strip().lower().rstrip('.')
-    return ('dns:' if '.' in name else 'host:') + name if name else ''
+    return ('netbios:' if '\\' in name else 'dns:' if '.' in name else 'host:') + name if name else ''
 
 
 def _merge(physical, virtual):
@@ -54,14 +54,18 @@ def linked_records(con, user_id, physical):
 
 
 def find_machines(con, computer):
-    """A short VDI alias may return several domains; callers must handle that."""
+    """A bare host is an alias across all sources, never an arbitrary first row."""
+    from directory_lookup import MACHINE_SHORT_SQL
     normalized = computer.strip().lower().rstrip('.')
+    condition='name_norm in (?,?)';parameters=(normalized,normalized+'.')
+    if '.' not in normalized and '\\' not in normalized and ':' not in normalized:
+        condition+=' or '+MACHINE_SHORT_SQL+'=?';parameters+=(normalized,)
+    known={r[1] for r in con.execute('pragma table_info(machines)')}
+    if 'source_ci' in known:
+        condition+=' or lower(source_ci)=?';parameters+=(normalized,)
     primary = [dict(row) for row in con.execute(
-        'select * from legacy_machines where name_norm=? order by id', (normalized,))]
+        'select * from legacy_machines where '+condition+' order by id', parameters)]
     supplemental = vdi_data.machine_records(con, computer) if vdi_data.exists(con) else []
-    if supplemental and '.' not in normalized and '\\' not in normalized:
-        like = normalized.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_') + '.%'
-        primary.extend(dict(row) for row in con.execute("select * from legacy_machines where name_norm like ? escape '\\' order by id", (like,)))
     return merge_records(primary, supplemental)
 
 

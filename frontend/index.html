@@ -176,6 +176,7 @@
             /><kbd>Enter</kbd>
             <button id="useHostname" type="button" hidden>Use hostname as target</button>
           </div>
+          <p id="lookupStatus" class="workspace-lookup-status" role="status" aria-live="polite" hidden></p>
           <div id="recentTargets" class="recent-targets"></div>
           <p id="unlistedTargetStatus" class="muted" role="status" hidden></p>
           <div id="users"></div>
@@ -593,8 +594,8 @@
               ><input type="checkbox" role="switch" id="bulkFresh" />
               Fresh</label
             ><button class="primary" id="bulkStart">Deploy to targets</button
-            ><button id="copyFailed">Copy failed</button
-            ><button id="exportCsv">Export CSV</button>
+            ><button id="copyFailed" disabled>Copy failed</button
+            ><button id="exportCsv" disabled>Export CSV</button>
           </div>
           <p id="bulkSelectionStatus" class="muted" role="status"></p>
           <div id="bulkSummary"></div>
@@ -611,7 +612,7 @@
                   <th>Details</th>
                 </tr>
               </thead>
-              <tbody id="bulkBody"></tbody>
+              <tbody id="bulkBody"><tr class="atlas-table-empty"><td colspan="7"><b>No deployment results yet</b><span>Per-device results appear here after a deployment run.</span></td></tr></tbody>
             </table>
           </div>
         </div>
@@ -625,6 +626,7 @@
             </div>
             <button id="refreshHistory">Refresh</button>
           </div>
+          <p id="historyStatus" class="atlas-table-status" role="status" aria-live="polite"></p>
           <div class="tablewrap">
             <table>
               <thead>
@@ -638,7 +640,7 @@
                   <th>Exit</th>
                 </tr>
               </thead>
-              <tbody id="historyBody"></tbody>
+              <tbody id="historyBody"><tr class="atlas-table-empty"><td colspan="7"><b>Deployment history</b><span>Open this page or use Refresh to retrieve recent operations.</span></td></tr></tbody>
             </table>
           </div>
         </div>
@@ -646,11 +648,11 @@
 
 <section id="terminal" class="page" aria-label="Terminal &amp; PowerShell ISE">
  <div class="card atlas-terminal">
- <div class="term-toolbar"><strong>Terminal &amp; PowerShell ISE</strong><span id="termStatus" role="status">Ready</span></div>
- <p>Runs on the Atlas host using the Windows account running Atlas. Each run starts a fresh process; variables and directory changes do not persist. Maximum run time: 15 minutes.</p>
- <div class="term-toolbar"><label>Mode <select id="termMode"><option value="command">Terminal</option><option value="script">PowerShell ISE · script editor</option></select></label><label id="termShellLabel">Shell <select id="termShell"><option value="powershell">PowerShell</option><option value="cmd">Command Prompt</option></select></label><button id="termImport">Open .ps1</button><input id="termFile" type="file" accept=".ps1" hidden><button id="termSave">Save .ps1</button></div>
+ <div class="term-toolbar term-heading"><h2>Terminal &amp; PowerShell ISE</h2><span id="termStatus" role="status">Ready</span></div>
+ <p class="term-scope">Runs on the Atlas host using the Windows account running Atlas. Each run starts a fresh process; variables and directory changes do not persist. Maximum run time: 15 minutes.</p>
+ <div class="term-toolbar term-configuration"><label>Mode <select id="termMode"><option value="command">Terminal</option><option value="script">PowerShell ISE · script editor</option></select></label><label id="termShellLabel">Shell <select id="termShell"><option value="powershell">PowerShell</option><option value="cmd">Command Prompt</option></select></label><div class="term-file-actions" role="group" aria-label="Script files"><button id="termImport">Open .ps1</button><input id="termFile" type="file" accept=".ps1" hidden><button id="termSave">Save .ps1</button></div></div>
  <label for="termCode">Command / script</label><textarea id="termCode" rows="5" spellcheck="false" placeholder="Get-Date" aria-label="Command or PowerShell script"></textarea>
- <div class="term-toolbar"><button id="termRun" class="primary">Run</button><button id="termSelection">Run selection</button><button id="termStop" disabled>Stop</button><button id="termReconnect">Reconnect</button><button id="termCopy">Copy output</button><button id="termClear">Clear output</button><span>Ctrl+Enter · Run</span></div>
+ <div class="term-toolbar term-execution"><div class="term-run-actions" role="group" aria-label="Execution"><button id="termRun" class="primary">Run</button><button id="termSelection">Run selection</button><button id="termStop" disabled>Stop</button><button id="termReconnect">Reconnect</button></div><div class="term-output-actions" role="group" aria-label="Output"><button id="termCopy">Copy output</button><button id="termClear">Clear output</button></div><small class="term-shortcut">Ctrl+Enter · Run</small></div>
  <p id="termMessage" role="status"></p><pre id="termOutput" tabindex="0" aria-label="Terminal output"></pre>
  </div>
 </section>
@@ -745,12 +747,14 @@
               <a href="https://learn.microsoft.com/en-us/sysinternals/license-terms" target="_blank" rel="noopener noreferrer">Microsoft Sysinternals EULA</a>
               for that tool under the executing Windows account.
             </p>
+            <div class="px-command-actions" role="group" aria-label="Reviewed command">
             <button id="pxRun" class="primary" type="button" disabled>
               Run on target
             </button>
             <button id="pxCopy" type="button" disabled>
               Copy PowerShell command
             </button>
+            </div>
             <p class="px-footnote" id="pxEncoding"></p>
             <section class="px-terminal" aria-label="PsTools terminal">
               <div class="px-terminal-toolbar">

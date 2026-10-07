@@ -35,6 +35,8 @@ const {snapshot, threads, profileSnapshot} = require('./performance_sample.cjs')
   view('gpu');view('cpu');view('overview');
   assert.equal(requests.length,0,'Selecting a machine or switching views must not scan');
   assert.equal(get('refreshProcesses').textContent,'Scan Overview');
+  assert.equal(get('processStatus').textContent,'','Idle status does not repeat the empty-state scan guide');
+  assert(get('adminOverview').textContent.includes('click Scan Overview'));
   await run("admin('overview')");
   assert(requests.includes('/api/performance/TESTPC?kind=overview'));
   assert.equal(get('adminOverview').querySelectorAll('.perf-donut').length,3);

@@ -5,6 +5,11 @@ const {JSDOM}=require('jsdom'),fs=require('fs'),assert=require('node:assert/stri
   w.AtlasReadOnly=readonly;w.AtlasClient={sessionToken:async()=> 'test',request:async(url,options)=>{calls.push([url,options]);if(url.endsWith('/run'))return {};return {state:'complete',target:'TEST',account:'TEST',output:'done',exit_code:0};}};
   w.eval(fs.readFileSync('frontend/assets/local-terminal.js','utf8'));
   const get=id=>w.document.getElementById('term'+id);
+  assert(get('Mode').closest('.term-configuration'));
+  assert.equal(get('Import').closest('[role="group"]').getAttribute('aria-label'),'Script files');
+  assert.equal(get('Run').closest('[role="group"]').getAttribute('aria-label'),'Execution');
+  assert.equal(get('Copy').closest('[role="group"]').getAttribute('aria-label'),'Output');
+  assert(w.document.querySelector('#terminal h2'));
   assert.equal(get('Run').disabled,readonly);
   get('Mode').value='script';get('Mode').onchange();get('Code').value='Get-Date\nGet-Location';get('Code').setSelectionRange(0,8);
   await get('Selection').onclick();await new Promise(r=>setTimeout(r,20));

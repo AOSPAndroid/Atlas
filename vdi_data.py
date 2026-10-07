@@ -53,6 +53,7 @@ SCHEMA = (
       backup text not null, full_snapshot integer not null)''',
     'create index if not exists ix_vdi_name on vdi_devices(name_norm)',
     'create index if not exists ix_vdi_short on vdi_devices(short_norm)',
+    'create index if not exists ix_vdi_original_lower on vdi_devices(lower(original_name))',
     'create index if not exists ix_vdi_users on vdi_links(user_key,machine_key)',
     'create index if not exists ix_vdi_refs_account on vdi_user_refs(ref_norm,machine_key)',
 )
@@ -295,35 +296,14 @@ def fingerprint(con):
 
 
 def _account_index(con):
-    full = defaultdict(set); bare = defaultdict(set); domains = {}
+    # Use only exported account fields/aliases. Emails and display names never
+    # become Citrix account evidence; an explicit UPN remains an exact account.
+    from identity_links import build_index
     columns = {row[1] for row in con.execute('pragma table_info(users)')}
     if not {'canonical_key', 'user_id'} <= columns:
-        return full, bare, domains
-    users = list(con.execute('select id,canonical_key,user_id from users'))
-    by_id = {row[0]: row[1] for row in users}
-    for _, key, value in users:
-        refs = user_tokens([value])
-        if len(refs) == 1 and refs[0]['valid']:
-            domains[key] = {refs[0]['domain']}
-    identities = [(key, value) for _, key, value in users]
-    if con.execute("select 1 from sqlite_master where type='table' and name='user_aliases'").fetchone():
-        identities.extend((by_id[uid], alias) for uid, alias in con.execute("select user_id_ref,alias_value from user_aliases where alias_type='user_id'") if uid in by_id)
-    for key, value in identities:
-        refs = user_tokens([value])
-        if len(refs) != 1 or not refs[0]['valid']:
-            continue
-        ref = refs[0]; account = ref['account']; domain = ref['domain']
-        # A bare alias does not erase a primary account's known realm.
-        if key not in domains:
-            domains[key] = {domain}
-        aliases = {account}
-        if re.fullmatch(r'g[0-9]+', account):
-            aliases.add('x' + account[1:])
-        for alias in aliases:
-            bare[alias].add(key)
-            if domain:
-                full[domain + '\\' + alias].add(key)
-    return full, bare, domains
+        return defaultdict(set), defaultdict(set), {}
+    index = build_index(con, canonical=True, include_names=False, accounts_only=True)
+    return index.accounts, index.bare, index.domains
 
 
 def match_refs(con, rows):
@@ -345,7 +325,7 @@ def match_refs(con, rows):
                     ids = bare.get(ref['account'], set())
                     if ref['domain']:
                         # A known conflicting domain never matches by dropping it.
-                        ids = {uid for uid in ids if '' in domains.get(uid, set()) or ref['domain'] in domains.get(uid, set())}
+                        ids = {uid for uid in ids if not domains.get(uid) or ref['domain'] in domains.get(uid, set())}
                         if not ids and bare.get(ref['account']):
                             reason = 'domain_mismatch'
             status = 'matched' if len(ids) == 1 else 'ambiguous' if ids else 'unmatched'

@@ -1,7 +1,8 @@
 // Group actions keep the exact DN and server captured from the displayed result.
 window.AtlasADRows = (() => {
- let menu;
- const close=()=>{menu?.remove();menu=null;};
+ let menu,origin;
+ const close=(restore=false)=>{menu?.remove();menu=null;const previous=origin;origin=null;if(restore&&previous?.isConnected)previous.focus({preventScroll:true});};
+ const server=(returned,requested='')=>{const value=String(returned||requested).trim();return value==='Default domain discovery'?'':value;};
  function button(label,fn){const b=document.createElement('button');b.type='button';b.textContent=label;b.onclick=fn;return b;}
  function attach(row,nameCell,actions,object,server,open){
   const isGroup=object.kind==='group';
@@ -17,18 +18,31 @@ window.AtlasADRows = (() => {
   copy.setAttribute('aria-label','Copy '+object.name);
   if(isGroup)actions.append(copy);
   const view=button(caption,invoke);view.disabled=!!window.AtlasReadOnly;actions.append(view);
-  row.addEventListener('contextmenu',event=>{
+  const showMenu=event=>{
    event.preventDefault();event.stopPropagation();close();
-   menu=document.createElement('div');menu.className='atlas-ad-context';menu.setAttribute('role','menu');
-   if(isGroup){const c=button('Copy group name',()=>{close();copy.click();});c.setAttribute('role','menuitem');menu.append(c);}
+   origin=event.target.closest?.('button:not(:disabled)')||row;
+   menu=document.createElement('div');menu.className='atlas-ad-context';menu.setAttribute('role','menu');menu.setAttribute('aria-label','Actions for '+object.name);
+   if(isGroup){const c=button('Copy group name',()=>{close(true);copy.click();});c.setAttribute('role','menuitem');c.tabIndex=-1;menu.append(c);}
    const v=button(caption,()=>{close();invoke();});v.disabled=!!window.AtlasReadOnly;v.setAttribute('role','menuitem');menu.append(v);
-   document.body.append(menu);const box=menu.getBoundingClientRect();menu.style.left=Math.max(8,Math.min(event.clientX,innerWidth-box.width-8))+'px';menu.style.top=Math.max(8,Math.min(event.clientY,innerHeight-box.height-8))+'px';menu.querySelector('button:not(:disabled)')?.focus();
-  });
+   v.tabIndex=-1;(row.closest('dialog[open]')||document.body).append(menu);
+   const box=menu.getBoundingClientRect(),anchor=origin.getBoundingClientRect(),keyboard=event.type==='keydown'||(!event.clientX&&!event.clientY);
+   menu.style.left=Math.max(8,Math.min(keyboard?anchor.left:event.clientX,innerWidth-box.width-8))+'px';menu.style.top=Math.max(8,Math.min(keyboard?anchor.bottom:event.clientY,innerHeight-box.height-8))+'px';
+   menu.onkeydown=e=>{
+    const buttons=[...menu.querySelectorAll('button:not(:disabled)')],current=buttons.indexOf(document.activeElement);let next;
+    if(e.key==='ArrowDown')next=(current+1)%buttons.length;
+    if(e.key==='ArrowUp')next=(current-1+buttons.length)%buttons.length;
+    if(e.key==='Home')next=0;if(e.key==='End')next=buttons.length-1;
+    if(next!==undefined&&buttons.length){e.preventDefault();e.stopPropagation();buttons[next].focus({preventScroll:true});}
+   };
+   menu.querySelector('button:not(:disabled)')?.focus({preventScroll:true});
+  };
+  row.tabIndex=-1;row.addEventListener('contextmenu',showMenu);
+  row.addEventListener('keydown',event=>{if(event.key==='ContextMenu'||(event.key==='F10'&&event.shiftKey))showMenu(event);});
  }
  document.addEventListener('pointerdown',e=>{if(menu&&!menu.contains(e.target))close();});
- document.addEventListener('keydown',e=>{if(e.key==='Escape'||e.key==='Tab')close();});
- window.addEventListener('hashchange',close);window.addEventListener('resize',close);
- return {attach};
+ document.addEventListener('keydown',e=>{if(!menu)return;if(e.key==='Escape'){e.preventDefault();e.stopPropagation();close(true);}else if(e.key==='Tab')close(true);});
+ window.addEventListener('hashchange',()=>close());window.addEventListener('resize',()=>close());
+ return {attach,server};
 })();
 (() => {
   const by = (id) => document.getElementById("ad" + id);
@@ -68,7 +82,7 @@ window.AtlasADRows = (() => {
       const now=Date.parse(data.queried_at)||Date.now(),date=Date.parse(expiration);
       items.push(['Account expiry',!Object.hasOwn(d,'Account expiration')?'Unknown':expiration==null?'No expiry recorded':Number.isFinite(date)?date<=now?'Expired':new Date(date).toLocaleDateString():'Unknown',Number.isFinite(date)&&date<=now?'bad':'unknown']);
       const expiry=Date.parse(d['Password expires']);
-      items.push(['Password',d['Password expired']===true?'Expired':Number.isFinite(expiry)?'Expires '+new Date(expiry).toLocaleDateString():d['Password never expires']===true?'Never expires':d['Password expiry status']||'Unknown',d['Password expired']===true||(Number.isFinite(expiry)&&expiry<=now)?'bad':Number.isFinite(expiry)&&expiry-now<7*86400000?'warn':'unknown']);
+      items.push(['Password',d['Password expired']===true?'Expired':Number.isFinite(expiry)?(expiry<=now?'Expired ':'Expires ')+new Date(expiry).toLocaleDateString():d['Password never expires']===true?'Never expires':d['Password expiry status']||'Unknown',d['Password expired']===true||(Number.isFinite(expiry)&&expiry<=now)?'bad':Number.isFinite(expiry)&&expiry-now<7*86400000?'warn':'unknown']);
     }
     items.push([user?'Password changed':'Machine password changed',valueText(d['Password last set']),'unknown']);
     items.push(['Nested groups',data.nested_complete===true?'Resolved in queried scope':data.nested_complete===false?'Partial':'Not checked',data.nested_complete===true?'good':'warn']);
@@ -184,7 +198,7 @@ window.AtlasADRows = (() => {
     const server = el("input");
     server.maxLength = 128;
     server.placeholder = "Domain / controller (optional)";
-    server.value = by("Server").value;
+    server.value = primary.queryServer;
     server.setAttribute("aria-label", "Comparison domain or controller");
     const go = el("button", "Compare groups");
     go.dataset.adCompare = "";go.disabled = !!window.AtlasReadOnly;
@@ -206,7 +220,7 @@ window.AtlasADRows = (() => {
       const b = new Map((secondary?.groups || []).map((g) => [key(g), g]));
       rows = [...new Set([...a.keys(), ...b.keys()])].map((k) => ({
         ...(a.get(k) || b.get(k)),
-        sourceServer: a.has(k) ? by("Server").value.trim() : server.value.trim(),
+        sourceServer: a.has(k) ? primary.queryServer : secondary.queryServer,
         firstMembership: a.get(k)?.membership || "",
         secondMembership: b.get(k)?.membership || "",
         presence: secondary
@@ -332,19 +346,16 @@ window.AtlasADRows = (() => {
       ];
       inputs.forEach((n) => (n.disabled = true));
       status.textContent = "Comparing memberships…";
+      const payload={kind:kind.value,identity:identity.value.trim(),server:server.value.trim()};
       try {
         const compared = await AtlasClient.request("/api/active-directory/lookup", {
           method: "POST",
           signal: pending.signal,
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            kind: kind.value,
-            identity: identity.value.trim(),
-            server: server.value.trim(),
-          }),
+          body: JSON.stringify(payload),
         });
         if (current !== revision || !compare.isConnected) return;
-        secondary = {...compared,kind:kind.value};
+        secondary = {...compared,kind:payload.kind,queryServer:AtlasADRows.server(compared.server,payload.server)};
         view.disabled = false;
         status.textContent =
           "Comparison complete. " + (secondary.warnings || []).join(" ");
@@ -407,7 +418,7 @@ window.AtlasADRows = (() => {
     try {
       const result=await AtlasClient.request('/api/active-directory/lookup',{method:'POST',signal:pending.signal,headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
       if(current!==revision)return;
-      render({...result,kind:payload.kind});
+      render({...result,kind:payload.kind,queryServer:AtlasADRows.server(result.server,payload.server)});
       by('Status').textContent=(result.warnings || []).join(' ');
     } catch(error) {
       if(current===revision) by('Status').textContent='Groups unavailable for '+payload.identity+'. '+error.message;
@@ -509,20 +520,22 @@ window.AtlasADRows = (() => {
   try{
    const data=await AtlasClient.request('/api/active-directory/browse',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
    if(remember&&old)history.push(old);
-   current={...payload,base:data.base};parent=data.parent||'';path.textContent=data.base;
+   const resultServer=AtlasADRows.server(data.server,payload.server);
+   tools.elements.server.value=resultServer;
+   current={...payload,base:data.base,server:resultServer};parent=data.parent||'';path.textContent=data.base;
    if(data.details){const dl=make('dl');dl.className='ad-browser-properties';for(const [k,v] of Object.entries(data.details)){dl.append(make('dt',k),make('dd',v||'—'));}results.append(dl);}
    const table=make('table');table.innerHTML='<thead><tr><th>Name / account</th><th>Type</th><th>Description</th><th>Directory path</th><th>Actions</th></tr></thead>';const body=make('tbody');table.append(body);
    for(const item of data.items){
     const row=make('tr'),name=make('td',item.name+(item.account?' · '+item.account:'')),kind=make('td',item.kind),dn=make('td',item.dn),actions=make('td');
-    if(['organizationalUnit','container','domainDNS'].includes(item.kind))actions.append(control('Open',()=>load({base:item.dn,operation:'children',server:payload.server})));
+    if(['organizationalUnit','container','domainDNS'].includes(item.kind))actions.append(control('Open',()=>load({base:item.dn,operation:'children',server:resultServer})));
     if(['user','computer','group'].includes(item.kind)){
      actions.className='ad-row-actions';
-     AtlasADRows.attach(row,name,actions,item,payload.server,()=>{
-      if(item.kind==='group')return AtlasAD.browseMembers(item.dn,payload.server);
-      document.getElementById('adServer').value=payload.server;AtlasAD.show(item.kind,item.guid||item.account||item.name);document.getElementById('adForm').scrollIntoView({block:'start'});
+     AtlasADRows.attach(row,name,actions,item,resultServer,()=>{
+      if(item.kind==='group')return AtlasAD.browseMembers(item.dn,resultServer);
+      document.getElementById('adServer').value=resultServer;AtlasAD.show(item.kind,item.guid||item.account||item.name);document.getElementById('adForm').scrollIntoView({block:'start'});
      });
     }
-    actions.append(control('Properties',()=>load({operation:'details',base:item.dn,server:payload.server})));
+    actions.append(control('Properties',()=>load({operation:'details',base:item.dn,server:resultServer})));
     row.append(name,kind,make('td',item.description||'—'),dn,actions);body.append(row);
    }
    const wrap=make('div');wrap.className='tablewrap';wrap.append(table);results.append(wrap);

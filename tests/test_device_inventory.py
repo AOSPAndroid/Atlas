@@ -38,11 +38,11 @@ class DeviceInventoryTests(unittest.TestCase):
         self.assertEqual((phone['asset_tag'],phone['device_location'],phone['install_status']),('PHONE-1','Paris','In Use'))
         self.assertEqual(phone['operational_status'],'')
         for term in ['PHONE-1','asset:PHONE-1','asset_tag:PHONE-1','type:iphone','model_category:Handheld','iPhone-EXAMPLE123','source_ci:iPhone-EXAMPLE123']:
-            self.assertEqual(search_directory(c,term)['machines'][0]['name'],'IPHONE-SERIAL-EXAMPLE123')
+            self.assertEqual(search_directory(c,term)['machines'][0]['name'],'INVENTORY-SERIAL:RAW-EXAMPLE123')
         self.assertEqual(len(search_directory(c,'device_location:Paris')['machines']),2)
         self.assertEqual(len(search_directory(c,'location:Paris')['users']),1)
         self.assertEqual(search_directory(c,'TESTPC-2')['machines'][0]['assigned_to'],'')
-        fields=exports.record(c,'machine','iphone-serial-example123')['fields']
+        fields=exports.record(c,'machine','inventory-serial:raw-example123')['fields']
         used=next(f for f in fields if f['header']=='cmp_last_used')
         self.assertEqual((used['value'],used['stored_value']),('46297.5','2026-10-02 12:00:00'))
 
@@ -63,24 +63,24 @@ class DeviceInventoryTests(unittest.TestCase):
             with self.assertRaises(RuntimeError): merge_directory(old,self.db)
         self.assertFalse(set(ASSET_COLUMNS)&{r[1] for r in dest.execute('pragma table_info(machines)')})
         merge_directory(old,self.db)
-        self.assertEqual(dest.execute("select asset_tag from machines where machine_name='IPHONE-SERIAL-EXAMPLE123'").fetchone()[0],'PHONE-1')
+        self.assertEqual(dest.execute("select asset_tag from machines where machine_name='INVENTORY-SERIAL:RAW-EXAMPLE123'").fetchone()[0],'PHONE-1')
         older=self.root/'older.db'; original=self.connection(older); src.backup(original)
         original.execute('drop index ix_machines_asset_lower')
         original.execute('drop index ix_machines_source_ci_lower')
         for column in ASSET_COLUMNS: original.execute('alter table machines drop column '+column)
         original.commit()
         merge_directory(old,older)
-        self.assertEqual(dest.execute("select asset_tag,last_used from machines where machine_name='IPHONE-SERIAL-EXAMPLE123'").fetchone()[:],('',''))
+        self.assertEqual(dest.execute("select asset_tag,last_used from machines where machine_name='INVENTORY-SERIAL:RAW-EXAMPLE123'").fetchone()[:],('',''))
 
     def test_phone_actions_rejected_before_windows_transport(self):
         from backend import main as m
         from fastapi.testclient import TestClient
         from atlas_api import TOKEN
         headers={'x-atlas-token':TOKEN}
-        con=self.connection();con.execute("update machines set source_ci='CORPMOBILE01' where machine_name='IPHONE-SERIAL-EXAMPLE123'");con.commit()
+        con=self.connection();con.execute("update machines set source_ci='CORPMOBILE01' where machine_name='INVENTORY-SERIAL:RAW-EXAMPLE123'");con.commit()
         with patch.object(m,'MASTER_DB',self.db), patch.object(m,'run') as run, patch.object(m,'ps') as ps, TestClient(m.app,base_url='http://127.0.0.1',client=('127.0.0.1',50000)) as client:
             calls=[('GET','/api/ping/IPHONE-EXAMPLE123',None),
-                   ('GET','/api/ping/IPHONE-SERIAL-EXAMPLE123',None),
+                   ('GET','/api/ping/INVENTORY-SERIAL:RAW-EXAMPLE123',None),
                    ('GET','/api/ping/CORPMOBILE01',None),
                    ('GET','/api/machine-health/IPHONE-EXAMPLE123/ping',None),
                    ('POST','/api/deploy',{'computer':'IPHONE-EXAMPLE123','folder':'Example','script':'setup_i.ps1'}),

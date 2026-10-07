@@ -37,30 +37,28 @@ def recover_operations():job_service.recover()
 NAME_RE=re.compile(r'^[A-Za-z0-9_.-]{1,64}$')
 
 def validate_pc(pc):
- pc=pc.strip().upper()
+ from device_inventory import canonical_machine_name,supports_windows
+ pc=canonical_machine_name(pc)
+ if pc.startswith('INVENTORY-') and ':' in pc:raise HTTPException(400,'This device is inventory only. Windows deployment and remote tools require a PC.')
  if not NAME_RE.fullmatch(pc) or pc.startswith(('-', '.')) or '..' in pc:raise HTTPException(400,'Invalid computer name')
- from device_inventory import supports_windows
- record={'machine_name':pc}
  if Path(MASTER_DB).exists():
   with sqlite3.connect(Path(MASTER_DB).resolve().as_uri()+'?mode=ro',uri=True,factory=ClosingConnection) as c:
-   c.row_factory=sqlite3.Row
-   c.execute('begin');row=None
+   c.row_factory=sqlite3.Row;c.execute('begin')
    if c.execute("select 1 from sqlite_master where type='table' and name='machines'").fetchone():
-    row=c.execute('select * from machines where machine_name_norm=?',(pc.lower(),)).fetchone()
-    if not row and c.execute("select 1 from pragma_table_info('machines') where name='source_ci'").fetchone():
-     row=c.execute('select * from machines where lower(source_ci)=? limit 1',(pc.lower(),)).fetchone()
-    if row:record=dict(row)
-   from vdi_data import machine_records
-   supplemental=machine_records(c,pc)
-   if len(supplemental)>1:raise HTTPException(400,'Ambiguous VDI hostname; select its fully qualified name.')
-   if supplemental and not supplemental[0]['windows_remote_supported']:raise HTTPException(400,'This Citrix record has no unique valid Windows target.')
-   if supplemental:
-    target=supplemental[0]['name'].upper()
-    if row and target!=str(record['machine_name']).upper():raise HTTPException(400,'Ambiguous inventory hostname; select its fully qualified name.')
-    if '.' not in pc and c.execute("select 1 from machines where machine_name_norm like ? escape '\\' limit 1",(pc.lower().replace('_','\\_')+'.%',)).fetchone():raise HTTPException(400,'Ambiguous inventory hostname; select its fully qualified name.')
-    if not row:pc=target
- if not supports_windows(record):raise HTTPException(400,'This device is inventory only. Windows deployment and remote tools require a PC.')
+    prepare_views(c)
+    from vdi_inventory import find_machines
+    matches=find_machines(c,pc)
+    if len(matches)>1:raise HTTPException(400,'Ambiguous inventory hostname; select its fully qualified name.')
+    if matches:
+     record=matches[0]
+     if not supports_windows(record) or record.get('windows_remote_supported') in (False,0):raise HTTPException(400,'This device is inventory only. Windows deployment and remote tools require a unique PC target.')
+     target=canonical_machine_name(record.get('name') or record.get('machine_name'))
+     if not NAME_RE.fullmatch(target) or target.startswith(('-', '.')) or '..' in target:raise HTTPException(400,'This inventory record has no valid Windows target.')
+     pc=target
+ # Unknown but valid hostnames remain usable for an explicitly chosen PC.
+ if not supports_windows({'machine_name':pc}):raise HTTPException(400,'This device is inventory only. Windows deployment and remote tools require a PC.')
  return pc
+
 def quote(v):return "'"+str(v).replace("'","''")+"'"
 def unc(pc,p='C:'):return rf'\\{validate_pc(pc)}\{p.replace(":","$",1).lstrip(chr(92))}'
 def run(args,check=True,timeout=120):
@@ -667,16 +665,10 @@ def master_status():
 
 @app.get('/api/master/resolve/{value}')
 def master_resolve(value:str):
- raw=value.strip()
+ from directory_lookup import resolve_directory
  with db() as c:
   c.execute('begin')
-  from vdi_inventory import machine_context
-  context=machine_context(c,raw)
-  if context and context.get('ambiguous'):return {'matched':False,'ambiguous':True,'query':raw,'machine':None,'machines':context['machines']}
-  machine=context['machine'] if context else None
-  rows=context['users'] if context else exact_users(c,raw)
-  if len(rows)!=1:return {'matched':False,'ambiguous':len(rows)>1,'query':raw,'machine':machine,'users':rows}
-  u=dict(rows[0]);return {'matched':True,'resolved_by':'machine' if machine else 'identity','user':u,'search_value':u['user_name'] or u['email'] or u['full_name'],'user_key':u['canonical_key'],'requested_machine':machine['machine_name'] if machine else '', 'machines':[r['name'] for r in linked_machines(c,u['id'])]}
+  return resolve_directory(c,value)
 
 @app.get('/api/machine/{computer}')
 def machine_record(computer:str):

@@ -1,4 +1,4 @@
-import json,sqlite3,re,math
+import json,sqlite3,re,math,uuid
 from datetime import datetime,timezone
 from pathlib import Path
 ROOT=Path(__file__).resolve().parent/"atlas"
@@ -94,10 +94,25 @@ def initialize():
         if con.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='users'").fetchone():
             con.execute('CREATE INDEX IF NOT EXISTS ix_users_email_lower ON users(lower(email))')
             con.execute('CREATE INDEX IF NOT EXISTS ix_users_employee_lower ON users(lower(employee_number))')
+            con.execute('CREATE INDEX IF NOT EXISTS ix_alias_kind_norm ON user_aliases(alias_type,alias_norm)')
+            con.execute('CREATE INDEX IF NOT EXISTS ix_alias_user ON user_aliases(user_id_ref)')
         if con.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='machines'").fetchone():
             con.execute('CREATE INDEX IF NOT EXISTS ix_machines_serial_lower ON machines(lower(serial_number))')
             con.execute('CREATE INDEX IF NOT EXISTS ix_machines_correlation_lower ON machines(lower(correlation_id))')
+            from directory_lookup import MACHINE_SHORT_SQL
+            con.execute('CREATE INDEX IF NOT EXISTS ix_machines_short ON machines('+MACHINE_SHORT_SQL+')')
         con.execute('BEGIN IMMEDIATE')
+        from identity_links import MATCHING_VERSION,rebuild_links
+        tables={row[0] for row in con.execute("select name from sqlite_master where type='table'")}
+        if {'users','user_aliases','machines','assignments'} <= tables:
+            version=con.execute("select value from metadata where key='directory.matching_version'").fetchone()
+            if not version or version[0]!=MATCHING_VERSION:
+                rebuild_links(con,preserve_manual=True)
+                from vdi_data import exists as vdi_exists,relink as relink_vdi,initialize as initialize_vdi
+                if vdi_exists(con):
+                    initialize_vdi(con);relink_vdi(con)
+                con.execute('insert or replace into metadata values(?,?)',('directory.matching_version',MATCHING_VERSION))
+                con.execute('insert or replace into metadata values(?,?)',('directory.generation',uuid.uuid4().hex))
         if not con.execute("SELECT 1 FROM metadata WHERE key='atlas.seeded'").fetchone():
             for r in json.loads((ROOT / 'data.json').read_text(encoding='utf-8'))['records']:
                 save_record(con, r, None, 'initial plan import')

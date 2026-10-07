@@ -2,6 +2,7 @@
 """Read directory workbooks and build validated import candidates."""
 import argparse, hashlib, json, os, re, shutil, sqlite3, zipfile, uuid
 from identity_links import rebuild_links
+from device_inventory import EMPTY_IDENTIFIERS, row_identity
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -113,9 +114,21 @@ def directory_data(columns, row):
         if not data.get(field):data[field]=value
     return data
 
-def user_identity(data):
-    return next((prefix+norm(data.get(field)) for prefix,field in
-                 (('uid:','user_id'),('email:','email'),('name:','full_name')) if clean(data.get(field))), '')
+def snapshot_identity(path):
+    digest=hashlib.sha256()
+    with Path(path).open('rb') as source:
+        for chunk in iter(lambda:source.read(1024*1024),b''):digest.update(chunk)
+    return digest.hexdigest()
+
+def user_identity(data, row_number, *, snapshot_id=None):
+    """Names are searchable aliases, never a unique person identifier."""
+    for prefix,field in (('uid:','user_id'),('email:','email'),
+                         ('sys:','sys_id'),('employee:','employee_number')):
+        value=norm(data.get(field))
+        if value not in EMPTY_IDENTIFIERS:return prefix+value
+    if clean(data.get('full_name')):
+        return 'row:'+row_identity(data,row_number,snapshot_id=snapshot_id)
+    return ''
 
 def directory_rows(path,kind,sheet,part):
     rows=iter_rows(path,part);first=next(rows,None)
@@ -170,6 +183,12 @@ def schema(c):
     ''')
     from device_inventory import ensure_asset_columns
     ensure_asset_columns(c)
+    c.execute('create index ix_alias_kind_norm on user_aliases(alias_type,alias_norm)')
+    c.execute('create index ix_alias_user on user_aliases(user_id_ref)')
+    c.execute('create index ix_users_employee_lower on users(lower(employee_number))')
+    c.execute('create index ix_users_email_lower on users(lower(email))')
+    from directory_lookup import MACHINE_SHORT_SQL
+    c.execute('create index ix_machines_short on machines('+MACHINE_SHORT_SQL+')')
 
 def normalise_vendor(v):
     x=clean(v);low=x.lower()
@@ -182,6 +201,7 @@ def normalise_vendor(v):
 @workbook_scope
 def build(src,out):
     src=Path(src);out=Path(out);candidate=out.with_name(out.stem+'_'+uuid.uuid4().hex+'_new.db')
+    snapshot_id=snapshot_identity(src)
     if candidate.exists():candidate.unlink()
     c=sqlite3.connect(candidate)
     try:
@@ -195,8 +215,8 @@ def build(src,out):
         user_count=0
         for number,d in directory_rows(src,'user',*parts['user']):
             uid=clean(d.get('user_id'));email=clean(d.get('email'));name=clean(d.get('full_name'))
-            if not (uid or email or name):continue
-            key=user_identity(d)
+            key=user_identity(d,number,snapshot_id=snapshot_id)
+            if not key:continue
             vals=(key,uid,norm(uid),name,norm(name),email,norm(email),d.get('organisational_unit',''),d.get('business_unit',''),excel_date(d.get('start_date','')),d.get('manager',''),d.get('location',''),excel_date(d.get('last_login','')),d.get('job_role',''),d.get('job_type',''),d.get('employee_number',''),d.get('department',''),d.get('last_login_time',''))
             if select_import_row(c,'user',key,number,d,vals,stats['user']):
                 c.execute('insert into users(canonical_key,user_id,user_id_norm,full_name,full_name_norm,email,email_norm,organisational_unit,business_unit,start_date,manager,location,last_login,job_role,job_type,employee_number,department,last_login_time) values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) on conflict(canonical_key) do update set user_id=excluded.user_id,user_id_norm=excluded.user_id_norm,full_name=excluded.full_name,full_name_norm=excluded.full_name_norm,email=excluded.email,email_norm=excluded.email_norm,organisational_unit=excluded.organisational_unit,business_unit=excluded.business_unit,start_date=excluded.start_date,manager=excluded.manager,location=excluded.location,last_login=excluded.last_login,job_role=excluded.job_role,job_type=excluded.job_type,employee_number=excluded.employee_number,department=excluded.department,last_login_time=excluded.last_login_time',vals)
@@ -214,7 +234,7 @@ def build(src,out):
         machine_sql = 'insert into machines('+machine_columns+') values('+','.join('?' for _ in range(15+len(ASSET_COLUMNS)))+') on conflict(machine_name_norm) do update set '+','.join(column+'=excluded.'+column for column in machine_columns.split(',') if column!='machine_name_norm')
         machine_count=0
         for number,d in directory_rows(src,'machine',*parts['machine']):
-            name,identity_source=inventory_identity(d,number)
+            name,identity_source=inventory_identity(d,number,snapshot_id=snapshot_id)
             if not name:continue
             if identity_source!='hostname':stats['mobile_identity_rows']+=1
             if identity_source=='row':stats['mobile_without_identifiers']+=1
@@ -226,7 +246,7 @@ def build(src,out):
             if machine_count%5000==0:c.commit()
         if not user_count or not machine_count:raise ValueError('Empty user or device extract refused. The existing directory was not changed.')
         links=rebuild_links(c)
-        capture(c,src,selection_table='directory_import_sources')
+        capture(c,src,selection_table='directory_import_sources',snapshot_id=snapshot_id)
         print('Relationship matching:',links)
         c.executemany('insert into metadata(key,value) values(?,?)',[('schema_version','3'),('created_at',datetime.now().isoformat(sep=' ',timespec='seconds')),('generation',uuid.uuid4().hex),('source_file',src.name),('import_resolution',json.dumps(stats))])
         c.commit();check=c.execute('pragma integrity_check').fetchone()[0]

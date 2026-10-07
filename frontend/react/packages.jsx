@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { LazyMotion, MotionConfig, domMax, m } from "motion/react";
 import * as Tabs from "@radix-ui/react-tabs";
 import { useAtlasMotion } from "./actions-hub.jsx";
@@ -32,8 +32,19 @@ export function Packages() {
     [selected, setSelected] = useState(null);
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
+  const [copying, setCopying] = useState(false),
+    [copyFeedback, setCopyFeedback] = useState("");
+  const copyRequest = useRef(0);
   const readonly = !!window.AtlasReadOnly;
   const reduced = useAtlasMotion();
+  useEffect(() => {
+    copyRequest.current += 1;
+    setCopying(false);
+    setCopyFeedback("");
+    return () => {
+      copyRequest.current += 1;
+    };
+  }, [selected?.id, visible]);
   useEffect(() => {
     const update = () => setVisible(section.classList.contains("active"));
     const observer = new MutationObserver(update);
@@ -99,6 +110,27 @@ export function Packages() {
     setSelected(null);
   };
   const stats = data?.stats;
+  const copyIdentifier = async (field, label) => {
+    const value = selected?.[field];
+    if (!value || busy || copying) return;
+    const request = ++copyRequest.current;
+    setCopying(true);
+    setCopyFeedback("");
+    try {
+      const copied = await window.AtlasContext.copy(value, label);
+      if (request === copyRequest.current)
+        setCopyFeedback(
+          copied ? `${label} copied.` : "Copy the selected text in the dialog.",
+        );
+    } catch {
+      if (request === copyRequest.current)
+        setCopyFeedback(
+          "Copy unavailable. Select the value and copy it manually.",
+        );
+    } finally {
+      if (request === copyRequest.current) setCopying(false);
+    }
+  };
   const inspect = () =>
     window.dispatchEvent(
       new CustomEvent("atlas:package-inspect", {
@@ -197,7 +229,9 @@ export function Packages() {
                             ? "Use Refresh to try again."
                             : query || state || coverage
                               ? "No packages match these filters."
-                              : "No package data yet. Upload the ServiceNow CSV in the database updater; source packages appear when the SharePoint folder is connected."}
+                              : readonly
+                                ? "No package metadata in this view. Ask an Atlas Admin operator to import package data; SharePoint availability is checked in Admin."
+                                : "No package data yet. Upload the ServiceNow CSV in the database updater; source packages appear when the SharePoint folder is connected."}
                         </td>
                       </tr>
                     )}
@@ -215,7 +249,9 @@ export function Packages() {
                             onClick={() => setSelected(item)}
                           >
                             <strong>{item.display_name}</strong>
-                            <code>{item.short_name || "Short name not supplied"}</code>
+                            <code>
+                              {item.short_name || "Short name not supplied"}
+                            </code>
                           </button>
                         </td>
                         <td>
@@ -268,10 +304,13 @@ export function Packages() {
               transition={{ duration: reduced ? 0 : 0.12 }}
             >
               {!selected ? (
-                <p>
-                  Select a package to see its state, ownership and source
-                  coverage.
-                </p>
+                <div className="package-detail-empty">
+                  <small>PACKAGE DETAILS</small>
+                  <h3>Select a package</h3>
+                  <p>
+                    Review its state, ownership, build and source coverage here.
+                  </p>
+                </div>
               ) : (
                 <>
                   <div className="package-detail-heading">
@@ -284,9 +323,42 @@ export function Packages() {
                       ×
                     </button>
                   </div>
-                  <code>{selected.short_name || "Short name not supplied"}</code>
+                  <code>
+                    {selected.short_name || "Short name not supplied"}
+                  </code>
+                  <div
+                    className="package-detail-actions"
+                    role="group"
+                    aria-label="Copy package identifiers"
+                  >
+                    <button
+                      type="button"
+                      data-package-copy="short_name"
+                      disabled={!selected.short_name || busy || copying}
+                      onClick={() => copyIdentifier("short_name", "Short name")}
+                    >
+                      Copy short name
+                    </button>
+                    <button
+                      type="button"
+                      data-package-copy="package_id"
+                      disabled={!selected.package_id || busy || copying}
+                      onClick={() => copyIdentifier("package_id", "Package ID")}
+                    >
+                      Copy ID
+                    </button>
+                  </div>
+                  <p
+                    className="package-copy-status"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    {copyFeedback}
+                  </p>
                   {selected.metadata_note && (
-                    <p className="package-source-note">{selected.metadata_note}</p>
+                    <p className="package-source-note">
+                      {selected.metadata_note}
+                    </p>
                   )}
                   <p>
                     <StateBadge state={selected.state} />{" "}

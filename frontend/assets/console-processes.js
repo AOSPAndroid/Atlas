@@ -139,7 +139,7 @@ function updatePerformanceControls() {
         ? `Scanning ${performanceViews[busy.kind].label} on ${busy.computer}…`
         : capturing
           ? "Slowness capture running. Waiting for a sample…"
-          : `No scan running. Click Scan ${label} to collect data. Changing views never starts a scan.`);
+          : "");
 }
 function acceptPerformanceSnapshot(computer, kind, raw) {
   const data = Array.isArray(raw) ? { items: raw, summary: {} } : raw;

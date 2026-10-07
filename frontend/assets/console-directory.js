@@ -1,3 +1,43 @@
+function workspaceLookupPresentation(phase = "ready", message = "") {
+  const column = $("#workspace .lookup-column"), empty = $("#workspace .lookup-empty"), status = $("#lookupStatus");
+  const populated = !!S.user || S.users.length > 0 || S.machines.length > 0 || !!(S.selectedDevice || S.target);
+  column.setAttribute("aria-busy", phase === "loading" ? "true" : "false");
+  empty.hidden = populated || phase === "loading" || phase === "error";
+  empty.querySelector("h3").textContent = phase === "ready" ? "No matching records" : "Find a user or machine";
+  empty.querySelector("p").textContent = phase === "ready"
+    ? "Try an account, email, name or hostname."
+    : "Look up a colleague to see their linked devices, or search for a hostname directly.";
+  if (!status) return;
+  status.dataset.state = phase;
+  status.hidden = phase === "idle";
+  const capped = S.lookupSource !== "machine" && (S.users.length >= 100 || S.machines.length >= 100);
+  status.textContent = message || (phase === "loading" ? "Searching directory…"
+    : phase === "error" ? "Directory lookup unavailable. Try again."
+    : S.user ? `User record · ${S.machines.length} linked ${S.machines.length === 1 ? "device" : "devices"}`
+    : S.users.length || S.machines.length ? [
+      S.users.length ? `${S.users.length} ${S.lookupSource === "machine" ? "linked " : ""}${S.users.length === 1 ? "user" : "users"}${capped ? " shown" : ""}` : "",
+      S.machines.length ? `${S.machines.length} ${S.machines.length === 1 ? "device" : "devices"}${capped ? " shown" : ""}` : "",
+    ].filter(Boolean).join(" · ") + (capped ? " · refine search" : S.lookupAmbiguousMachine ? " · choose the full device identity"
+      : S.users.length ? " found · select a record" : S.selectedDevice || S.target ? " found · device selected" : " found · select a device")
+    : S.target ? "Hostname target · no directory record" : "No matching directory records");
+}
+function syncMachineSelection() {
+  const pc = S.selectedDevice || S.target;
+  $$("#machines [data-machine]").forEach(card => {
+    const selected = !!pc && String(S.machines[+card.dataset.machine]?.name || "").toUpperCase() === pc;
+    card.classList.toggle("selected", selected);
+    card.querySelector(".workspace-machine-select")?.setAttribute("aria-pressed", String(selected));
+  });
+}
+function workspaceMachineRelationship(machine) {
+  if (!S.user) return {text: AtlasUI.isCitrixVdi(machine) ? "Citrix inventory · assignment snapshot" : "Directory device · inventory record", title: "Stored device record; a user relationship has not been selected."};
+  const assigned = !!Number(machine.assigned_relationship), logon = !!Number(machine.logon_relationship);
+  return {text: assigned && logon ? "Assigned + last logged on · inventory"
+    : assigned ? "Assigned to this user" + (AtlasUI.isCitrixVdi(machine) ? " · Citrix snapshot" : "")
+    : logon ? "Last logged on only · inventory"
+    : machine.desk_equipment ? "Recorded desk equipment" : machine.match_type || "Linked in directory export",
+    title: "Relationship to " + (S.user.user_name || S.user.name || "the selected user") + ". Imported assignment and logon records do not confirm a current sign-in."};
+}
 function setTarget(pc, status = "", quick = true) {
   pc = String(pc || "")
     .trim()
@@ -23,12 +63,16 @@ function setTarget(pc, status = "", quick = true) {
     $("#healthLine").classList.add("hidden");
     $("#preflight").innerHTML = "";
     $("#packagePresence").innerHTML = "";
-    $$("[data-machine]").forEach(x => x.classList.toggle("selected", String(S.machines[+x.dataset.machine]?.name || "").toUpperCase() === pc));
+    syncMachineSelection();
+    workspaceLookupPresentation();
     refreshConsoleSummary();
     window.AtlasSelection?.refresh();
     return;
   }
   if (pc === S.target) {
+    $("#barState").textContent = status;
+    syncMachineSelection();
+    workspaceLookupPresentation();
     if (quick) refreshTargetHealth("quick");
     window.AtlasSelection?.refresh();
     return;
@@ -42,9 +86,7 @@ function setTarget(pc, status = "", quick = true) {
   $("#barTarget").textContent = pc;
   $("#barState").textContent = status;
   $("#targetBar").classList.remove("hidden");
-  $$("[data-machine]").forEach((x) =>
-    x.classList.toggle("selected", String(S.machines[+x.dataset.machine]?.name || "").toUpperCase() === pc),
-  );
+  syncMachineSelection();
   rememberTarget(pc);
   refreshTargetHealth(quick ? "quick" : false);
   if (citrix) {
@@ -54,8 +96,10 @@ function setTarget(pc, status = "", quick = true) {
   refreshConsoleSummary();
   updatePackagePresence();
   window.AtlasSelection?.refresh();
+  workspaceLookupPresentation();
 }
-function clearLookup() {
+function clearLookup(invalidate = true) {
+  if (invalidate) ++lookupSequence;
   clearDirectTarget();
   AtlasHealth.cancel($("#healthLine"));
   S.user = null;
@@ -63,6 +107,8 @@ function clearLookup() {
   S.machines = [];
   S.target = "";
   S.selectedDevice = "";
+  S.lookupSource = "";
+  S.lookupAmbiguousMachine = false;
   window.AtlasPsExec?.syncTarget("");
   syncDeploymentPanel();
   masterState.resolution = null;
@@ -77,6 +123,7 @@ function clearLookup() {
   $("#preflight").innerHTML = "";
   $("#packagePresence").innerHTML = "";
   window.AtlasSelection?.refresh();
+  workspaceLookupPresentation("idle");
 }
 function directHostname(term) {
   const pc = term.replace(/^machine:\s*/i, "").trim().toUpperCase();
@@ -109,33 +156,46 @@ function offerDirectTarget(term, sequence) {
 async function search() {
   const term = $("#search").value.trim(),
     sequence = ++lookupSequence;
-  clearLookup();
+  clearLookup(false);
   if (!term) return toast("Enter a search");
-  let resolved = null;
-  if (!term.includes(":"))
-    resolved = await api("/api/master/resolve/" + encodeURIComponent(term));
-  if (sequence !== lookupSequence) return;
-  if (resolved?.matched) {
-    await loadUser(resolved.user_key, sequence);
-    if (sequence === lookupSequence && resolved.requested_machine)
-      setTarget(resolved.requested_machine, "Database record");
-    return;
+  workspaceLookupPresentation("loading");
+  try {
+    let resolved = null;
+    if (!term.includes(":"))
+      resolved = await api("/api/master/resolve/" + encodeURIComponent(term));
+    if (sequence !== lookupSequence) return;
+    if (resolved?.matched) {
+      await loadUser(resolved.user_key, sequence);
+      if (sequence === lookupSequence && resolved.requested_machine)
+        setTarget(resolved.requested_machine, "Database record");
+      return;
+    }
+    const machineContext = !!resolved?.machine || Array.isArray(resolved?.machines) && resolved.machines.length > 0;
+    const d = machineContext || resolved?.ambiguous && resolved?.users?.length
+      ? {users: resolved.users || [], machines: resolved.machine ? [resolved.machine] : resolved.machines || []}
+      : await api("/api/search?term=" + encodeURIComponent(term));
+    if (sequence !== lookupSequence) return;
+    S.users = d.users;
+    S.machines = d.machines;
+    S.lookupSource = machineContext ? "machine" : "";
+    S.lookupAmbiguousMachine = machineContext && !resolved.machine && !!resolved.ambiguous;
+    if (d.users.length === 1 && !d.machines.length)
+      return loadUser(AtlasUI.personKey(d.users[0]), sequence);
+    renderUsers();
+    renderMachines();
+    if (!d.users.length && !d.machines.length)
+      offerDirectTarget(term, sequence);
+  } catch (error) {
+    if (sequence !== lookupSequence) return;
+    workspaceLookupPresentation("error", "Directory lookup unavailable · " + error.message);
+    throw error;
   }
-  const d = await api("/api/search?term=" + encodeURIComponent(term));
-  if (sequence !== lookupSequence) return;
-  S.users = d.users;
-  S.machines = d.machines;
-  if (d.users.length === 1 && !d.machines.length)
-    return loadUser(AtlasUI.personKey(d.users[0]), sequence);
-  renderUsers();
-  renderMachines();
-  if (!d.users.length && !d.machines.length)
-    offerDirectTarget(term, sequence);
 }
 function renderUsers() {
-  if (!S.users.length) return ($("#users").innerHTML = "");
+  if (!S.users.length) {$("#users").innerHTML = "";workspaceLookupPresentation();return;}
+  const heading = S.lookupSource === "machine" ? "Linked users" : "Matching users";
   $("#users").innerHTML =
-    `<div class=panel><small>MATCHING USERS</small><div class=row>${S.users.map((u, i) => `<button ${AtlasContext.attributes("user", u)} data-user="${i}">${esc(u.name)} · ${esc(u.user_name)} · ${esc(u.location)}</button><button data-email="${i}">Copy email</button>`).join("")}</div></div>`;
+    `<section class="workspace-user-results" aria-label="${heading}"><div class="workspace-result-heading"><strong>${heading}</strong><small>${S.users.length} ${S.users.length === 1 ? "record" : "records"}${S.users.length >= 100 && S.lookupSource !== "machine" ? " shown" : ""}</small></div><ul class="workspace-user-result-list">${S.users.map((u, i) => `<li class="workspace-user-result"><button type="button" class="workspace-user-result-select" ${AtlasContext.attributes("user", u)} data-user="${i}"><span class="workspace-result-avatar" aria-hidden="true">${esc((u.full_name || u.name || u.user_name || "?").trim().split(/\s+/).slice(0,2).map(word => word[0]).join(""))}</span><span class="workspace-user-result-info"><strong>${esc(u.full_name || u.name || u.user_name || "Unnamed user")}</strong><span>${esc([u.user_name || u.user_id, u.location].filter(Boolean).join(" · ") || "Account details not supplied")}</span>${u.email ? '<small>' + esc(u.email) + '</small>' : ""}</span></button><button type="button" class="workspace-user-result-copy" data-email="${i}" ${String(u.email || "").trim() ? "" : "disabled"} aria-label="Copy email for ${esc(u.full_name || u.name || u.user_name || "this user")}" title="${String(u.email || "").trim() ? "Copy email" : "Email not supplied"}">${AtlasUI.icon("copy")}<span>Copy email</span></button></li>`).join("")}</ul></section>`;
   $$("[data-user]").forEach(
     (b) =>
       (b.onclick = () =>
@@ -146,20 +206,33 @@ function renderUsers() {
   $$("[data-email]").forEach(
     (b) => (b.onclick = () => copy(S.users[+b.dataset.email].email, "Email")),
   );
+  workspaceLookupPresentation();
 }
 async function loadUser(id, sequence) {
   if (sequence === undefined) {
     sequence = ++lookupSequence;
-    clearLookup();
+    clearLookup(false);
   }
-  const d = await api("/api/user/" + encodeURIComponent(id));
-  if (sequence !== lookupSequence) return;
-  S.user = d.user;
-  S.machines = d.machines;
-  $("#users").innerHTML = "";
-  renderKyc();
-  renderMachines();
-  AtlasUI.motion.slideUp($("#kyc"));
+  workspaceLookupPresentation("loading", "Loading user record…");
+  try {
+    const d = await api("/api/user/" + encodeURIComponent(id));
+    if (sequence !== lookupSequence) return;
+    if (!d.user || !Array.isArray(d.machines)) throw Error("User record unavailable.");
+    S.user = d.user;
+    S.machines = d.machines;
+    S.users = [];
+    S.lookupSource = "";
+    S.lookupAmbiguousMachine = false;
+    $("#users").innerHTML = "";
+    renderKyc();
+    renderMachines();
+    AtlasUI.motion.slideUp($("#kyc"));
+    workspaceLookupPresentation();
+  } catch (error) {
+    if (sequence !== lookupSequence) return;
+    workspaceLookupPresentation("error", "User record unavailable · " + error.message);
+    throw error;
+  }
 }
 function renderKyc() {
   const u = S.user;
@@ -177,7 +250,7 @@ function renderKyc() {
   window.AtlasSelection?.refresh();
 }
 function renderMachines() {
-  if (!S.machines.length) return ($("#machines").innerHTML = "");
+  if (!S.machines.length) {$("#machines").innerHTML = "";workspaceLookupPresentation();return;}
   $("#machines").innerHTML =
     `<div class=machinegrid>${S.machines.map((m, i) => `<div class="card machine ${String(m.name || "").toUpperCase() === (S.selectedDevice || S.target) ? "selected" : ""}" data-machine-kind="${AtlasUI.machineKind(m)}" data-machine="${i}"><button class=copyhost data-host="${i}" aria-label="Copy device identity for ${esc(m.name)}">${AtlasUI.icon("copy")}<span>Copy</span></button><h3>${esc(m.name)}</h3><p class="workspace-device-model"><span class="workspace-device-model-name">${esc(m.model_id || m.model_category || "Model not supplied")}</span>${m.asset_tag ? '<span class="workspace-device-asset">Asset: ' + esc(m.asset_tag) + '</span>' : ""}</p>${AtlasUI.supportsWindows(m) ? "" : '<p class="atlas-device-note">Inventory only · ' + (AtlasUI.isCitrixVdi(m) ? 'No safe Windows target supplied.' : 'Windows tools require a PC.') + '</p>'}<div class=facts><span>Match<b>${esc(m.match_type || "Device identity")}</b></span><span>Inventory discovered<b>${esc(m.last_discovered || "Not supplied")}</b></span><span>Record updated<b>${esc(m.updated_on || "Not supplied")}</b></span>${m.operational_status ? `<span>Inventory status<b>${esc(m.operational_status)}</b></span>` : ""}</div></div>`).join("")}</div>`;
   $$("[data-machine]").forEach(
@@ -199,11 +272,14 @@ function renderMachines() {
     let m = S.machines[0];
     setTarget(m.name, m.operational_status, false);
   }
-  AtlasUI.machineFilters($("#machines"));
+  AtlasUI.machineFilters($("#machines"), {linked: !!S.user});
   bindMachineContext();
   document.querySelectorAll("#machines [data-machine]").forEach((card) => {
     const m = S.machines[Number(card.dataset.machine)];
     card.insertAdjacentHTML("beforeend", AtlasHealth.badges(m));
+    const relationship = workspaceMachineRelationship(m), relation = document.createElement("p");
+    relation.className = "workspace-device-relationship";relation.textContent = relationship.text;relation.title = relationship.title;
+    card.append(relation);
     card.insertAdjacentHTML("beforeend", AtlasUI.machineDetails(m));
     card.querySelector(".atlas-machine-details").onclick = (event) =>
       event.stopPropagation();
@@ -221,6 +297,8 @@ function renderMachines() {
     heading.replaceChildren(choose);
     card.classList.add("workspace-machine-row");
   });
+  syncMachineSelection();
+  workspaceLookupPresentation();
   applyCompactWorkspace();
 }
 // Reuse the selected records and existing health snapshot across console pages.
@@ -277,7 +355,8 @@ function installSelectionSidebar() {
     }
     if (!pc) return;
     text(deviceButton.querySelector(".selection-title"), pc); deviceButton.title = "Open stored details for " + pc;
-    html(deviceButton.querySelector(".selection-device-icon"), AtlasUI.icon(["iphone", "phone", "tablet"].includes(AtlasUI.machineKind(record)) ? "phone" : "admin"));
+    const kind = AtlasUI.machineKind(record);
+    html(deviceButton.querySelector(".selection-device-icon"), AtlasUI.icon(kind === "laptop" ? "laptop" : kind === "tablet" ? "tablet" : ["iphone", "phone"].includes(kind) ? "phone" : "admin"));
     html(summary.querySelector(".selection-device-facts"), `<p>${esc(record.model_id || record.model_category || "Model not supplied")}</p>${record.asset_tag ? `<dl class="selection-meta"><div><dt>Asset</dt><dd>${esc(record.asset_tag)}</dd></div></dl>` : ""}${S.machines.includes(record) ? AtlasUI.machineBadges(record) : '<small>Hostname target · no inventory record</small>'}`);
     scan.hidden = !windows;
     if (!windows) {

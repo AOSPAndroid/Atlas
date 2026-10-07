@@ -381,7 +381,7 @@
     const login = String(
       user?.login_id || user?.user_name || user?.user_id || "",
     ).trim();
-    return !login ? "" : login.includes("\\") ? login : `INTRANET\\${login}`;
+    return !login ? "" : /[\\@]/.test(login) ? login : `INTRANET\\${login}`;
   }
   function person(user) {
     const name =
@@ -840,7 +840,7 @@
     ).join("");
     return '<div class="atlas-device-badges" aria-label="Stored device information"><div class="atlas-device-status">' + render(status) + '</div><div class="atlas-device-history">' + render(history) + '</div></div>';
   }
-  function machineFilters(host) {
+  function machineFilters(host, {linked = true} = {}) {
     if (!host || host.querySelector(":scope > .atlas-machine-filters")) return;
     const rows = [...host.querySelectorAll("[data-machine-kind]")];
     if (!rows.length) return;
@@ -865,7 +865,7 @@
     const bar = document.createElement("div");
     bar.className = "atlas-machine-filters";
     bar.innerHTML =
-      '<div class="atlas-machine-filter-heading"><strong>Linked devices</strong><small aria-live="polite"></small></div><div role="group" aria-label="Filter machine types"></div>';
+      '<div class="atlas-machine-filter-heading"><strong>' + (linked ? 'Linked devices' : 'Matching devices') + '</strong><small aria-live="polite"></small></div><div role="group" aria-label="Filter machine types"></div>';
     const group = bar.querySelector('[role="group"]'),
       status = bar.querySelector("small");
     const selected = new Set();
@@ -888,7 +888,7 @@
         );
       const count = rows.filter((row) => !row.hidden).length;
       status.textContent = count === rows.length
-        ? `${rows.length} linked ${rows.length === 1 ? "device" : "devices"}`
+        ? `${rows.length} ${linked ? "linked " : ""}${rows.length === 1 ? "device" : "devices"}`
         : `${count} of ${rows.length} shown`;
       empty.hidden = count > 0;
       for (const section of host.querySelectorAll(".ops-machine-group")) {

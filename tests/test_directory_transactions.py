@@ -155,7 +155,9 @@ class DirectoryTransactions(unittest.TestCase):
         self.assertEqual(metadata['directory.source_file'], 'replacement.xlsx')
         self.assertEqual(json.loads(metadata['directory.import_resolution']), restored_stats)
         self.assertEqual(metadata['atlas.seeded'], 'keep-target')
-        self.assertEqual({k for k in metadata if k.startswith('directory.')}, {'directory.schema_version', 'directory.created_at', 'directory.source_file', 'directory.import_resolution', 'directory.generation'})
+        from identity_links import MATCHING_VERSION
+        self.assertEqual(metadata['directory.matching_version'], MATCHING_VERSION)
+        self.assertEqual({k for k in metadata if k.startswith('directory.')}, {'directory.schema_version', 'directory.created_at', 'directory.source_file', 'directory.import_resolution', 'directory.generation', 'directory.matching_version'})
 
     def test_same_timestamp_refresh_invalidates_cached_names_before_reused_user_ids(self):
         from desk_directory import resolve_person

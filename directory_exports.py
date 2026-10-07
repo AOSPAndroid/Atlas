@@ -79,10 +79,11 @@ def copy_archive(source, target):
                            (tuple(row) for row in source.execute('select sheet,row_number,entity_key,cells,'+selected+' from directory_export_rows')))
 
 
-def capture(con, path, *, selection_table=None):
-    from directory_workbook import workbook_parts, iter_rows, directory_columns, directory_data, user_identity, norm
+def capture(con, path, *, selection_table=None, snapshot_id=None):
+    from directory_workbook import workbook_parts, iter_rows, directory_columns, directory_data, user_identity, snapshot_identity, norm
     from device_inventory import inventory_identity
     if selection_table not in (None,'directory_import_sources'):raise ValueError('Unknown import selection table')
+    if snapshot_id is None:snapshot_id=snapshot_identity(path)
     schema(con)
     for sheet, part in workbook_parts(path):
         kind = sheet_kind(sheet)
@@ -106,9 +107,9 @@ def capture(con, path, *, selection_table=None):
             d = directory_data(columns,row)
             key = ''
             if kind == 'user':
-                key = user_identity(d)
+                key = user_identity(d,number,snapshot_id=snapshot_id)
             elif kind == 'machine':
-                name,_=inventory_identity(d,number)
+                name,_=inventory_identity(d,number,snapshot_id=snapshot_id)
                 if name:key='machine:'+norm(name)
             values=(sheet,number,key,json.dumps(cells,ensure_ascii=False,separators=(',',':')))
             if selection_table:

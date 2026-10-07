@@ -79,9 +79,10 @@ def packages(term: str = Query('', max_length=200), state: str = Query('', max_l
 
 @app.get('/api/master/resolve/{key}')
 def resolve(key: str):
+    from directory_lookup import resolve_directory
     with connect() as con:
-        rows = exact_users(con, key)
-        return {'matched': True, 'user_key': rows[0]['canonical_key']} if len(rows) == 1 else {'matched': False}
+        con.execute('begin')
+        return resolve_directory(con,key)
 
 
 @app.get('/api/palette/desks')

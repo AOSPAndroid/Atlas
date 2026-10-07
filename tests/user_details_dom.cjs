@@ -67,6 +67,8 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
   const shared=w.document.createElement('div');shared.innerHTML=w.AtlasUI.person(domainUser);
   assert.equal(shared.querySelector('.domain-account-fact b').textContent,'INTRANET\\x00123456');
   assert.equal(w.AtlasUI.domainAccount({login_id:'OTHER\\someone'}),'OTHER\\someone');
+  assert.equal(w.AtlasUI.domainAccount({login_id:'someone@realm.example'}),'someone@realm.example');
+  assert.equal(w.AtlasUI.domainAccount({user_name:'someone@realm.example'}),'someone@realm.example');
   assert.equal(w.AtlasUI.domainAccount({}),'');
   // Read-only lookup may host the palette; an edit dialog must still block it.
   const readOnly=w.AtlasUI.dialog('User & machine lookup');readOnly.element.classList.add('viewer-lookup-dialog');readOnly.body.innerHTML=w.AtlasUI.person(user);

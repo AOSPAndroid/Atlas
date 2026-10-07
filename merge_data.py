@@ -31,6 +31,10 @@ def merge_directory(target,source,*,before_merge=None,after_merge=None):
    value=metadata.get('directory.'+key,metadata.get(key))
    if value is not None:dst.execute('insert into metadata values(?,?)',('directory.'+key,value))
   dst.execute('insert into metadata values(?,?)',('directory.generation',uuid.uuid4().hex))
+  # Old backups also gain the current conservative links and indexed aliases.
+  from identity_links import MATCHING_VERSION,rebuild_links
+  rebuild_links(dst,preserve_manual=True)
+  dst.execute('insert or replace into metadata values(?,?)',('directory.matching_version',MATCHING_VERSION))
   from directory_exports import copy_archive
   copy_archive(src,dst)
   from vdi_data import exists as vdi_exists,relink as relink_vdi

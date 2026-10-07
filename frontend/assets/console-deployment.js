@@ -471,10 +471,13 @@ function bulkPoll(id) {
   );
 }
 function renderBulk(j) {
-  let r = S.rows;
+  const r = S.rows,
+    failed = r.filter((x) => x.copy === "Failed" || x.completion === "Failed").length;
+  $("#copyFailed").disabled = !failed;
+  $("#exportCsv").disabled = !r.length;
   $("#bulkSummary").innerHTML =
-    `<div class=summary><div>Phase<b>${esc(j.phase)}</b></div><div>Total<b>${r.length}</b></div><div>Failed<b>${r.filter((x) => x.copy === "Failed" || x.completion === "Failed").length}</b></div><div>Complete<b>${r.filter((x) => ["Complete", "Launched"].includes(x.completion)).length}</b></div></div>`;
-  $("#bulkBody").innerHTML = r
+    `<div class=summary><div>Phase<b>${esc(j.phase || j.state || "Waiting")}</b></div><div>Total<b>${r.length}</b></div><div>Failed<b>${failed}</b></div><div>Launched / complete<b>${r.filter((x) => ["Complete", "Launched"].includes(x.completion)).length}</b></div></div>`;
+  $("#bulkBody").innerHTML = r.length ? r
     .map(
       (x) =>
         `<tr><td><b>${esc(x.machine)}</b></td><td class="${x.copy === "Failed" ? "bad" : "good"}">${esc(x.copy)}</td><td>${esc(x.launch)}</td><td>${esc(x.pid)}</td><td>${esc(x.completion)}</td><td>${esc(x.exit_code)}</td><td>${esc(
@@ -483,16 +486,48 @@ function renderBulk(j) {
             .slice(-1)[0],
         )}</td></tr>`,
     )
-    .join("");
+    .join("") : `<tr class="atlas-table-empty"><td colspan="7"><b>${AtlasClient.terminal.has(j.state) ? "No per-device results returned" : "Waiting for device results…"}</b><span>${AtlasClient.terminal.has(j.state) ? "This run has no rows to copy or export." : "Results appear here as this run reports progress."}</span></td></tr>`;
 }
+let deploymentHistorySequence = 0;
 async function loadDeploymentHistory() {
-  let d = await api("/api/history");
-  $("#historyBody").innerHTML = d
-    .map(
-      (x) =>
-        `<tr><td>${esc(x.started)}</td><td>${esc(x.target)}</td><td>${esc(x.package)}</td><td>${esc(x.action)}</td><td>${esc(x.mode)}</td><td>${esc(x.state)}</td><td>${esc(x.exit_code)}</td></tr>`,
-    )
-    .join("");
+  const sequence = ++deploymentHistorySequence,
+    body = $("#historyBody"), status = $("#historyStatus"), refresh = $("#refreshHistory");
+  const empty = (title, message) => `<tr class="atlas-table-empty"><td colspan="7"><b>${esc(title)}</b><span>${esc(message)}</span></td></tr>`;
+  if (window.AtlasReadOnly) {
+    body.innerHTML = empty("History is not included in this read-only view", "Open Atlas Admin to review recent deployment operations.");
+    body.setAttribute("aria-busy", "false");
+    status.textContent = "Deployment history is available in Atlas Admin.";
+    status.dataset.state = "readonly";
+    refresh.disabled = true;
+    return;
+  }
+  body.setAttribute("aria-busy", "true");
+  refresh.disabled = true;
+  status.textContent = "Loading recent operations…";
+  status.dataset.state = "loading";
+  if (!body.querySelector("tr:not(.atlas-table-empty)"))
+    body.innerHTML = empty("Loading history…", "Retrieving recorded deployment operations.");
+  try {
+    const records = await api("/api/history");
+    if (sequence !== deploymentHistorySequence) return;
+    if (!Array.isArray(records)) throw Error("Invalid history response");
+    body.innerHTML = records.length ? records.map((x) =>
+      `<tr><td>${esc(x.started)}</td><td>${esc(x.target)}</td><td>${esc(x.package)}</td><td>${esc(x.action)}</td><td>${esc(x.mode)}</td><td>${esc(x.state)}</td><td>${esc(x.exit_code)}</td></tr>`
+    ).join("") : empty("No recent operations", "Deployment operations will appear here when they are recorded. Use Refresh to check again.");
+    status.textContent = records.length ? `${records.length} recorded operation${records.length === 1 ? "" : "s"}` : "No recorded deployment operations returned.";
+    status.dataset.state = "ready";
+  } catch (error) {
+    if (sequence !== deploymentHistorySequence) return;
+    status.textContent = "History unavailable · " + (body.querySelector("tr:not(.atlas-table-empty)") ? "previous results shown · " : "") + error.message;
+    status.dataset.state = "error";
+    if (!body.querySelector("tr:not(.atlas-table-empty)"))
+      body.innerHTML = empty("History unavailable", "Use Refresh to try again.");
+  } finally {
+    if (sequence === deploymentHistorySequence) {
+      body.setAttribute("aria-busy", "false");
+      refresh.disabled = false;
+    }
+  }
 }
 function exportCsv() {
   if (!S.rows.length) return;

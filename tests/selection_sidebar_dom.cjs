@@ -16,6 +16,7 @@ const settle = () => new Promise(resolve => setTimeout(resolve, 25));
   const {w,run} = f, d = w.document;
   await f.console();run('installSelectionSidebar();renderNavigationIcons();AtlasUI.installIcons()');await settle();
   const side = d.querySelector('#selectionSummary'), host = d.querySelector('#healthLine');
+  const iconMarkup = kind => {const node=d.createElement('span');node.innerHTML=w.AtlasUI.icon(kind);return node.innerHTML;};
   const count = () => calls.filter(url => url.startsWith('/api/machine-health/')).length;
   assert(!side.querySelector('.selection-empty').hidden);
   for (const selector of ['[data-page="packages"]', '.atlas-primary-nav a[href="/"]', '[data-section="workspace"]', '[data-section="knowledge"]', '#deploymentsToggle', '#queueToggle', '#deploymentToggle']) {
@@ -25,6 +26,7 @@ const settle = () => new Promise(resolve => setTimeout(resolve, 25));
   run(`S.user={name:'Alice <script>literal</script>',user_name:'alice',email:'alice@example.test',department:'Support',location:'Paris'};S.machines=[{name:'PC-A',model_id:'Dell Latitude',asset_tag:'BB01',assigned_to:'alice'},{name:'PC-B',model_id:'HP Desktop'},{name:'IPHONE-EXAMPLE',model_id:'Apple iPhone 15',model_category:'Mobile Device - Handheld'}];renderKyc();renderMachines();setTarget('PC-A','',false)`);
   await settle();assert.equal(count(),0);assert(!side.querySelector('script'));
   assert(side.textContent.includes('Alice <script>literal</script>'));assert(side.textContent.includes('Dell Latitude'));
+  assert.equal(side.querySelector('.selection-device-icon').innerHTML,iconMarkup('laptop'));
   const initial = count();
   for (const page of ['admin','packages','active-directory','bulk','history','psexec','knowledge','workspace']) run(`page('${page}')`);
   await settle();assert.equal(count(),initial,'Changing pages does not repeat health checks');
@@ -54,6 +56,9 @@ const settle = () => new Promise(resolve => setTimeout(resolve, 25));
   assert(side.textContent.includes('PC-B'));assert(!side.textContent.includes('Intel'));assert(side.querySelector('.selection-readings').textContent.includes('Not scanned'));
   const beforePhone = count();run("setTarget('IPHONE-EXAMPLE')");await settle();assert.equal(count(),beforePhone);
   assert.equal(run('S.target'),'');assert(side.querySelector('.selection-scan').hidden);assert(side.textContent.includes('Inventory device'));assert(!side.textContent.includes('80.0 GiB'));
+  assert.equal(side.querySelector('.selection-device-icon').innerHTML,iconMarkup('phone'));
+  run("S.machines.push({name:'TABLET-FICT',device_kind:'tablet'});setTarget('TABLET-FICT','',false)");
+  assert.equal(side.querySelector('.selection-device-icon').innerHTML,iconMarkup('tablet'));
   assert.equal(d.querySelector('#adminPc').value,'');
   for (const id of ['refreshProcesses','diagnoseSlowness','adminServices','refreshServices'])
     assert(d.getElementById(id).disabled, id+' disables immediately for an inventory-only device');
