@@ -4,6 +4,11 @@ function setTarget(pc, status = "", quick = true) {
     .toUpperCase();
   if (!pc) return;
   const record = S.machines.find(m => String(m.name || "").toUpperCase() === pc) || {name: pc};
+  const citrix = AtlasUI.isCitrixVdi(record);
+  if (citrix) {
+    quick = false;
+    status = ["Citrix snapshot", record.vdi_registration_state || record.vdi_state, record.vdi_power_state].filter(Boolean).join(" · ");
+  }
   S.selectedDevice = pc;
   if (!AtlasUI.supportsWindows(record)) {
     S.target = "";
@@ -38,10 +43,14 @@ function setTarget(pc, status = "", quick = true) {
   $("#barState").textContent = status;
   $("#targetBar").classList.remove("hidden");
   $$("[data-machine]").forEach((x) =>
-    x.classList.toggle("selected", S.machines[+x.dataset.machine]?.name === pc),
+    x.classList.toggle("selected", String(S.machines[+x.dataset.machine]?.name || "").toUpperCase() === pc),
   );
   rememberTarget(pc);
   refreshTargetHealth(quick ? "quick" : false);
+  if (citrix) {
+    const note = $("#healthLine p");
+    if (note) note.textContent = AtlasUI.machineSnapshotNote(record);
+  }
   refreshConsoleSummary();
   updatePackagePresence();
   window.AtlasSelection?.refresh();
@@ -117,7 +126,7 @@ async function search() {
   S.users = d.users;
   S.machines = d.machines;
   if (d.users.length === 1 && !d.machines.length)
-    return loadUser("id:" + d.users[0].id, sequence);
+    return loadUser(AtlasUI.personKey(d.users[0]), sequence);
   renderUsers();
   renderMachines();
   if (!d.users.length && !d.machines.length)
@@ -130,7 +139,7 @@ function renderUsers() {
   $$("[data-user]").forEach(
     (b) =>
       (b.onclick = () =>
-        loadUser("id:" + S.users[+b.dataset.user].id).catch((e) =>
+        loadUser(AtlasUI.personKey(S.users[+b.dataset.user])).catch((e) =>
           toast(e.message),
         )),
   );
@@ -170,7 +179,7 @@ function renderKyc() {
 function renderMachines() {
   if (!S.machines.length) return ($("#machines").innerHTML = "");
   $("#machines").innerHTML =
-    `<div class=machinegrid>${S.machines.map((m, i) => `<div class="card machine ${m.name === (S.selectedDevice || S.target) ? "selected" : ""}" data-machine-kind="${AtlasUI.machineKind(m)}" data-machine="${i}"><button class=copyhost data-host="${i}" aria-label="Copy device identity for ${esc(m.name)}">${AtlasUI.icon("copy")}<span>Copy</span></button><h3>${esc(m.name)}</h3><p class="workspace-device-model"><span class="workspace-device-model-name">${esc(m.model_id || m.model_category || "Model not supplied")}</span>${m.asset_tag ? '<span class="workspace-device-asset">Asset: ' + esc(m.asset_tag) + '</span>' : ""}</p>${AtlasUI.supportsWindows(m) ? "" : '<p class="atlas-device-note">Inventory only · Windows tools require a PC.</p>'}<div class=facts><span>Match<b>${esc(m.match_type || "Device identity")}</b></span><span>Inventory discovered<b>${esc(m.last_discovered || "Not supplied")}</b></span><span>Record updated<b>${esc(m.updated_on || "Not supplied")}</b></span>${m.operational_status ? `<span>Inventory status<b>${esc(m.operational_status)}</b></span>` : ""}</div></div>`).join("")}</div>`;
+    `<div class=machinegrid>${S.machines.map((m, i) => `<div class="card machine ${String(m.name || "").toUpperCase() === (S.selectedDevice || S.target) ? "selected" : ""}" data-machine-kind="${AtlasUI.machineKind(m)}" data-machine="${i}"><button class=copyhost data-host="${i}" aria-label="Copy device identity for ${esc(m.name)}">${AtlasUI.icon("copy")}<span>Copy</span></button><h3>${esc(m.name)}</h3><p class="workspace-device-model"><span class="workspace-device-model-name">${esc(m.model_id || m.model_category || "Model not supplied")}</span>${m.asset_tag ? '<span class="workspace-device-asset">Asset: ' + esc(m.asset_tag) + '</span>' : ""}</p>${AtlasUI.supportsWindows(m) ? "" : '<p class="atlas-device-note">Inventory only · ' + (AtlasUI.isCitrixVdi(m) ? 'No safe Windows target supplied.' : 'Windows tools require a PC.') + '</p>'}<div class=facts><span>Match<b>${esc(m.match_type || "Device identity")}</b></span><span>Inventory discovered<b>${esc(m.last_discovered || "Not supplied")}</b></span><span>Record updated<b>${esc(m.updated_on || "Not supplied")}</b></span>${m.operational_status ? `<span>Inventory status<b>${esc(m.operational_status)}</b></span>` : ""}</div></div>`).join("")}</div>`;
   $$("[data-machine]").forEach(
     (x) =>
       (x.onclick = () =>
@@ -328,7 +337,7 @@ function renderRecentTargets() {
 }
 function supportSummary() {
   const u = S.user || {},
-    m = (S.machines || []).find((x) => x.name === S.target) || {};
+    m = (S.machines || []).find((x) => String(x.name || "").toUpperCase() === S.target) || {};
   return [
     `Timestamp: ${new Date().toLocaleString("en-GB")}`,
     `User: ${u.name || ""}`,
@@ -503,7 +512,7 @@ function bindMachineContext() {
     );
 }
 function completeMachineReport() {
-  const m = S.machines.find((x) => x.name === S.target) || {},
+  const m = S.machines.find((x) => String(x.name || "").toUpperCase() === S.target) || {},
     u = S.user || {},
     inventory = softwareState.software.get(S.target);
   return [

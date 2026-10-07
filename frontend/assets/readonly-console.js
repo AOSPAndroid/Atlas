@@ -76,7 +76,7 @@
     "/api/operations/recovery": { targets: [] },
   };
   const stored =
-    /^\/api\/(?:package-data|health|capabilities|master\/status|master\/resolve\/[^/]+|search|user\/[^/]+|machine\/[^/]+|directory\/record|palette\/desks|palette\/person\/[^/]+|desks\/[^/]+\/context)$/;
+    /^\/api\/(?:package-data|health|capabilities|master\/status|master\/resolve\/[^/]+|search|user\/[^/]+|machine\/[^/]+|directory\/record|vdi-data\/record\/[^/]+|palette\/desks|palette\/person\/[^/]+|desks\/[^/]+\/context)$/;
   function read(url, options = {}) {
     const parsed = new URL(url, location.href);
     if (

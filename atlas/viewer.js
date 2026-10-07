@@ -46,7 +46,7 @@ function userButtons(users) {
   return users
     .map(
       (u) =>
-        `<button type="button" class="ops-user-result" ${AtlasContext.attributes("user", u)} data-person="id:${u.id}"><b>${esc(u.full_name || u.name)}</b><span>${esc(u.user_name)} · ${esc(u.email)}</span>${u.assigned_relationship || u.logon_relationship ? `<small>${esc(relationship(u))}</small>` : ""}</button>`,
+        `<button type="button" class="ops-user-result" ${AtlasContext.attributes("user", u)} data-person="${esc(AtlasUI.personKey(u))}"><b>${esc(u.full_name || u.name)}</b><span>${esc(u.user_name)} · ${esc(u.email)}</span>${u.assigned_relationship || u.logon_relationship ? `<small>${esc(relationship(u))}</small>` : ""}</button>`,
     )
     .join("");
 }
@@ -217,7 +217,7 @@ export function createViewerOperations({ onSelect, toast }) {
           `<span class="ops-chip ${data.match_method === "confirmed" ? "good" : ""}">${esc(label)}</span>` +
           personCard(data.user) +
           (data.user
-            ? `<button type="button" data-person="id:${data.user.id}">Open person details</button>`
+            ? `<button type="button" data-person="${esc(AtlasUI.personKey(data.user))}">Open person details</button>`
             : userButtons(data.candidates || [])) +
           machinesCard(data.machines);
         bindLinks(host, data.machines);

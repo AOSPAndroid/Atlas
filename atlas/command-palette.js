@@ -286,7 +286,7 @@ export function installCommandPalette({
             ]
               .filter(Boolean)
               .join(" · "),
-            person: "id:" + u.id,
+            person: String(u.canonical_key || "").trim() || "id:" + u.id,
             mappedDesks,
           };
         });

@@ -44,11 +44,21 @@ def validate_pc(pc):
  if Path(MASTER_DB).exists():
   with sqlite3.connect(Path(MASTER_DB).resolve().as_uri()+'?mode=ro',uri=True,factory=ClosingConnection) as c:
    c.row_factory=sqlite3.Row
+   c.execute('begin');row=None
    if c.execute("select 1 from sqlite_master where type='table' and name='machines'").fetchone():
     row=c.execute('select * from machines where machine_name_norm=?',(pc.lower(),)).fetchone()
     if not row and c.execute("select 1 from pragma_table_info('machines') where name='source_ci'").fetchone():
      row=c.execute('select * from machines where lower(source_ci)=? limit 1',(pc.lower(),)).fetchone()
     if row:record=dict(row)
+   from vdi_data import machine_records
+   supplemental=machine_records(c,pc)
+   if len(supplemental)>1:raise HTTPException(400,'Ambiguous VDI hostname; select its fully qualified name.')
+   if supplemental and not supplemental[0]['windows_remote_supported']:raise HTTPException(400,'This Citrix record has no unique valid Windows target.')
+   if supplemental:
+    target=supplemental[0]['name'].upper()
+    if row and target!=str(record['machine_name']).upper():raise HTTPException(400,'Ambiguous inventory hostname; select its fully qualified name.')
+    if '.' not in pc and c.execute("select 1 from machines where machine_name_norm like ? escape '\\' limit 1",(pc.lower().replace('_','\\_')+'.%',)).fetchone():raise HTTPException(400,'Ambiguous inventory hostname; select its fully qualified name.')
+    if not row:pc=target
  if not supports_windows(record):raise HTTPException(400,'This device is inventory only. Windows deployment and remote tools require a PC.')
  return pc
 def quote(v):return "'"+str(v).replace("'","''")+"'"
@@ -245,17 +255,19 @@ async def local_only(request:Request,call_next):
  return response
 @app.get('/api/health')
 def health():
- u=m=0
+ u=m=v=0
  if DB.exists():
-  with db() as c:u=c.execute('select count(*) from users').fetchone()[0];m=c.execute('select count(*) from machines').fetchone()[0]
- return {'identity':identity(),'users':u,'machines':m,'database':DB.exists(),'repository':REPO.is_dir(),'application':'Office Atlas','mode':'admin','version':__version__,'instance_id':os.environ.get('ATLAS_INSTANCE_ID'),'instance_root':str(ROOT)}
+  with db() as c:
+   from vdi_inventory import count
+   u=c.execute('select count(*) from users').fetchone()[0];m=c.execute('select count(*) from machines').fetchone()[0];v=count(c)
+ return {'identity':identity(),'users':u,'machines':m,'vdi_machines':v,'database':DB.exists(),'repository':REPO.is_dir(),'application':'Office Atlas','mode':'admin','version':__version__,'instance_id':os.environ.get('ATLAS_INSTANCE_ID'),'instance_root':str(ROOT)}
 
 
 
 @app.get('/api/search')
 def search(term:str,palette:bool=False):
  with db() as c:
-  if palette:c.execute('begin')
+  c.execute('begin')
   result=search_directory(c,term)
   if palette:
    from desk_directory import palette_search
@@ -264,6 +276,7 @@ def search(term:str,palette:bool=False):
 @app.get('/api/user/{uid}')
 def user(uid:str):
  with db() as c:
+  c.execute('begin')
   rows=c.execute('select * from legacy_users where id=?',(int(uid[3:]),)).fetchall() if uid.startswith('id:') and uid[3:].isdigit() else exact_users(c,uid)
   if not rows:raise HTTPException(404,'User not found')
   if len(rows)!=1:raise HTTPException(409,'Ambiguous identity; select a user from search results')
@@ -645,6 +658,8 @@ def master_status():
         with master_db() as c:
             result['users']=c.execute('select count(*) from users').fetchone()[0]
             result['machines']=c.execute('select count(*) from machines').fetchone()[0]
+            from vdi_inventory import count
+            result['vdi_machines']=count(c)
             result['assignments']=c.execute('select count(*) from assignments').fetchone()[0]
             row=c.execute("select value from metadata where key='created_at'").fetchone();result['created_at']=row[0] if row else ''
     except Exception as exc:result.update(available=False,error=str(exc))
@@ -652,14 +667,26 @@ def master_status():
 
 @app.get('/api/master/resolve/{value}')
 def master_resolve(value:str):
- raw=value.strip();q=raw.casefold().rstrip('.')
+ raw=value.strip()
  with db() as c:
-  machine=c.execute('select * from legacy_machines where machine_name_norm=?',(q,)).fetchone()
-  if machine:
-   rows=c.execute('select distinct u.* from assignments a join legacy_users u on u.id=a.user_id_ref where a.machine_id=? order by u.id',(machine['id'],)).fetchall()
-  else:rows=exact_users(c,raw)
-  if len(rows)!=1:return {'matched':False,'ambiguous':len(rows)>1,'query':raw,'machine':dict(machine) if machine else None}
-  u=dict(rows[0]);return {'matched':True,'resolved_by':'machine' if machine else 'identity','user':u,'search_value':u['user_name'] or u['email'] or u['full_name'],'user_key':'id:'+str(u['id']),'requested_machine':machine['machine_name'] if machine else '', 'machines':[r['name'] for r in linked_machines(c,u['id'])]}
+  c.execute('begin')
+  from vdi_inventory import machine_context
+  context=machine_context(c,raw)
+  if context and context.get('ambiguous'):return {'matched':False,'ambiguous':True,'query':raw,'machine':None,'machines':context['machines']}
+  machine=context['machine'] if context else None
+  rows=context['users'] if context else exact_users(c,raw)
+  if len(rows)!=1:return {'matched':False,'ambiguous':len(rows)>1,'query':raw,'machine':machine,'users':rows}
+  u=dict(rows[0]);return {'matched':True,'resolved_by':'machine' if machine else 'identity','user':u,'search_value':u['user_name'] or u['email'] or u['full_name'],'user_key':u['canonical_key'],'requested_machine':machine['machine_name'] if machine else '', 'machines':[r['name'] for r in linked_machines(c,u['id'])]}
+
+@app.get('/api/machine/{computer}')
+def machine_record(computer:str):
+ if not NAME_RE.fullmatch(computer) or computer.startswith(('-', '.')) or '..' in computer:raise HTTPException(400,'Invalid computer name')
+ from desk_directory import machine_context
+ with db() as c:
+  result=machine_context(c,computer)
+  if result is None:raise HTTPException(404,'Machine not found in directory')
+  if result.get('ambiguous'):raise HTTPException(409,'Ambiguous VDI hostname; select its fully qualified name.')
+  return result
 
 app.mount('/assets',StaticFiles(directory=WEB/'assets'),name='assets')
 @app.get('/installer')

@@ -169,8 +169,8 @@
             <p>
               Mobile devices with generic or empty CI names remain searchable
               using their hardware identifiers. PCs without a ci/name hostname
-              stay in the export archive.
-              Unassigned devices with a hostname remain searchable and usable.
+              stay in the export archive. Unassigned devices with a hostname
+              remain searchable and usable.
             </p>
             <a class="atlas-return" href="/api/excel-templates/directory"
               >Download directory template (.xlsx)</a
@@ -462,20 +462,113 @@
               <code>assigned_to</code>, <code>u_domain</code>,
               <code>u_build</code> and <code>sys_created_on</code>.
               Display-label headers are accepted too. Extra columns are
-              retained. <code>sys_updated_on</code> or <code>Updated</code>, when
-              supplied, determines which repeated record is selected. Creation
-              date and package state do not determine priority.
-              CSV limit: 10 MB / 20,000 rows.
+              retained. <code>sys_updated_on</code> or <code>Updated</code>,
+              when supplied, determines which repeated record is selected.
+              Creation date and package state do not determine priority. CSV
+              limit: 10 MB / 20,000 rows.
             </p>
           </details>
           <a class="atlas-return" href="/installer?command=packages"
             >Browse packages</a
           >
         </section>
+        <section class="panel atlas-upload-section" id="vdi-data-import">
+          <h2>Citrix VDI data</h2>
+          <p>
+            Upload the raw Citrix machine export to link virtual desktops with
+            their users, machine catalogue and delivery group.
+          </p>
+          <p class="atlas-import-notice">
+            Updates each supplied VDI machine and replaces its complete user
+            list. Omitted VDI records are kept. ServiceNow users and devices
+            stay in place.
+          </p>
+          <p id="vdi-data-status" role="status">Loading VDI import status…</p>
+          <div class="atlas-import-controls" id="vdi-data-controls">
+            <label
+              >Citrix machine export (.csv or .xlsx)<input
+                id="vdi-data-file"
+                type="file"
+                accept=".csv,.xlsx,text/csv"
+            /></label>
+            <button id="vdi-data-validate" class="primary" type="button">
+              Validate and preview
+            </button>
+            <label
+              ><input id="vdi-data-full" type="checkbox" />Replace all VDI
+              records</label
+            >
+            <p id="vdi-data-mode" class="atlas-import-notice">
+              Merge update: VDI machines omitted from this export are retained.
+            </p>
+            <p id="vdi-data-message" role="status" aria-live="polite">
+              Choose your Citrix CSV or Excel export.
+            </p>
+            <progress
+              id="vdi-data-progress"
+              aria-label="Processing Citrix VDI export"
+              hidden
+            ></progress>
+            <section id="vdi-data-review" class="atlas-import-review" hidden>
+              <h3>Review VDI changes</h3>
+              <p id="vdi-data-source"></p>
+              <p id="vdi-data-summary"></p>
+              <p id="vdi-data-user-summary"></p>
+              <p id="vdi-data-warnings"></p>
+              <details id="vdi-data-user-warnings" hidden>
+                <summary>User links to review (import can continue)</summary>
+                <pre id="vdi-data-user-examples"></pre>
+              </details>
+              <details id="vdi-data-record-warnings" hidden>
+                <summary>Machine records to review</summary>
+                <pre id="vdi-data-record-examples"></pre>
+              </details>
+              <details id="vdi-data-removals" hidden>
+                <summary>VDI records removed by this snapshot</summary>
+                <pre id="vdi-data-removed-examples"></pre>
+              </details>
+              <details>
+                <summary>Original columns and example machines</summary>
+                <p id="vdi-data-columns"></p>
+                <pre id="vdi-data-examples"></pre>
+              </details>
+              <p>
+                Every supplied user association and original export column is
+                retained. Unmatched or ambiguous accounts remain visible for
+                review. A VDI-only backup is saved before applying.
+              </p>
+              <div class="row">
+                <button
+                  id="vdi-data-apply"
+                  class="primary"
+                  type="button"
+                  disabled
+                >
+                  Back up and save VDI data</button
+                ><button id="vdi-data-cancel" type="button">
+                  Discard preview
+                </button>
+              </div>
+            </section>
+          </div>
+          <details class="atlas-import-help">
+            <summary>Accepted Citrix headers and user lists</summary>
+            <p>
+              Keep the original headers, including <code>Name</code>,
+              <code>MachineCatalog</code>, <code>DeliveryGroup</code> and
+              <code>User</code>. Extra columns are retained. A User cell can
+              contain several domain accounts; Atlas keeps all associations and
+              matches usernames and domain accounts to the user directory,
+              rather than assuming that display names identify an account. CSV /
+              XLSX limit: 50 MB and 300,000 nonblank rows.
+            </p>
+          </details>
+        </section>
       </div>
     </main>
     <script src="/assets/database.js"></script>
     <script src="/assets/package-data-import.js"></script>
+    <script src="/assets/vdi-data-import.js"></script>
     <script src="/assets/desk-moves.js"></script>
     <script src="/assets/seating-excel.js"></script>
     <script

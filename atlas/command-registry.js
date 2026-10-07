@@ -76,6 +76,12 @@ export const DATABASE_UPDATES = Object.freeze({
     detail: "Upload the ServiceNow CSV with package states and ownership",
     keywords: "update packages package data metadata status live packaging csv import upload",
   },
+  "update-vdi": {
+    section: "vdi-data-import",
+    title: "Update VDI data",
+    detail: "Upload Citrix machines, user associations, catalogues and delivery groups",
+    keywords: "update vdi citrix virtual desktops machine catalog catalogue delivery group users csv excel import upload",
+  },
   "update-floorplans": {
     section: "floorplan-import",
     title: "Update floor plans",
@@ -254,8 +260,8 @@ export const COMMANDS = [
   [
     "database",
     "Manage database",
-    "Upload users, devices, package data and floor plan changes",
-    "database import excel csv packages metadata moves",
+    "Upload users, devices, VDI, package data and floor plan changes",
+    "database import excel csv packages metadata moves vdi citrix",
   ],
   ["view", "Switch 2D / 3D map", "Change the map view", "map view 2d 3d"],
   ["reset", "Fit floor", "Fit the current floor", "reset zoom map"],

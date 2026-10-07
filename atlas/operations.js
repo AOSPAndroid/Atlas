@@ -139,7 +139,17 @@ export function createOperations({
               .forEach((n) => n.classList.toggle("chosen", n.contains(input)));
             updateDeploy();
             AtlasUI.motion.slideUp(q(".ops-deployment"));
-            health(g, target);
+            if (AtlasUI.isCitrixVdi(machine)) {
+              const healthHost = q("#ops-target-health");
+              window.AtlasHealth.mount(
+                healthHost,
+                target,
+                () => valid(g) && target === machine.name,
+              );
+              const note = healthHost.querySelector(":scope > p");
+              if (note)
+                note.textContent = AtlasUI.machineSnapshotNote(machine);
+            } else health(g, target);
           }),
       );
     host().querySelectorAll(".ops-machine").forEach(card => {

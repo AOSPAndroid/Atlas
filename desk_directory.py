@@ -69,8 +69,9 @@ def desk_context(c, desk):
         if existing:
             existing['desk_equipment'] = True
         else:
-            row = c.execute('select * from legacy_machines where name_norm=?', (hostname.lower(),)).fetchone()
-            machine = dict(row) if row else {'name':hostname,'operational_status':'Not in directory','model_id':'','serial_number':''}
+            from vdi_inventory import find_machines
+            matches = find_machines(c, hostname)
+            machine = matches[0] if len(matches) == 1 else {'name':hostname,'operational_status':'Ambiguous machine' if matches else 'Not in directory','model_id':'','serial_number':'','windows_remote_supported':not bool(matches)}
             machine.update(link_source='Desk equipment record',match_type='Recorded at this desk',desk_equipment=True,assigned_relationship=0,logon_relationship=0)
             machines.insert(0, machine)
     for machine in machines:
@@ -141,15 +142,14 @@ def palette_search(c, result):
 @read_snapshot
 def machine_context(c, computer):
     """Stored inventory and identity evidence only; never contacts a machine."""
-    machine = c.execute('select * from legacy_machines where name_norm=?', (computer.casefold().rstrip('.'),)).fetchone()
-    if machine is None:
+    from vdi_inventory import machine_context as inventory_context
+    result = inventory_context(c, computer)
+    if result is None:
         return None
-    users = [dict(row) for row in c.execute("""select u.*,
-        max(a.relationship_type='assigned_to') as assigned_relationship,
-        max(a.relationship_type='last_logon_user') as logon_relationship
-        from assignments a join legacy_users u on u.id=a.user_id_ref
-        where a.machine_id=? group by u.id order by u.full_name,u.id""", (machine['id'],))]
+    if result.get('ambiguous'):
+        return result
+    machine = result['machine']
     desks = [{'id':r['id'], 'floor':r['floor'], 'match':'recorded at this desk'}
              for (body,) in c.execute('select body from official_records')
              for r in [json.loads(body)] if r.get('hostname','').casefold().rstrip('.') == machine['name'].casefold().rstrip('.')]
-    return {'machine':dict(machine), 'users':users, 'desks':desks}
+    return {**result, 'desks':desks}

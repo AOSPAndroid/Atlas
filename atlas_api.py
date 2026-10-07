@@ -110,9 +110,10 @@ def register_atlas(app):
 
  @app.get('/api/palette/person/{uid}')
  def palette_person(uid:str):
-  if not uid.startswith('id:') or not uid[3:].isdigit():raise HTTPException(400,'Select a directory result')
+  if not (uid.startswith('id:') and uid[3:].isdigit()) and ':' not in uid:raise HTTPException(400,'Select a directory result')
   with wmi.db() as c:
-   person=c.execute('select * from legacy_users where id=?',(int(uid[3:]),)).fetchone()
+   c.execute('begin')
+   person=c.execute('select * from legacy_users where id=?',(int(uid[3:]),)).fetchone() if uid.startswith('id:') and uid[3:].isdigit() else c.execute('select * from legacy_users where canonical_key=?',(uid,)).fetchone()
    if not person:raise HTTPException(404,'Person not found')
    return {'desks':person_desks(c,person)}
 
@@ -301,6 +302,8 @@ def register_atlas(app):
  register_database_manager(app,wmi,check_token)
  from package_data_api import register as register_package_data
  register_package_data(app,wmi,check_token)
+ from vdi_data_api import register as register_vdi_data
+ register_vdi_data(app,wmi,check_token)
 
  from official_atlas import register_official
  register_official(app,wmi,check_token)

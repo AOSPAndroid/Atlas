@@ -44,7 +44,7 @@ const preview = {id: 'stage-one', source: 'emea.xlsx', report: {
   for (const file of ['database.js']) run(fs.readFileSync(path.join(root, 'frontend/assets', file), 'utf8'));
   await sleep(50);
   assert.equal(w.document.activeElement, get('directory-import'), 'The users/devices shortcut focuses its upload section');
-  for (const id of ['package-data-import', 'floorplan-import']) {
+  for (const id of ['package-data-import', 'floorplan-import', 'vdi-data-import']) {
     w.location.hash = id; await sleep(20);
     assert.equal(w.document.activeElement, get(id), 'Other update shortcuts focus their upload sections');
   }
@@ -52,7 +52,7 @@ const preview = {id: 'stage-one', source: 'emea.xlsx', report: {
   assert(!get('validate').disabled, 'Slow status loading does not disable validation');
   assert(!w.document.querySelector('.atlas-edge-panel'), 'Upload workflows never move into floating controls');
   assert(get('preview').hidden, 'Confirmation remains hidden before a valid preview');
-  assert.equal(w.document.querySelectorAll('.atlas-upload-grid > section').length, 3);
+  assert.equal(w.document.querySelectorAll('.atlas-upload-grid > section').length, 4);
   assert(get('full').closest('#preview'));
   assert(get('seating-file').closest('#seating-panel'));
   assert(get('seating-confirm').closest('#seating-result'));

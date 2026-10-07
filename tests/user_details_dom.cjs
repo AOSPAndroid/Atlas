@@ -8,7 +8,7 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
   const f=await fixture({fetch:async url=>{
     url=String(url);calls.push(url);
     let data={users:[],machines:[],available:false};
-    if(url.includes('/api/user/id%3A1'))data={user,machines:[{name:'PC-A'},{name:'PC-B'}]};
+    if(url.includes('/api/user/id%3A1') || url.includes('/api/user/uid%3Aalice'))data={user,machines:[{name:'PC-A'},{name:'PC-B'}]};
     else if(url.includes('/api/user/id%3A2'))data={user:{id:2,name:'Minimal Person',user_name:'minimal'},machines:[]};
     else if(url==='/api/health')data={identity:'FIXTURE',users:0,machines:0};
     else if(url==='/api/history')data=[];
@@ -116,7 +116,8 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
     assert.equal(f.run('S.machines.map(m=>m.name).join(",")'),'PC-A,PC-B');
     assert.equal(w.location.href,consoleUrl);
     assert(!calls.slice(start).some(url=>url.includes('/palette/person/')));
-    assert(calls.slice(start).some(url=>url.includes('/api/user/id%3A1')));
+    assert(calls.slice(start).some(url=>url.includes('/api/user/uid%3Aalice')),'palette follows the stable canonical account key');
+    assert(!calls.slice(start).some(url=>url.includes('/api/user/id%3A1')),'palette never rebuilds an ID that a directory refresh could reuse');
     assert(!calls.slice(start).some(url=>/\/api\/(assistant|machine-health|performance)\//.test(url)));
   }
   // Filters are local and preserve target identity, row indices and assignment order.

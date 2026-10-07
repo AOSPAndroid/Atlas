@@ -156,6 +156,13 @@ async function checkCombinedResults() {
   // A backend without enrichment preserves its separate local fallback.
   state.records=[state.records[0]];state.users=[{id:7,full_name:'Sam Example',user_name:'sam.a'}];
   rows=await search('Sam');assert.equal(rows.length,2);assert(rows.some(row=>row.querySelector('.palette-kind').textContent==='Desk'));
+  // Numeric database IDs can change on refresh; a returned canonical key identifies
+  // the selected account for both full profiles and a fresh map resolution.
+  state.records=[];state.users=[{...person,id:7,canonical_key:'uid:fict-stable',palette_desks:[]}];
+  rows=await search('Alice');assert.equal(rows.length,1);rows[0].click();await sleep(10);
+  assert.deepEqual(outcomes(),[['person','uid:fict-stable']],mode+' retains the returned canonical user key');
+  assert.equal(requests.some(url=>url.endsWith('/uid%3Afict-stable')),mode!=='console','map resolution uses the canonical account, console opens it directly');
+  state.records=[{...record(first),name:'Sam Example'}];
   state.fail=true;rows=await search('Sam');assert.equal(rows.length,1);assert.equal(rows[0].querySelector('.palette-kind').textContent,'Desk');assert(palette.root.querySelector('#atlas-command-status').textContent.includes('Directory unavailable'));rows[0].click();await sleep(0);assert.deepEqual(outcomes(),[['desk','DESK-A']]);
   rows=await search('desk:DESK-A');assert.equal(rows.length,1);assert.equal(requests.length,0,'explicit desk lookup never contacts directory or assistant');key('Enter');await sleep(0);assert.deepEqual(outcomes(),[['desk','DESK-A']]);
   assert(!allRequests.some(url=>/\/api\/(assistant|machine-health|performance)\//.test(url)),'person/desk lookup never runs AI or WMI');

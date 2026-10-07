@@ -1669,9 +1669,10 @@ body.atlas-upload-workflows .atlas-upload-grid {
   align-items: start;
   gap: 8px;
 }
-@media (min-width: 1200px) {
-  body.atlas-upload-workflows .atlas-upload-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-}
+body .atlas-vdi-assigned-accounts { display:flex; flex-wrap:wrap; gap:4px 8px; padding:0; margin:0; list-style:none; }
+body .atlas-vdi-assigned-accounts li { min-width:0; overflow-wrap:anywhere; }
+body .atlas-device-badge.vdi-snapshot { color:var(--atlas-muted); }
+body .atlas-vdi-details .atlas-machine-inventory > p { margin:4px 0 6px; }
 body.atlas-upload-workflows .atlas-upload-section {
   min-width: 0;
   margin: 0;

@@ -33,6 +33,8 @@ def merge_directory(target,source,*,before_merge=None,after_merge=None):
   dst.execute('insert into metadata values(?,?)',('directory.generation',uuid.uuid4().hex))
   from directory_exports import copy_archive
   copy_archive(src,dst)
+  from vdi_data import exists as vdi_exists,relink as relink_vdi
+  if vdi_exists(dst):relink_vdi(dst)
   if after_merge:after_merge(dst)
   dst.commit()
  except:dst.rollback();raise

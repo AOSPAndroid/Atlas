@@ -504,11 +504,35 @@
       ? `<button type="button" class="atlas-export-button" data-export-kind="${esc(kind)}" data-export-key="${esc(key)}">All export fields</button>`
       : "";
   }
+  function personKey(user) {
+    return String(user?.canonical_key || "").trim() ||
+      (/^\d+$/.test(String(user?.id ?? "")) ? "id:" + user.id : "");
+  }
+  function isCitrixVdi(machine) {
+    return !!machine.vdi_key ||
+      (machineKind(machine) === "vdi" && String(machine.source || "").toLowerCase() === "citrix");
+  }
+  function vdiAccounts(machine) {
+    return Array.isArray(machine.vdi_assigned_users)
+      ? machine.vdi_assigned_users.map(value => String(value ?? "")).filter(value => value.trim())
+      : [];
+  }
+  function vdiAssignmentCount(machine) {
+    const supplied = machine.vdi_assignment_count ?? machine.vdi_assigned_user_count;
+    return supplied !== undefined && supplied !== null && Number.isInteger(Number(supplied)) && Number(supplied) >= 0
+      ? Number(supplied) : vdiAccounts(machine).length;
+  }
+  function machineSnapshotNote(machine) {
+    return isCitrixVdi(machine)
+      ? "Imported Citrix snapshot. Registration, power and assignments describe the extract; " +
+        (supportsWindows(machine) ? "run a manual health check for current connectivity." : "Windows checks are unavailable for this inventory identity.")
+      : machineNote;
+  }
   // Only fields actually supplied by the directory export. No live-state aliases.
   function machineSections(machine) {
     const supplied = (value) =>
       value !== null && value !== undefined && String(value).trim() !== "";
-    return [
+    const sections = [
       [
         "Identity",
         [
@@ -545,7 +569,28 @@
           ["Record updated", machine.updated_on],
         ],
       ],
-    ]
+    ];
+    if (isCitrixVdi(machine)) sections.push([
+      "Citrix snapshot",
+      [
+        ["Citrix machine name", machine.vdi_original_name || machine.vdi_fqdn || machine.name || machine.machine_name],
+        ["Remote target", machine.vdi_original_name && String(machine.vdi_original_name).toUpperCase() !== String(machine.name || machine.machine_name || "").toUpperCase() && supportsWindows(machine) ? machine.name || machine.machine_name : ""],
+        ["Domain", machine.vdi_domain],
+        ["Catalog", machine.vdi_catalog],
+        ["Delivery group", machine.vdi_delivery_group],
+        ["Registration state (snapshot)", machine.vdi_registration_state || machine.vdi_state],
+        ["Power state (snapshot)", machine.vdi_power_state],
+        ["Maintenance mode", machine.vdi_maintenance_mode ?? (machine.vdi_maintenance_enabled === true ? "On" : machine.vdi_maintenance_enabled === false ? "Off" : "")],
+        ["User change persistence", machine.vdi_user_change_persistence],
+        ["Assigned account count", vdiAssignmentCount(machine)],
+        ["Assigned accounts (all)", vdiAccounts(machine).join("\n") || "No assigned accounts supplied"],
+        ["Assigned user display names", machine.vdi_user_display_names],
+        ["Source", "Citrix"],
+        ["Source file", machine.vdi_source],
+        ["Imported at", machine.vdi_imported_at || "Import time unavailable"],
+      ],
+    ]);
+    return sections
       .map(([title, fields]) => [
         title,
         fields.filter(([, value]) => supplied(value)),
@@ -561,18 +606,19 @@
           `<section><h4>${esc(title)}</h4><dl>${fields
             .map(
               ([label, value]) =>
-                `<div${["Infrastructure", "Serial number", "Description"].includes(label) ? ' class="atlas-machine-wide"' : ""}><dt>${esc(label)}</dt><dd>${esc(value)}</dd></div>`,
+                `<div${["Infrastructure", "Serial number", "Description", "Assigned accounts (all)", "Citrix machine name", "Remote target", "Catalog", "Delivery group"].includes(label) ? ' class="atlas-machine-wide"' : ""}><dt>${esc(label)}</dt><dd>${label === "Assigned accounts (all)" && vdiAccounts(machine).length ? '<ul class="atlas-vdi-assigned-accounts">' + vdiAccounts(machine).map(account => `<li>${esc(account)}</li>`).join("") + "</ul>" : esc(value)}</dd></div>`,
             )
             .join("")}</dl></section>`,
       )
       .join("");
-    return `<details class="atlas-machine-details"${open ? " open" : ""}><summary>Device details</summary><div class="atlas-machine-inventory"><p>${machineNote}</p>${sections}${exportButton("machine", machine.machine_name_norm || String(machine.name || machine.machine_name || "").toLowerCase())}</div></details>`;
+    const citrix = isCitrixVdi(machine);
+    return `<details class="atlas-machine-details${citrix ? " atlas-vdi-details" : ""}"${open ? " open" : ""}><summary>${citrix ? "Citrix details" : "Device details"}</summary><div class="atlas-machine-inventory"><p>${machineSnapshotNote(machine)}</p>${sections}${citrix ? exportButton("vdi", machine.vdi_key) : exportButton("machine", machine.machine_name_norm || String(machine.name || machine.machine_name || "").toLowerCase())}</div></details>`;
   }
   function machineReport(machine) {
     return [
       "Stored machine details",
       "Machine: " + (machine.name || machine.machine_name || "Not supplied"),
-      machineNote,
+      machineSnapshotNote(machine),
       ...machineSections(machine).flatMap(([title, fields]) => [
         "",
         title,
@@ -662,7 +708,10 @@
           kind: button.dataset.exportKind,
           key: button.dataset.exportKey,
         });
-        const response = await fetch("/api/directory/record?" + query, {
+        const citrix = button.dataset.exportKind === "vdi";
+        const response = await fetch(citrix
+          ? "/api/vdi-data/record/" + encodeURIComponent(button.dataset.exportKey)
+          : "/api/directory/record?" + query, {
           signal: controller.signal,
           cache: "no-store",
         });
@@ -670,7 +719,7 @@
         if (!response.ok)
           throw Error(data.detail || "Export fields unavailable");
         if (!element.open) return;
-        body.innerHTML = `<h3>${esc(data.name)}</h3><p>${esc(data.original_cells ? `${data.source} · ${data.sheet} · row ${data.row}${data.source_rows > 1 ? ` · selected from ${data.source_rows} retained source rows` : ""}` : "Stored directory fields. Refresh the directory export to retain original cells and any additional columns.")}</p>${data.restricted_columns ? "<p>Additional export columns are available in the admin version.</p>" : ""}<label>Find a field<input type="search" aria-label="Find an export field" placeholder="Name or value…"></label><p class="atlas-export-count" role="status"></p><div class="atlas-export-fields"></div><button type="button" class="atlas-export-copy">Copy all fields</button>`;
+        body.innerHTML = `<h3>${esc(data.name)}</h3>${citrix ? '<p>Imported Citrix snapshot · stored source fields.</p>' : ""}<p>${esc(data.original_cells ? `${data.source} · ${data.sheet} · row ${data.row}${data.source_rows > 1 ? ` · selected from ${data.source_rows} retained source rows` : ""}` : "Stored directory fields. Refresh the directory export to retain original cells and any additional columns.")}</p>${data.restricted_columns ? "<p>Additional export columns are available in the admin version.</p>" : ""}<label>Find a field<input type="search" aria-label="Find an export field" placeholder="Name or value…"></label><p class="atlas-export-count" role="status"></p><div class="atlas-export-fields"></div><button type="button" class="atlas-export-copy">Copy all fields</button>`;
         const valueOf = (field) => {
           const value = field.stored_value ?? field.value;
           return [
@@ -732,12 +781,13 @@
     true,
   );
   function machineKind(machine) {
-    if (machine.device_kind) return machine.device_kind;
+    if (machine.device_kind) return String(machine.device_kind).toLowerCase();
     const name = String(machine.name || machine.machine_name || "")
       .trim()
       .toUpperCase()
       .split(".")[0];
     const text = [machine.model_category, machine.model_id, machine.sys_class_name].filter(Boolean).join(" ").toLowerCase();
+    if (/\b(vdi|citrix)\b/.test(text)) return "vdi";
     if (text.includes("iphone") || name === "IPHONE" || name.startsWith("IPHONE-")) return "iphone";
     if (/\b(ipad|tablet)\b/.test(text) || ["IPAD", "TABLET"].includes(name) || /^(IPAD|TABLET)-/.test(name)) return "tablet";
     if (/mobile device|handheld|android|\b(phone|smartphone)\b/.test(text) || name === "PHONE" || name.startsWith("PHONE-")) return "phone";
@@ -751,6 +801,8 @@
     return "other";
   }
   function supportsWindows(machine) {
+    if (machine.windows_remote_supported !== undefined && machine.windows_remote_supported !== null)
+      return [true, 1, "1"].includes(machine.windows_remote_supported);
     return !["iphone", "phone", "tablet", "mac"].includes(machineKind(machine));
   }
   function machineBadges(machine) {
@@ -766,9 +818,20 @@
       [labels[kind] || "Device", "kind", labels[kind] || "Device"],
       [owned ? "Assigned" : "Unassigned", owned ? "assigned" : "unassigned", ownership],
     ];
+    const citrix = isCitrixVdi(machine), shared = vdiAssignmentCount(machine);
+    if (citrix && shared > 1)
+      status[1] = [`Shared (${shared})`, "assigned shared", `Citrix snapshot: assigned to ${shared} accounts; assignments do not establish concurrent sessions`];
+    if (citrix && (machine.vdi_registration_state || machine.vdi_state))
+      status.push(["Citrix: " + (machine.vdi_registration_state || machine.vdi_state), "vdi-state", "Registration state in the imported Citrix snapshot"]);
+    if (citrix && machine.vdi_power_state)
+      status.push(["Power: " + machine.vdi_power_state, "vdi-power", "Power state in the imported Citrix snapshot"]);
     if (machine.install_status)
       status.push([machine.install_status, "asset-state", "Asset state from the export: " + machine.install_status]);
-    const history = [["Last used: " + (date(machine.last_used) || "—"), "last-used", "Last used in the export: " + (exportDate(machine.last_used) || "Not supplied")]];
+    const history = citrix
+      ? [["Citrix snapshot · " + (date(machine.vdi_imported_at) || "Import time unavailable"), "vdi-snapshot", machineSnapshotNote(machine) + " Imported at: " + (machine.vdi_imported_at || "Unavailable")]]
+      : [["Last used: " + (date(machine.last_used) || "—"), "last-used", "Last used in the export: " + (exportDate(machine.last_used) || "Not supplied")]];
+    if (citrix && machine.last_used)
+      history.push(["Last used: " + date(machine.last_used), "last-used", "Last used in the inventory export: " + exportDate(machine.last_used)]);
     const logon = machine.logon_relationship !== undefined ? !!Number(machine.logon_relationship) : !!machine.last_logon_user;
     if (logon)
       history.push(["Last logged-on", "logon", "Inventory relationship" + (machine.last_logon_user ? ": " + machine.last_logon_user : "") + "; not a live sign-in check"]);
@@ -870,6 +933,8 @@
     icon,
     installIcons,
     machineKind,
+    isCitrixVdi,
+    machineSnapshotNote,
     supportsWindows,
     machineBadges,
     machineFilters,
@@ -879,6 +944,7 @@
     domainAccount,
     machineDetails,
     machineReport,
+    personKey,
     dialog,
     performance: { isCitrix, setDisplay },
     motion: {
@@ -908,7 +974,7 @@ window.AtlasContext = (() => {
     const identity = kind === "user" ? record.user_name || record.user_id || record.email || "" : record.name || record.machine_name || "";
     const ad = kind === "user" || AtlasUI.supportsWindows(record);
     return `data-atlas-context="${kind}"${ad ? ` data-ad-kind="${kind === "user" ? "user" : "computer"}" data-ad-identity="${AtlasUI.esc(identity)}"` : ""}` + attribute("identity", identity) + (kind === "user" ?
-      attribute("person", /^id:\d+$/.test(record.canonical_key || "") ? record.canonical_key : /^\d+$/.test(String(record.id ?? "")) ? "id:" + record.id : "") +
+      attribute("person", AtlasUI.personKey(record)) +
       attribute("name", record.full_name || record.name) + attribute("domain", AtlasUI.domainAccount(record)) + attribute("email", record.email) +
       attribute("department", record.department) + attribute("location", record.location) + attribute("manager", record.manager) : "");
   }

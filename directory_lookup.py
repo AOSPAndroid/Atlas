@@ -30,6 +30,8 @@ SEARCH_FIELDS.update({
 })
 
 def exact_users(c,value):
+ canonical=c.execute('select * from legacy_users where canonical_key=?',(value.strip(),)).fetchall()
+ if canonical:return canonical
  q=' '.join(value.strip().split()).lower();login=q.rsplit('\\',1)[-1]
  # Resolve Windows X-number logins without rewriting the original export ID.
  # Keep both matches if an export contains separate G and X records.
@@ -38,7 +40,14 @@ def exact_users(c,value):
  return c.execute("select distinct u.* from legacy_users u where u.user_name_norm in (?,?,?,?) or lower(u.email)=? or lower(u.brid)=? or u.name_norm=? or u.id in (select user_id_ref from user_aliases where alias_norm in (?,?)) order by u.name,u.id limit 100",(login,q,exported_login,exported_domain,q,q,q,q,login)).fetchall()
 
 def linked_machines(c,uid):
- return [dict(r) for r in c.execute("""select m.*,max(a.relationship_type='assigned_to') as assigned_relationship,max(a.relationship_type='last_logon_user') as logon_relationship,case when count(distinct a.relationship_type)>1 then 'Assigned + last logged on (inventory)' when max(a.relationship_type)='assigned_to' then 'Assigned' else 'Last logged on (inventory)' end as match_type from assignments a join legacy_machines m on m.id=a.machine_id where a.user_id_ref=? group by m.id order by assigned_relationship desc,case when lower(m.operational_status)='operational' then 0 else 1 end,m.last_discovered desc,m.name""",(uid,))]
+ c.execute('savepoint directory_linked_read')
+ try:return _linked_machines(c,uid)
+ finally:c.execute('release directory_linked_read')
+
+def _linked_machines(c,uid):
+ physical=[dict(r) for r in c.execute("""select m.*,max(a.relationship_type='assigned_to') as assigned_relationship,max(a.relationship_type='last_logon_user') as logon_relationship,case when count(distinct a.relationship_type)>1 then 'Assigned + last logged on (inventory)' when max(a.relationship_type)='assigned_to' then 'Assigned' else 'Last logged on (inventory)' end as match_type from assignments a join legacy_machines m on m.id=a.machine_id where a.user_id_ref=? group by m.id order by assigned_relationship desc,case when lower(m.operational_status)='operational' then 0 else 1 end,m.last_discovered desc,m.name""",(uid,))]
+ from vdi_inventory import linked_records
+ return linked_records(c,uid,physical)
 
 def search_directory(c,term:str):
  text=' '.join(term.strip().split());prefix=''
@@ -52,7 +61,11 @@ def search_directory(c,term:str):
   if prefix.lower()=='asset':
    condition='('+condition+' or lower(asset_tag) like ? escape \'\\\')';parameters=(like,like)
   rows=c.execute('select * from '+table+' where '+condition+' order by name,id limit 100',parameters).fetchall()
-  return {'users':[dict(r) for r in rows] if kind=='user' else [],'machines':[dict(r) for r in rows] if kind=='machine' else []}
+  machines=[dict(r) for r in rows] if kind=='machine' else []
+  if kind=='machine':
+   from vdi_inventory import merge_records,search_records
+   machines=merge_records(machines,search_records(c,text,field=column),limit=100)
+  return {'users':[dict(r) for r in rows] if kind=='user' else [],'machines':machines}
  if ':' in text and text.split(':',1)[0].lower() in ('machine','user','email','name','brid'):
   prefix,text=text.split(':',1);prefix=prefix.lower();text=text.strip()
  if not text:return {'users':[],'machines':[]}
@@ -68,12 +81,15 @@ def search_directory(c,term:str):
   source_ci=c.execute("select 1 from pragma_table_info('machines') where name='source_ci'").fetchone()
   if source_ci:condition+=' or lower(source_ci)=?';parameters+=(q,)
   machines=c.execute('select * from legacy_machines where '+condition+' order by name limit 100',parameters).fetchall()
+  from vdi_inventory import merge_records,search_records
+  machines=merge_records(machines,search_records(c,text,exact=True),limit=100)
  if not users and not machines:
   if prefix!='machine':users=c.execute("select * from legacy_users where user_name_norm like ? escape '\\' or name_norm like ? escape '\\' or email_norm like ? escape '\\' or lower(brid) like ? escape '\\' order by name,id limit 100",(like,like,like,like)).fetchall()
   if prefix not in ('user','email','name','brid'):
    condition="name_norm like ? escape '\\'";parameters=(like,)
    if source_ci:condition+=" or lower(source_ci) like ? escape '\\'";parameters+=(like,)
    machines=c.execute('select * from legacy_machines where '+condition+' order by name limit 100',parameters).fetchall()
+   machines=merge_records(machines,search_records(c,text),limit=100)
  return {'users':[dict(x) for x in users],'machines':[dict(x) for x in machines]}
 
 

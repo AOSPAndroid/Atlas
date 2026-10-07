@@ -52,6 +52,8 @@ def health():
     with connect() as con:
         con.execute('select body from official_records limit 1').fetchone()
         counts = {key: con.execute(f'select count(*) from {key}').fetchone()[0] for key in ('users','machines','assignments')}
+        from vdi_inventory import count
+        counts['vdi_machines'] = count(con)
     return {'application': 'Office Atlas', 'mode': 'viewer', 'version': __version__, 'read_only': True, 'instance_id': os.environ.get('ATLAS_INSTANCE_ID'), 'identity': 'Demo · read-only directory', 'database': True, 'repository': False, **counts}
 
 
@@ -63,7 +65,7 @@ def capabilities():
 @app.get('/api/master/status')
 def master_status():
     data = health()
-    return {'available': True, **{key: data[key] for key in ('users','machines','assignments')}}
+    return {'available': True, **{key: data[key] for key in ('users','machines','assignments','vdi_machines')}}
 
 
 @app.get('/api/package-data')
@@ -79,7 +81,7 @@ def packages(term: str = Query('', max_length=200), state: str = Query('', max_l
 def resolve(key: str):
     with connect() as con:
         rows = exact_users(con, key)
-        return {'matched': True, 'user_key': 'id:' + str(rows[0]['id'])} if len(rows) == 1 else {'matched': False}
+        return {'matched': True, 'user_key': rows[0]['canonical_key']} if len(rows) == 1 else {'matched': False}
 
 
 @app.get('/api/palette/desks')
@@ -99,8 +101,7 @@ def state():
 @app.get('/api/search')
 def search(term: str, palette: bool = False):
     with connect() as con:
-        if palette:
-            con.execute('begin')
+        con.execute('begin')
         result = search_directory(con, term)
         return palette_search(con, result) if palette else result
 
@@ -120,6 +121,7 @@ def export_record(kind: str, key: str):
 @app.get('/api/user/{uid}')
 def user(uid: str):
     with connect() as con:
+        con.execute('begin')
         rows = con.execute('select * from legacy_users where id=?', (int(uid[3:]),)).fetchall() if uid.startswith('id:') and uid[3:].isdigit() else exact_users(con, uid)
         if not rows:
             raise HTTPException(404, 'User not found')
@@ -128,6 +130,15 @@ def user(uid: str):
         person = dict(rows[0])
         desks=person_desks(con,person)
         return {'user': person, 'machines': linked_machines(con, person['id']), 'desks':[d['id'] for d in desks], 'desk_matches':desks}
+
+@app.get('/api/vdi-data/record/{key:path}')
+def vdi_record(key:str):
+    from vdi_data import record
+    with connect() as con:
+        result=record(con,key,include_unmapped=False)
+        if result is None:
+            raise HTTPException(404,'Citrix inventory record not found.')
+        return result
 
 
 
@@ -143,10 +154,11 @@ def context(desk_id: str):
 
 @app.get('/api/palette/person/{uid}')
 def palette_person(uid: str):
-    if not uid.startswith('id:') or not uid[3:].isdigit():
-        raise HTTPException(400, 'Select a directory result')
+    if not (uid.startswith('id:') and uid[3:].isdigit()) and ':' not in uid:
+        raise HTTPException(400,'Select a directory result')
     with connect() as con:
-        person = con.execute('select * from legacy_users where id=?', (int(uid[3:]),)).fetchone()
+        con.execute('begin')
+        person = con.execute('select * from legacy_users where id=?', (int(uid[3:]),)).fetchone() if uid.startswith('id:') and uid[3:].isdigit() else con.execute('select * from legacy_users where canonical_key=?',(uid,)).fetchone()
         if not person:
             raise HTTPException(404, 'Person not found')
         return {'desks': person_desks(con, person)}
@@ -160,6 +172,8 @@ def machine(computer: str):
         result = machine_context(con, computer)
         if result is None:
             raise HTTPException(404, 'Machine not found in directory')
+        if result.get('ambiguous'):
+            raise HTTPException(409, 'Ambiguous VDI hostname; select its fully qualified name.')
         return result
 
 
