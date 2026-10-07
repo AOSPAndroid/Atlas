@@ -55,6 +55,45 @@ export function installCommandPalette({
     timer,
     controller,
     previousFocus;
+  const focusedElement = () => {
+    let element = document.activeElement;
+    while (element?.shadowRoot?.activeElement)
+      element = element.shadowRoot.activeElement;
+    return element;
+  };
+  function within(container, element) {
+    for (
+      let node = element;
+      node;
+      node = node.parentElement || node.getRootNode()?.host
+    )
+      if (node === container || container.contains(node)) return true;
+    return false;
+  }
+  function visibleFocusTarget(element) {
+    if (
+      !element?.isConnected ||
+      typeof element.focus !== "function" ||
+      element.matches(":disabled")
+    )
+      return false;
+    for (
+      let node = element;
+      node;
+      node = node.parentElement || node.getRootNode()?.host
+    ) {
+      if (node.hidden || node.inert || node.matches("dialog:not([open])"))
+        return false;
+      const style = getComputedStyle(node);
+      if (
+        style.display === "none" ||
+        style.visibility === "hidden" ||
+        style.visibility === "collapse"
+      )
+        return false;
+    }
+    return true;
+  }
   const openConsole = (key, value) =>
     key === "person" ? openPerson(value) : openMachine(value);
   const actions = COMMANDS.map((a) => ({
@@ -353,9 +392,7 @@ export function installCommandPalette({
       )
     )
       return;
-    previousFocus =
-      document.activeElement?.shadowRoot?.activeElement ||
-      document.activeElement;
+    previousFocus = focusedElement();
     dialog.showModal();
     input.value = typeof query === "string" ? query : "";
     search();
@@ -375,8 +412,28 @@ export function installCommandPalette({
   input.oninput = search;
   dialog.querySelector(".palette-close").onclick = close;
   dialog.addEventListener("close", () => {
+    // Native close events are queued: a command may already have focused its
+    // textarea, editor or dialog, or reopened this palette before this runs.
+    if (dialog.open) return;
     invalidate();
-    previousFocus?.focus();
+    const current = focusedElement();
+    if (
+      current &&
+      current !== document.body &&
+      current !== document.documentElement &&
+      current !== previousFocus &&
+      !within(root, current) &&
+      visibleFocusTarget(current)
+    )
+      return;
+    if (
+      [...document.querySelectorAll("dialog[open]")].some(
+        (existing) => !within(existing, previousFocus),
+      )
+    )
+      return;
+    const target = visibleFocusTarget(previousFocus) ? previousFocus : trigger;
+    if (visibleFocusTarget(target)) target.focus();
   });
   dialog.addEventListener("cancel", invalidate);
   dialog.addEventListener("click", (e) => {

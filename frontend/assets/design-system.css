@@ -101,9 +101,7 @@ body.atlas-console .console-page-actions :is(.queue-toggle,.deployments-toggle) 
   font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
-body.atlas-console.knowledge-open .console-page-heading { display: flex; }
-body.atlas-console.knowledge-open .console-page-heading > :first-child { display: none; }
-body.atlas-console.knowledge-open .console-page-actions { margin-left: auto; }
+body.atlas-console.knowledge-open .console-page-heading { display:none; }
 body.atlas-console .console-page-heading h1 {
   font-size: 18px;
   margin-bottom: 2px;
@@ -356,6 +354,9 @@ body.atlas-console .console-sidebar .sidebar-status { margin-top:6px; }
 body.atlas-console.knowledge-open { grid-template-columns:var(--atlas-sidebar-width) minmax(0,1fr); }
 body.atlas-console.knowledge-open > .console-sidebar { display:flex; }
 body.atlas-console.knowledge-open > main { grid-column:2; }
+body.atlas-console.knowledge-open:has(#knowledge.kb-focused) { grid-template-columns:minmax(0,1fr); }
+body.atlas-console.knowledge-open:has(#knowledge.kb-focused) > .console-sidebar { display:none; }
+body.atlas-console.knowledge-open:has(#knowledge.kb-focused) > main { grid-column:1 / -1; }
 @media (max-width: 760px) {
   body.atlas-console .console-sidebar nav { grid-auto-rows:1fr; }
   body.atlas-console .console-sidebar nav button[data-page] {
@@ -1466,23 +1467,47 @@ body :is(.context-menu, .desk-menu) button {
   text-align: center;
   justify-content: center;
 }
-/* Knowledge Base app chrome follows Atlas; embedded Draw.io owns the drawing canvas. */
-body #knowledge :is(.kb-library, .kb-work, .kb-details > section) {
-  border-radius: var(--atlas-panel-radius);
-}
-body #knowledge .kb-heading h2 {
-  font-size: var(--atlas-title-size);
-}
-body #knowledge :is(.kb-document-bar, .kb-editor-bar) {
-  gap: 4px;
-  padding: 5px 6px;
-}
+/* Knowledge docks resize the existing editor; Draw.io owns its internal canvas. */
+body #knowledge .kb-heading.kb-titlebar { display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-start; gap:4px 6px; margin:0 0 6px; }
+body #knowledge .kb-heading.kb-titlebar h2 { flex:none; margin:0; font:600 13px/1.4 var(--atlas-font); }
+body #knowledge #kbTitle { flex:1 1 160px; width:auto; margin:0; font-size:12px; }
+body #knowledge :is(.kb-dock-controls,.kb-document-actions) { display:flex; flex-wrap:wrap; align-items:center; gap:4px; }
+body #knowledge .kb-dock-controls button[aria-expanded="true"], body #knowledge button[data-kb="focus"][aria-pressed="true"] { color:var(--atlas-accent); border-color:var(--atlas-accent); background:var(--atlas-surface-subtle); }
+body #knowledge .kb-layout { display:grid; grid-template-columns:0 minmax(0,1fr) 0; grid-template-rows:minmax(0,1fr); gap:0; align-items:stretch; min-height:0; height:var(--kb-available-height); }
+body #knowledge.kb-focused .kb-layout { grid-template-columns:0 minmax(0,1fr) 0; }
+body #knowledge[data-documents-open="true"] .kb-layout { grid-template-columns:176px minmax(0,1fr) 0; }
+body #knowledge[data-notes-open="true"] .kb-layout { grid-template-columns:0 minmax(0,1fr) 236px; }
+body #knowledge[data-documents-open="true"][data-notes-open="true"] .kb-layout { grid-template-columns:176px minmax(0,1fr) 236px; }
+body #knowledge .kb-library { display:flex; flex-direction:column; grid-column:1; margin:0 6px 0 0; }
+body #knowledge .kb-work { display:grid; grid-column:2; grid-template-rows:minmax(0,1fr) auto; align-self:stretch; min-width:0; min-height:0; overflow:hidden; }
+body #knowledge .kb-details { display:flex; grid-column:3; margin:0 0 0 6px; }
+body #knowledge :is(.kb-library,.kb-details,.kb-notes,#kbEditorHost) { min-width:0; min-height:0; }
+body #knowledge .kb-dock { overflow:auto; padding:6px; background:var(--atlas-surface); border:1px solid var(--atlas-line); border-radius:var(--atlas-panel-radius); }
+body #knowledge #kbDocuments { flex:1; min-height:0; max-height:none; overflow:auto; margin:6px 0; }
+body #knowledge .kb-templates { padding:6px 0 0; }
+body #knowledge .kb-library .kb-templates { display:block; grid-column:auto; border-top:1px solid var(--atlas-line); }
+body #knowledge .kb-library .kb-templates button { display:flex; width:100%; margin:4px 0; }
+body #knowledge .kb-templates > summary, body #knowledge .kb-notes-help > summary { font:11px/1.4 var(--atlas-font); color:var(--atlas-muted); cursor:pointer; padding:3px 0; }
+body #knowledge .kb-storage { margin:6px 0 0; font:11px/1.4 var(--atlas-font); }
+body #knowledge .kb-notes { display:flex; flex-direction:column; width:100%; padding:0; background:transparent; }
+body #knowledge .kb-details > section { border:0; border-radius:0; }
+body #knowledge .kb-notes h3 { flex:none; margin:0 0 4px; font-size:12px; }
+body #knowledge #kbNotes { flex:1; width:100%; height:auto; min-height:0; margin:0; resize:none; font:12px/1.45 var(--atlas-font); }
+body #knowledge .kb-notes > button { flex:none; margin:6px 0 4px; }
+body #knowledge .kb-notes-help small { display:block; margin:4px 0 0; font:400 11px/1.45 var(--atlas-font); letter-spacing:normal; text-transform:none; }
+body #knowledge .kb-status { min-height:0; padding:4px 6px; gap:4px 8px; font:11px/1.4 var(--atlas-font); }
+body #knowledge #kbEditorHost { overflow:hidden; }
+body #knowledge #kbDrawio, body #knowledge.kb-focused #kbDrawio { display:block; width:100%; height:100%; min-height:0; border:0; }
+body #knowledge[data-kb-narrow="true"] .kb-layout { grid-template-columns:minmax(0,1fr); grid-template-rows:0 minmax(0,1fr) 0; gap:0; }
+body #knowledge[data-kb-narrow="true"][data-documents-open="true"] .kb-layout { grid-template-rows:minmax(0,1fr) minmax(0,3fr) 0; }
+body #knowledge[data-kb-narrow="true"][data-notes-open="true"] .kb-layout { grid-template-rows:0 minmax(0,2fr) minmax(0,1fr); }
+body #knowledge[data-kb-narrow="true"][data-documents-open="true"][data-notes-open="true"] .kb-layout { grid-template-rows:minmax(0,1fr) minmax(0,2fr) minmax(0,1fr); }
+body #knowledge[data-kb-narrow="true"] .kb-library { display:block; grid-column:1; grid-row:1; margin:0 0 6px; }
+body #knowledge[data-kb-narrow="true"] #kbDocuments { overflow:visible; max-height:none; }
+body #knowledge[data-kb-narrow="true"] .kb-work { grid-column:1; grid-row:2; }
+body #knowledge[data-kb-narrow="true"] .kb-details { grid-column:1; grid-row:3; margin:6px 0 0; }
 body #knowledge .kb-file-menu > summary { display:inline-flex; align-items:center; justify-content:center; min-height:var(--atlas-control-height); box-sizing:border-box; padding:4px 7px; border:1px solid var(--atlas-line); border-radius:var(--atlas-control-radius); background:var(--atlas-surface); font:12px/1.4 var(--atlas-font); list-style:none; }
 body #knowledge .kb-file-menu > summary::-webkit-details-marker { display:none; }
-@media(min-width:1150px) {
-  body #knowledge:not(.kb-focused) .kb-layout { grid-template-columns:160px minmax(0,1fr) 220px; }
-  body #knowledge:not(.kb-focused) .kb-details { grid-column:auto; grid-template-columns:minmax(0,1fr); }
-}
 /* Utilities keep semantic colours and dark mode, with the same type/spacing scale. */
 body.atlas-utility main#utility {
   max-width: 1200px;

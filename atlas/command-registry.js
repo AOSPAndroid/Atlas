@@ -30,7 +30,7 @@ const targeted = new Set([
   "report",
 ]);
 const viewerCommands = new Set(["ad-browser","ad-support-summary","daas","vdi","desktop-mode","ad-open","ad-user-groups","ad-machine-groups","ad-compare","ad-filter-groups","ad-export-groups",
-"kb-layers","kb-format","kb-duplicate","kb-delete","kb-zoom-in","kb-zoom-out","kb-png","knowledge","kb-new","kb-notes","kb-convert","kb-process","kb-decision","kb-database","kb-note","kb-connect","kb-fit","kb-undo","kb-redo","kb-save","kb-export","kb-drawio","kb-svg","kb-import","kb-template-flow","kb-template-network",
+"kb-layers","kb-format","kb-duplicate","kb-delete","kb-zoom-in","kb-zoom-out","kb-png","knowledge","kb-new","kb-notes","kb-focus","kb-convert","kb-process","kb-decision","kb-database","kb-note","kb-connect","kb-fit","kb-undo","kb-redo","kb-save","kb-export","kb-drawio","kb-svg","kb-import","kb-template-flow","kb-template-network",
   "workspace",
   "admin",
   "bulk",
@@ -114,6 +114,7 @@ export const COMMANDS = [
   ["kb-png", "Export PNG image", "Download a PNG diagram image", "drawio png"],
   ["kb-new", "New diagram", "Create a blank knowledge document", "drawio diagram new canvas"],
   ["kb-notes", "Write notes", "Focus the knowledge notes panel", "drawio knowledge notes write"],
+  ["kb-focus", "Focus knowledge editor", "Hide or restore document and notes panels", "drawio knowledge focus editor panels canvas"],
   ["kb-convert", "Notes to diagram", "Convert structured notes locally into editable shapes", "drawio notes convert flowchart generate"],
   ["kb-process", "Add process shape", "Insert a process rectangle", "drawio shape rectangle process"],
   ["kb-decision", "Add decision shape", "Insert a decision diamond", "drawio diamond decision"],

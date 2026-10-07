@@ -335,6 +335,7 @@ Workspace package selection applies immediately: clicking elsewhere, switching m
 
 Use Map / Workspace / Knowledge Base in the header. Atlas embeds the actual open-source Draw.io 31.5.3 editor, bundled under `frontend/drawio` with licenses and provenance. It loads only when opened. No external diagram or AI service is used; the editor blocks external network connections.
 
+- **Documents** and **Notes** toggle docked panels beside the editor. Notes starts closed to leave room for the diagram; narrow windows also start with Documents closed. **Focus editor** temporarily hides both panels and the Operations sidebar, then restores their previous state. These controls resize the existing editor without reopening the document or clearing its draft. The canvas uses the available window height, including inside Atlas Desktop.
 - Native Draw.io shapes, connectors, pages, layers, formatting, undo/redo and zoom, with incident-triage and network templates.
 - Notes to diagram converts steps, indented bullets and `A -> B` connections into editable shapes. `Check ping? -> [Yes] Check application` creates a decision and labelled connection. Conversion is deterministic and local, not AI interpretation. Review the result. Existing diagrams are kept separately.
 - Admin auto-saves to `data/knowledge.sqlite3`. Revision checks prevent silent overwrites between windows. Back up this database, or export documents.

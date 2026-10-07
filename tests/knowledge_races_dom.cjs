@@ -22,9 +22,9 @@ const response = (data, ok = true) => ({
   headers: { get: () => null },
   json: async () => data,
 });
-async function setup() {
+async function setup({delaySave=false}={}) {
   const reads = [],
-    writes = [];
+    writes = [], deletes = [], saves = [];
   const f = await fixture({
     fetch: async (url, options = {}) => {
       if (url === "/api/knowledge") return response({ documents });
@@ -32,11 +32,14 @@ async function setup() {
       if (url.startsWith("/api/knowledge/") && options.method === "PUT") {
         const doc = JSON.parse(options.body);
         writes.push(doc);
+        if(delaySave)return new Promise(resolve=>saves.push({finish:()=>resolve(response({revision:doc.revision+1,updated:'2026-10-07T12:00:00Z'}))}));
         return response({
           revision: doc.revision + 1,
           updated: "2026-10-06T10:00:00Z",
         });
       }
+      if(url.startsWith('/api/knowledge/')&&options.method==='DELETE')
+        return new Promise(resolve=>deletes.push({url,finish:()=>resolve(response({ok:true})),fail:()=>resolve(response({detail:'OBSOLETE DELETE FAILURE'},false))}));
       assert.equal(options.method || "GET", "GET");
       assert(
         url.startsWith("/api/knowledge/"),
@@ -98,6 +101,8 @@ async function setup() {
     api,
     reads,
     writes,
+    deletes,
+    saves,
     open,
     connect,
     status: () => d.getElementById("kbStatus").textContent,
@@ -260,8 +265,53 @@ async function setup() {
   assert.equal(f.api.getDocument().id, importId);
   f.close();
 
+  const deferred=()=>{let resolve,reject;const promise=new Promise((done,fail)=>{resolve=done;reject=fail});return {promise,resolve,reject};};
+  const imported=JSON.stringify({title:'Imported older file',notes:'OLDER IMPORT',xml:xml('OLDER IMPORT')});
+  const file=(f,pending)=>{
+    const control=f.d.getElementById('kbImport');
+    Object.defineProperty(control,'files',{configurable:true,value:[{name:'fictional.atlas.json',size:100,text:()=>pending.promise}]});
+    return control;
+  };
+  const edit=(f,text)=>{const notes=f.d.getElementById('kbNotes');notes.value=text;notes.dispatchEvent(new f.w.Event('input'));};
+  for(const change of ['switch','notes','title','failure']){
+    f=await setup();const pending=deferred(),control=file(f,pending),opening=control.onchange();
+    if(change==='switch'||change==='failure')await f.api.command('kb-new');
+    if(change==='title'){const title=f.d.getElementById('kbTitle');title.value='NEWER TITLE';title.dispatchEvent(new f.w.Event('input'));}
+    else edit(f,'NEWER IMPORT CONTEXT');
+    const current=f.api.getDocument(),currentStatus=f.status(),frame=f.d.getElementById('kbDrawio');
+    change==='failure'?pending.reject(Error('OBSOLETE FILE FAILURE')):pending.resolve(imported);await opening;
+    assert.deepEqual(f.api.getDocument(),current,'A delayed file read cannot replace '+change+' context');assert.equal(f.status(),currentStatus);assert.equal(f.d.getElementById('kbDrawio'),frame);assert.equal(f.writes.length,0);f.close();
+  }
+  f=await setup();const oldFile=deferred(),newFile=deferred(),control=file(f,oldFile);let selectedValue='old-file';
+  Object.defineProperty(control,'value',{configurable:true,get:()=>selectedValue,set:value=>{selectedValue=value}});
+  const oldImport=control.onchange();file(f,newFile);selectedValue='new-file';const newImport=control.onchange();
+  oldFile.resolve(imported);await oldImport;assert.equal(selectedValue,'new-file','An older import finally cannot clear the newer file selection');
+  newFile.resolve(JSON.stringify({title:'Latest imported file',notes:'LATEST IMPORT',xml:xml('LATEST')}));await newImport;
+  assert.equal(f.api.getDocument().notes,'LATEST IMPORT');assert.equal(selectedValue,'');f.close();
+
+  for(const sameDocument of [false,true])for(const failed of [false,true]){
+    f=await setup();const opened=await f.open('A');opened.finish();await settle();f.w.confirm=()=>true;
+    const deleteOperation=f.api.command('kb-delete-document');await settle();assert.equal(f.deletes.length,1);assert.equal(f.deletes[0].url,'/api/knowledge/A?revision=3');
+    if(!sameDocument){const newer=await f.open('B');newer.finish();await settle();}
+    edit(f,'NEWER DELETE CONTEXT');const current=f.api.getDocument(),currentStatus=f.status(),frame=f.d.getElementById('kbDrawio');
+    failed?f.deletes[0].fail():f.deletes[0].finish();await deleteOperation;
+    assert.equal(f.api.getDocument().notes,current.notes,'Pending DELETE cannot erase newer edits');assert.equal(f.d.getElementById('kbDrawio'),frame,'Pending DELETE preserves the newer editor session');assert.equal(f.writes.length,0);
+    if(sameDocument&&!failed){assert.notEqual(f.api.getDocument().id,'A');assert.equal(f.api.getDocument().revision,0);assert(f.status().includes('current edits kept as a new draft'));}
+    else{assert.equal(f.api.getDocument().id,current.id);assert.equal(f.status(),currentStatus,'Obsolete delete results cannot replace current status');}
+    f.close();
+  }
+  f=await setup();const existing=await f.open('A');existing.finish();await settle();f.w.confirm=()=>true;
+  const deleting=f.api.command('kb-delete-document');await settle();f.deletes[0].finish();await deleting;
+  assert.notEqual(f.api.getDocument().id,'A');assert.equal(f.api.getDocument().title,'Untitled diagram');assert.equal(f.api.getDocument().revision,0);f.close();
+
+  // Editing while leaving a draft waits for the normal discard decision.
+  f=await setup({delaySave:true});edit(f,'ORIGINAL UNSAVED NOTES');const saveBeforeImport=deferred(),importControl=file(f,saveBeforeImport),pendingImport=importControl.onchange();
+  saveBeforeImport.resolve(imported);await settle();assert.equal(f.saves.length,1);assert.equal(f.writes[0].notes,'ORIGINAL UNSAVED NOTES');
+  edit(f,'NEWER NOTES DURING SAVE');let discardPrompts=0;f.w.confirm=()=>{discardPrompts++;return false};
+  f.saves[0].finish();await pendingImport;assert.equal(discardPrompts,1);assert.equal(f.api.getDocument().notes,'NEWER NOTES DURING SAVE');assert.equal(f.api.getDocument().revision,1);assert.equal(f.api.getDocument().title,'Untitled diagram');f.close();
+
   console.log(
-    "PASS: latest Knowledge Base switches win, newer notes/diagram edits survive pending reads, synchronous capture remains usable, and obsolete errors/import/copy loads cannot replace the current draft",
+    "PASS: latest KB switches and edits survive pending reads/imports/deletes, deleted current edits remain a fresh draft, obsolete statuses/file resets are ignored, ordinary capture/save/import/delete remain usable and newer edits require explicit discard",
   );
 })().catch((error) => {
   console.error(error);
