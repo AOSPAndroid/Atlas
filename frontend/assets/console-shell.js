@@ -31,6 +31,19 @@ function page(id) {
     navigation?.querySelector(".nav-label")?.textContent ||
     $("#" + id).getAttribute("aria-label") ||
     id;
+  const descriptions = {
+    workspace: "People, devices and the tools to support them.",
+    "active-directory": "Explore accounts, memberships and directory objects.",
+    packages: "Find software and prepare your next deployment.",
+    admin: "Inspect device health and investigate performance.",
+    bulk: "Prepare packages and actions across multiple devices.",
+    history: "Review deployment activity and execution details.",
+    terminal: "Write scripts and run commands from one place.",
+    psexec: "Remote utilities, command templates and execution output.",
+    knowledge: "Diagrams, notes and shared support knowledge."
+  };
+  const description = document.getElementById("pageDescription");
+  if (description) description.textContent = descriptions[id] || "";
   document.querySelectorAll("nav [data-page]").forEach((b) => {
     if (b.dataset.page === id) b.setAttribute("aria-current", "page");
     else b.removeAttribute("aria-current");
@@ -57,6 +70,9 @@ async function init() {
   $("#search").focus();
 }
 function bind() {
+  document.querySelectorAll("[data-workspace-open]").forEach(button => {
+    button.addEventListener("click", () => page(button.dataset.workspaceOpen));
+  });
   $("#pkgSearch").oninput = () => {
     clearTimeout(window.pt);
     window.pt = setTimeout(packages, 250);

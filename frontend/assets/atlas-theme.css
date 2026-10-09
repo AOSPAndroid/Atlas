@@ -1650,7 +1650,7 @@ label,
 button,
 .atlas-return,
 .toolmenu-btn {
-  border-radius: 12px !important;
+  border-radius: var(--atlas-control-radius, 6px);
 }
 
 #fresh,

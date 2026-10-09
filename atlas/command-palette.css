@@ -232,13 +232,13 @@
 @media(pointer:coarse){#atlas-commands,:host-context(.atlas-app-header) #atlas-commands,.palette-result,.palette-close{min-height:42px}}
 
 /* Shared Atlas visual finish inside the palette shadow root. */
-.atlas-palette { border-color:#cbdde9; border-radius:12px; box-shadow:0 20px 65px #12364e30; background:#fff; }
-#atlas-commands { border-color:#dce6ed; color:#24465d; }
+.atlas-palette { border-color:#dce2e9; border-radius:10px; box-shadow:0 20px 65px #17223430; background:#fff; }
+#atlas-commands { border-color:#e1e5eb; color:#526074; background:#f8f9fb; }
 .atlas-palette::backdrop { background:#102a4359; backdrop-filter:none; }
 .atlas-palette input { color:#193449; background:#f8fbfe; }
 .atlas-palette kbd { background:#f1f6fa; border-color:#d4e1eb; color:#526b7d; }
 
-.palette-input-row { border-bottom:1px solid #dce6ed; background:#f8fbfe; }
+.palette-input-row { border-bottom:1px solid #e1e5eb; background:#f8f9fb; }
 .palette-result { border-radius:7px; }
 .palette-result.selected { background:#e8f5fb; box-shadow:inset 3px 0 #0087b4; }
 .palette-result strong { color:#193449; }
