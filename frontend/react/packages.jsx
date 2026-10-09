@@ -2,6 +2,11 @@ import React, { useEffect, useRef, useState } from "react";
 import { LazyMotion, MotionConfig, domMax, m } from "motion/react";
 import * as Tabs from "@radix-ui/react-tabs";
 import { useAtlasMotion } from "./actions-hub.jsx";
+import { Badge } from "./components/ui/badge";
+import { Button } from "./components/ui/button";
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from "./components/ui/empty";
+import { Skeleton } from "./components/ui/skeleton";
+import { Package } from "lucide-react";
 
 const coverageLabels = {
   matched: "Source + data",
@@ -16,7 +21,7 @@ function StateBadge({ state }) {
     : /progress|packaging/i.test(state)
       ? "progress"
       : "unknown";
-  return <span className={`package-state package-state-${tone}`}>{text}</span>;
+  return <Badge variant={tone === "live" ? "default" : "secondary"} data-tone={tone}>{text}</Badge>;
 }
 export function Packages() {
   const section = document.getElementById("packages");
@@ -140,7 +145,7 @@ export function Packages() {
   return (
     <LazyMotion features={domMax}>
       <MotionConfig reducedMotion={reduced ? "always" : "user"}>
-        <div className="package-browser">
+        <div className="package-browser atlas-shadcn">
           <div className="package-toolbar">
             <label className="package-search">
               Search packages
@@ -178,13 +183,13 @@ export function Packages() {
                 ))}
               </select>
             </label>
-            <button
+            <Button variant="outline" size="sm"
               type="button"
               onClick={() => setRefresh((value) => value + 1)}
               disabled={busy}
             >
               Refresh
-            </button>
+            </Button>
             {!readonly && (
               <a
                 className="atlas-return"
@@ -222,6 +227,9 @@ export function Packages() {
                     </tr>
                   </thead>
                   <tbody>
+                    {busy && !data && Array.from({ length: 5 }, (_, row) => (
+                      <tr key={`loading-${row}`} aria-hidden="true">{Array.from({ length: 5 }, (_, col) => <td key={col}><Skeleton className="atl:h-3 atl:w-full" /></td>)}</tr>
+                    ))}
                     {!busy && !data?.items.length && (
                       <tr>
                         <td colSpan={5}>
@@ -260,9 +268,9 @@ export function Packages() {
                         <td>{item.packager || "—"}</td>
                         <td>{item.build || "—"}</td>
                         <td>
-                          <span className="package-coverage">
+                          <Badge variant="outline">
                             {coverageLabels[item.coverage]}
-                          </span>
+                          </Badge>
                         </td>
                       </tr>
                     ))}
@@ -304,13 +312,15 @@ export function Packages() {
               transition={{ duration: reduced ? 0 : 0.12 }}
             >
               {!selected ? (
-                <div className="package-detail-empty">
-                  <small>PACKAGE DETAILS</small>
-                  <h3>Select a package</h3>
-                  <p>
+                <Empty>
+                  <EmptyHeader>
+                  <EmptyMedia variant="icon"><Package aria-hidden="true" /></EmptyMedia>
+                  <EmptyTitle>Select a package</EmptyTitle>
+                  <EmptyDescription>
                     Review its state, ownership, build and source coverage here.
-                  </p>
-                </div>
+                  </EmptyDescription>
+                  </EmptyHeader>
+                </Empty>
               ) : (
                 <>
                   <div className="package-detail-heading">

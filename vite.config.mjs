@@ -3,6 +3,7 @@ import tailwindcss from "@tailwindcss/vite";
 import { resolve } from "node:path";
 
 export default defineConfig({
+  resolve: { alias: { "@": resolve(import.meta.dirname, "frontend/react") } },
   plugins: [tailwindcss()],
   define: { "process.env.NODE_ENV": JSON.stringify("production") },
   build: {

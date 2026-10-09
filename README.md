@@ -458,3 +458,7 @@ Output streams into the embedded terminal with an exit code, Copy output and Sto
 
 ### Atlas visual system
 The shared UI uses a blue/slate palette, layered white surfaces, restrained borders/shadows, a strong navigation selection and consistent table, form, dialog and terminal styling. The final rules live in frontend/assets/design-system.css; the command palette mirrors them inside its shadow root. Map, Workspace, AD, Packages, Remote Admin, Bulk Deploy, History, Terminal, PsTools, Knowledge Base, database management and Desktop share these rules. Dense row/control geometry, semantic warning colours, map labels and the Draw.io canvas remain intact. The refresh adds no animation loops, remote fonts, image dependencies or JavaScript runtime work.
+
+### shadcn UI components
+
+Workspace launch cards and Packages badges, buttons, empty states and loading skeletons use official shadcn source in frontend/react/components/ui. The CLI configuration is components.json (Radix, JavaScript, prefixed Tailwind). Rebuild with npm run build:ui. Atlas semantic colours and compact geometry remain in the shared design system; reduced motion also disables skeleton animation. No CDN or browser-time component downloads are used.

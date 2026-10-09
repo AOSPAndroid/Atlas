@@ -23,7 +23,7 @@ const unusual={...pending,id:'data:/atlas-raw/path',short_name:'../ixExample',di
  const choose=async (node,value)=>{Object.getOwnPropertyDescriptor(w[node.tagName==='SELECT'?'HTMLSelectElement':'HTMLInputElement'].prototype,'value').set.call(node,value);node.dispatchEvent(new w.Event(node.tagName==='SELECT'?'change':'input',{bubbles:true}));await sleep(240);};
  run(fs.readFileSync('frontend/assets/atlas-interactions.js','utf8'));await sleep(240);assert.equal(requests.length,0,'A hidden Packages tab does not scan its source');
  d.getElementById('workspace').classList.remove('active');d.getElementById('packages').classList.add('active');await sleep(260);assert.equal(requests.length,1);
- assert.match(d.querySelector('.package-counts').textContent,/8,000 source packages/);assert.equal(d.querySelectorAll('.package-row-select').length,2);
+ assert(d.querySelector('.package-counts').textContent.includes(w.Number(8000).toLocaleString()+' source packages'));assert.equal(d.querySelectorAll('.package-row-select').length,2);
  click(d.querySelector('.package-row-select'));await sleep(40);assert.match(d.querySelector('.package-detail').textContent,/EPP123/);
  assert(d.querySelector('.package-detail button').getAttribute('aria-label')==='Close package details');
  const beforeCopy=requests.length;

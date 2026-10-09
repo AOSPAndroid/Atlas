@@ -2,6 +2,7 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import { Packages } from "./packages.jsx";
 import { ActionsHub } from "./actions-hub.jsx";
+import { WorkspaceStart } from "./workspace-start.jsx";
 import { installMotionBridge } from "./motion-bridge.js";
 import "./styles.css";
 
@@ -28,6 +29,10 @@ function install() {
   const packagesHost = document.getElementById("packageBrowser");
   const packagesRoot = packagesHost ? createRoot(packagesHost) : null;
   packagesRoot?.render(<Packages />);
+  const workspaceHost = document.querySelector(".workspace-launchers");
+  const workspaceRoot = workspaceHost ? createRoot(workspaceHost) : null;
+  workspaceHost?.classList.add("atlas-shadcn");
+  workspaceRoot?.render(<WorkspaceStart />);
   window.AtlasInteractions = { ready: true, ...installMotionBridge() };
   window.addEventListener(
     "pagehide",
@@ -35,6 +40,7 @@ function install() {
       if (!event.persisted) {
         root.unmount();
         packagesRoot?.unmount();
+        workspaceRoot?.unmount();
       }
     },
     { once: true },
