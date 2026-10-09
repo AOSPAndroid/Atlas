@@ -18,7 +18,7 @@ function openTool(id) {
 }
 export function WorkspaceStart() {
   return tools.map(({ id, title, icon: Icon, tag, description, action }) => (
-    <Card key={id} data-tool={id}>
+    <Card key={id} data-workspace-tool={id}>
       <CardHeader>
         <CardTitle role="heading" aria-level={3}><Icon aria-hidden="true" />{title}</CardTitle>
         <CardAction><Badge variant="secondary">{tag}</Badge></CardAction>
