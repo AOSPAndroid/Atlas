@@ -2446,3 +2446,6 @@ body.atlas-console .term-output-actions { border-color:#d4e1ea; }
 body.atlas-desktop #dock { border-color:#ffffffb0; box-shadow:0 8px 30px #17334625; }
 body.atlas-desktop .desktop-window.active { border-color:#88b7d0; }
 body.atlas-database :is(h1,h2),body.atlas-utility :is(h1,h2) { color:var(--atlas-ink); letter-spacing:-.35px; }
+
+body.atlas-desktop .desktop-menu, body.atlas-desktop .desktop-menu :is(button,b,span,time) { color:var(--atlas-ink); }
+body.atlas-desktop .desktop-menu button:hover { background:#dfeef7; color:#005f84; }
