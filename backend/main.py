@@ -29,6 +29,8 @@ REPO=package_repository(CONFIG,ROOT)
 REMOTE_ROOT=r'C:\Temp\Packages'; NW=0x08000000 if os.name=='nt' else 0
 logging.basicConfig(filename=LOGS/'application.log',level=logging.INFO,format='%(asctime)s %(levelname)s %(message)s')
 app=FastAPI(title='Office Atlas',version=__version__,docs_url='/api/docs',redoc_url=None)
+from response_compression import compress_responses
+compress_responses(app)
 from job_service import JobService, TERMINAL
 job_service=JobService(lambda:HISTORY_DB)
 jobs=job_service.jobs;lock=job_service.lock

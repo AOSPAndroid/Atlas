@@ -8,6 +8,7 @@ from fastapi.responses import FileResponse,Response,JSONResponse
 import atlas_store as store
 from merge_data import atlas_schema,import_atlas
 from desk_directory import resolve_person,desk_context as shared_context,person_desks
+from static_responses import cached_file,prewarm
 TOKEN=secrets.token_urlsafe(32)
 
 def now():return datetime.now(timezone.utc).isoformat()
@@ -315,13 +316,14 @@ def register_atlas(app):
   from fastapi.responses import RedirectResponse
   return RedirectResponse('/')
 
+ prewarm(store.ROOT/'official-data.json',store.ROOT/'studio-floor-2.svg')
  @app.get('/')
  def atlas_home():return FileResponse(store.ROOT/'official-index.html')
 
  @app.get('/{filename}')
- def atlas_asset(filename:str):
+ def atlas_asset(filename:str,request:Request):
   allowed={'service-actions.js','site-info.js','command-registry.js','command-palette.js','command-palette.css','catalogue.js','map-furniture.js','map-amenities.js','map-plan-details.js','official-app.js','camera-motion.js','map-cursor.js','official-data.json','official.css','style.css','data.json','operations.js','operations.css'}
   allowed|={'official-floor-'+str(n)+ext for n in range(-1,9) for ext in ('.jpg','.pdf')}
   allowed|={'studio-floor-'+str(n)+'.svg' for n in range(-1,9)}
   if filename not in allowed:raise HTTPException(404,'Not found')
-  return FileResponse(store.ROOT/filename)
+  return cached_file(request,store.ROOT/filename)

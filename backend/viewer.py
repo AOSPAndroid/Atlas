@@ -16,12 +16,15 @@ from directory_lookup import exact_users, linked_machines, search_directory, pre
 from desk_directory import desk_context,person_desks,machine_context,palette_search
 import directory_exports
 from backend import __version__
+from response_compression import compress_responses
+from static_responses import cached_file, prewarm
 
 ROOT = Path(__file__).resolve().parent.parent
 from runtime_paths import database_path
 DB = database_path()
 ATLAS = ROOT / 'atlas'
 app = FastAPI(title='Atlas read-only viewer', version=__version__, docs_url=None, redoc_url=None, openapi_url=None)
+compress_responses(app)
 
 
 @contextmanager
@@ -178,6 +181,9 @@ def machine(computer: str):
         return result
 
 
+prewarm(ATLAS / 'official-data.json', ATLAS / 'studio-floor-2.svg')
+
+
 @app.get('/')
 def home():
     html = (ATLAS / 'official-index.html').read_text(encoding='utf-8')
@@ -200,20 +206,20 @@ def console():
 
 
 @app.get('/assets/{filename}')
-def shared_asset(filename:str):
+def shared_asset(filename:str, request:Request):
     # Only assets referenced by the shared console template. No API registration.
     template = (ROOT / 'frontend/index.html').read_text(encoding='utf-8')
     allowed = set(re.findall(r'/assets/([\w.-]+)', template)) | {'desktop.html','desktop.js','desktop.css','desktop-utility.html','desktop-utility.js','desktop-utility.css'}
     if filename not in allowed:raise HTTPException(404,'Not available')
-    return FileResponse(ROOT/'frontend/assets'/filename)
+    return cached_file(request, ROOT/'frontend/assets'/filename)
 
 
 @app.get('/{filename}')
-def asset(filename: str):
+def asset(filename: str, request: Request):
     allowed = {'catalogue.js','service-actions.js','site-info.js','command-palette.js', 'command-palette.css', 'command-registry.js', 'map-furniture.js','map-amenities.js','map-plan-details.js','official-app.js','camera-motion.js','map-cursor.js', 'official-data.json', 'official.css', 'style.css', 'operations.css', 'viewer.js', 'viewer.css'}
     if filename not in allowed and not re.fullmatch(r'(official-floor-(-1|[0-8])\.(jpg|pdf)|studio-floor-(-1|[0-8])\.svg)', filename):
         raise HTTPException(404, 'Not available in the shared viewer')
-    return FileResponse(ATLAS / filename)
+    return cached_file(request, ATLAS / filename)
 
 # Bundled open-source Draw.io static editor (no server-side editor endpoints).
 from fastapi.staticfiles import StaticFiles
