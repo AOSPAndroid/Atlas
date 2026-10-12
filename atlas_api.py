@@ -1,5 +1,5 @@
 """Atlas desk register, directory resolution and deployment orchestration."""
-import json,re,secrets,sqlite3,tempfile,uuid
+import json,re,secrets,sqlite3,tempfile,time,uuid
 from datetime import datetime,timezone
 from pathlib import Path
 from fastapi import HTTPException,Request
@@ -274,7 +274,7 @@ def register_atlas(app):
     # Both deployment audit and desk association commit before the worker starts.
     c.execute('insert into deployments(id,started,operator,target,package,action,script,mode,state) values(?,?,?,?,?,?,?,?,?)',(job,now(),wmi.identity(),pc,Path(p.folder).name,p.action,p.script,p.mode,'queued'))
     c.execute('insert into desk_deployments values(?,?,?,?,?,?)',(job,desk_id,expected,pc,r['revision'],now()))
-   wmi.jobs[job]={'state':'queued','target':pc,'events':[]};wmi.start_job(wmi.deploy_worker,job,p)
+   wmi.jobs[job]={'state':'queued','target':pc,'events':[],'started_at':time.time()};wmi.start_job(wmi.deploy_worker,job,p)
    return {'job':job,'desk_id':desk_id,'computer':pc}
   except store.Conflict as e:raise HTTPException(409,str(e))
   except (ValueError,TypeError) as e:raise HTTPException(400,str(e))
