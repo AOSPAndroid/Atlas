@@ -723,7 +723,8 @@ register_activity(app,sys.modules[__name__])
 
 # Knowledge documents stay in the local Admin runtime, never in published assets.
 from knowledge_base import register as register_knowledge
-register_knowledge(app, DATA/'knowledge.sqlite3')
+from runtime_paths import knowledge_path
+register_knowledge(app, knowledge_path())
 
 # Bundled open-source Draw.io static editor (no server-side editor endpoints).
 app.mount('/drawio', StaticFiles(directory=ROOT/'frontend/drawio', html=True), name='drawio')
