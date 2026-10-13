@@ -530,7 +530,7 @@ function search() {
     ? sorted
         .map(
           (r) =>
-            `<button class="result ${r.id === selected?.id ? "active" : ""}" data-record="${esc(r.id)}" role="listitem"><span class="avatar">${
+            `<button class="result ${r.id === selected?.id ? "active" : ""}" data-record="${esc(r.id)}" title="${esc([r.name === "Unconfirmed desk" ? r.id : r.name, r.team].filter(Boolean).join(" · "))}" role="listitem"><span class="avatar">${
               r.kind === "area"
                 ? "⌖"
                 : esc(

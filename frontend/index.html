@@ -853,6 +853,14 @@ Ready. Choose a command and click Run.</pre>
         ><button id="pauseQueue">Pause after current</button
         ><button id="clearQueue">Clear waiting</button>
       </div>
+      <section class="deployment-kits" aria-labelledby="kitsHeading">
+        <h3 id="kitsHeading">Deployment kits</h3>
+        <p class="kit-help">Save the queued packages as a kit, then add the whole set for any machine in one click.</p>
+        <div class="kit-save">
+          <input id="kitName" maxlength="60" placeholder="Kit name, e.g. New starter" aria-label="Kit name" /><button id="saveKit">Save queue as kit</button>
+        </div>
+        <div id="kitList"></div>
+      </section>
     </aside>
     <aside id="deploymentsDrawer" class="deployments-drawer">
       <div class="deployments-head">
@@ -1088,6 +1096,7 @@ Ready. Choose a command and click Run.</pre>
     <script src="/assets/app.js"></script>
     <script src="/assets/console-directory.js?v=3"></script>
     <script src="/assets/console-deployment.js?v=2"></script>
+    <script src="/assets/deployment-kits.js"></script>
     <script src="/assets/console-processes.js"></script>
     <script src="/assets/slowdown-diagnostics.js"></script>
     <script src="/assets/psexec-catalogue.js"></script>
