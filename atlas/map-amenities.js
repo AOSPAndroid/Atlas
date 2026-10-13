@@ -1,4 +1,4 @@
-import { applySourcePlanDetails } from "./map-plan-details.js?v=3";
+import { applySourcePlanDetails } from "./map-plan-details.js?v=4";
 // Locations confirmed by the office owner. Coordinates follow each individual floor plan.
 const amenities = {
   "2": [

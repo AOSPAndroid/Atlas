@@ -1,6 +1,6 @@
 function atlasMapNavigate(url){if(!window.AtlasDesktop?.navigate(url))location.assign(url);}
-import { applyFurnitureCorrections } from "./map-furniture.js?v=6";
-import { applyMapAmenities } from "./map-amenities.js?v=12";
+import { applyFurnitureCorrections } from "./map-furniture.js?v=7";
+import { applyMapAmenities } from "./map-amenities.js?v=13";
 import { createCameraMotion } from "./camera-motion.js";
 import { installMapCursor } from "./map-cursor.js?v=5";
 import { openSiteInfo } from "./site-info.js?v=1";
@@ -30,6 +30,8 @@ const toast = (s) => {
   window.tt = setTimeout(() => $("#toast").classList.remove("show"), 3500);
 };
 let data;
+// Desk records download alongside the floor geometry instead of after it.
+const initialState = fetch("/api/official/state").catch(() => null);
 try {
   const response = await fetch("official-data.json", { cache: "no-cache" });
   if (!response.ok) throw Error();
@@ -373,8 +375,8 @@ let token = null,
   previousRecords = [],
   previousMappings = {};
 try {
-  const response = await fetch("/api/official/state");
-  if (response.ok) {
+  const response = await initialState;
+  if (response?.ok) {
     const state = await response.json();
     records = state.records;
     previousRecords = state.legacy || [];
@@ -528,7 +530,7 @@ function search() {
     ? sorted
         .map(
           (r) =>
-            `<button class="result ${r.id === selected?.id ? "active" : ""}" data-record="${esc(r.id)}" role="listitem"><span class="avatar">${
+            `<button class="result ${r.id === selected?.id ? "active" : ""}" data-record="${esc(r.id)}" title="${esc([r.name === "Unconfirmed desk" ? r.id : r.name, r.team].filter(Boolean).join(" · "))}" role="listitem"><span class="avatar">${
               r.kind === "area"
                 ? "⌖"
                 : esc(
@@ -2720,6 +2722,8 @@ function officialImage(level) {
       raster.getContext("2d").drawImage(img, 0, 0);
       img.raster = raster;
       draw();
+      if (!performance.getEntriesByName("atlas-map-ready").length)
+        performance.mark("atlas-map-ready");
     };
     img.onerror = () => toast("Plan image could not load.");
     img.src = `studio-floor-${level}.svg?v=3`;

@@ -207,6 +207,14 @@ body.atlas-map .empty-detail .crosshair { width: 32px; height: 32px; margin-bott
 body.atlas-map .directory .search { padding:4px 6px; gap:6px; }
 body.atlas-map .directory .search input { min-width:0; border:0; padding:0; background:transparent; }
 body.atlas-map .directory .filter-row { margin-top:6px; gap:6px; }
+/* People list: compact left-aligned rows. The shared centred-button rule otherwise
+   wraps each name over two centred lines and fits only about five people. */
+body.atlas-map .directory #results button.result { display:flex; justify-content:flex-start; text-align:left; gap:8px; padding:5px 8px; margin-bottom:1px; }
+body.atlas-map .directory #results .result > div { flex:1; min-width:0; }
+body.atlas-map .directory #results .result :is(strong, small) { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+body.atlas-map .directory #results .result strong { font-size:13px; line-height:1.3; }
+body.atlas-map .directory #results .result small { margin-top:1px; font-size:11px; }
+body.atlas-map .directory #results .result .avatar { width:26px; height:26px; font-size:10px; }
 @media (max-width: 760px) {
   body.atlas-console > main {
     padding: 8px 6px 12px;
@@ -2546,3 +2554,14 @@ body.atlas-desktop :is(.window-bar,.desktop-menu) { background:#f8f9fb; }
   body.atlas-console .console-sidebar nav button[data-page] { color:CanvasText; }
   body.atlas-console .console-sidebar nav button[data-page]:is(.active,[aria-current="page"]) { background:Highlight; color:HighlightText; }
 }
+
+/* Deployment kits in the activity queue drawer. */
+body.atlas-console .deployment-kits { border-top: 1px solid var(--atlas-line); margin-top: 8px; padding-top: 6px; }
+body.atlas-console .deployment-kits .kit-help { margin: 2px 0 6px; font-size: 11px; color: var(--atlas-muted, #64748b); }
+body.atlas-console .deployment-kits .kit-save { display: flex; gap: 6px; }
+body.atlas-console .deployment-kits .kit-save input { flex: 1; min-width: 0; min-height: var(--atlas-control-height); padding: 4px 8px; border: 1px solid var(--atlas-line); border-radius: var(--atlas-control-radius); font: 12px var(--atlas-font); }
+body.atlas-console .deployment-kits .kit-row { display: flex; align-items: center; gap: 6px; padding: 6px 8px; margin: 6px 0; border: 1px solid var(--atlas-line); border-radius: var(--atlas-control-radius); }
+body.atlas-console .deployment-kits .kit-row > div { flex: 1; min-width: 0; }
+body.atlas-console .deployment-kits .kit-row b { display: block; font-size: 12px; }
+body.atlas-console .deployment-kits .kit-row span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--atlas-muted, #64748b); }
+body.atlas-console .deployment-kits .empty { margin: 6px 0; font-size: 11px; }

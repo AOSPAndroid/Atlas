@@ -2,6 +2,8 @@
 <html lang="en">
   <head>
     <script src="/assets/desktop-mode.js"></script>
+    <!-- The default floor drawing is the slowest map dependency; fetch it with the page. -->
+    <link rel="preload" as="image" href="studio-floor-2.svg?v=3" />
     <link rel="stylesheet" href="/assets/desktop-mode.css">
     <link rel="stylesheet" href="/assets/ui-tokens.css?v=75" />
     <script src="/assets/shared-ui.js?v=10"></script>
@@ -144,7 +146,7 @@
             aria-label="Interactive official office plan. Select a name from the directory for keyboard access."
           ></canvas>
           <div id="source" hidden>
-            <img id="source-image" alt="Original scanned floor plan" />
+            <img id="source-image" loading="lazy" alt="Original scanned floor plan" />
           </div>
           <div class="map-top">
             <span class="pill">PARIS · OFFICIAL DESK POSITIONS</span>
@@ -210,7 +212,7 @@
       </aside>
     </div>
     <div id="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="official-app.js?v=103"></script>
+    <script type="module" src="official-app.js?v=105"></script>
   <script type="module" src="/assets/atlas-interactions.js" data-atlas-interactions></script>
   </body>
 </html>

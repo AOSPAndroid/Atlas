@@ -29,6 +29,8 @@ REPO=package_repository(CONFIG,ROOT)
 REMOTE_ROOT=r'C:\Temp\Packages'; NW=0x08000000 if os.name=='nt' else 0
 logging.basicConfig(filename=LOGS/'application.log',level=logging.INFO,format='%(asctime)s %(levelname)s %(message)s')
 app=FastAPI(title='Office Atlas',version=__version__,docs_url='/api/docs',redoc_url=None)
+from response_compression import compress_responses
+compress_responses(app)
 from job_service import JobService, TERMINAL
 job_service=JobService(lambda:HISTORY_DB)
 jobs=job_service.jobs;lock=job_service.lock
@@ -202,7 +204,7 @@ def bulk_worker(j,p):
  rows=[{'machine':pc,'copy':'Waiting','launch':'Waiting','pid':'','completion':'','exit_code':'','details':''} for pc in p.computers]
  jobs[j].update(state='running',phase='deploy',results=rows)
  def work(row):
-  child=uuid.uuid4().hex;jobs[child]={'state':'queued','events':[]}
+  child=uuid.uuid4().hex;jobs[child]={'state':'queued','events':[],'started_at':time.time()}
   item=Deploy(computer=row['machine'],folder=p.folder,script=p.script,action=p.action,fresh=p.fresh,threads=p.threads)
   row.update(copy='Running',completion='Running',job=child)
   try:
@@ -328,7 +330,7 @@ def bulk_deploy(p:Bulk):
  targets=list(dict.fromkeys(validate_pc(x) for x in p.computers))
  for pc in targets:validate_deployment(Deploy(computer=pc,folder=p.folder,script=p.script,action=p.action,fresh=p.fresh,threads=p.threads))
  p.computers=targets
- j=uuid.uuid4().hex;jobs[j]={'state':'queued','phase':'queued','results':[],'events':[]}
+ j=uuid.uuid4().hex;jobs[j]={'state':'queued','phase':'queued','results':[],'events':[],'started_at':time.time()}
  start_job(bulk_worker,j,p);return {'job':j}
 @app.get('/api/bulk/job/{j}')
 def bulk_job(j:str):
@@ -498,7 +500,7 @@ def _queue_worker(queue_id,items):
     if q.get('pause_requested'):
      q['state']='paused';return
     row['state']='running';child=uuid.uuid4().hex
-    jobs[child]={'state':'queued','target':item.computer,'events':[]};row['job']=child;job_service.save(queue_id,queue=True)
+    jobs[child]={'state':'queued','target':item.computer,'events':[],'started_at':time.time()};row['job']=child;job_service.save(queue_id,queue=True)
    try:
     history_create(child,item.computer,Path(item.folder).name,item.action,item.script,item.mode)
     deploy_worker(child,item)
@@ -520,7 +522,7 @@ def start_queue(request:QueueRequest):
  for item in request.items:
   validate_deployment(item);job_service.target_ready(item.computer)
  queue_id=uuid.uuid4().hex
- queue_jobs[queue_id]={'id':queue_id,'state':'queued','pause_requested':False,'items':[{'target':x.computer,'package':Path(x.folder).name,'action':x.action,'mode':x.mode,'state':'waiting','events':[],'payload':x.model_dump()} for x in request.items]}
+ queue_jobs[queue_id]={'id':queue_id,'state':'queued','pause_requested':False,'started_at':time.time(),'items':[{'target':x.computer,'package':Path(x.folder).name,'action':x.action,'mode':x.mode,'state':'waiting','events':[],'payload':x.model_dump()} for x in request.items]}
  job_service.save(queue_id,queue=True)
  try:job_service.submit(_queue_worker,queue_id,request.items)
  except Exception:
@@ -602,11 +604,18 @@ def deployment_details(job_id,job):
             if row:details.update(dict(row))
     return details
 
+def newest_first(pool):
+    # Latest deployment first so it is visible without scrolling. Older saved jobs
+    # without a start time keep their relative order below the timed ones.
+    items=[(k,job_service.snapshot(pool,k)) for k in list(pool)]
+    order={k:i for i,(k,_) in enumerate(items)}
+    return sorted(items,key=lambda kv:(kv[1].get('started_at') or 0,order[kv[0]]),reverse=True)
+
 @app.get('/api/deployments/active')
 def active_deployments():
     active_states={'queued','running','monitoring','paused'}
     deployments=[]
-    for job_id,job_data in [(k,job_service.snapshot(jobs,k)) for k in list(jobs)]:
+    for job_id,job_data in newest_first(jobs):
         state=job_data.get('state','unknown')
         if state not in active_states:continue
         events=job_data.get('events',[])
@@ -615,10 +624,11 @@ def active_deployments():
             **deployment_details(job_id,job_data),
             'kind':'single',
             'state':state,
+            'started_at':job_data.get('started_at'),
             'events':events[-200:],
             'last_message':events[-1].get('message','') if events else '',
         })
-    for queue_id,queue_data in [(k,job_service.snapshot(queue_jobs,k)) for k in list(queue_jobs)]:
+    for queue_id,queue_data in newest_first(queue_jobs):
         state=queue_data.get('state','unknown')
         if state not in active_states:continue
         items=[]
@@ -630,13 +640,15 @@ def active_deployments():
                 'state':item.get('state','waiting'),
                 'events':item.get('events',[])[-100:],
             })
-        deployments.append({'id':queue_id,'kind':'queue','state':state,'items':items})
+        deployments.append({'id':queue_id,'kind':'queue','state':state,'started_at':queue_data.get('started_at'),'items':items})
+    # Interleave single jobs and queues by start time; sorted() keeps ties stable.
+    deployments.sort(key=lambda d:d.get('started_at') or 0,reverse=True)
     return {'count':len(deployments),'deployments':deployments}
 
 @app.get('/api/deployments/recent')
 def recent_deployments():
     result=[]
-    for job_id,job_data in list(jobs.items())[-20:]:
+    for job_id,job_data in newest_first(jobs)[:20]:
         events=job_data.get('events',[])
         result.append({
             'id':job_id,'kind':'single','state':job_data.get('state','unknown'),

@@ -1,4 +1,6 @@
 
+const without = (items, excluded) => excluded.size ? (items || []).filter(item => !excluded.has(JSON.stringify(item))) : items || [];
+
 export function applySourcePlanDetails(data) {
   for (const floor of data.floors) {
     const detail = sourcePlanDetails[floor.level];
@@ -8,10 +10,10 @@ export function applySourcePlanDetails(data) {
       g[key] = detail[key];
     const walls = new Set([...detail.excludedWalls, ...detail.stairTreads].map(e => JSON.stringify(e)));
     const doors = new Set(detail.excludedDoors.map(e => JSON.stringify(e)));
-    g.walls = (g.walls || []).filter(e => !walls.has(JSON.stringify(e)));
-    g.doorSwings = (g.doorSwings || []).filter(e => !doors.has(JSON.stringify(e)));
+    g.walls = without(g.walls, walls);
+    g.doorSwings = without(g.doorSwings, doors);
     const removedPlan = new Set(detail.excludedPlanSegments.map(e => JSON.stringify(e)));
-    g.planLinework = (g.planLinework || []).filter(e => !removedPlan.has(JSON.stringify(e)));
+    g.planLinework = without(g.planLinework, removedPlan);
     const confirmedIds = new Set(detail.confirmedAmenities.map(p => p.id));
     const places = (g.wayfinding || []).filter(p => !p.id?.startsWith("source-") && !confirmedIds.has(p.id));
     for (const place of detail.confirmedAmenities)

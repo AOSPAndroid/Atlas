@@ -319,6 +319,10 @@ The floating Queue now includes live widgets for deployments and batches, deploy
 
 The activity feed reads existing server state; it never starts a remote scan. Slowness capture has a Stop capture control; PsExec can stop its local session; deployment queues can pause after the current item, resume or cancel waiting items. Ordinary running requests and installers are not given a misleading Cancel button. Completed widgets clear after ten seconds; failed or uncertain results remain briefly for inspection or dismissal. Opening Queue does not repeat an action. Demo and Preview show the shared layout but make no live activity requests.
 
+### Deployment kits in Queue
+
+Queue the packages you usually deploy together, type a name under **Deployment kits** and click **Save queue as kit**. Later, select any machine and click **Add for MACHINE** to queue every package in the kit for it, with the same script, action and copy options. Adding a kit only fills the queue; nothing deploys until you click **Start queue**. Saving with an existing name replaces that kit. Kits are kept in this browser's storage. Demo shows them read-only.
+
 ### Windows features and DISM through PsExec
 
 The Windows features & DISM category provides Enable .NET Framework 3.5, check NetFx3 status, enable Microsoft Print to PDF, list optional features, CheckHealth, ScanHealth, RestoreHealth, AnalyzeComponentStore, and list Windows servicing packages. These templates run DISM on the selected remote machine as SYSTEM (`-s`) using the configured local PsExec path (default `C:\Data\PsExec.exe`).

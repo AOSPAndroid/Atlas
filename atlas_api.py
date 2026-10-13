@@ -1,5 +1,5 @@
 """Atlas desk register, directory resolution and deployment orchestration."""
-import json,re,secrets,sqlite3,tempfile,uuid
+import json,re,secrets,sqlite3,tempfile,time,uuid
 from datetime import datetime,timezone
 from pathlib import Path
 from fastapi import HTTPException,Request
@@ -8,6 +8,7 @@ from fastapi.responses import FileResponse,Response,JSONResponse
 import atlas_store as store
 from merge_data import atlas_schema,import_atlas
 from desk_directory import resolve_person,desk_context as shared_context,person_desks
+from static_responses import cached_file,prewarm
 TOKEN=secrets.token_urlsafe(32)
 
 def now():return datetime.now(timezone.utc).isoformat()
@@ -273,7 +274,7 @@ def register_atlas(app):
     # Both deployment audit and desk association commit before the worker starts.
     c.execute('insert into deployments(id,started,operator,target,package,action,script,mode,state) values(?,?,?,?,?,?,?,?,?)',(job,now(),wmi.identity(),pc,Path(p.folder).name,p.action,p.script,p.mode,'queued'))
     c.execute('insert into desk_deployments values(?,?,?,?,?,?)',(job,desk_id,expected,pc,r['revision'],now()))
-   wmi.jobs[job]={'state':'queued','target':pc,'events':[]};wmi.start_job(wmi.deploy_worker,job,p)
+   wmi.jobs[job]={'state':'queued','target':pc,'events':[],'started_at':time.time()};wmi.start_job(wmi.deploy_worker,job,p)
    return {'job':job,'desk_id':desk_id,'computer':pc}
   except store.Conflict as e:raise HTTPException(409,str(e))
   except (ValueError,TypeError) as e:raise HTTPException(400,str(e))
@@ -315,13 +316,14 @@ def register_atlas(app):
   from fastapi.responses import RedirectResponse
   return RedirectResponse('/')
 
+ prewarm(store.ROOT/'official-data.json',store.ROOT/'studio-floor-2.svg')
  @app.get('/')
  def atlas_home():return FileResponse(store.ROOT/'official-index.html')
 
  @app.get('/{filename}')
- def atlas_asset(filename:str):
+ def atlas_asset(filename:str,request:Request):
   allowed={'service-actions.js','site-info.js','command-registry.js','command-palette.js','command-palette.css','catalogue.js','map-furniture.js','map-amenities.js','map-plan-details.js','official-app.js','camera-motion.js','map-cursor.js','official-data.json','official.css','style.css','data.json','operations.js','operations.css'}
   allowed|={'official-floor-'+str(n)+ext for n in range(-1,9) for ext in ('.jpg','.pdf')}
   allowed|={'studio-floor-'+str(n)+'.svg' for n in range(-1,9)}
   if filename not in allowed:raise HTTPException(404,'Not found')
-  return FileResponse(store.ROOT/filename)
+  return cached_file(request,store.ROOT/filename)
