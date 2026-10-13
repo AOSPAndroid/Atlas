@@ -2565,3 +2565,21 @@ body.atlas-console .deployment-kits .kit-row > div { flex: 1; min-width: 0; }
 body.atlas-console .deployment-kits .kit-row b { display: block; font-size: 12px; }
 body.atlas-console .deployment-kits .kit-row span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--atlas-muted, #64748b); }
 body.atlas-console .deployment-kits .empty { margin: 6px 0; font-size: 11px; }
+/* Workspace activity: compact, readable history with no remote polling. */
+body.atlas-console #workspace .lookup-column:has(.lookup-empty:not([hidden])) #recentTargets { display:none; }
+body.atlas-console .workspace-activity { display:grid; grid-template-columns:minmax(0, .85fr) minmax(0, 1.15fr); gap:8px; margin-top:12px; text-align:left; }
+body.atlas-console .workspace-activity-card { min-width:0; border:1px solid var(--atlas-line); border-radius:8px; background:var(--atlas-surface, #fff); padding:8px; }
+body.atlas-console .workspace-activity-card header { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:4px; margin-bottom:6px; }
+body.atlas-console #workspace .workspace-activity-card h3 { margin:0; font-size:12px; }
+body.atlas-console .workspace-activity-card ul { padding:0; margin:0; list-style:none; }
+body.atlas-console .workspace-activity-card li + li { border-top:1px solid var(--atlas-line); }
+body.atlas-console .workspace-activity-card [data-home-machine] { width:100%; display:flex; justify-content:space-between; gap:6px; text-align:left; border:0; background:transparent; padding:6px 2px; white-space:normal; overflow-wrap:anywhere; }
+body.atlas-console .workspace-deployment-row { display:flex; align-items:center; justify-content:space-between; gap:6px; padding:6px 0; }
+body.atlas-console .workspace-deployment-row > div { min-width:0; overflow-wrap:anywhere; }
+body.atlas-console .workspace-deployment-row small { display:block; color:var(--atlas-muted); font-size:11px; }
+body.atlas-console .workspace-state { flex-shrink:0; border-radius:4px; padding:2px 5px; background:var(--atlas-bg); font-size:11px; }
+body.atlas-console .workspace-state[data-state="failed"] { color:var(--atlas-danger, #a32332); }
+body.atlas-console .workspace-state:is([data-state="running"],[data-state="queued"]) { color:var(--atlas-accent); }
+body.atlas-console .workspace-state:is([data-state="launched"],[data-state="complete"],[data-state="completed"]) { color:var(--atlas-success, #18724a); }
+body.atlas-console [data-home-history] { margin-top:6px; }
+@media(max-width:650px) { body.atlas-console .workspace-activity { grid-template-columns:minmax(0,1fr); } }

@@ -1,5 +1,6 @@
 @echo off
 setlocal
+echo Updating Atlas from AOSPAndroid/Atlas ^(main^).
 call "%~dp0Python_Settings.bat"
 if errorlevel 1 (
   set "ATLAS_UPDATE_RESULT=1"

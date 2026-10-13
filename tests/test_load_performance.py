@@ -48,9 +48,10 @@ class MapStartupWork(unittest.TestCase):
         # The exclusion filters previously serialised every plan segment on every floor.
         script = r'''
 import fs from "fs";
+import { pathToFileURL } from "node:url";
 const data = JSON.parse(fs.readFileSync(process.argv[1] + "/atlas/official-data.json"));
-const { applyFurnitureCorrections } = await import(process.argv[1] + "/atlas/map-furniture.js");
-const { applyMapAmenities } = await import(process.argv[1] + "/atlas/map-amenities.js");
+const { applyFurnitureCorrections } = await import(pathToFileURL(process.argv[1] + "/atlas/map-furniture.js"));
+const { applyMapAmenities } = await import(pathToFileURL(process.argv[1] + "/atlas/map-amenities.js"));
 const before = new Map(data.floors.map(f => [f.level, f.geometry.planLinework]));
 const start = performance.now();
 applyMapAmenities(data); applyFurnitureCorrections(data);

@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import argparse
-from contextlib import contextmanager
+from contextlib import contextmanager, closing
 from datetime import datetime, timezone
 import json
 import os
@@ -17,7 +17,7 @@ import time
 import urllib.request
 import uuid
 
-REPOSITORY = 'https://github.com/AOSPAndroid/BAtlas.git'
+REPOSITORY = 'https://github.com/AOSPAndroid/Atlas.git'
 BRANCH = 'main'
 BOOTSTRAP = {'Update-Atlas.bat', 'update_atlas.py'}
 PROTECTED = {'data', 'backups', 'logs', 'config.json', '.git', '.env', '.venv', 'venv', 'models', 'node_modules'}
@@ -108,7 +108,12 @@ class Updater:
 
     @staticmethod
     def _remote(value):
-        return value.strip().replace('git@github.com:', 'https://github.com/').rstrip('/').removesuffix('.git').casefold()
+        remote = value.strip().replace('git@github.com:', 'https://github.com/').rstrip('/').removesuffix('.git').casefold()
+        # GitHub renamed this repository. Accept existing installs, but fetch
+        # the canonical repository explicitly rather than relying on redirects.
+        if remote == 'https://github.com/aospandroid/batlas':
+            return 'https://github.com/aospandroid/atlas'
+        return remote
 
     def _database(self):
         configured = self.environment.get('ATLAS_DB_PATH')
@@ -128,8 +133,8 @@ class Updater:
         def progress(status, remaining, total):
             if time.monotonic() > deadline:
                 raise UpdateError('Database backup timed out; application files were not changed.')
-        with sqlite3.connect(source.resolve().as_uri() + '?mode=ro', uri=True, timeout=20) as original:
-            with sqlite3.connect(target, timeout=20) as snapshot:
+        with closing(sqlite3.connect(source.resolve().as_uri() + '?mode=ro', uri=True, timeout=20)) as original:
+            with closing(sqlite3.connect(target, timeout=20)) as snapshot:
                 original.backup(snapshot, pages=1024, progress=progress)
                 if snapshot.execute('pragma integrity_check').fetchone()[0] != 'ok':
                     raise UpdateError('Database backup failed its integrity check.')
@@ -285,7 +290,7 @@ class Updater:
                     if self.git_run('status', '--porcelain', '--untracked-files=no').strip():
                         raise UpdateError('Local application files have changes. Commit or keep them separately before updating; imported data is kept.')
                     before = self.git_run('rev-parse', 'HEAD').strip()
-                    self.git_run('fetch', '--quiet', 'origin', BRANCH)
+                    self.git_run('fetch', '--quiet', self.repository, BRANCH)
                     after = self.git_run('rev-parse', 'FETCH_HEAD').strip()
                     before_paths = self._paths(before)
                     after_paths = self._paths(after)

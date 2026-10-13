@@ -2,19 +2,21 @@
 
 Use **[Update-Atlas.bat](../Update-Atlas.bat)** in your existing Atlas folder. After its first update, the same folder receives future versions from GitHub; you do not need to download another ZIP or reimport users, devices, packages or Citrix VDI records.
 
+Updates come from **AOSPAndroid/Atlas, main**. Existing Git installs using the old BAtlas URL remain supported. Only merged changes are released.
+
 ## Add the updater to an older Atlas folder
 
 If the folder does not contain the updater yet, download these two files from this repository's **main** branch and place both beside `Python_Settings.bat` in your existing Atlas folder:
 
-- [Update-Atlas.bat](https://raw.githubusercontent.com/AOSPAndroid/BAtlas/main/Update-Atlas.bat)
-- [update_atlas.py](https://raw.githubusercontent.com/AOSPAndroid/BAtlas/main/update_atlas.py)
+- [Update-Atlas.bat](https://raw.githubusercontent.com/AOSPAndroid/Atlas/main/Update-Atlas.bat)
+- [update_atlas.py](https://raw.githubusercontent.com/AOSPAndroid/Atlas/main/update_atlas.py)
 
 Save the files under those exact names, without an added `.txt` extension. You only need this pair once; the Python updater uses the standard library and obtains the rest of the current application from Git.
 
 Alternatively, open PowerShell **in the existing Atlas folder** and run this download-only command:
 
 ```powershell
-@('Update-Atlas.bat', 'update_atlas.py') | ForEach-Object { Invoke-WebRequest -UseBasicParsing -Uri ("https://raw.githubusercontent.com/AOSPAndroid/BAtlas/main/" + $_) -OutFile (Join-Path $PWD $_) -ErrorAction Stop }
+@('Update-Atlas.bat', 'update_atlas.py') | ForEach-Object { Invoke-WebRequest -UseBasicParsing -Uri ("https://raw.githubusercontent.com/AOSPAndroid/Atlas/main/" + $_) -OutFile (Join-Path $PWD $_) -ErrorAction Stop }
 ```
 
 This saves files; it does not execute downloaded code. If raw downloads are restricted or repository access requires authentication, download the two files through your signed-in GitHub browser using your approved process. Then follow the steps below.

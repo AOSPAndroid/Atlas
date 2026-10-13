@@ -337,8 +337,10 @@ def bulk_job(j:str):
  if j not in jobs:raise HTTPException(404,'Job not found')
  return job_service.snapshot(jobs,j)
 @app.get('/api/history')
-def history(limit:int=100):
- with hist_db() as c:return [dict(x) for x in c.execute('select * from deployments order by started desc limit ?', (max(1,min(limit,500)),))]
+def history(limit:int=100,today:bool=False):
+ with hist_db() as c:
+  where = ' where date(started)=date("now","localtime")' if today else ''
+  return [dict(x) for x in c.execute('select * from deployments'+where+' order by started desc limit ?', (max(1,min(limit,500)),))]
 @app.get('/api/ping/{pc}')
 def ping(pc:str):return {'online':has_echo_reply(run(['ping.exe','-4','-n','1','-w','1200',validate_pc(pc)],False,timeout=5))}
 @app.get('/api/access/{pc}')

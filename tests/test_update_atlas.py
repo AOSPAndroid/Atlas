@@ -13,6 +13,17 @@ import tempfile
 import unittest
 from unittest.mock import patch
 from types import SimpleNamespace
+from contextlib import contextmanager
+
+
+@contextmanager
+def database_connection(path):
+    con = sqlite3.connect(path)
+    try:
+        with con:
+            yield con
+    finally:
+        con.close()
 
 
 def git(root, *arguments):
@@ -182,7 +193,7 @@ class UpdateSuccess(LocalGitFixture):
         self.raw_zip(); database = self.persistent(); root_before = self.root.resolve()
         old_backup = self.root / 'backups' / 'absolute-before-import.db'
         fictional_database(old_backup, 'historical-directory-data')
-        with sqlite3.connect(database) as con:
+        with database_connection(database) as con:
             con.execute('insert into directory_import_history values(?,?,?,?,?)',
                         ('fictional-import', '2026-10-01', 'fictional.xlsx', str(old_backup.resolve()), '{}'))
         new_head = self.release()
@@ -192,7 +203,7 @@ class UpdateSuccess(LocalGitFixture):
         self.assertEqual(git(self.root, 'rev-parse', 'HEAD'), new_head)
         self.assertEqual(git(self.root, 'remote', 'get-url', 'origin'), str(self.upstream))
         self.assertEqual(values(database), ['local-user-data'])
-        with sqlite3.connect(database) as con:
+        with database_connection(database) as con:
             path = Path(con.execute('select backup from directory_import_history').fetchone()[0])
         self.assertEqual(path, old_backup.resolve()); self.assertTrue(path.is_file())
         self.assertEqual(values(path), ['historical-directory-data'])
@@ -226,7 +237,7 @@ class UpdateSuccess(LocalGitFixture):
 
     def test_edited_legacy_root_seed_migrates_before_incoming_seed_replacement(self):
         self.raw_zip(); self.persistent(database=False)
-        with sqlite3.connect(self.root / 'office_atlas.db') as con:
+        with database_connection(self.root / 'office_atlas.db') as con:
             con.execute('insert into fictional_data values(?)', ('operator-imported-users',))
         (self.author / 'office_atlas.db').unlink()
         fictional_database(self.author / 'office_atlas.db', 'new-upstream-seed')
@@ -281,7 +292,7 @@ class UpdateRefusals(LocalGitFixture):
     def refuse_default_runtime_alias(self, link):
         self.raw_zip(); runtime = self.persistent(database=False)
         seed = self.root / 'office_atlas.db'
-        with sqlite3.connect(seed) as con:
+        with database_connection(seed) as con:
             con.execute('insert into fictional_data values(?)', ('operator-root-data',))
         try:
             link(seed, runtime)
@@ -415,10 +426,10 @@ class UpdateRefusals(LocalGitFixture):
 
     def test_active_jobs_block_before_stop_and_leave_data_usable(self):
         self.raw_zip(); database = self.persistent(); self.release()
-        with sqlite3.connect(database) as con:
+        with database_connection(database) as con:
             con.execute('insert into operation_state values(?,?,?,?)', ('fictional-job', 'job', '{"state":"running"}', 1))
         def active():
-            with sqlite3.connect(database) as con:
+            with database_connection(database) as con:
                 return any(json.loads(body).get('state') == 'running' for body, in con.execute('select body from operation_state'))
         self.assert_refused(self.manager(active=active))
         self.assertFalse((self.root / '.git').exists()); self.assertEqual(values(database), ['local-user-data'])
