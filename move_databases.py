@@ -12,6 +12,7 @@ import shutil
 import sqlite3
 import sys
 import uuid
+from contextlib import closing
 from datetime import datetime
 from pathlib import Path
 
@@ -27,16 +28,17 @@ class MoveError(Exception):
 
 def atlas_running():
     try:
-        return [spec['mode'] for spec in launcher.servers()
-                if launcher.running(spec, launcher.read_record(spec['mode']))]
+        # A stale/unresponsive record is not proof that the process stopped.
+        # The launcher removes owned records only after stopping the process.
+        return [mode for mode in ('admin', 'viewer') if launcher.read_record(mode)]
     except (OSError, ValueError):
-        return []
+        raise MoveError('Cannot verify Atlas server records. Run Stop-All-Atlas.bat and retry.')
 
 
 def row_counts(path):
-    with sqlite3.connect(path.resolve().as_uri() + '?mode=ro', uri=True, timeout=20) as db:
+    with closing(sqlite3.connect(path.resolve().as_uri() + '?mode=ro', uri=True, timeout=20)) as db:
         tables = [r[0] for r in db.execute("select name from sqlite_master where type='table' and name not like 'sqlite_%'")]
-        return {t: db.execute(f'select count(*) from "{t}"').fetchone()[0] for t in tables}
+        return {t: db.execute('select count(*) from "' + t.replace('"', '""') + '"').fetchone()[0] for t in tables}
 
 
 def copy_database(source, target):
@@ -55,7 +57,8 @@ def copy_database(source, target):
             raise MoveError(f'The copy of {source.name} does not match the original. Nothing was changed.')
         os.replace(temporary, target)
     finally:
-        temporary.unlink(missing_ok=True)
+        for part in (temporary, Path(str(temporary) + '-wal'), Path(str(temporary) + '-shm')):
+            part.unlink(missing_ok=True)
 
 
 def save_folder(root, folder):
@@ -65,8 +68,11 @@ def save_folder(root, folder):
         raise MoveError('config.json is not a settings object; fix it before moving the databases.')
     config['database_folder'] = str(folder)
     temporary = root / ('config.' + uuid.uuid4().hex + '.tmp')
-    temporary.write_text(json.dumps(config, indent=2), encoding='utf-8')
-    os.replace(temporary, path)
+    try:
+        temporary.write_text(json.dumps(config, indent=2), encoding='utf-8')
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def move(destination, root=None):
@@ -80,9 +86,10 @@ def move(destination, root=None):
         raise MoveError('Give the destination as a full path, for example F:\\Atlas\\DB.')
     if not Path(destination.anchor).exists():
         raise MoveError(f'Drive {destination.anchor} is not available. Connect it and retry.')
-    sources = [p for p in (runtime_paths.database_path(), runtime_paths.knowledge_path()) if p.is_file()]
-    if not sources:
-        raise MoveError('No Atlas database was found to move.')
+    primary = runtime_paths.database_path()
+    if not primary.is_file():
+        raise MoveError('The main Atlas database was not found. Restore its configured location before moving it.')
+    sources = [primary, *([runtime_paths.knowledge_path()] if runtime_paths.knowledge_path().is_file() else [])]
     current = runtime_paths.database_folder(root)
     if current and destination.resolve() == current.resolve():
         print(f'The databases are already in {destination}. Nothing to do.')
@@ -100,14 +107,14 @@ def move(destination, root=None):
             print(f'Copying {source} ...')
             copy_database(source, destination / name)
             copied.append(destination / name)
+        save_folder(root, destination)
     except BaseException:
         for path in copied:
             path.unlink(missing_ok=True)
         raise
-    save_folder(root, destination)
 
     # Keep the originals as a rollback copy. The tracked seed in the application folder stays.
-    archive = root / 'data' / 'backups' / ('before-database-move-' + datetime.now().strftime('%Y%m%d-%H%M%S'))
+    archive = root / 'data' / 'backups' / ('before-database-move-' + datetime.now().strftime('%Y%m%d-%H%M%S') + '-' + uuid.uuid4().hex[:8])
     for source in names.values():
         if source.resolve() == (root / runtime_paths.DATABASE).resolve():
             continue
@@ -130,8 +137,8 @@ def main():
     args = parser.parse_args()
     try:
         move(args.destination)
-    except MoveError as error:
-        print('Not moved: ' + str(error))
+    except (MoveError, OSError, sqlite3.Error, ValueError) as error:
+        print('Database move error: ' + str(error))
         return 1
     return 0
 

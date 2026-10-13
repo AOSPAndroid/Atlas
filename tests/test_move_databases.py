@@ -39,7 +39,7 @@ class MoveDatabases(unittest.TestCase):
         return result, out.getvalue()
 
     def count(self, path):
-        with sqlite3.connect(path) as db:
+        with contextlib.closing(sqlite3.connect(path)) as db:
             return db.execute('select count(*) from items').fetchone()[0]
 
     def test_moves_both_databases_and_switches_atlas(self):
@@ -99,6 +99,26 @@ class MoveDatabases(unittest.TestCase):
         updater.root, updater.environment = self.root, {}
         self.assertEqual(updater._database(), self.dest / 'office_atlas.db')
         self.assertEqual(updater._database_folder(), self.dest)
+
+    def test_config_failure_keeps_sources_and_removes_copies(self):
+        self.main.close()
+        with patch.object(move_databases, 'save_folder', side_effect=OSError('write failed')):
+            with self.assertRaises(OSError): self.run_move()
+        self.assertEqual(list(self.dest.iterdir()), [])
+        self.assertTrue((self.root / 'data' / 'office_atlas.db').exists())
+
+    def test_missing_primary_cannot_rename_knowledge_database(self):
+        with patch.object(runtime_paths, 'database_path', return_value=self.root / 'missing.db'):
+            with self.assertRaisesRegex(move_databases.MoveError, 'main Atlas database'): self.run_move()
+        self.assertFalse(self.dest.exists())
+
+    def test_unreadable_server_record_fails_closed(self):
+        # Bypass the fixture's stopped-server stub to exercise the real check.
+        with patch.object(move_databases.launcher, 'read_record', side_effect=ValueError('invalid')):
+            with self.assertRaisesRegex(move_databases.MoveError, 'server records'):
+                ORIGINAL_RUNNING_CHECK()
+
+ORIGINAL_RUNNING_CHECK = move_databases.atlas_running
 
 
 if __name__ == '__main__':
