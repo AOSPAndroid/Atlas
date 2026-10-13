@@ -115,8 +115,19 @@ class Updater:
             return 'https://github.com/aospandroid/atlas'
         return remote
 
+    def _database_folder(self):
+        # Mirrors runtime_paths.database_folder; kept inline because an update replaces that file.
+        try:
+            folder = json.loads((self.root / 'config.json').read_text(encoding='utf-8')).get('database_folder')
+        except (OSError, ValueError, AttributeError):
+            return None
+        return Path(folder).expanduser() if isinstance(folder, str) and folder.strip() else None
+
     def _database(self):
         configured = self.environment.get('ATLAS_DB_PATH')
+        folder = None if configured else self._database_folder()
+        if folder:
+            return folder / 'office_atlas.db'
         path = Path(configured).expanduser() if configured else self.root / 'data' / 'office_atlas.db'
         if not path.is_absolute():
             path = self.root / path
@@ -221,7 +232,7 @@ class Updater:
                 runtime = self.root / 'data' / 'office_atlas.db'
                 if not runtime.exists():
                     shutil.copy2(backup / 'database.sqlite3', runtime)
-        knowledge = self.root / 'data' / 'knowledge.sqlite3'
+        knowledge = (self._database_folder() or self.root / 'data') / 'knowledge.sqlite3'
         if knowledge.is_file():
             self._sqlite_backup(knowledge, backup / 'knowledge.sqlite3')
         config = self.root / 'config.json'

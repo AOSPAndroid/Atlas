@@ -319,6 +319,10 @@ The floating Queue now includes live widgets for deployments and batches, deploy
 
 The activity feed reads existing server state; it never starts a remote scan. Slowness capture has a Stop capture control; PsExec can stop its local session; deployment queues can pause after the current item, resume or cancel waiting items. Ordinary running requests and installers are not given a misleading Cancel button. Completed widgets clear after ten seconds; failed or uncertain results remain briefly for inspection or dismissal. Opening Queue does not repeat an action. Demo and Preview show the shared layout but make no live activity requests.
 
+### Moving the databases to another drive
+
+Run **Stop-All-Atlas.bat**, then **Move-Databases.bat**. It moves the Atlas database and the Knowledge Base database to `F:\Atlas\DB` (or to a folder you give it, for example `Move-Databases.bat G:\AtlasData`) and records the folder as `database_folder` in `config.json`. Each copy must pass an integrity check and match the original's row counts before Atlas switches to it; existing files are never overwritten, and the old files are kept in `data\backups\before-database-move-...` until you delete them. If the drive is missing when Atlas starts, Atlas stops with a message instead of opening an empty database. To go back, remove `database_folder` from `config.json` and return the files to `data`.
+
 ### Deployment kits in Queue
 
 Queue the packages you usually deploy together, type a name under **Deployment kits** and click **Save queue as kit**. Later, select any machine and click **Add for MACHINE** to queue every package in the kit for it, with the same script, action and copy options. Adding a kit only fills the queue; nothing deploys until you click **Start queue**. Saving with an existing name replaces that kit. Kits are kept in this browser's storage. Demo shows them read-only.

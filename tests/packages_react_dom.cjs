@@ -3,6 +3,8 @@ const assert=require('node:assert/strict'),fs=require('node:fs');
 const {fixture}=require('./ui_fixture.cjs');
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const response=data=>({ok:true,status:200,json:async()=>data});
+// Wait for the island to render instead of trusting a fixed delay on a busy machine.
+const until=async(check,ms=5000)=>{for(const end=Date.now()+ms;Date.now()<end;await sleep(20))if(check())return;throw Error('Packages view did not render in time')};
 const first={id:'repo:ixExample',folder:'ixExample',short_name:'ixExample',display_name:'Example Browser',state:'Live',packager:'Operator',requester:'Requester',package_id:'EPP123',domain:'Client, Intranet',build:'Windows 11',created:'03/10/2026 09:32',source:'package.csv',imported_at:'2026-10-03T09:32:00Z',coverage:'matched',source_present:true,metadata_present:true};
 const pending={...first,id:'data:ixPending',folder:'',short_name:'ixPending',display_name:'Pending Package',state:'Work in Progress',coverage:'metadata-only',source_present:false};
 const unnamed={...pending,id:'data:/atlas-raw/example',short_name:'',display_name:'EPP-RAW-123',package_id:'EPP-RAW-123',metadata_note:'Short name not supplied; original record preserved.'};
@@ -46,7 +48,7 @@ const unusual={...pending,id:'data:/atlas-raw/path',short_name:'../ixExample',di
  // Demo renders stored metadata without deployment controls or an upload link.
  let demoItems=[unnamed];const demo=await fixture({fetch:async()=>response({items:demoItems,total:demoItems.length,limit:100,states:['Work in Progress'],stats:{source_packages:0,metadata_packages:demoItems.length,matched:0,source_only:0,metadata_only:demoItems.length,ambiguous:0},note:'Package source available in Admin'})});
  const dw=demo.w,dd=dw.document;dw.ResizeObserver=class{observe(){}unobserve(){}disconnect(){}};dw.AtlasReadOnly={reason:'Readonly',read:()=>null};dw.AtlasUI.motion.isReduced=()=>true;
- dd.getElementById('workspace').classList.remove('active');const Observer=dw.MutationObserver;let lateOpened=false;dw.MutationObserver=class extends Observer{observe(target,options){if(target.id==='packages'&&!lateOpened){lateOpened=true;target.classList.add('active');}super.observe(target,options)}};demo.run(fs.readFileSync('frontend/assets/atlas-interactions.js','utf8'));await sleep(260);
+ dd.getElementById('workspace').classList.remove('active');const Observer=dw.MutationObserver;let lateOpened=false;dw.MutationObserver=class extends Observer{observe(target,options){if(target.id==='packages'&&!lateOpened){lateOpened=true;target.classList.add('active');}super.observe(target,options)}};demo.run(fs.readFileSync('frontend/assets/atlas-interactions.js','utf8'));await sleep(260);await until(()=>dd.querySelector('.package-row-select'));
  assert(!dd.querySelector('.package-toolbar a'));dd.querySelector('.package-row-select').click();await sleep(40);assert(![...dd.querySelectorAll('.package-detail button')].some(node=>node.textContent==='Inspect source scripts'));
  assert.match(dd.querySelector('.package-detail h3').textContent,/EPP-RAW-123/);assert.match(dd.querySelector('.package-detail').textContent,/Short name not supplied/);
  assert(dd.querySelector('[data-package-copy="short_name"]').disabled);assert(!dd.querySelector('[data-package-copy="package_id"]').disabled,'Read-only stored package IDs remain copyable');

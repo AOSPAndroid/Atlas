@@ -1,17 +1,39 @@
 """Source assets and mutable runtime data have separate lifetimes."""
+import json
 import os
 import sqlite3
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
+DATABASE = 'office_atlas.db'
+KNOWLEDGE = 'knowledge.sqlite3'
+
+
+def database_folder(root=None):
+    """Folder named by "database_folder" in config.json (for example F:\\Atlas\\DB), or None."""
+    try:
+        config = json.loads(((root or ROOT) / 'config.json').read_text(encoding='utf-8'))
+        folder = config.get('database_folder') if isinstance(config, dict) else None
+    except (OSError, ValueError):
+        return None
+    return Path(folder).expanduser() if isinstance(folder, str) and folder.strip() else None
 
 
 def database_path():
     configured = os.environ.get('ATLAS_DB_PATH')
     if configured:
         return Path(configured).expanduser().resolve()
-    runtime = ROOT / 'data' / 'office_atlas.db'
-    return runtime if runtime.exists() else ROOT / 'office_atlas.db'
+    folder = database_folder()
+    if folder:
+        # No fallback to the seed: a missing drive must not open an empty-looking Atlas.
+        return folder / DATABASE
+    runtime = ROOT / 'data' / DATABASE
+    return runtime if runtime.exists() else ROOT / DATABASE
+
+
+def knowledge_path():
+    folder = database_folder()
+    return folder / KNOWLEDGE if folder else ROOT / 'data' / KNOWLEDGE
 
 
 def prepare_runtime_database():
@@ -20,6 +42,13 @@ def prepare_runtime_database():
         path = database_path()
         if not path.is_file():
             raise ValueError('ATLAS_DB_PATH must point to an existing Atlas database.')
+        return path
+    folder = database_folder()
+    if folder:
+        path = folder / DATABASE
+        if not path.is_file():
+            raise ValueError(f'The Atlas database was not found in {folder}. Check that the drive is connected, '
+                             'or remove "database_folder" from config.json to use the data folder.')
         return path
     target = ROOT / 'data' / 'office_atlas.db'
     if target.exists():
