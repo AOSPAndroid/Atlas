@@ -728,6 +728,12 @@ from knowledge_base import register as register_knowledge
 from runtime_paths import knowledge_path
 register_knowledge(app, knowledge_path())
 
+# Private local Outlook queue: intentionally absent from backend.viewer.
+from mail_inbox import register as register_inbox
+register_inbox(app, db)
+from inbox_control import register as register_inbox_control
+register_inbox_control(app)
+
 # Bundled open-source Draw.io static editor (no server-side editor endpoints).
 app.mount('/drawio', StaticFiles(directory=ROOT/'frontend/drawio', html=True), name='drawio')
 

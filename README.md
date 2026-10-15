@@ -1,3 +1,9 @@
+## Live Inbox with Outlook and Teams
+
+**[Live Inbox setup](docs/inbox-integration.md)** connects incoming Outlook emails and Teams/Outlook notification previews to the existing Atlas GUI, sender lookup and linked machines. Configure the normal mail account once in Atlas Admin > Live Inbox. All local Start BAT files then launch the collectors through its limited interactive Windows task; Stop BAT files request graceful shutdown. Start/Stop, source switches and listener settings are also in the GUI.
+
+Run **[Install-Inbox-Collectors.bat](Install-Inbox-Collectors.bat)** once in the normal mail account with an approved signed notification package. Windows notification consent is still required. The repo includes the build source, a compiled development folder and an unsigned MSIX for the approved signing process. Demo and Preview never receive email or notification data.
+
 ## Launch all six views
 
 Double-click **[Start-All-Atlas.bat](Start-All-Atlas.bat)** to start the shared local services once and open six browser tabs: Classic Admin, Demo and hosted Preview, then Desktop Admin, Demo and hosted Preview. The Preview tabs require internet access. These are six views backed by two local services and the existing hosted site, not six separate installations.
@@ -35,6 +41,8 @@ Atlas is a self-hosted Windows IT support and administration tool with a browser
 The **map** helps you explore floors and seating in 2D or 3D. The **IT console** brings user lookup, linked machines, health checks and deployment into one workspace. Both share the same command palette, package catalogue and detail panels. A separate **read-only demo/viewer** now includes the full IT console alongside maps, people and stored machine details.
 
 ## What Atlas can do
+
+**Live Inbox:** emails and Teams/Outlook notification previews, matched sender records and linked machines inside the main Atlas GUI. Start/Stop collectors, choose sources and open listener settings from the same screen. See [integrated setup](docs/inbox-integration.md). Suggested fixes are not yet included.
 
 **New to the performance tools?** Read the [Remote Admin performance guide](docs/REMOTE_ADMIN_PERFORMANCE.md) for what each CPU, GPU, Memory and Overview button does, how to interpret the results, and a practical slowness investigation workflow. All scans require an explicit button click.
 

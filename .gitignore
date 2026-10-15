@@ -19,3 +19,6 @@ Build-Transfer.py
 Build-Transfer.bat
 
 node_modules/
+
+# Local test environments, build packages and screenshots are never source data.
+output/

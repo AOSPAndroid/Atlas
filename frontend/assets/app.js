@@ -47,7 +47,7 @@ const softwareState = {
   softwareTarget: "",
 };
 const navigationIcons = Object.fromEntries(
-  ['workspace','active-directory','packages','admin','bulk','history','terminal','psexec','knowledge']
+  ['workspace','inbox','active-directory','packages','admin','bulk','history','terminal','psexec','knowledge']
     .map(name => [name, AtlasUI.icon(name)]),
 );
 

@@ -33,11 +33,13 @@ def stop_record(mode,record):
     record_path(mode).unlink(missing_ok=True);return 0
 
 def stop():
-    failed=0
+    from inbox_control import launcher_action
+    collectors_stopped=launcher_action('stop')
+    failed=0 if collectors_stopped is not False else 1
     for mode in ('viewer','admin'):
         record=read_record(mode)
         if record:failed |= stop_record(mode,record)
-    print('Atlas servers stopped.' if not failed else 'A server could not be stopped; its record was retained.')
+    print('Atlas servers stopped.' if not failed else 'Atlas shutdown needs attention. Any unresponsive server record was retained; check collector status before updating.')
     return failed
 
 def start_server(spec):
@@ -92,6 +94,8 @@ def run(open_browser=True):
     urls=share_urls(specs[1]['port'])
     message=f'Admin: {admin_url}\nViewer preview: {viewer_url}\nShare on your network:\n'+'\n'.join(urls or [f"http://YOUR-IP:{specs[1]['port']}"])
     (ROOT/'data'/'share-addresses.txt').write_text(message+'\n',encoding='utf-8');print(message)
+    from inbox_control import launcher_action
+    launcher_action('start')
     if open_browser:webbrowser.open(admin_url);webbrowser.open(viewer_url)
     return 0
 

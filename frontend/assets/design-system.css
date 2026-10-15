@@ -2583,3 +2583,75 @@ body.atlas-console .workspace-state:is([data-state="running"],[data-state="queue
 body.atlas-console .workspace-state:is([data-state="launched"],[data-state="complete"],[data-state="completed"]) { color:var(--atlas-success, #18724a); }
 body.atlas-console [data-home-history] { margin-top:6px; }
 @media(max-width:650px) { body.atlas-console .workspace-activity { grid-template-columns:minmax(0,1fr); } }
+
+/* Local inbox: compact queue beside sender context; shared Admin/Demo/Preview UI. */
+body.atlas-console #inbox.active { display:block; }
+body.atlas-console .live-inbox { min-width:0; font:12px/1.45 var(--atlas-font); }
+body.atlas-console .inbox-toolbar,
+body.atlas-console .inbox-toolbar > div,
+body.atlas-console .inbox-list-heading { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:6px; }
+body.atlas-console .inbox-toolbar { margin-bottom:6px; }
+body.atlas-console .inbox-toolbar > div { justify-content:flex-start; }
+body.atlas-console .inbox-muted { color:var(--atlas-muted); }
+body.atlas-console .inbox-connection { margin-bottom:8px; padding:6px 8px; border:1px solid var(--atlas-line); border-radius:var(--atlas-control-radius); background:var(--atlas-surface-subtle); }
+body.atlas-console .inbox-connection summary { cursor:pointer; }
+body.atlas-console .inbox-connection p { margin:6px 0 0; }
+body.atlas-console .inbox-grid { display:grid; grid-template-columns:minmax(270px,.9fr) minmax(340px,1.25fr); align-items:start; gap:8px; }
+body.atlas-console .inbox-mail-list { min-width:0; border:1px solid var(--atlas-line); border-radius:var(--atlas-panel-radius); background:var(--atlas-surface); padding:6px; }
+body.atlas-console .inbox-list-heading { padding:2px 2px 6px; }
+body.atlas-console .inbox-list-heading h2 { font-size:13px; margin:0; }
+body.atlas-console .inbox-mail-list > ul { list-style:none; margin:0 0 6px; padding:0; max-height:calc(100vh - 250px); min-height:160px; overflow:auto; scrollbar-gutter:stable; }
+body.atlas-console .inbox-mail-list li + li { border-top:1px solid var(--atlas-line); }
+body.atlas-console #liveInbox .inbox-mail-row { display:flex; flex-direction:column; align-items:stretch; gap:4px; width:100%; height:auto; min-height:82px; padding:8px 6px; text-align:left; white-space:normal; border-radius:var(--atlas-control-radius); }
+body.atlas-console #liveInbox .inbox-mail-row[aria-current="true"] { background:var(--atlas-selected); box-shadow:inset 2px 0 var(--atlas-accent); }
+body.atlas-console .inbox-mail-top,
+body.atlas-console .inbox-mail-bottom { display:flex; justify-content:space-between; align-items:center; gap:6px; }
+body.atlas-console .inbox-mail-top strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+body.atlas-console .inbox-mail-top time { flex-shrink:0; color:var(--atlas-muted); font-size:11px; }
+body.atlas-console .inbox-subject { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+body.atlas-console .inbox-address { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:11px; color:var(--atlas-muted); }
+body.atlas-console .inbox-context { display:grid; gap:8px; min-width:0; }
+body.atlas-console #liveInbox [data-slot="card"] { gap:6px; padding:8px 0; box-shadow:none; border-color:var(--atlas-line); border-radius:var(--atlas-panel-radius); }
+body.atlas-console #liveInbox :is([data-slot="card-header"],[data-slot="card-content"],[data-slot="card-footer"]) { padding:0 8px; }
+body.atlas-console #liveInbox [data-slot="card-header"] { gap:4px; }
+body.atlas-console #liveInbox [data-slot="card-title"] { display:flex; align-items:center; gap:6px; font-size:13px; line-height:1.4; overflow-wrap:anywhere; }
+body.atlas-console #liveInbox [data-slot="card-title"] > svg { width:16px; height:16px; flex-shrink:0; color:var(--atlas-muted); }
+body.atlas-console #liveInbox [data-slot="card-description"] { font-size:11px; overflow-wrap:anywhere; }
+body.atlas-console #liveInbox [data-slot="card-content"] p { margin:4px 0; overflow-wrap:anywhere; }
+body.atlas-console .inbox-person-card h3 { margin:0; font-size:14px; }
+body.atlas-console .inbox-match-note { color:var(--atlas-warning); }
+body.atlas-console .inbox-candidates { display:grid; gap:6px; margin-bottom:8px; }
+body.atlas-console .inbox-candidates button { height:auto; min-height:32px; white-space:normal; justify-content:flex-start; }
+body.atlas-console .inbox-devices { list-style:none; margin:0; padding:0; }
+body.atlas-console .inbox-devices li { padding:6px 0; }
+body.atlas-console .inbox-devices li + li { border-top:1px solid var(--atlas-line); }
+body.atlas-console .inbox-devices li > div { display:flex; align-items:center; gap:6px; flex-wrap:wrap; overflow-wrap:anywhere; }
+body.atlas-console .inbox-devices small { color:var(--atlas-muted); font-size:11px; }
+body.atlas-console .inbox-body { font:12px/1.55 var(--atlas-font); white-space:pre-wrap; overflow-wrap:anywhere; margin:0; max-height:340px; overflow:auto; background:var(--atlas-surface-subtle); color:var(--atlas-text); padding:8px; border-radius:var(--atlas-control-radius); }
+body.atlas-console #liveInbox [data-slot="empty"] { min-height:160px; padding:16px 8px; gap:8px; }
+body.atlas-console #liveInbox [data-slot="empty-title"] { font-size:14px; }
+body.atlas-console #liveInbox [data-slot="empty-description"] { font-size:12px; }
+body.atlas-console .inbox-loading { min-height:180px; width:100%; }
+body.atlas-console .inbox-error { color:var(--atlas-danger); margin:6px 0; overflow-wrap:anywhere; }
+body.atlas-console .inbox-controls { margin-bottom:6px; }
+body.atlas-console .inbox-controls-bar, body.atlas-console .inbox-control-actions { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:6px; margin-bottom:6px; }
+body.atlas-console .inbox-control-actions { justify-content:flex-start; margin:0; }
+body.atlas-console .inbox-controls [data-slot="alert"] { margin:6px 0; padding:6px 8px; overflow-wrap:anywhere; }
+body.atlas-console .inbox-controls [data-slot="alert-description"] { font-size:12px; white-space:pre-wrap; max-height:120px; overflow:auto; }
+body.atlas-console .inbox-controls [data-slot="field-set"] { border:0; padding:0; margin:8px 0 0; min-width:0; gap:6px; }
+body.atlas-console .inbox-controls [data-slot="field-legend"] { font-size:12px; margin-bottom:6px; }
+body.atlas-console .inbox-controls [data-slot="field"] { gap:6px; min-width:0; }
+body.atlas-console .inbox-controls :is([data-slot="field-label"],[data-slot="field-description"]) { font-size:12px; margin:0; }
+body.atlas-console .inbox-controls [data-slot="input"] { height:30px; font-size:12px; padding:4px 6px; }
+body.atlas-console .inbox-controls .inbox-setup-fields { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:8px 0; }
+body.atlas-console .inbox-controls .inbox-source-fields { display:flex; flex-direction:row; flex-wrap:wrap; gap:8px 16px; }
+body.atlas-console .inbox-source-fields [data-slot="field"] { width:auto; }
+body.atlas-console #liveInbox [data-slot="switch"] { display:inline-flex; align-items:center; justify-content:flex-start; box-sizing:border-box; width:32px; min-width:32px; height:18px; min-height:18px; padding:1px; border:1px solid var(--atlas-line); border-radius:999px; background:var(--atlas-line); box-shadow:none; }
+body.atlas-console #liveInbox [data-slot="switch"][data-state="checked"] { background:var(--atlas-accent); border-color:var(--atlas-accent); }
+body.atlas-console #liveInbox [data-slot="switch-thumb"] { display:block; width:14px; height:14px; flex-shrink:0; border-radius:50%; background:var(--atlas-surface); translate:none; transform:translateX(0); }
+body.atlas-console #liveInbox [data-slot="switch-thumb"][data-state="checked"] { transform:translateX(14px); }
+body.atlas-console .inbox-controls form > button { margin-top:8px; }
+body.atlas-console .inbox-controls p { overflow-wrap:anywhere; }
+@media(max-width:650px) { body.atlas-console .inbox-controls .inbox-setup-fields { grid-template-columns:minmax(0,1fr); } }
+@media(max-width:950px) { body.atlas-console .inbox-grid { grid-template-columns:minmax(0,1fr); } body.atlas-console .inbox-mail-list > ul { max-height:300px; } }
+@media(max-width:460px) { body.atlas-console .inbox-mail-top { align-items:flex-start; flex-direction:column; gap:2px; } body.atlas-console .inbox-mail-bottom { flex-wrap:wrap; } }

@@ -1,4 +1,10 @@
 function atlasConsoleNavigate(url){if(!window.AtlasDesktop?.navigate(url))location.assign(url);}
+window.addEventListener("atlas:inbox-person", event => {
+  const id = event.detail?.id;
+  if (!Number.isSafeInteger(id) || id < 1) return;
+  page("workspace");
+  loadUser("id:" + id).catch(error => toast(error.message));
+});
 function toast(m) {
   let x = document.createElement("div");
   x.className = "toast";
@@ -33,6 +39,7 @@ function page(id) {
     id;
   const descriptions = {
     workspace: "People, devices and the tools to support them.",
+    inbox: "Incoming emails and Teams/Outlook notification previews, sender records and linked machines.",
     "active-directory": "Explore accounts, memberships and directory objects.",
     packages: "Find software and prepare your next deployment.",
     admin: "Inspect device health and investigate performance.",
@@ -661,7 +668,7 @@ async function runSharedCommand(id) {
   }
   if (id === "desktop-mode") return window.AtlasDesktop?.open();
   if (id === "animations") return AtlasUI.motion.toggle();
-  if (id === "packages") { page("packages"); return; }
+  if (id === "packages" || id === "inbox") { page(id); return; }
   if (id === "catalogue") return openConsoleCatalogue();
   const { MAP_COMMANDS, commandUrl } = await import("/command-registry.js");
   if (MAP_COMMANDS.has(id)) {

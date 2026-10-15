@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { Packages } from "./packages.jsx";
 import { ActionsHub } from "./actions-hub.jsx";
 import { WorkspaceStart } from "./workspace-start.jsx";
+import { LiveInbox } from "./live-inbox.jsx";
 import { installMotionBridge } from "./motion-bridge.js";
 import "./styles.css";
 
@@ -33,6 +34,9 @@ function install() {
   const workspaceRoot = workspaceHost ? createRoot(workspaceHost) : null;
   workspaceHost?.classList.add("atlas-shadcn");
   workspaceRoot?.render(<WorkspaceStart />);
+  const inboxHost = document.getElementById("liveInbox");
+  const inboxRoot = inboxHost ? createRoot(inboxHost) : null;
+  inboxRoot?.render(<LiveInbox />);
   window.AtlasInteractions = { ready: true, ...installMotionBridge() };
   window.addEventListener(
     "pagehide",
@@ -41,6 +45,7 @@ function install() {
         root.unmount();
         packagesRoot?.unmount();
         workspaceRoot?.unmount();
+        inboxRoot?.unmount();
       }
     },
     { once: true },

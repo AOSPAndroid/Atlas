@@ -32,6 +32,7 @@ const targeted = new Set([
 const viewerCommands = new Set(["ad-browser","ad-support-summary","daas","vdi","desktop-mode","ad-open","ad-user-groups","ad-machine-groups","ad-compare","ad-filter-groups","ad-export-groups",
 "kb-layers","kb-format","kb-duplicate","kb-delete","kb-zoom-in","kb-zoom-out","kb-png","knowledge","kb-new","kb-notes","kb-focus","kb-convert","kb-process","kb-decision","kb-database","kb-note","kb-connect","kb-fit","kb-undo","kb-redo","kb-save","kb-export","kb-drawio","kb-svg","kb-import","kb-template-flow","kb-template-network",
   "workspace",
+  "inbox",
   "admin",
   "bulk",
   "history",
@@ -202,6 +203,12 @@ export const COMMANDS = [
     "IT workspace",
     "Directory, machines and application deployment",
     "console install workspace",
+  ],
+  [
+    "inbox",
+    "Live Inbox",
+    "Incoming emails and notification previews with linked machines",
+    "outlook teams email notification listener sender inbox machines",
   ],
   [
     "admin",
