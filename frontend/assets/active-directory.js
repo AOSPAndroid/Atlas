@@ -4,12 +4,26 @@ window.AtlasADRows = (() => {
  const close=(restore=false)=>{menu?.remove();menu=null;const previous=origin;origin=null;if(restore&&previous?.isConnected)previous.focus({preventScroll:true});};
  const server=(returned,requested='')=>{const value=String(returned||requested).trim();return value==='Default domain discovery'?'':value;};
  function button(label,fn){const b=document.createElement('button');b.type='button';b.textContent=label;b.onclick=fn;return b;}
+ // Small object icons in the style of Active Directory Users and Computers.
+ const paths={
+  group:'<circle cx="5.5" cy="5" r="2.3" fill="#3a7bd5"/><path d="M1.5 12.5c0-2.4 1.8-4 4-4s4 1.6 4 4z" fill="#3a7bd5"/><circle cx="10.5" cy="5.5" r="2" fill="#2bb3a3"/><path d="M8.2 12.5c.2-2 1.2-3.4 2.3-3.4 1.9 0 3.5 1.4 3.5 3.4z" fill="#2bb3a3"/>',
+  user:'<circle cx="8" cy="5" r="2.8" fill="#3a7bd5"/><path d="M2.5 14c0-3 2.4-5 5.5-5s5.5 2 5.5 5z" fill="#3a7bd5"/>',
+  computer:'<rect x="1.5" y="2.5" width="13" height="8.5" rx="1" fill="#e8eef5" stroke="#5b6b7c"/><rect x="5" y="12.5" width="6" height="1.5" fill="#5b6b7c"/>',
+  ou:'<path d="M1.5 4.5h4.5l1.5 1.5h7v7.5h-13z" fill="#e8b84a" stroke="#b8862b" stroke-width=".8"/><rect x="5" y="8" width="6" height="3.5" rx=".5" fill="#fff8e6" stroke="#b8862b" stroke-width=".6"/>',
+  container:'<path d="M1.5 4.5h4.5l1.5 1.5h7v7.5h-13z" fill="#e8b84a" stroke="#b8862b" stroke-width=".8"/>',
+  domain:'<circle cx="8" cy="8" r="6" fill="#dbe9f7" stroke="#3a7bd5"/><path d="M2 8h12M8 2c2 2 2 10 0 12M8 2c-2 2-2 10 0 12" stroke="#3a7bd5" fill="none" stroke-width=".8"/>'};
+ const kinds={organizationalUnit:'ou',container:'container',builtinDomain:'container',domainDNS:'domain'};
+ function icon(kind){const span=document.createElement('span');span.className='ad-icon';span.setAttribute('aria-hidden','true');span.innerHTML='<svg viewBox="0 0 16 16" width="16" height="16">'+(paths[kinds[kind]||kind]||paths.container)+'</svg>';return span;}
+ const typeNames={organizationalUnit:'Organizational Unit',container:'Container',builtinDomain:'Container',domainDNS:'Domain',user:'User',computer:'Computer',group:'Group',contact:'Contact'};
+ const typeName=kind=>typeNames[kind]||kind||'Object';
  function attach(row,nameCell,actions,object,server,open){
   const isGroup=object.kind==='group';
   const caption=isGroup?'See members':'See groups';
   const invoke=()=>{if(!window.AtlasReadOnly)return open();};
   const link=button(object.name,invoke);link.className='ad-object-link';link.disabled=!!window.AtlasReadOnly;
-  link.title=caption+' · '+object.name;nameCell.replaceChildren(link);
+  link.title=caption+' · '+object.name;nameCell.replaceChildren(icon(object.kind),link);
+  // Like the Windows console: double-click opens the object.
+  row.addEventListener('dblclick',event=>{if(!event.target.closest('button,summary,input,a'))invoke();});
   const copy=button('Copy',async()=>{
    const text=object.name;
    try{await navigator.clipboard.writeText(text);copy.textContent='Copied';setTimeout(()=>copy.textContent='Copy',1500);}
@@ -42,7 +56,7 @@ window.AtlasADRows = (() => {
  document.addEventListener('pointerdown',e=>{if(menu&&!menu.contains(e.target))close();});
  document.addEventListener('keydown',e=>{if(!menu)return;if(e.key==='Escape'){e.preventDefault();e.stopPropagation();close(true);}else if(e.key==='Tab')close(true);});
  window.addEventListener('hashchange',()=>close());window.addEventListener('resize',()=>close());
- return {attach,server};
+ return {attach,server,icon,typeName};
 })();
 (() => {
   const by = (id) => document.getElementById("ad" + id);
@@ -179,6 +193,15 @@ window.AtlasADRows = (() => {
     download.type = "button";
     bar.append(search, mode, view);
     result.prepend(bar);
+    // Always-visible object summary, like the title area of an AD properties sheet.
+    const header=el('div');header.className='ad-object-header';
+    const who=el('div');who.className='ad-object-name';
+    who.append(AtlasADRows.icon(data.kind==='computer'?'computer':'user'),el('strong',data.details.Name||data.details.Account||'AD object'));
+    if(data.details.Account&&data.details.Account!==data.details.Name)who.append(el('span',data.details.Account));
+    const where=el('small',data.details['Canonical path']||data.details['OU / parent container']||'');where.title=data.details['Distinguished name']||'';
+    const strip=el('div');strip.className='ad-health-strip';
+    for(const [label,value,tone] of healthItems(data).slice(1)){const badge=el('span');badge.className='ad-health-'+tone;badge.append(el('strong',label+': '),el('span',value));strip.append(badge);}
+    header.append(who,where,strip);result.prepend(header);
     const secondaryTools=el('div');secondaryTools.className='ad-group-tools';secondaryTools.append(download);result.append(secondaryTools);
     const compare = el("form");
     compare.className = "ad-group-tools ad-group-compare";
@@ -261,20 +284,24 @@ window.AtlasADRows = (() => {
       const table = el('table');
       table.setAttribute('aria-label','AD group memberships');
       const head=el('thead'), header=el('tr');
-      for(const text of ['Group','Membership', ...(secondary?['Comparison']:[]),'Description','Actions']){const th=el('th',text);th.scope='col';header.append(th);}
+      for(const text of ['Name','Type','Membership', ...(secondary?['Comparison']:[]),'Description','Actions']){const th=el('th',text);th.scope='col';header.append(th);}
       head.append(header);table.append(head);const body=el('tbody');table.append(body);
       for (const g of rows) {
         const row=el('tr'),name=el('td'),description=el('td');
         const actions=el('td');actions.className='ad-row-actions';
         AtlasADRows.attach(row,name,actions,{...g,kind:'group'},g.sourceServer,()=>AtlasAD.browseMembers(g.dn,g.sourceServer));
         const detail=el('details');detail.className='ad-group-record';
-        const summary=el('summary');summary.append(el('strong','Group details'));detail.append(summary);
+        // A small inline toggle keeps each group on one line, like the Windows console.
+        const summary=el('summary');summary.title='Group details';summary.setAttribute('aria-label','Group details for '+g.name);summary.append(el('span','i'));detail.append(summary);
         const properties=el('dl');
         for(const [label,value] of [['Description',g.description==null?'Description unavailable':g.description||'No description recorded'],['Directory path',g.dn],['Scope',g.scope],['Category',g.category]])properties.append(el('dt',label),el('dd',value||'Unavailable'));
         detail.append(properties);name.append(detail);
         description.className='ad-group-description';
         description.textContent=g.description==null?'Description unavailable':g.description||'No description recorded';description.title=description.textContent;
-        row.append(name,el('td',secondary?`${g.firstMembership||'—'} / ${g.secondMembership||'—'}`:g.membership));
+        const known=value=>value&&value!=='Unavailable';
+        const type=el('td',known(g.category)?`${g.category} Group${known(g.scope)?' - '+g.scope:''}`:'Group');type.className='ad-type';
+        row.title=g.dn||'';
+        row.append(name,type,el('td',secondary?`${g.firstMembership||'—'} / ${g.secondMembership||'—'}`:g.membership));
         if(secondary)row.append(el('td',{both:'In both',first:'Only first object',second:'Only second object'}[g.presence]));
         row.append(description,actions);body.append(row);
       }
@@ -511,6 +538,14 @@ window.AtlasADRows = (() => {
  let current=null,parent='',history=[],busy=false;
  const make=(tag,text)=>{const n=document.createElement(tag);if(text!=null)n.textContent=String(text);return n;};
  const control=(label,fn)=>{const b=make('button',label);b.type='button';b.onclick=fn;return b;};
+ // "OU=Paris,DC=corp,DC=example" -> "corp.example › Paris", as the console tree shows it.
+ const crumbs=dn=>{
+  const parts=String(dn||'').split(/,(?=(?:[A-Za-z]+)=)/).map(part=>part.split('=')).filter(part=>part.length>1);
+  const domain=parts.filter(([k])=>k.toUpperCase()==='DC').map(([,v])=>v).join('.');
+  const names=parts.filter(([k])=>k.toUpperCase()!=='DC').map(([,...v])=>v.join('=').replace(/\\(.)/g,'$1')).reverse();
+  return [domain||'Directory',...names].join(' › ');
+ };
+ const containers=['organizationalUnit','container','domainDNS','builtinDomain'];
  async function load(request,remember=true){
   if(busy||window.AtlasReadOnly)return;
   busy=true;status.textContent='Reading directory…';host.setAttribute('aria-busy','true');
@@ -522,12 +557,19 @@ window.AtlasADRows = (() => {
    if(remember&&old)history.push(old);
    const resultServer=AtlasADRows.server(data.server,payload.server);
    tools.elements.server.value=resultServer;
-   current={...payload,base:data.base,server:resultServer};parent=data.parent||'';path.textContent=data.base;
+   current={...payload,base:data.base,server:resultServer};parent=data.parent||'';path.textContent=data.base?crumbs(data.base):'';path.title=data.base||'';
    if(data.details){const dl=make('dl');dl.className='ad-browser-properties';for(const [k,v] of Object.entries(data.details)){dl.append(make('dt',k),make('dd',v||'—'));}results.append(dl);}
-   const table=make('table');table.innerHTML='<thead><tr><th>Name / account</th><th>Type</th><th>Description</th><th>Directory path</th><th>Actions</th></tr></thead>';const body=make('tbody');table.append(body);
+   const table=make('table');table.innerHTML='<thead><tr><th>Name</th><th>Type</th><th>Description</th><th>Directory path</th><th>Actions</th></tr></thead>';const body=make('tbody');table.append(body);
    for(const item of data.items){
-    const row=make('tr'),name=make('td',item.name+(item.account?' · '+item.account:'')),kind=make('td',item.kind),dn=make('td',item.dn),actions=make('td');
-    if(['organizationalUnit','container','domainDNS'].includes(item.kind))actions.append(control('Open',()=>load({base:item.dn,operation:'children',server:resultServer})));
+    const row=make('tr'),name=make('td'),kind=make('td',AtlasADRows.typeName(item.kind)),dn=make('td',item.dn),actions=make('td');
+    name.append(AtlasADRows.icon(item.kind),make('span',item.name));
+    const account=item.account?make('small',item.account):null;if(account)account.className='ad-account';
+    kind.className='ad-type';dn.className='ad-dn';dn.title=item.dn||'';
+    if(containers.includes(item.kind)){
+     const open=()=>load({base:item.dn,operation:'children',server:resultServer});
+     actions.append(control('Open',open));
+     row.addEventListener('dblclick',event=>{if(!event.target.closest('button'))open();});
+    }
     if(['user','computer','group'].includes(item.kind)){
      actions.className='ad-row-actions';
      AtlasADRows.attach(row,name,actions,item,resultServer,()=>{
@@ -535,6 +577,7 @@ window.AtlasADRows = (() => {
       document.getElementById('adServer').value=resultServer;AtlasAD.show(item.kind,item.guid||item.account||item.name);document.getElementById('adForm').scrollIntoView({block:'start'});
      });
     }
+    if(account)name.append(account);
     actions.append(control('Properties',()=>load({operation:'details',base:item.dn,server:resultServer})));
     row.append(name,kind,make('td',item.description||'—'),dn,actions);body.append(row);
    }

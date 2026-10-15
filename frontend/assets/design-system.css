@@ -2686,3 +2686,42 @@ body.atlas-console .screen-reader-bar strong svg { width:14px; height:14px; }
 body.atlas-console .screen-reader-text label { display:grid; gap:2px; font-size:11px; color:var(--atlas-muted); margin-bottom:6px; }
 body.atlas-console .screen-reader-text :is(input, textarea) { width:100%; padding:4px 6px; border:1px solid var(--atlas-line); border-radius:var(--atlas-control-radius); font:12px var(--atlas-font); color:inherit; background:var(--atlas-surface); }
 body.atlas-console .screen-reader-text textarea { resize:vertical; min-height:180px; font-family:ui-monospace, Consolas, monospace; }
+
+/* Active Directory: compact list view in the style of Active Directory Users and Computers. */
+body.atlas-console #active-directory :is(.ad-group-list, .ad-browser-results) table { width:100%; table-layout:auto; border-collapse:collapse; font:12px/1.35 "Segoe UI", var(--atlas-font); }
+body.atlas-console #active-directory :is(.ad-group-list, .ad-browser-results) th { position:sticky; top:0; z-index:1; background:#f3f4f6; color:#1f2937; font-size:12px; font-weight:600; text-transform:none; letter-spacing:0; text-align:left; padding:3px 8px; border:0; border-bottom:1px solid #d6dae0; border-right:1px solid #e3e6ea; white-space:nowrap; }
+body.atlas-console #active-directory :is(.ad-group-list, .ad-browser-results) td { height:24px; padding:1px 8px; border:0; background:#fff; vertical-align:middle; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:380px; font-size:12px; overflow-wrap:normal; }
+body.atlas-console #active-directory :is(.ad-group-list, .ad-browser-results) tbody tr { cursor:default; }
+body.atlas-console #active-directory :is(.ad-group-list, .ad-browser-results) tbody tr:hover td { background:#e5f3ff; }
+body.atlas-console #active-directory :is(.ad-group-list, .ad-browser-results) tbody tr:is(:focus, :focus-within) td { background:#cce8ff; }
+body.atlas-console #active-directory .ad-icon { display:inline-flex; width:16px; height:16px; margin-right:6px; vertical-align:-3px; flex:none; }
+body.atlas-console #active-directory button.ad-object-link { min-height:0; height:auto; padding:0; font:inherit; font-weight:400; color:#111827; white-space:nowrap; overflow-wrap:normal; vertical-align:baseline; }
+body.atlas-console #active-directory button.ad-object-link:hover { color:var(--atlas-accent, #007da5); text-decoration:underline; }
+body.atlas-console #active-directory :is(.ad-type, .ad-account, .ad-dn) { color:#5b6573; }
+body.atlas-console #active-directory .ad-account { margin-left:6px; font-size:11px; }
+body.atlas-console #active-directory .ad-dn { font-size:11px; max-width:320px; }
+body.atlas-console #active-directory .ad-group-description { color:#374151; max-width:340px; }
+body.atlas-console #active-directory .ad-row-actions { min-width:0; white-space:nowrap; text-align:right; }
+body.atlas-console #active-directory :is(.ad-row-actions, .ad-browser-results td:last-child) button { min-height:0; height:20px; margin:0 0 0 3px; padding:0 6px; font-size:11px; line-height:18px; }
+body.atlas-console #active-directory .ad-browser-results td:last-child { min-width:0; text-align:right; }
+/* Group details: a small inline toggle; the properties open below the name. */
+body.atlas-console #active-directory details.ad-group-record { display:inline-block; margin:0 0 0 6px; vertical-align:middle; }
+body.atlas-console #active-directory details.ad-group-record[open] { display:block; margin:2px 0 4px 22px; white-space:normal; }
+body.atlas-console #active-directory .ad-group-record > summary { list-style:none; display:inline-grid; place-items:center; width:14px; height:14px; min-height:0; padding:0; border:1px solid #9aa4b2; border-radius:50%; font:italic 600 9px/1 Georgia, serif; color:#5b6573; cursor:pointer; }
+body.atlas-console #active-directory .ad-group-record > summary::-webkit-details-marker { display:none; }
+body.atlas-console #active-directory .ad-group-record[open] > summary { background:#cce8ff; border-color:#3a7bd5; color:#1f4f8f; }
+body.atlas-console #active-directory .ad-group-record dl { grid-template-columns:90px minmax(0,1fr); gap:1px 8px; margin:3px 0 0; }
+body.atlas-console #active-directory .ad-group-record dt { margin:0; }
+/* Object summary above the groups, like the title area of a properties sheet. */
+body.atlas-console #active-directory .ad-object-header { display:flex; flex-wrap:wrap; align-items:center; gap:4px 12px; margin:6px 0; padding:6px 8px; border:1px solid var(--atlas-line); border-radius:var(--atlas-control-radius); background:#f8fafc; }
+body.atlas-console #active-directory .ad-object-name { display:flex; align-items:center; gap:6px; font-size:14px; }
+body.atlas-console #active-directory .ad-object-name > span:not(.ad-icon) { color:#5b6573; font-size:12px; }
+body.atlas-console #active-directory .ad-object-header small { color:#5b6573; font-size:11px; }
+body.atlas-console #active-directory .ad-object-header .ad-health-strip { flex-basis:100%; margin:0; }
+body.atlas-console #active-directory .ad-browser-path { font:12px var(--atlas-font); color:#374151; }
+body.atlas-console #active-directory .ad-group-count { margin:4px 0; font-size:11px; color:#5b6573; }
+/* Short columns keep their full text; names and descriptions take the remaining width. */
+body.atlas-console #active-directory :is(.ad-group-list, .ad-browser-results) td:is(.ad-type, .ad-row-actions, :last-child) { width:1%; max-width:none; overflow:visible; text-overflow:clip; }
+body.atlas-console #active-directory .ad-group-list td:nth-child(3) { width:1%; }
+body.atlas-console #active-directory :is(.ad-icon, button.ad-object-link, details.ad-group-record:not([open])) { vertical-align:middle; }
+body.atlas-console #active-directory small.ad-account { text-transform:none; letter-spacing:0; font-weight:400; }
