@@ -242,6 +242,7 @@
       return null;
     }
   }
+  window.addEventListener("atlas:open-inbox", () => open("workspace", "/installer?command=inbox"));
   function open(id, route) {
     if (!apps[id]) return;
     let win = windows.get(id);

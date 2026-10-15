@@ -43,13 +43,14 @@ class ViewerTests(unittest.TestCase):
         html=self.client.get('/installer?mode=admin').text
         self.assertIn('content="viewer"',html)
         self.assertIn('atlas-demo-badge',html)
+        self.assertIn('content="viewer"', self.client.get('/assets/desktop.html').text)
         for page in ('workspace','admin','bulk','history','psexec'):
             self.assertIn('data-page="'+page+'"',html)
         for filename in re.findall(r'/assets/([\w.-]+)',html):
             self.assertEqual(self.client.get('/assets/'+filename).status_code,200,filename)
         self.assertEqual(self.client.get('/installer/').status_code,200)
         self.assertEqual(self.client.get('/api/capabilities').json()['elevated_operations'],False)
-        for path in ('/api/psexec/runs','/api/overview/PC','/api/machine-health/PC/cpu','/api/catalog','/api/session'):
+        for path in ('/api/psexec/runs','/api/overview/PC','/api/machine-health/PC/cpu','/api/catalog','/api/session','/api/app','/api/inbox/arrivals','/api/inbox/control','/atlas-sw.js','/atlas.webmanifest'):
             self.assertEqual(self.client.get(path).status_code,404,path)
         for path in ('/api/psexec/run','/api/psexec/runs/fake/input','/api/bulk/deploy','/api/queue'):
             self.assertEqual(self.client.post(path,json={}).status_code,403,path)

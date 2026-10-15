@@ -60,6 +60,14 @@ class InboxTests(unittest.TestCase):
         self.assertEqual(detail['machines'][0]['match_type'], 'Assigned')
         self.assertNotIn('entry_id', detail['message'])
 
+    def test_desktop_arrivals_are_count_only_and_respect_cursor(self):
+        self.assertEqual(self.client.get('/api/inbox/arrivals').json(), {'newest_id': 0, 'count': 0})
+        first, second = self.add(), self.add()
+        self.assertEqual(self.client.get(f'/api/inbox/arrivals?after_id={first}').json(), {'newest_id': second, 'count': 1})
+        self.assertEqual(self.client.get(f'/api/inbox/arrivals?after_id={second}').json(), {'newest_id': second, 'count': 0})
+        self.assertEqual(self.client.get('/api/inbox/arrivals?after_id=99999').json(), {'newest_id': second, 'count': 0})
+        self.assertEqual(self.client.get('/api/inbox/arrivals?after_id=-1').status_code, 422)
+
     def test_upn_alias_and_case_match(self):
         mid = self.add(address=' A.MORGAN@EXAMPLE.TEST ')
         detail = self.client.get(f'/api/inbox/messages/{mid}').json()

@@ -42,9 +42,17 @@ shows the error; the rest of the GUI remains available.
   use the same startup hook. After setup, they request collector startup once;
   repeated launches reuse the task and collector locks. Preview-only launchers
   do not start any local process.
+- **Email watcher** and **Notification watcher** are always visible above the
+  feed. Switches apply immediately and persist for the next Atlas launch. Email
+  controls full classic Outlook messages; notifications controls Teams and the
+  optionally selected Outlook previews. Turning on a switch after Stop starts
+  only that source. Turning off the last source shuts down the supervisor.
 - **Start collectors** and **Stop collectors** control the shared normal-user
-  supervisor. **Sources and connection** saves independent email, Teams preview
-  and Outlook preview switches. Start uses those saved choices.
+  supervisor while retaining source preferences. The switches show Off while
+  stopped. On means requested; the status badges above confirm actual readiness,
+  waiting for Outlook, missing permission or errors. With email still on,
+  notification Off pauses capture; the companion may remain in the tray.
+- **Sources and connection** contains the optional Outlook preview setting.
 - **Listener settings** opens Windows consent and notification-source selection
   even when preview capture is disabled. Enabling Outlook previews alongside
   full emails can show both forms of the same incoming message.
@@ -59,6 +67,48 @@ An existing manually configured collector can still work without integrated
 setup through `ATLAS_MAIL_DIR`. The integrated setup takes precedence once saved.
 It does not move or delete any older queue. For the same accounts, an existing
 bridge is reused only if its exact permissions match.
+
+## Install Atlas as an app (PWA)
+
+1. Start Atlas with the normal BAT launcher. Open **http://127.0.0.1:8770/installer**
+   in Edge or Chrome under your normal Windows account. Keep using the same
+   address and port; `localhost` is a different browser origin.
+2. In **Live Inbox**, click **Install Atlas app**, then confirm the browser's
+   installation dialog. If it is unavailable, use Edge's Apps menu or its address
+   bar install icon. Organization policy may disable web-app installation.
+3. Use **Atlas desktop alerts** to opt in to Windows notifications and accept the
+   browser prompt. This is separate from the notification watcher, which reads
+   selected Teams/Outlook notifications with the native companion's permission.
+
+The installed app uses the same Classic/Desktop preference and GUI. It gives
+Atlas its own window and taskbar entry; it does not install or start the Python
+server. Keep using the elevated Atlas launcher (`x01426046_dsk`) and the normal
+mail user's collector task (`x01426046`). If the server is stopped, the app shows
+startup instructions and a Retry link. A PWA cannot read another app's Windows
+notifications or replace the native collectors.
+
+Alerts poll a count-only local endpoint every five seconds while an Atlas window
+is open, including minimized. Browser suspension, Do Not Disturb and organization
+settings can delay or silence delivery. Closing all Atlas windows stops app
+alerts; collector capture can continue until Stop Atlas. There is no cloud push
+provider or closed-app background polling in this release.
+
+The alert shows a new-item count, without names or message bodies. Clicking it
+focuses Atlas and opens Live Inbox. Old items are skipped when enabling or opening
+alerts. Concurrent windows in the same browser profile share a lock and cursor
+to avoid duplicate alerts. Different browser profiles/origins have independent
+settings. The service worker stores no UI, mail or API response cache; browser
+storage contains only the alert preference and numeric cursor. Demo/Preview do
+not expose the app capability or arrival-count endpoint.
+
+OpenFin is a possible later wrapper if the workstation already has an approved
+OpenFin deployment. Its runtime and Notification Center integration are separate
+from a PWA; neither wrapper grants access to Outlook or Teams. No OpenFin runtime
+or dependency is included here.
+
+References: [Edge PWA installation](https://learn.microsoft.com/en-us/microsoft-edge/progressive-web-apps/how-to/),
+[Edge app notifications](https://learn.microsoft.com/en-us/microsoft-edge/progressive-web-apps/how-to/notifications-badges),
+[OpenFin Notification Center](https://developer.openfin.co/docs/services/notifications/stable/api/index.html).
 
 ## Accounts, data and control
 

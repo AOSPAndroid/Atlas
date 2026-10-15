@@ -2652,6 +2652,11 @@ body.atlas-console #liveInbox [data-slot="switch-thumb"] { display:block; width:
 body.atlas-console #liveInbox [data-slot="switch-thumb"][data-state="checked"] { transform:translateX(14px); }
 body.atlas-console .inbox-controls form > button { margin-top:8px; }
 body.atlas-console .inbox-controls p { overflow-wrap:anywhere; }
+body.atlas-console .inbox-controls .inbox-watcher-switches { padding:6px 8px; border:1px solid var(--atlas-line); border-radius:var(--atlas-control-radius); background:var(--atlas-surface); }
+body.atlas-console .inbox-controls .inbox-watcher-switches [data-slot="field-legend"] { margin:0; padding:0 4px; }
+body.atlas-console .inbox-controls > p, body.atlas-console .inbox-app-controls > p { margin:4px 0 6px; font-size:11px; }
+body.atlas-console .inbox-app-controls [data-slot="field"] { width:auto; gap:6px; }
+body.atlas-console .inbox-app-controls [data-slot="field-label"] { font-size:12px; }
 @media(max-width:650px) { body.atlas-console .inbox-controls .inbox-setup-fields { grid-template-columns:minmax(0,1fr); } }
 @media(max-width:950px) { body.atlas-console .inbox-grid { grid-template-columns:minmax(0,1fr); } body.atlas-console .inbox-mail-list > ul { max-height:300px; } }
 @media(max-width:460px) { body.atlas-console .inbox-mail-top { align-items:flex-start; flex-direction:column; gap:2px; } body.atlas-console .inbox-mail-bottom { flex-wrap:wrap; } }

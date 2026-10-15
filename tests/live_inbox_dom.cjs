@@ -26,6 +26,12 @@ const response = data => ({ ok: true, status: 200, json: async () => data });
         const body = JSON.parse(options.body); actions.push(body);
         if (body.action === 'stop') { control.state = 'stopped'; control.desired.running = false; }
         else if (body.action === 'start') { control.state = 'running'; control.desired.running = true; }
+        else if (body.action === 'source') {
+          if (!control.desired.running) Object.assign(control.desired, { outlook: false, notifications: false });
+          for (const key of ['outlook', 'notifications']) if (key in body) control.desired[key] = body[key];
+          control.desired.running = control.desired.outlook || control.desired.notifications;
+          control.state = control.desired.running ? 'running' : 'stopped';
+        }
         else if (body.action === 'preferences') Object.assign(control.desired, body);
       }
       return response(structuredClone(control));
@@ -88,10 +94,20 @@ const response = data => ({ ok: true, status: 200, json: async () => data });
   await until(() => /Notification permission needed/.test(d.querySelector('[data-notification-status]').textContent));
   assert.match(d.querySelector('[data-inbox-status]').textContent, /Watching Outlook/, 'Notification permissions do not stop Outlook mail');
   const controls = d.querySelector('[data-inbox-controls]');
+  assert(!d.getElementById('inbox-source-outlook').closest('details'), 'Watcher switches are always visible');
   const clickControl = label => [...controls.querySelectorAll('button')].find(button => button.textContent === label).click();
   clickControl('Stop collectors');
   await until(() => /Collectors stopped/.test(controls.textContent));
   assert.equal(actions.at(-1).action, 'stop');
+  assert.equal(d.getElementById('inbox-source-outlook').getAttribute('aria-checked'), 'false');
+  d.getElementById('inbox-source-outlook').click();
+  await until(() => actions.at(-1).action === 'source' && !d.getElementById('inbox-source-outlook').disabled);
+  assert.equal(d.getElementById('inbox-source-outlook').getAttribute('aria-checked'), 'true');
+  assert.equal(d.getElementById('inbox-source-notifications').getAttribute('aria-checked'), 'false', 'Starting mail alone keeps notifications off');
+  d.getElementById('inbox-source-notifications').click();
+  await until(() => actions.at(-1).notifications === true && !d.getElementById('inbox-source-notifications').disabled);
+  clickControl('Stop collectors');
+  await until(() => /Collectors stopped/.test(controls.textContent));
   clickControl('Start collectors');
   await until(() => /Collector task connected/.test(controls.textContent));
   d.getElementById('inbox-source-notifications').click();

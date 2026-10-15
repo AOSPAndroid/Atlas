@@ -53,6 +53,31 @@ class InboxControlTests(unittest.TestCase):
         self.assertFalse(result['desired']['outlook'])
         self.assertTrue(result['desired']['outlook_previews'])
 
+    def test_switches_start_only_chosen_source_and_stop_last_source(self):
+        result = self.integration.command('source', outlook=True)
+        self.assertTrue(result['desired']['running'])
+        self.assertTrue(result['desired']['outlook'])
+        self.assertFalse(result['desired']['notifications'])
+        self.integration.command('source', notifications=True)
+        result = self.integration.command('source', outlook=False)
+        self.assertTrue(result['desired']['running'])
+        self.assertTrue(result['desired']['notifications'])
+        result = self.integration.command('source', notifications=False)
+        self.assertFalse(result['desired']['running'])
+        result = control.InboxIntegration(self.root).command('start')
+        self.assertFalse(result['desired']['outlook'])
+        self.assertFalse(result['desired']['notifications'])
+
+    def test_switch_does_not_resume_other_source_after_master_stop(self):
+        self.integration.command('start')
+        self.integration.command('stop')
+        result = self.integration.command('source', notifications=True)
+        self.assertTrue(result['desired']['notifications'])
+        self.assertFalse(result['desired']['outlook'])
+        for values in ({}, {'outlook': True, 'notifications': True}, {'outlook_previews': True}, {'outlook': 'yes'}):
+            with self.assertRaises(control.IntegrationError):
+                self.integration.command('source', **values)
+
     def test_failure_is_actionable_and_retry_retains_preferences(self):
         self.ps.side_effect = control.IntegrationError('Mail user is not signed in')
         with self.assertRaisesRegex(control.IntegrationError, 'not signed in'):

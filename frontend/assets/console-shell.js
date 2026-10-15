@@ -1,4 +1,5 @@
 function atlasConsoleNavigate(url){if(!window.AtlasDesktop?.navigate(url))location.assign(url);}
+window.addEventListener("atlas:open-inbox", () => page("inbox"));
 window.addEventListener("atlas:inbox-person", event => {
   const id = event.detail?.id;
   if (!Number.isSafeInteger(id) || id < 1) return;

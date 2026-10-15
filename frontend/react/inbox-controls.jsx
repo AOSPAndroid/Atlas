@@ -7,7 +7,7 @@ import { Alert, AlertDescription } from "./components/ui/alert";
 import { Field, FieldGroup, FieldLabel, FieldDescription, FieldSet, FieldLegend } from "./components/ui/field";
 
 const labels = { running: "Collector task connected", attention: "Collector needs attention", stopped: "Collectors stopped", stopping: "Stopping collectors", unresponsive: "Collector not responding", error: "Setup needs attention", not_configured: "Connect collectors" };
-const sources = [["outlook", "Classic Outlook emails"], ["notifications", "Teams notification previews"], ["outlook_previews", "Also include Outlook previews"]];
+const sources = [["outlook", "Email watcher"], ["notifications", "Notification watcher"]];
 export function InboxControls({ active, onChange }) {
   const [control, setControl] = useState(null), [error, setError] = useState(""), [busy, setBusy] = useState(false);
   const [readError, setReadError] = useState("");
@@ -53,6 +53,14 @@ export function InboxControls({ active, onChange }) {
         <Button size="sm" variant="secondary" disabled={busy} onClick={() => send({ action: "show" })}>Listener settings</Button>
       </div>}
     </div>
+    <FieldSet className="inbox-watcher-switches"><FieldLegend variant="label">Live watchers</FieldLegend><FieldGroup className="inbox-source-fields">
+      {sources.map(([key, label]) => <Field orientation="horizontal" data-disabled={busy || !configured} key={key}>
+        <Switch id={"inbox-source-" + key} size="sm" checked={!!(desired.running && desired[key])} disabled={busy || !configured} onCheckedChange={value => send({ action: "source", [key]: value })} />
+        <FieldLabel htmlFor={"inbox-source-" + key}>{label}</FieldLabel>
+        <span className="inbox-muted" aria-hidden="true">{desired.running && desired[key] ? "On" : "Off"}</span>
+      </Field>)}
+    </FieldGroup></FieldSet>
+    <p className="inbox-muted">{configured ? "Switches apply immediately and are remembered for the next Atlas start. Status above confirms when each watcher is ready." : "Connect collectors below to enable the watcher switches."}</p>
     {(error || readError) && <Alert variant="destructive"><AlertDescription>{error || readError}</AlertDescription></Alert>}
     {control?.detail && (control.state === "error" || control.state === "unresponsive" || (desired.running && !control.agent_running)) && <Alert><AlertDescription>{control.detail}</AlertDescription></Alert>}
     {Object.entries(control?.errors || {}).map(([source, message]) => <Alert key={source}><AlertDescription><strong>{source === "outlook" ? "Outlook emails" : "Notification listener"}</strong>{message}</AlertDescription></Alert>)}
@@ -60,11 +68,11 @@ export function InboxControls({ active, onChange }) {
     <details className="inbox-connection" open={control ? !configured || editing : false}>
       <summary>{configured ? "Sources and connection" : "Connect collectors"}</summary>
       {configured && !editing ? <>
-        <FieldSet><FieldLegend variant="label">Collect when Atlas starts</FieldLegend><FieldGroup className="inbox-source-fields">
-          {sources.map(([key, label]) => <Field orientation="horizontal" data-disabled={busy} key={key}>
-            <Switch id={"inbox-source-" + key} size="sm" checked={!!desired[key]} disabled={busy} onCheckedChange={value => send({ action: "preferences", [key]: value })} />
-            <FieldLabel htmlFor={"inbox-source-" + key}>{label}</FieldLabel>
-          </Field>)}
+        <FieldSet><FieldLegend variant="label">Notification sources</FieldLegend><FieldGroup className="inbox-source-fields">
+          <Field orientation="horizontal" data-disabled={busy}>
+            <Switch id="inbox-source-outlook_previews" size="sm" checked={!!desired.outlook_previews} disabled={busy} onCheckedChange={value => send({ action: "preferences", outlook_previews: value })} />
+            <FieldLabel htmlFor="inbox-source-outlook_previews">Include Outlook previews alongside Teams</FieldLabel>
+          </Field>
         </FieldGroup></FieldSet>
         <p>Atlas: <strong>{control.atlas_user}</strong> · Outlook and Teams: <strong>{control.mail_user}</strong>. Keep that account signed in. Closing this page keeps collecting; Stop Atlas requests collector shutdown.</p>
         <p>Open classic Outlook for full emails. For notifications, use Listener settings → Allow access and start once. Windows consent and app source selection appear in your normal account.</p>

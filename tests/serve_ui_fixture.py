@@ -13,10 +13,16 @@ fixture_control = dict(configured=True, state='running', agent_running=True, pen
                        mail_user='EXAMPLE\\MailUser', atlas_user='EXAMPLE\\AtlasAdmin', directory='C:\\Example\\Inbox',
                        desired=dict(running=True, outlook=True, notifications=True, outlook_previews=False))
 def fixture_command(self, action, **preferences):
+ if action == 'source' and not fixture_control['desired']['running']:
+  fixture_control['desired'].update(outlook=False, notifications=False)
  fixture_control['desired'].update(preferences)
  if action in ('start', 'stop'):
   fixture_control['desired']['running'] = action == 'start'
   fixture_control['state'] = 'running' if action == 'start' else 'stopped'
+ if action == 'source':
+  fixture_control['desired']['running'] = fixture_control['desired']['outlook'] or fixture_control['desired']['notifications']
+  fixture_control['state'] = 'running' if fixture_control['desired']['running'] else 'stopped'
+ fixture_control['agent_running'] = fixture_control['desired']['running']
  return fixture_control
 inbox_control.InboxIntegration.status=lambda self:fixture_control
 inbox_control.InboxIntegration.command=fixture_command
@@ -44,11 +50,11 @@ with tempfile.TemporaryDirectory() as tmp:
   for eid,name,email,subject,body in [('1','Unknown Sender','unknown@example.test','Printer on floor 3','The printer reports a paper jam.'),('2','Sam Green','unlisted@example.test','Teams audio is cutting out','My microphone disconnects during calls.'),('3','Alex Morgan','alex@example.test','VPN will not connect after the update','Hi IT,\n\nMy laptop cannot connect to VPN this morning. I restarted it, but the connection still times out.\n\nCould you help?\nAlex\n\nFICTIONAL TEST MESSAGE')]:
    queue.insert('fixture',dict(entry_id=eid,received_at=stamp(utcnow()),conversation_id=eid,sender_name=name,sender_address=email,subject=subject,body=body,body_truncated=0))
   queue.close()
-  mail_inbox.watcher_status=lambda directory:dict(state='watching',running=True,stale=False,interval=15,last_success_at=stamp(utcnow()),config={'mailbox':'Fictional test inbox'},detail='Fictional messages used for UI verification; no mailbox is connected.')
+  mail_inbox.watcher_status=lambda directory:dict(state='watching' if fixture_control['desired']['running'] and fixture_control['desired']['outlook'] else 'stopped',running=fixture_control['desired']['running'] and fixture_control['desired']['outlook'],stale=False,interval=15,last_success_at=stamp(utcnow()),config={'mailbox':'Fictional test inbox'},detail='Fictional messages used for UI verification; no mailbox is connected.')
   if '--notifications' in sys.argv:
    with sqlite3.connect(base/'mail'/'inbox.sqlite3') as c:
     c.execute("insert into messages(source,entry_id,received_at,imported_at,conversation_id,sender_name,sender_address,subject,body,body_truncated,channel,content_kind,app_name) values('notification:fixture','4',?,?,'','Alex Morgan','','Alex Morgan',?,0,'teams','notification','Microsoft Teams')",(stamp(utcnow()),stamp(utcnow()),'My laptop keeps disconnecting from Wi-Fi. Could you check it?\n\nFICTIONAL TEAMS NOTIFICATION'))
-   mail_inbox.notification_status=lambda directory:dict(state='watching',running=True,stale=False,last_success_at=stamp(utcnow()),teams_seen=1,captured=1,detail='Fictional notification fixture; no Teams account is connected.')
+   mail_inbox.notification_status=lambda directory:dict(state='watching' if fixture_control['desired']['running'] and fixture_control['desired']['notifications'] else 'stopped',running=fixture_control['desired']['running'] and fixture_control['desired']['notifications'],stale=False,last_success_at=stamp(utcnow()),teams_seen=1,captured=1,detail='Fictional notification fixture; no Teams account is connected.')
  m.REPO=base/'repo';m.REPO.mkdir();(m.REPO/'Example App').mkdir();(m.REPO/'Example App'/'setup_i.ps1').write_text('exit 0')
  m.identity=lambda:'LOCAL UI TEST'
  m.run=lambda *a,**k:type('Result',(),{'stdout':'TEST','stderr':'','returncode':0})()

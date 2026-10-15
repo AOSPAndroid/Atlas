@@ -6,6 +6,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from "./components/ui/empty";
 import { Skeleton } from "./components/ui/skeleton";
 import { InboxControls } from "./inbox-controls";
+import { AppControls } from "./app-controls";
 
 const matchLabels = { email: "Email match", name: "Name match · verify", ambiguous: "Choose a person", unmatched: "No Atlas match" };
 const states = { watching: "Watching Outlook", scanning: "Checking Outlook", starting: "Starting watcher", stopped: "Watcher stopped", waiting_for_outlook: "Waiting for Outlook", retrying: "Retrying Outlook", error: "Watcher needs attention" };
@@ -107,6 +108,7 @@ export function LiveInbox() {
     </div>
     {error && <p role="alert" className="inbox-error">{error} Retrying automatically; displayed messages may be out of date.</p>}
     <InboxControls active={visible} onChange={() => setRefresh(value => value + 1)} />
+    <AppControls />
     <details className="inbox-connection">
       <summary>Connection details · Outlook {date(watcher?.last_success_at)} · notifications {date(notifications?.last_success_at)}</summary>
       <p>{watcher?.detail || "Connect the collectors above, then open classic Outlook in your normal Windows account."}</p>

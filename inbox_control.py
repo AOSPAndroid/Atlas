@@ -140,22 +140,31 @@ class InboxIntegration:
 
     def _command(self, config, action, preferences):
         desired = self.desired(config)
+        if action == 'source':
+            if len(preferences) != 1 or next(iter(preferences), '') not in ('outlook', 'notifications'):
+                raise IntegrationError('Choose one email or notification watcher switch.')
+            # A switch starts only that source after Stop, even when other
+            # sources were enabled before the supervisor was stopped.
+            if not desired['running']:
+                desired.update(outlook=False, notifications=False)
         if action == 'start':
             desired['running'] = True
         elif action == 'stop':
             desired['running'] = False
         elif action == 'show':
             desired.update(running=True, show_window=uuid.uuid4().hex)
-        elif action != 'preferences':
+        elif action not in ('preferences', 'source'):
             raise IntegrationError('Unsupported inbox action.')
         for key, value in preferences.items():
             if key not in ('outlook', 'notifications', 'outlook_previews') or type(value) is not bool:
                 raise IntegrationError('Unsupported inbox preference.')
             desired[key] = value
+        if action == 'source':
+            desired['running'] = desired['outlook'] or desired['notifications']
         desired.update(revision=uuid.uuid4().hex, updated_at=stamp(utcnow()))
         write_json(Path(config['control_directory']) / 'desired.json', desired)
         directory = Path(config['directory'])
-        orphaned = action == 'stop' and any(is_running(directory, name) for name in ('watcher.lock', 'notifications.lock'))
+        orphaned = not desired['running'] and any(is_running(directory, name) for name in ('watcher.lock', 'notifications.lock'))
         if desired['running'] or orphaned:
             # Re-running is harmless: the Windows task ignores duplicate
             # starts and the agent holds an OS lock for the queue.
@@ -170,7 +179,7 @@ class Setup(BaseModel):
 
 class Command(BaseModel):
     model_config = ConfigDict(extra='forbid')
-    action: Literal['start', 'stop', 'show', 'preferences']
+    action: Literal['start', 'stop', 'show', 'preferences', 'source']
     outlook: StrictBool | None = None
     notifications: StrictBool | None = None
     outlook_previews: StrictBool | None = None

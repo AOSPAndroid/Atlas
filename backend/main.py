@@ -706,6 +706,9 @@ def index():
  html=re.sub(r'((?:src|href)="/assets/)([^"?]+\.(?:js|css))(")',version,html)
  return HTMLResponse(html)
 
+# Register the app files before Atlas's single-segment static fallback.
+from pwa import register as register_pwa
+register_pwa(app)
 from atlas_api import register_atlas
 register_atlas(app)
 from psexec_runner import register as register_psexec

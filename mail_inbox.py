@@ -85,6 +85,16 @@ def match_sender(connection, message, chosen=None):
 
 
 def register(app, directory_connection, get_directory=mail_directory):
+    @app.get('/api/inbox/arrivals')
+    def arrivals(after_id: int = Query(0, ge=0)):
+        # Atlas desktop alerts need counts only, never sender names or bodies.
+        with queue_reader(get_directory()) as queue:
+            if queue is None:
+                return {'newest_id': 0, 'count': 0}
+            newest = queue.execute('SELECT coalesce(max(id),0) FROM messages').fetchone()[0]
+            count = queue.execute('SELECT count(*) FROM messages WHERE id>?', (after_id,)).fetchone()[0]
+            return {'newest_id': newest, 'count': count}
+
     @app.get('/api/inbox/messages')
     def messages(after_id: int = Query(0, ge=0), before_id: int = Query(0, ge=0),
                  limit: int = Query(50, ge=1, le=100)):
