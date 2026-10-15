@@ -4,7 +4,37 @@ Use **Atlas Admin > Workspace > Live Inbox** in Classic or Desktop. Incoming
 Outlook email and Teams/Outlook notification previews share one local feed,
 sender lookup, candidate selection and linked-machine panel. Open in Workspace
 selects the matched person in the existing Atlas tools. Messages never launch
-diagnostics or fixes automatically. Suggested fixes are not part of this release.
+diagnostics, deployments or fixes automatically.
+
+## Acting on a message
+
+Each selected message shows a **Request** card and buttons on every machine:
+
+- **Request type.** Atlas reads the subject and the newest part of the body
+  (quoted earlier replies are ignored) in English or French. *Software request*
+  means words like install, uninstall, reinstall or "can I have"; *Issue* lists
+  recognised categories such as slow PC, application error, Outlook, Teams,
+  network/VPN, printing, password or locked account, access, disk space and
+  peripherals. These are keyword suggestions; check them before acting.
+- **Machine.** Machines written in the message (for example `GBRPWMK20881521`)
+  are checked against inventory and listed first, even when they are not linked
+  to the sender. Otherwise the sender's linked Windows machines are offered.
+  Phones and other inventory-only devices get no Windows actions.
+- **Packages.** Product names in the message are matched against the package
+  catalogue. **Install… / Uninstall… / Repair…** opens Workspace with the person,
+  machine, package, action and script selected; click the deploy button there.
+  **Add to queue** adds it to the deployment queue, which still needs
+  **Start queue**. If nothing matches, **Search catalogue** opens the package
+  picker with the words after "install". Saved deployment kits can be added too.
+- **Suggested checks** depend on the issue: performance scan, health check,
+  reboot (with the usual confirmation), and the user's or machine's AD groups.
+- **Knowledge Base** shows documents whose title or notes mention the matched
+  words.
+- **Machine buttons** (Select, Health, Groups, Reboot…) work on any listed machine.
+
+The package list is read from the repository at most every two minutes. If the
+package share or Knowledge Base is unavailable, the message still opens and the
+card says which suggestions are missing.
 
 ## One-time setup on the work PC
 

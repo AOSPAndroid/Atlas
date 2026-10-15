@@ -217,5 +217,5 @@
     window.addEventListener('beforeunload',e=>{if(dirty||saving){e.preventDefault();e.returnValue='';}});
     renderLibrary();loadEditor();status(viewer()?'Draft · download to keep your work':'New document');
   }
-  window.AtlasKnowledge={open,async command(id){await open();return action(id.replace(/^kb-/,''));},validate,validateXML,getDocument:()=>clone(doc)};
+  window.AtlasKnowledge={open,async show(id){page('knowledge');await open();return openDocument(id);},async command(id){await open();return action(id.replace(/^kb-/,''));},validate,validateXML,getDocument:()=>clone(doc)};
 })();

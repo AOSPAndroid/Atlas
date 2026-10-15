@@ -733,7 +733,32 @@ register_knowledge(app, knowledge_path())
 
 # Private local Outlook queue: intentionally absent from backend.viewer.
 from mail_inbox import register as register_inbox
-register_inbox(app, db)
+_inbox_catalogue={'at':0.0,'repo':None,'items':[]}
+def inbox_packages():
+ # Cached briefly: listing a OneDrive-synced share on every message click would be slow.
+ now=time.monotonic();cache=_inbox_catalogue
+ if cache['repo']==str(REPO) and now-cache['at']<120:return cache['items']
+ from package_data import load,join_metadata
+ names=sorted((p.name for p in REPO.iterdir() if p.is_dir()),key=str.casefold) if REPO.is_dir() else []
+ with db() as c:
+  saved={r['folder']:r['display_name'] for r in c.execute('select folder,display_name from package_catalog where repository=?',(str(REPO.resolve()),))}
+  info=join_metadata(names,load(c,include_source=False))
+ items=[{'folder':n,'display_name':saved.get(n) or (info.get(n) or {}).get('display_name') or n} for n in names]
+ cache.update(at=now,repo=str(REPO),items=items)
+ return items
+def inbox_documents():
+ path=knowledge_path()
+ if not path.is_file():return []
+ c=sqlite3.connect(path.resolve().as_uri()+'?mode=ro',uri=True,timeout=5,factory=ClosingConnection)
+ with c:
+  rows=c.execute('select id,title,body from documents').fetchall()
+ documents=[]
+ for doc_id,title,body in rows:
+  try:notes=json.loads(body).get('notes','')
+  except (ValueError,AttributeError):notes=''
+  documents.append({'id':doc_id,'title':title,'notes':str(notes)[:20000]})
+ return documents
+register_inbox(app, db, packages=inbox_packages, documents=inbox_documents)
 from inbox_control import register as register_inbox_control
 register_inbox_control(app)
 

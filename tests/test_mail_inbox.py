@@ -49,6 +49,44 @@ class InboxTests(unittest.TestCase):
             'sender_name': name, 'sender_address': address, 'subject': subject, 'body': body, 'body_truncated': 0})
         return int(eid)
 
+    def test_detail_includes_request_analysis_from_catalogue_knowledge_and_inventory(self):
+        with connect(self.directory) as c:
+            c.execute("INSERT INTO machines(id,machine_name,machine_name_norm) VALUES(2,'OTHER-PC-0042','other-pc-0042')")
+        def directory_connection():
+            c = connect(self.directory)
+            c.row_factory = sqlite3.Row
+            prepare_views(c)
+            return c
+        app = FastAPI()
+        register(app, directory_connection, lambda: self.base / 'mail',
+                 packages=lambda: [{'folder': 'Example_App_1.2', 'display_name': 'Example App'}],
+                 documents=lambda: [{'id': 'kb1', 'title': 'Example App install guide', 'notes': ''}])
+        client = TestClient(app); self.addCleanup(client.close)
+        mid = self.add(subject='Software request', body='Please install Example App on OTHER-PC-0042 and LAPTOP-01.')
+        analysis = client.get(f'/api/inbox/messages/{mid}').json()['analysis']
+        self.assertEqual((analysis['kind'], analysis['action']), ('software', 'Install'))
+        self.assertEqual(analysis['packages'][0]['folder'], 'Example_App_1.2')
+        self.assertEqual([(m['name'], m['linked']) for m in analysis['machines']], [('LAPTOP-01', True), ('OTHER-PC-0042', False)])
+        self.assertEqual(analysis['knowledge'], [{'id': 'kb1', 'title': 'Example App install guide'}])
+        self.assertEqual(analysis['warnings'], [])
+
+    def test_unavailable_catalogue_still_opens_the_message(self):
+        def broken():
+            raise OSError('share offline')
+        app = FastAPI()
+        def directory_connection():
+            c = connect(self.directory)
+            c.row_factory = sqlite3.Row
+            prepare_views(c)
+            return c
+        register(app, directory_connection, lambda: self.base / 'mail', packages=broken)
+        client = TestClient(app); self.addCleanup(client.close)
+        mid = self.add(subject='Install', body='Please install Example App')
+        detail = client.get(f'/api/inbox/messages/{mid}').json()
+        self.assertEqual(detail['match']['user']['id'], 1)
+        self.assertEqual(detail['analysis']['packages'], [])
+        self.assertEqual(detail['analysis']['warnings'], ['Package catalogue unavailable: share offline'])
+
     def test_email_wins_over_ambiguous_name_and_lists_devices(self):
         mid = self.add()
         listing = self.client.get('/api/inbox/messages').json()

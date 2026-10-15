@@ -84,7 +84,25 @@ def match_sender(connection, message, chosen=None):
             'candidates': people, 'chosen': chosen is not None}
 
 
-def register(app, directory_connection, get_directory=mail_directory):
+def mentioned_machines(connection, names):
+    if not names:
+        return []
+    rows = connection.execute(
+        'SELECT name,device_kind,model_id,operational_status,windows_remote_supported FROM legacy_machines '
+        'WHERE name_norm IN (%s) ORDER BY name' % ','.join('?' * len(names)), names).fetchall()
+    return [dict(row) for row in rows]
+
+
+def safely(load, label, warnings):
+    # The request can still be read when the package share or knowledge store is unavailable.
+    try:
+        return list(load())
+    except Exception as error:
+        warnings.append(f'{label} unavailable: {error}')
+        return []
+
+
+def register(app, directory_connection, get_directory=mail_directory, packages=lambda: [], documents=lambda: []):
     @app.get('/api/inbox/arrivals')
     def arrivals(after_id: int = Query(0, ge=0)):
         # Atlas desktop alerts need counts only, never sender names or bodies.
@@ -138,10 +156,16 @@ def register(app, directory_connection, get_directory=mail_directory):
         # Outlook entry/store IDs are private implementation details, not browser links.
         for key in ('source', 'entry_id', 'conversation_id'):
             item.pop(key, None)
+        from inbox_analysis import analyse
+        warnings = []
+        catalogue, knowledge = safely(packages, 'Package catalogue', warnings), safely(documents, 'Knowledge Base', warnings)
         try:
             with directory_connection() as connection:
                 match = match_sender(connection, item, user_id)
                 machines = linked_machines(connection, match['user']['id']) if match['user'] else []
+                analysis = analyse(item.get('subject'), item.get('body'), packages=catalogue, documents=knowledge,
+                                   find_machines=lambda names: mentioned_machines(connection, names),
+                                   linked=[m.get('name') for m in machines])
         except sqlite3.Error as error:
             raise HTTPException(503, 'Atlas directory lookup is unavailable. Retry after the database is ready.') from error
-        return {'message': item, 'match': match, 'machines': machines}
+        return {'message': item, 'match': match, 'machines': machines, 'analysis': {**analysis, 'warnings': warnings}}

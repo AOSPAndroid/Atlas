@@ -2660,3 +2660,20 @@ body.atlas-console .inbox-app-controls [data-slot="field-label"] { font-size:12p
 @media(max-width:650px) { body.atlas-console .inbox-controls .inbox-setup-fields { grid-template-columns:minmax(0,1fr); } }
 @media(max-width:950px) { body.atlas-console .inbox-grid { grid-template-columns:minmax(0,1fr); } body.atlas-console .inbox-mail-list > ul { max-height:300px; } }
 @media(max-width:460px) { body.atlas-console .inbox-mail-top { align-items:flex-start; flex-direction:column; gap:2px; } body.atlas-console .inbox-mail-bottom { flex-wrap:wrap; } }
+
+/* Live Inbox request suggestions and machine actions. */
+body.atlas-console .inbox-machine-actions { display:flex; flex-wrap:wrap; gap:4px; margin-top:4px; }
+body.atlas-console .inbox-request-card [data-slot="card-content"] { display:grid; gap:6px; }
+body.atlas-console .inbox-request-tags { display:flex; flex-wrap:wrap; gap:4px; margin:0; }
+body.atlas-console .inbox-request-section { display:grid; gap:4px; border-top:1px solid var(--atlas-line); padding-top:6px; }
+body.atlas-console .inbox-request-section h3 { display:flex; align-items:center; gap:6px; margin:0; font-size:12px; }
+body.atlas-console .inbox-request-section h3 svg { width:14px; height:14px; }
+body.atlas-console .inbox-request-list { list-style:none; margin:0; padding:0; display:grid; gap:4px; }
+body.atlas-console .inbox-request-list li { display:flex; align-items:center; gap:4px; flex-wrap:wrap; }
+body.atlas-console .inbox-request-list li > span { flex:1; min-width:140px; display:grid; }
+body.atlas-console .inbox-request-list small { color:var(--atlas-muted); font-size:11px; overflow-wrap:anywhere; }
+body.atlas-console .inbox-request-row { display:flex; flex-wrap:wrap; gap:4px; align-items:center; }
+body.atlas-console .inbox-request-row :is(input, select), body.atlas-console .inbox-request-target select { flex:1; min-width:140px; min-height:var(--atlas-control-height); padding:2px 6px; border:1px solid var(--atlas-line); border-radius:var(--atlas-control-radius); font:12px var(--atlas-font); background:var(--atlas-surface); }
+body.atlas-console .inbox-request-target { display:flex; flex-direction:row; align-items:center; justify-content:flex-start; gap:6px; font-size:12px; }
+/* The description is long; keep it under the title instead of squeezing the title. */
+body.atlas-console #liveInbox .inbox-request-card [data-slot="card-header"] { grid-template-columns:minmax(0,1fr); }
