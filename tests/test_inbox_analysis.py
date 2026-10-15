@@ -66,6 +66,10 @@ class Issues(unittest.TestCase):
         self.assertEqual(result['machines'][0]['name'], 'EXAMPLE-DESKTOP-02')
         self.assertFalse(result['machines'][0]['linked'])
 
+    def test_email_addresses_do_not_match_packages(self):
+        result = run('Help', 'Outlook keeps freezing. Contact me at alex@example.test')
+        self.assertEqual((result['kind'], result['packages']), ('issue', []))
+
     def test_french_issue(self):
         result = run('Compte', 'Mon compte est verrouillé, mot de passe expiré')
         self.assertEqual([c['id'] for c in result['categories']], ['account'])

@@ -310,6 +310,9 @@ def register_atlas(app):
  register_official(app,wmi,check_token)
  from remote_software import register_remote_software
  register_remote_software(app,wmi,check_token)
+ # Reads only the operator's own session; never registered on the LAN viewer.
+ from screen_reader import register as register_screen_reader
+ register_screen_reader(app,wmi,check_token)
 
  @app.get('/legacy-atlas')
  def previous_atlas():

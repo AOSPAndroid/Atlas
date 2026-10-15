@@ -179,9 +179,11 @@ def search_hint(words, phrases):
 def analyse(subject, body, *, packages=(), documents=(), find_machines=lambda names: [], linked=()):
     text = latest_text(subject, body)
     found = list(find_machines(hostname_candidates(text)))
-    # Machine names are not product names: "EXAMPLE-DESKTOP-02" must not suggest "Example App".
+    # Machine names and email addresses are not product names: "EXAMPLE-DESKTOP-02" or
+    # "alex@example.test" must not suggest "Example App".
     for machine in found:
         text = re.sub(re.escape(str(machine.get('name', ''))), ' ', text, flags=re.I)
+    text = re.sub(r'[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+', ' ', text)
     words = plain(text)
     action = next((name for name, phrases in ACTIONS if any(contains(words, p) for p in phrases)), None)
     categories = []

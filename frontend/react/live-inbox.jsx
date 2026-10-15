@@ -8,6 +8,7 @@ import { Skeleton } from "./components/ui/skeleton";
 import { InboxControls } from "./inbox-controls";
 import { AppControls } from "./app-controls";
 import { RequestCard, MachineActions } from "./inbox-request";
+import { ScreenReader } from "./screen-reader";
 
 const matchLabels = { email: "Email match", name: "Name match · verify", ambiguous: "Choose a person", unmatched: "No Atlas match" };
 const states = { watching: "Watching Outlook", scanning: "Checking Outlook", starting: "Starting watcher", stopped: "Watcher stopped", waiting_for_outlook: "Waiting for Outlook", retrying: "Retrying Outlook", error: "Watcher needs attention" };
@@ -109,6 +110,7 @@ export function LiveInbox() {
       <Button variant="outline" size="sm" onClick={() => setRefresh(value => value + 1)}><RefreshCw data-icon="inline-start" />Refresh now</Button>
     </div>
     {error && <p role="alert" className="inbox-error">{error} Retrying automatically; displayed messages may be out of date.</p>}
+    <ScreenReader />
     <InboxControls active={visible} onChange={() => setRefresh(value => value + 1)} />
     <AppControls />
     <details className="inbox-connection">

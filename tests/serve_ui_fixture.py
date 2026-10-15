@@ -59,6 +59,17 @@ with tempfile.TemporaryDirectory() as tmp:
  m.identity=lambda:'LOCAL UI TEST'
  m.run=lambda *a,**k:type('Result',(),{'stdout':'TEST','stderr':'','returncode':0})()
  m.ps=lambda *a,**k:'True'
+ if '--inbox' in sys.argv:
+  # Fictional screen reading: no screenshot, OCR or clipboard access.
+  import screen_reader
+  screen_reader.windows=lambda:True
+  plain_ps=m.ps
+  def fake_ps(script,*a,**k):
+   if not script.startswith('$Mode='):return plain_ps(script,*a,**k)
+   mode=script.split("'")[1]
+   text='EXAMPLE-LAPTOP-01' if mode=='clipboard' else 'Alex Morgan 09:41\nHi, my laptop is very slow since this morning and Outlook keeps freezing.\nalex@example.test\nFICTIONAL SCREEN TEXT'
+   return json.dumps(dict(source=mode,title='Chat | Alex Morgan | Microsoft Teams',process='ms-teams',text=text,lines=4,language='en-GB'))
+  m.ps=fake_ps
  import psexec_runner as px
  def fake_pstools(args,**options):
   assert args.count('-accepteula')==1,'The selected tool must receive EULA acceptance'

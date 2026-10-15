@@ -36,6 +36,33 @@ The package list is read from the repository at most every two minutes. If the
 package share or Knowledge Base is unavailable, the message still opens and the
 card says which suggestions are missing.
 
+## Read from screen
+
+For requests that arrive another way (a ServiceNow ticket, a Teams chat, a
+phone call you typed up), use **Read from screen** at the top of Live Inbox:
+
+- **Window in 3 s**: click it, then bring the ticket or chat to the front.
+  After three seconds Atlas reads the text of the window in front.
+- **Whole screen in 3 s**: the same for all monitors.
+- **Clipboard**: reads text you copied, for example a hostname or an email
+  address. No countdown.
+
+The text is read with Windows' built-in text recognition (Windows.Media.Ocr),
+so nothing is installed. Atlas then works out the person (email addresses in
+the text first, then a name in the window title such as
+`Chat | Alex Morgan | Microsoft Teams`), the machines and the request, exactly
+as for an email, with the same Request card and machine buttons. Correct any
+misread words in the text box and click **Analyse again**; if several people
+share a name, choose the right one.
+
+- It reads only your own Windows session: the account and desktop where Atlas
+  Admin runs. It never captures another person's PC.
+- The screenshot is a temporary file deleted straight after recognition. Text
+  is analysed in memory and not saved. Demo and Preview do not offer it.
+- If Atlas itself is still in front when the countdown ends, nothing is read;
+  switch windows sooner and retry. Very small text reads better after zooming in.
+- Recognition uses the languages installed for your Windows account.
+
 ## One-time setup on the work PC
 
 1. Keep the Atlas checkout in a local folder readable by both Windows accounts.
