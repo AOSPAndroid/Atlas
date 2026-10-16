@@ -2727,3 +2727,12 @@ body.atlas-console #active-directory :is(.ad-icon, button.ad-object-link, detail
 body.atlas-console #active-directory small.ad-account { text-transform:none; letter-spacing:0; font-weight:400; }
 
 body.atlas-console .inbox-read-as { color:#9a5b00; font-size:11px; }
+
+/* Terminal and PsTools output drawn with xterm.js; the <pre> stays for screen readers and Copy. */
+body.atlas-console :is(#termOutput, #pxOutput).atlas-xterm-source { position:absolute !important; width:1px !important; height:1px !important; min-height:0 !important; padding:0 !important; border:0 !important; overflow:hidden !important; clip-path:inset(50%); white-space:pre; }
+body.atlas-console .atlas-xterm { height:max(30vh, 220px); padding:6px 4px 6px 8px; background:#172234; border:1px solid #2b3b50; border-radius:8px; box-sizing:border-box; }
+body.atlas-console .atlas-xterm .xterm { height:100%; }
+body.atlas-console .atlas-xterm-search { display:flex; align-items:center; gap:4px; margin:4px 0; }
+body.atlas-console .atlas-xterm-search input { flex:0 1 220px; min-width:0; min-height:var(--atlas-control-height); padding:2px 6px; border:1px solid var(--atlas-line); border-radius:var(--atlas-control-radius); font:12px var(--atlas-font); }
+body.atlas-console .atlas-xterm-search button { min-height:0; height:24px; padding:0 8px; }
+body.atlas-console .atlas-xterm-search small { color:var(--atlas-muted); font-size:11px; }

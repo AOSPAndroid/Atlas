@@ -37,6 +37,10 @@ class MapAssetCaching(unittest.TestCase):
         self.assertEqual(first.status_code, 200)
         self.assertEqual(self.client.get('/assets/shared-ui.js', headers={'if-none-match': first.headers['etag']}).status_code, 304)
 
+    def test_demo_serves_the_terminal_files(self):
+        for name in ('xterm-6.0.0.js', 'xterm-6.0.0.css', 'xterm-addon-fit-0.11.0.js', 'xterm-addon-search-0.16.0.js', 'terminal-view.js'):
+            self.assertEqual(self.client.get('/assets/' + name).status_code, 200, name)
+
     def test_stale_etag_gets_the_current_file(self):
         response = self.client.get('/official-app.js', headers={'if-none-match': '"stale"'})
         self.assertEqual(response.status_code, 200)
