@@ -430,6 +430,17 @@ class StartAndStop(unittest.TestCase):
             self.runtime.wait_ready(20)
         self.assertIn('out of memory', str(caught.exception))
 
+    def test_the_model_server_outlives_the_request_thread_that_started_it(self):
+        # Atlas handles requests on short-lived worker threads: the server must not stop when that thread ends.
+        import time
+        worker = threading.Thread(target=self.runtime.start)
+        worker.start()
+        worker.join()
+        self.runtime.wait_ready(20)
+        time.sleep(1.5)
+        self.assertTrue(self.runtime.ready(), 'Still running after the starting thread ended')
+        self.assertTrue(self.runtime.status()['started_by_atlas'])
+
     @unittest.skipUnless(sys.platform.startswith('linux'), 'Parent-death signal is Linux; Windows uses a job object')
     def test_the_model_server_ends_when_atlas_is_killed(self):
         import signal

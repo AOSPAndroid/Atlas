@@ -193,8 +193,8 @@ class Runtime:
             flags = 0x08000000 if os.name == 'nt' else 0  # CREATE_NO_WINDOW
             extra = {'preexec_fn': _end_with_atlas} if sys.platform.startswith('linux') else {}
             try:
-                self.process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
-                                                cwd=str(Path(command[0]).parent if mode == 'llama-server' else self.root), creationflags=flags, **extra)
+                self.process = self._spawn(command, stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
+                                           cwd=str(Path(command[0]).parent if mode == 'llama-server' else self.root), creationflags=flags, **extra)
             except OSError as error:
                 raise AssistantError(f'Could not start the model server: {error}', 500) from error
             finally:
@@ -204,6 +204,30 @@ class Runtime:
             self.mode, self.started = mode, time.time()
             self.last_used = time.time()
             self._watch()
+
+    @staticmethod
+    def _spawn(command, **options):
+        """Start the server from a thread that lives exactly as long as the server.
+
+        On Linux the "stop when Atlas dies" signal follows the thread that started the process, and Atlas
+        answers requests on short-lived worker threads: started from one of those, the server would stop
+        when that thread is recycled."""
+        box, started = {}, threading.Event()
+
+        def run():
+            try:
+                box['process'] = subprocess.Popen(command, **options)
+            except OSError as error:
+                box['error'] = error
+            finally:
+                started.set()
+            if 'process' in box:
+                box['process'].wait()
+        threading.Thread(target=run, name='assistant-model-server', daemon=True).start()
+        started.wait()
+        if 'error' in box:
+            raise box['error']
+        return box['process']
 
     def wait_ready(self, timeout=LOAD_TIMEOUT):
         end = time.time() + timeout
