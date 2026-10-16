@@ -16,6 +16,7 @@ from directory_lookup import linked_machines, prepare_views, search_directory
 from directory_workbook import NS, col_idx, iter_rows, norm, schema
 from identity_links import rebuild_links
 from seating_excel import account_index
+from sqlite_fixture import FixtureConnection, connect as fixture_connect
 
 
 class WorkbookBounds(unittest.TestCase):
@@ -114,7 +115,7 @@ class RuntimeBackups(unittest.TestCase):
             root = Path(temporary); runtime = root / 'persistent'; runtime.mkdir()
             install = root / 'install'; install.mkdir()
             database = runtime / 'directory.db'; app = FastAPI()
-            with sqlite3.connect(database) as c:
+            with fixture_connect(database) as c:
                 c.executescript('''
                     create table records(id text primary key,body text);
                     create table official_records(id text primary key,body text);
@@ -147,7 +148,7 @@ class DeskSnapshotConsistency(unittest.TestCase):
         from desk_directory import resolve_person
         from merge_data import atlas_schema
 
-        class RefreshDuringLookup(sqlite3.Connection):
+        class RefreshDuringLookup(FixtureConnection):
             replacement = None
 
             def execute(self, sql, parameters=()):
@@ -158,16 +159,16 @@ class DeskSnapshotConsistency(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as temporary:
             database = Path(temporary) / 'concurrent.db'
-            with sqlite3.connect(database) as c:
+            with fixture_connect(database) as c:
                 schema(c); atlas_schema(c)
                 c.execute('insert into metadata values(?,?)', ('directory.generation', 'original'))
                 c.execute('''insert into users(id,canonical_key,user_id,user_id_norm,full_name,full_name_norm)
                     values(1,'uid:original','G1','g1','Original Person','original person')''')
-            with sqlite3.connect(database, factory=RefreshDuringLookup) as c:
+            with fixture_connect(database, factory=RefreshDuringLookup) as c:
                 c.execute('pragma journal_mode=wal'); c.row_factory = sqlite3.Row; prepare_views(c)
 
                 def replace():
-                    with sqlite3.connect(database) as writer:
+                    with fixture_connect(database) as writer:
                         writer.execute('delete from users')
                         writer.execute('''insert into users(id,canonical_key,user_id,user_id_norm,full_name,full_name_norm)
                             values(1,'uid:replacement','G2','g2','Replacement Person','replacement person')''')
