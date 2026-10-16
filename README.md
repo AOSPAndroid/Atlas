@@ -363,10 +363,6 @@ Use Map / Workspace / Knowledge Base in the header, then **Diagrams**. Atlas emb
 
 Restart Atlas after updating to register editor and document routes. Remote-administration permissions remain unchanged.
 
-### Local Assistant: notes to articles, reading requests
-
-A small language model running on this PC (llama.cpp, no Ollama, no cloud) drafts Knowledge Base articles from your notes and files, reads Live Inbox requests and screen text, and adds your notes folders (a whole drive such as `F:\` works) to Search everything. **Import knowledge from folders** works through a drive in the background, skips what is not IT knowledge and fills a review queue of checked drafts; nothing is published until you choose. Every line it writes is checked in code against your text: invented machine names, numbers, commands or steps are flagged or hidden, never shown as fact. Put `llama-server.exe` (or, if programs are blocked, run **Install-Assistant.bat** for the pip-installed llama-cpp-python library) and one `.gguf` model in the `llm` folder; see [docs/local-assistant.md](docs/local-assistant.md) for downloads, model choice for 8 GB graphics cards and how the checks work.
-
 ### PsTools suite
 
 The **PsTools** page (formerly PsExec) now includes a tool selector, searchable templates, command previews and the existing embedded terminal. Search Ctrl+K for PsTools or a utility name. Extract Microsoft's PsTools into `C:\Data` on the **Atlas host**, then start Atlas from an elevated account. The PsExec path determines the folder: `C:\Data\PsExec.exe` selects the adjacent tool executables; a PsExec64 path selects their 64-bit names. Each tool must be present on the Atlas host. PsExec and direct PsTools commands include `-accepteula`: clicking Run or executing a copied command accepts the [Microsoft Sysinternals licence terms](https://learn.microsoft.com/en-us/sysinternals/license-terms) for that tool under the Windows account executing it. Browsing, preparing and copying commands do not launch a tool or accept a licence. Atlas uses your existing tool installation and does not require a previous licence-acceptance registry entry.
