@@ -10,7 +10,7 @@ const {fixture, root} = require('./ui_fixture.cjs');
   const parents = controls.map(x => x.parentNode);
   let kills = 0; d.querySelector('#killOpenFin').disabled = false; d.querySelector('#killOpenFin').onclick = () => kills++;
   assert(!fs.existsSync(root+'/frontend/assets/edge-controls.js'));
-  for (const entry of ['frontend/index.html','frontend/database.html','frontend/assets/desktop.html','frontend/assets/desktop-utility.html','atlas/official-index.html']) assert(!fs.readFileSync(root+'/'+entry,'utf8').includes('/assets/edge-controls.js'));
+  for (const entry of ['frontend/index.html','frontend/database.html','atlas/official-index.html']) assert(!fs.readFileSync(root+'/'+entry,'utf8').includes('/assets/edge-controls.js'));
   assert(!d.documentElement.classList.contains('atlas-auto-hide'));
   assert.equal(d.querySelectorAll('.atlas-edge-panel,.atlas-edge-handle,.atlas-edge-settings').length,0);
   controls.forEach((control,i) => {assert.equal(control.parentNode,parents[i]);assert(!control.inert)});

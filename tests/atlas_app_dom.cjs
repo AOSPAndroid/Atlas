@@ -67,7 +67,7 @@ const flush = async () => { for (let i = 0; i < 8; i++) await new Promise(setImm
   const response = await offline; assert.equal(response.status, 503); assert.match(await response.text(), /Start-Office-Atlas.bat/);
   events.get('fetch')({ request: { url: 'http://localhost:8770/api/inbox/messages', mode: 'cors' }, respondWith: () => assert.fail('Never intercept or cache mail API') });
   windows.push({ url: 'http://localhost:8770/installer', frameType: 'nested', focus: () => assert.fail('Do not target iframe') });
-  windows.push({ url: 'http://localhost:8770/assets/desktop.html', frameType: 'top-level', focus: async () => focused.push(true), postMessage: value => posted.push(value) });
+  windows.push({ url: 'http://localhost:8770/installer?command=workspace', frameType: 'top-level', focus: async () => focused.push(true), postMessage: value => posted.push(value) });
   let clicked;
   const click = () => events.get('notificationclick')({ notification: { close() {}, data: { url: 'https://untrusted.test/' } }, waitUntil: promise => clicked = promise });
   click(); await clicked; assert.equal(focused.length, 1); assert.equal(posted[0].type, 'atlas-open-inbox');

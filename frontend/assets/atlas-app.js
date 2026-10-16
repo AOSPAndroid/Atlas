@@ -17,7 +17,7 @@
     emit();
   }
   function openInbox() {
-    if (document.body.classList.contains("atlas-desktop") || document.querySelector("#inbox"))
+    if (document.querySelector("#inbox"))
       window.dispatchEvent(new Event("atlas:open-inbox"));
     else location.assign("/installer?command=inbox");
   }

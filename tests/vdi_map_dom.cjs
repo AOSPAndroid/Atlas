@@ -103,7 +103,7 @@ const response = (data) => ({ ok: true, json: async () => data });
       w.HTMLCanvasElement.prototype.getContext = () => null;
       w.requestAnimationFrame = () => 1;
       w.cancelAnimationFrame = () => {};
-      w.AtlasDesktop = { navigate: (url) => { navigations.push(url); return true; } };
+      w.AtlasNavigate = (url) => { navigations.push(url); return true; };
       // Observe the real quick-check adapter; all possible reads stay inside this fixture.
       const quick = w.AtlasHealth.quick;
       w.AtlasHealth.quick = (...args) => {

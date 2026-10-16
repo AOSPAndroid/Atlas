@@ -1,6 +1,6 @@
 # Live Inbox in the main Atlas GUI
 
-Use **Atlas Admin > Workspace > Live Inbox** in Classic or Desktop. Incoming
+Use **Atlas Admin > Workspace > Live Inbox**. Incoming
 Outlook email and Teams/Outlook notification previews share one local feed,
 sender lookup, candidate selection and linked-machine panel. Open in Workspace
 selects the matched person in the existing Atlas tools. Messages never launch
@@ -116,8 +116,8 @@ shows the error; the rest of the GUI remains available.
 
 ## Normal use
 
-- `Start-Office-Atlas.bat`, `Start-Classic-Atlas.bat`, `Start-Desktop-Atlas.bat`,
-  `Start-All-Atlas.bat`, and the nested Classic/Desktop Admin/Demo launchers all
+- `Start-Office-Atlas.bat`, `Start-Classic-Atlas.bat`, `Start-All-Atlas.bat`
+  and the Classic-Atlas Admin/Demo launchers all
   use the same startup hook. After setup, they request collector startup once;
   repeated launches reuse the task and collector locks. Preview-only launchers
   do not start any local process.
@@ -159,7 +159,7 @@ bridge is reused only if its exact permissions match.
    browser prompt. This is separate from the notification watcher, which reads
    selected Teams/Outlook notifications with the native companion's permission.
 
-The installed app uses the same Classic/Desktop preference and GUI. It gives
+The installed app uses the same GUI. It gives
 Atlas its own window and taskbar entry; it does not install or start the Python
 server. Keep using the elevated Atlas launcher (`x01426046_dsk`) and the normal
 mail user's collector task (`x01426046`). If the server is stopped, the app shows

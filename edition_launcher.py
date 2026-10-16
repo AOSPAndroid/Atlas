@@ -1,17 +1,20 @@
-"""Launch an explicit Atlas edition without duplicating the shared application."""
+"""Start Atlas and open Admin, Demo and/or the hosted Preview in the browser.
+
+There is one Atlas layout. The old "desktop" and "both" arguments are still accepted so older
+shortcuts keep working; they open the same Atlas.
+"""
 import argparse
 import webbrowser
 import launcher
 
 PREVIEW = "https://office-atlas-mobile-preview.daaalil.chatgpt.site"
 
-def edition_url(edition, mode):
-    path = "/?layout=classic" if edition == "classic" else "/assets/desktop.html"
+def edition_url(mode):
     if mode == "preview":
-        return PREVIEW + path
+        return PREVIEW + "/"
     specs = launcher.servers()
     spec = next(s for s in specs if s["mode"] == ("admin" if mode == "admin" else "viewer"))
-    return f"http://127.0.0.1:{spec['port']}" + path
+    return f"http://127.0.0.1:{spec['port']}/"
 
 def launch(edition, mode, open_browser=True):
     if edition not in {"classic", "desktop", "both"} or mode not in {"admin", "demo", "preview", "all"}:
@@ -20,14 +23,13 @@ def launch(edition, mode, open_browser=True):
         result = launcher.run(open_browser=False)
         if result:
             return result
-    editions = ("classic", "desktop") if edition == "both" else (edition,)
+    # "both" (Start-All-Atlas) also opens the hosted Preview.
     modes = (("admin", "demo", "preview") if edition == "both" else ("admin", "demo")) if mode == "all" else (mode,)
-    for layout in editions:
-        for target in modes:
-            url = edition_url(layout, target)
-            print(f"{layout.capitalize()} {target}: {url}")
-            if open_browser:
-                webbrowser.open_new_tab(url)
+    for target in modes:
+        url = edition_url(target)
+        print(f"Atlas {target}: {url}")
+        if open_browser:
+            webbrowser.open_new_tab(url)
     return 0
 
 if __name__ == "__main__":

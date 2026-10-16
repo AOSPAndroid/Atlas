@@ -1104,13 +1104,13 @@ body .ops-machines {
 }
 
 /* Consistent controls and states; diagram canvas, map labels, switches and desktop dock retain their geometry. */
-body:is(.atlas-console, .atlas-map, .atlas-utility, .atlas-database) {
+body:is(.atlas-console, .atlas-map, .atlas-database) {
   font-family: var(--atlas-font);
   font-size: var(--atlas-body-size);
   line-height: 1.4;
   color: var(--atlas-text);
 }
-body:is(.atlas-console, .atlas-map, .atlas-utility, .atlas-database)
+body:is(.atlas-console, .atlas-map, .atlas-database)
   :is(
     input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not(
         [type="color"]
@@ -1128,7 +1128,7 @@ body:is(.atlas-console, .atlas-map, .atlas-utility, .atlas-database)
   max-width: 100%;
   box-sizing: border-box;
 }
-body:is(.atlas-console, .atlas-map, .atlas-utility, .atlas-database)
+body:is(.atlas-console, .atlas-map, .atlas-database)
   button:not(.map-name):not(.room-label) {
   font-family: var(--atlas-font);
   font-size: 12px;
@@ -1137,7 +1137,7 @@ body:is(.atlas-console, .atlas-map, .atlas-utility, .atlas-database)
 }
 /* Center action content in every first-party surface. Record tables and map
    labels keep their own reading alignment; Desktop keeps its dock geometry. */
-body:is(.atlas-console, .atlas-map, .atlas-utility, .atlas-database, .atlas-desktop)
+body:is(.atlas-console, .atlas-map, .atlas-database)
   button:not(.map-name):not(.room-label):not(.dock-item):not(.window-activate):not([data-page]),
 body :is(.atlas-return, .primary-button, .ops-header-link),
 body .atlas-primary-nav a,
@@ -1176,11 +1176,11 @@ body.atlas-map .ops-user-result {
   text-align: center;
   gap: 2px;
 }
-body:is(.atlas-console, .atlas-map, .atlas-utility, .atlas-database)
+body:is(.atlas-console, .atlas-map, .atlas-database)
   :is(.row, .actions, .copybar, .services-toolbar, .atlas-control-group) {
   gap: var(--atlas-space-2);
 }
-body:is(.atlas-console, .atlas-map, .atlas-utility, .atlas-database)
+body:is(.atlas-console, .atlas-map, .atlas-database)
   :is(.row, .actions, .copybar, .services-toolbar, .atlas-control-group)
   > :is(button, input, select) {
   margin: 0;
@@ -1197,13 +1197,13 @@ body button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
-body:is(.atlas-console, .atlas-map, .atlas-utility, .atlas-database)
+body:is(.atlas-console, .atlas-map, .atlas-database)
   :is(button.primary, .primary-button) {
   color: #fff;
   background: var(--atlas-accent);
   border-color: var(--atlas-accent);
 }
-body:is(.atlas-console, .atlas-map, .atlas-utility, .atlas-database)
+body:is(.atlas-console, .atlas-map, .atlas-database)
   button.primary:hover:not(:disabled) {
   background: #00658b;
 }
@@ -1520,110 +1520,14 @@ body #knowledge[data-kb-narrow="true"] .kb-details { grid-column:1; grid-row:3; 
 body #knowledge .kb-file-menu > summary { display:inline-flex; align-items:center; justify-content:center; min-height:var(--atlas-control-height); box-sizing:border-box; padding:4px 7px; border:1px solid var(--atlas-line); border-radius:var(--atlas-control-radius); background:var(--atlas-surface); font:12px/1.4 var(--atlas-font); list-style:none; }
 body #knowledge .kb-file-menu > summary::-webkit-details-marker { display:none; }
 /* Utilities keep semantic colours and dark mode, with the same type/spacing scale. */
-body.atlas-utility main#utility {
-  max-width: 1200px;
-  padding: 8px;
-}
-body.atlas-utility header {
-  margin-bottom: 8px;
-  gap: 6px;
-}
-body.atlas-utility h1 {
-  font-size: 18px;
-  letter-spacing: 0;
-  margin: 0;
-}
-body.atlas-utility h2 {
-  font-size: 14px;
-  margin: 6px 0;
-}
-body.atlas-utility .card {
-  padding: 8px;
-  margin: 6px 0;
-  border-radius: var(--atlas-panel-radius);
-}
-body.atlas-utility :is(form, .row, .world-clocks) {
-  gap: 6px;
-}
-body.atlas-utility form {
-  margin: 6px 0;
-}
-body.atlas-utility .entry {
-  padding: 6px 0;
-  gap: 6px;
-}
-body.atlas-utility .calendar-grid button {
-  height: 36px;
-}
-body.atlas-utility #utilityStatus {
-  padding: 6px 8px;
-  font-size: 11px;
-}
-body.atlas-utility #noteText {
-  min-height: 220px;
-  line-height: 1.5;
-}
-body.atlas-utility .calc {
-  padding: 10px;
-  margin: 8px auto;
-  border-radius: 12px;
-}
-body.atlas-utility .calc-grid {
-  gap: 5px;
-}
-body.atlas-utility .calc button {
-  height: 38px;
-  font-size: 17px;
-}
-body.atlas-utility .calc output {
-  font-size: 28px;
-  padding: 8px 4px;
-}
-body.atlas-utility .muted {
-  opacity: 1;
-  color: var(--atlas-muted);
-}
-body.atlas-utility.dark {
-  --atlas-text: #e9eef5;
-  --atlas-muted: #b5c5d4;
-  --atlas-line: #506173;
-  --atlas-focus: #69b8da;
-}
+
 /* Desktop's dock/window chrome is intentionally different; settings use shared geometry. */
-body.atlas-desktop #desktopSettings {
-  padding: 12px;
-  border-radius: 12px;
-}
-body.atlas-desktop #desktopSettings h2 {
-  font-size: 16px;
-  margin: 0 0 8px;
-}
-body.atlas-desktop .desktop-switch {
-  gap: 8px;
-  margin: 8px 0;
-}
-body.atlas-desktop .personal-settings {
-  padding-top: 8px;
-  margin: 8px 0;
-}
-body.atlas-desktop .personal-settings > label:not(.desktop-switch) {
-  gap: 8px;
-  margin: 7px 0;
-}
-body.atlas-desktop #appLauncher {
-  padding: 12px;
-  border-radius: 12px;
-}
-body.atlas-desktop .launcher-grid {
-  gap: 8px;
-}
+
 @media (pointer: coarse) {
   :root {
     --atlas-control-height: 42px;
   }
   body.atlas-console .process-table :is(button, .thread-link),
-  body.atlas-utility .calendar-grid button,
-  body.atlas-utility .calc button,
   body :is(.context-menu, .desk-menu, .atlas-ad-context) button {
     min-height: 42px;
   }
@@ -1848,7 +1752,7 @@ body .atlas-unified-header .atlas-header-actions { display:flex; flex-wrap:nowra
 .atlas-unified-header .atlas-header-menu { max-height:min(70vh,500px); overflow:auto; }
 .atlas-unified-header .atlas-header-menu .atlas-display-mode { display:flex; padding:6px; gap:6px; }
 .atlas-unified-header .atlas-header-menu :is(.ops-header-link,a[href="/"]) { display:none; }
-.atlas-in-window body > .atlas-unified-header { grid-template-columns:minmax(250px,1fr) auto; }
+
 @media(max-width:700px) {
   body > .atlas-app-header.atlas-unified-header { grid-template-columns:1fr auto; }
   .atlas-unified-header .atlas-brand { grid-column:1 / -1; }
@@ -1869,16 +1773,14 @@ body > .atlas-app-header.atlas-unified-header > .preview-notice {
   grid-column:1 / -1; grid-row:2; order:0; width:auto; min-width:0;
   padding:0; margin:0; border:0; font:11px/1.4 var(--atlas-font); color:var(--atlas-muted);
 }
-.atlas-in-window body > .atlas-unified-header > .atlas-primary-nav { grid-column:1; }
-.atlas-in-window body > .atlas-unified-header > .atlas-header-actions { grid-column:2; }
+
 @media(max-width:700px) {
   body > .atlas-app-header.atlas-unified-header { grid-template-columns:minmax(0,1fr) auto; }
   body .atlas-unified-header > .atlas-brand { grid-column:1; grid-row:1; }
   body .atlas-unified-header > .atlas-header-actions { grid-column:2; grid-row:1; }
   body .atlas-unified-header > .atlas-primary-nav { grid-column:1 / -1; grid-row:2; }
   body > .atlas-app-header.atlas-unified-header > .preview-notice { grid-row:3; }
-  .atlas-in-window body > .atlas-unified-header > .atlas-primary-nav { grid-column:1; grid-row:1; }
-  .atlas-in-window body > .atlas-unified-header > .preview-notice { grid-row:2; }
+
 }
 
 body .atlas-unified-header .atlas-primary-nav a { font-weight:600; white-space:nowrap; }
@@ -2357,7 +2259,7 @@ body.atlas-console :is(#termMessage,#processStatus):empty { display:none; }
 }
 
 /* Visual finish: shared surfaces, without changing operational density or canvas geometry. */
-body:is(.atlas-console,.atlas-map,.atlas-database,.atlas-utility) {
+body:is(.atlas-console,.atlas-map,.atlas-database) {
   background:#f4f5f7; color:var(--atlas-text); -webkit-font-smoothing:antialiased;
 }
 body > .atlas-app-header {
@@ -2388,19 +2290,19 @@ body.atlas-console :is(.selection-card,.ad-health-strip,.selection-health-grid >
 body.atlas-console .card.machine.selected { background:#f1faff; border-color:#65b6d3; box-shadow:inset 3px 0 #0089b5; }
 body.atlas-console .workspace-device-icon, body .atlas-person .avatar { background:#e8f5fb; color:#007ba6; border-radius:8px; }
 body.atlas-console .workspace-machine-row:not(.selected):hover { background:#f8fbfe; border-color:#a8cbdc; }
-body:is(.atlas-console,.atlas-database,.atlas-utility) :is(input:not([type="checkbox"]):not([type="radio"]),select,textarea) {
+body:is(.atlas-console,.atlas-database) :is(input:not([type="checkbox"]):not([type="radio"]),select,textarea) {
   border-color:#d5dae2; background:#fff; color:var(--atlas-text); box-shadow:0 1px 2px #17223404;
 }
-body:is(.atlas-console,.atlas-database,.atlas-utility) :is(input,select,textarea):focus-visible {
+body:is(.atlas-console,.atlas-database) :is(input,select,textarea):focus-visible {
   outline:2px solid #008bb7; outline-offset:2px; background:#fff;
 }
-body:is(.atlas-console,.atlas-map,.atlas-database,.atlas-utility) button:not(.primary):not(.danger):not([aria-pressed="true"]):not(.active):not(:disabled):hover {
+body:is(.atlas-console,.atlas-map,.atlas-database) button:not(.primary):not(.danger):not([aria-pressed="true"]):not(.active):not(:disabled):hover {
   border-color:#99bdcf;
 }
-body:is(.atlas-console,.atlas-map,.atlas-database,.atlas-utility) button.primary {
+body:is(.atlas-console,.atlas-map,.atlas-database) button.primary {
   background:#087fa6; border-color:#08789d; color:#fff; box-shadow:0 1px 2px #17223416;
 }
-body:is(.atlas-console,.atlas-map,.atlas-database,.atlas-utility) button.primary:hover:not(:disabled) { background:#006c94; }
+body:is(.atlas-console,.atlas-map,.atlas-database) button.primary:hover:not(:disabled) { background:#006c94; }
 body :is(button,input,select,textarea):disabled { cursor:not-allowed; }
 body :is(input[type="checkbox"],input[type="radio"]) { accent-color:var(--atlas-accent); }
 body.atlas-console :is(.tablewrap,.ad-group-list,.ad-browser-results), body.atlas-database .tablewrap { border-color:var(--atlas-line); background:#fff; }
@@ -2428,9 +2330,8 @@ body.atlas-map :is(.directory,.detail) { background:#fbfdff; }
 body.atlas-map .map-heading { background:#f8fbfe; border-bottom:1px solid var(--atlas-line); }
 body.atlas-map .side-head h1 { letter-spacing:-.5px; color:var(--atlas-ink); }
 body.atlas-map :is(.search,.floor-switch,.map-settings) { border-color:#c8dce8; box-shadow:var(--atlas-shadow-soft); }
-body.atlas-desktop .desktop-window { border-color:#c9d9e5; box-shadow:0 12px 38px #12364e30; }
-body.atlas-desktop :is(.window-bar,.desktop-menu) { background:#f3f8fc; border-color:#d3e1eb; }
-body.atlas-utility :is(.card,.panel),body.atlas-database :is(.card,.panel) { border-color:var(--atlas-line); border-radius:10px; box-shadow:var(--atlas-shadow-soft); }
+
+body.atlas-database :is(.card,.panel) { border-color:var(--atlas-line); border-radius:10px; box-shadow:var(--atlas-shadow-soft); }
 @media (forced-colors:active) {
   body.atlas-console .console-sidebar nav button[data-page]:is(.active,[aria-current="page"]) { background:Highlight; color:HighlightText; }
   body :is(.panel,.card,.atlas-dialog) { box-shadow:none; border-color:CanvasText; }
@@ -2451,12 +2352,8 @@ body .atlas-request-loading { color:#006c94; border-color:#b9dce9; background:#e
 body :is(.atlas-header-menu,.atlas-ad-context,.atlas-context-menu) { background:#fff; border:1px solid #d3e1eb; border-radius:9px; box-shadow:var(--atlas-overlay-shadow); }
 body.atlas-console .atlas-terminal { border-top:3px solid #1887ae; }
 body.atlas-console .term-output-actions { border-color:#d4e1ea; }
-body.atlas-desktop #dock { border-color:#ffffffb0; box-shadow:0 8px 30px #17334625; }
-body.atlas-desktop .desktop-window.active { border-color:#88b7d0; }
-body.atlas-database :is(h1,h2),body.atlas-utility :is(h1,h2) { color:var(--atlas-ink); letter-spacing:-.35px; }
 
-body.atlas-desktop .desktop-menu, body.atlas-desktop .desktop-menu :is(button,b,span,time) { color:var(--atlas-ink); }
-body.atlas-desktop .desktop-menu button:hover { background:#dfeef7; color:#005f84; }
+body.atlas-database :is(h1,h2){ color:var(--atlas-ink); letter-spacing:-.35px; }
 
 /* Workbench composition: neutral surfaces, a focused navigation rail and useful empty states. */
 /* shadcn adapters: shared variants and density; keep legacy resets out of these islands. */
@@ -2540,8 +2437,7 @@ body.atlas-map .side-head h1 { font-size:21px; letter-spacing:-.6px; }
 body.atlas-map :is(.floor-switch,.map-settings) { border-color:#dce2e9; box-shadow:0 3px 10px #1722340d; }
 body .atlas-app-header .atlas-primary-nav a[aria-current="page"] { background:#f0f5f8; color:#075d80; box-shadow:inset 0 -2px #087fa6; }
 body :is(.atlas-header-menu,.atlas-ad-context,.atlas-context-menu) { border-color:#e1e5eb; border-radius:7px; }
-body.atlas-desktop .desktop-window { border-color:#d4dce7; }
-body.atlas-desktop :is(.window-bar,.desktop-menu) { background:#f8f9fb; }
+
 @media(max-width:760px) {
   body.atlas-console .console-breadcrumb { display:none; }
   body.atlas-console #pageTitle { font-size:17px; }

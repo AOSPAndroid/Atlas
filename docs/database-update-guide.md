@@ -1,6 +1,6 @@
 # Updating Atlas databases
 
-Classic and Desktop share one local database. Import once to update both Admin layouts and the local Demo. Hosted Preview uses a separately published snapshot.
+Admin and the local Demo share one local database. Import once to update both. Hosted Preview uses a separately published snapshot.
 
 ## Updating Atlas itself
 

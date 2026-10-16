@@ -209,11 +209,8 @@ def console():
 def shared_asset(filename:str, request:Request):
     # Only assets referenced by the shared console template. No API registration.
     template = (ROOT / 'frontend/index.html').read_text(encoding='utf-8')
-    allowed = set(re.findall(r'/assets/([\w.-]+)', template)) | {'desktop.html','desktop.js','desktop.css','desktop-utility.html','desktop-utility.js','desktop-utility.css'}
+    allowed = set(re.findall(r'/assets/([\w.-]+)', template))
     if filename not in allowed:raise HTTPException(404,'Not available')
-    if filename == 'desktop.html':
-        html = (ROOT / 'frontend/assets/desktop.html').read_text(encoding='utf-8')
-        return HTMLResponse(html.replace('<head>', '<head><meta name="atlas-mode" content="viewer">', 1))
     return cached_file(request, ROOT/'frontend/assets'/filename)
 
 

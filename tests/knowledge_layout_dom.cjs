@@ -50,8 +50,7 @@ const settle=()=>new Promise(resolve=>setTimeout(resolve,25));
   assert(!dock.hidden,'Resize retains explicit dock choices');
   // Normal document scroll never changes the sizing anchor or grows the editor.
   scroll=80;top=50;w.dispatchEvent(new w.Event('scroll'));observers.at(-1).callback([]);await settle();assert.equal(root.style.getPropertyValue('--kb-available-height'),'458px');
-  height=500;w.AtlasDesktopHidden=true;w.dispatchEvent(new w.Event('resize'));await settle();assert.equal(root.style.getPropertyValue('--kb-available-height'),'458px');
-  w.AtlasDesktopHidden=false;w.dispatchEvent(new w.Event('atlas-display-change'));await settle();assert.equal(root.style.getPropertyValue('--kb-available-height'),'358px');
+  height=500;w.dispatchEvent(new w.Event('atlas-display-change'));await settle();assert.equal(root.style.getPropertyValue('--kb-available-height'),'358px');
   root.classList.remove('active');height=700;w.dispatchEvent(new w.Event('resize'));await settle();assert.equal(root.style.getPropertyValue('--kb-available-height'),'358px');
   root.classList.add('active');await api.open();await settle();assert.equal(root.style.getPropertyValue('--kb-available-height'),'558px');
   assert.equal(d.getElementById('kbDrawio'),frame,'Docking/resizing/reopening preserves the editor session');assert.equal(d.getElementById('kbNotes'),notes);assert.equal(notes.value,draft.notes);assert.deepEqual(api.getDocument(),draft);

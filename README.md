@@ -4,33 +4,25 @@
 
 Run **[Install-Inbox-Collectors.bat](Install-Inbox-Collectors.bat)** once in the normal mail account with an approved signed notification package. Windows notification consent is still required. The repo includes the build source, a compiled development folder and an unsigned MSIX for the approved signing process. Demo and Preview never receive email or notification data.
 
-## Launch all six views
+## Launch Admin, Demo and Preview
 
-Double-click **[Start-All-Atlas.bat](Start-All-Atlas.bat)** to start the shared local services once and open six browser tabs: Classic Admin, Demo and hosted Preview, then Desktop Admin, Demo and hosted Preview. The Preview tabs require internet access. These are six views backed by two local services and the existing hosted site, not six separate installations.
+Double-click **[Start-All-Atlas.bat](Start-All-Atlas.bat)** to start the local services once and open three browser tabs: Admin, Demo and the hosted Preview (which needs internet access).
 
-**[Stop-All-Atlas.bat](Stop-All-Atlas.bat)** stops both local servers for every edition. Finish active jobs first. It leaves browser tabs open and does not unpublish hosted Preview. Existing per-edition launchers still work.
+**[Stop-All-Atlas.bat](Stop-All-Atlas.bat)** stops both local servers. Finish active jobs first. It leaves browser tabs open and does not unpublish hosted Preview.
 
 ## Quick start and stop
 
-| Edition | Start Admin + Demo | Stop local services |
-| --- | --- | --- |
-| Classic Atlas | [Start-Classic-Atlas.bat](Start-Classic-Atlas.bat) | [Stop-Classic-Atlas.bat](Stop-Classic-Atlas.bat) |
-| Desktop Atlas | [Start-Desktop-Atlas.bat](Start-Desktop-Atlas.bat) | [Stop-Desktop-Atlas.bat](Stop-Desktop-Atlas.bat) |
+| Start Admin + Demo | Stop local services |
+| --- | --- |
+| [Start-Classic-Atlas.bat](Start-Classic-Atlas.bat) | [Stop-Classic-Atlas.bat](Stop-Classic-Atlas.bat) |
 
-Start opens Admin and Demo in the selected layout. Both editions share local services, so **either Stop script stops both editions' Admin and Demo**; finish queue jobs first. Hosted Preview stays online. To open only one mode, use its edition subfolder launcher.
+Start opens Admin and Demo. Stop stops both; finish queue jobs first. Hosted Preview stays online. To open only one mode, use the launchers in [Classic-Atlas](Classic-Atlas/README.md). (The optional Desktop layout with a dock and draggable windows was removed; old Desktop shortcuts open normal Atlas.)
 
 **[Database update guide](docs/database-update-guide.md)** covers imports, backups, recovery, seating and hosted Preview updates.
 
 **[Update-Atlas.bat](Update-Atlas.bat)** updates this installation from GitHub while preserving its data and settings. Install Git for Windows once, finish active jobs, then run it from your existing Atlas folder. [Update instructions](docs/updating-atlas.md) cover ZIP installations, backups and checks.
 
 **[Latest code audit](docs/code-audit-2026-10-06.md)** records the confirmed fixes, regression coverage and large-directory measurements.
-
-## Choose your Atlas edition
-
-- **[Classic Atlas](Classic-Atlas/README.md)** — normal Atlas layout, with Admin, Demo and Preview folders.
-- **[Desktop Atlas](Desktop-Atlas/README.md)** — desktop layout, with Admin, Demo and Preview folders.
-
-Both editions use the shared application below, keeping fixes, data and permissions consistent. Clone/download the complete repository; the edition folders contain launch profiles rather than duplicated application code. Existing root launchers still work.
 
 # Atlas 7.0.0
 
@@ -375,19 +367,7 @@ Restart Atlas after updating to register editor and document routes. Remote-admi
 
 A small language model running on this PC (llama.cpp, no Ollama, no cloud) drafts Knowledge Base articles from your notes and files, reads Live Inbox requests and screen text, and adds your notes folders (a whole drive such as `F:\` works) to Search everything. **Import knowledge from folders** works through a drive in the background, skips what is not IT knowledge and fills a review queue of checked drafts; nothing is published until you choose. Every line it writes is checked in code against your text: invented machine names, numbers, commands or steps are flagged or hidden, never shown as fact. Put `llama-server.exe` and one `.gguf` model in the `llm` folder; see [docs/local-assistant.md](docs/local-assistant.md) for downloads, model choice for 8 GB graphics cards and how the checks work.
 
-### Optional Atlas Desktop
-
-Choose **Desktop** beside the Map / Workspace / Knowledge Base links, or open `/assets/desktop.html`. Classic remains the initial layout; this browser remembers the chosen layout. Use **Window > Switch to Classic Atlas** to return.
-
-The desktop dock opens Map, Workspace and Knowledge Base on demand. App windows can be dragged, resized on all edges, minimized, maximized by the green control or title-bar double-click, or snapped left/right. Red hides the window without closing its work. Dock indicators identify open and active apps. **All apps** searches the core apps and seven working utilities: Calendar (local events and calendar export), Notes (saved scratchpad and text export), Reminders (checklists), Calculator, Clock (world clocks and stopwatch), Files (local file previews) and Music (local audio playback). Calendar, Notes and Reminders are saved in this browser, not synced to Outlook or a corporate account. Files and audio remain local.
-
-**Window multitasking** switches between floating windows and one active app filling the desktop. App frames stay alive so selection, unsaved notes and operation monitoring survive dock switching. Minimized maps stop drawing. Compact screens automatically use one active app without changing the saved multitasking preference. Animations respect Atlas and system motion preferences. Window positions are stored locally; **Reset window positions** brings them back into view. Focus a title bar and use arrows to move, or Shift+arrows to resize.
-
-Admin, Demo and Preview use the same shell, with existing remote-administration restrictions. Layout changes or browser reloads reload apps; save/download diagrams first. This is a browser desktop theme, not an operating system or virtual machine.
-
-Desktop settings include utility light/dark appearance, four minimal Atlas wallpapers, accent colour, dock size, magnification, auto-hide, transparency, and clock format/seconds. Preferences stay in this browser. Utilities load only when opened; hidden clocks skip rendering.
-
-### PsTools suite in Classic and Desktop
+### PsTools suite
 
 The **PsTools** page (formerly PsExec) now includes a tool selector, searchable templates, command previews and the existing embedded terminal. Search Ctrl+K for PsTools or a utility name. Extract Microsoft's PsTools into `C:\Data` on the **Atlas host**, then start Atlas from an elevated account. The PsExec path determines the folder: `C:\Data\PsExec.exe` selects the adjacent tool executables; a PsExec64 path selects their 64-bit names. Each tool must be present on the Atlas host. PsExec and direct PsTools commands include `-accepteula`: clicking Run or executing a copied command accepts the [Microsoft Sysinternals licence terms](https://learn.microsoft.com/en-us/sysinternals/license-terms) for that tool under the Windows account executing it. Browsing, preparing and copying commands do not launch a tool or accept a licence. Atlas uses your existing tool installation and does not require a previous licence-acceptance registry entry.
 
@@ -425,9 +405,8 @@ Microsoft references: [Get-ADUser](https://learn.microsoft.com/en-us/powershell/
 
 ### Compact interface and loading feedback
 
-Classic and Desktop use tighter shared spacing: smaller desktop controls, 12px console panels, narrower sidebars and compact headers. Touchscreen controls keep larger targets. Knowledge Base navigation and tools have SVG icons, and the editor uses the available window height. Slow foreground requests show a small loading indicator after 180ms; it clears on success or error, including concurrent requests. Background watcher polls stay silent. Draw.io has its own loading indicator and timeout message. Indicators respect Animations Off, reduced motion and Citrix mode; they never show invented percentages.
+Atlas uses tight shared spacing: small controls, 12px console panels, narrower sidebars and compact headers. Touchscreen controls keep larger targets. Knowledge Base navigation and tools have SVG icons, and the editor uses the available window height. Slow foreground requests show a small loading indicator after 180ms; it clears on success or error, including concurrent requests. Background watcher polls stay silent. Draw.io has its own loading indicator and timeout message. Indicators respect Animations Off, reduced motion and Citrix mode; they never show invented percentages.
 
-Controls now hide at the edges by default across Map, the console, Database Manager, Desktop and utilities. Move toward a labelled edge handle, click/tap it, or reach it with Tab to reveal its panel. Panels overlay the content without resizing the map or results; typing, keyboard focus and open menus keep them available. **Pin** holds one panel open at an edge; **Close** or Escape hides an unpinned panel. Row actions appear on hover or keyboard focus and stay visible on touch screens. Target, scan state, document title and results remain visible. **Layout > Always show controls** restores persistent controls; the preference applies to all same-origin Desktop windows. **Ctrl+Shift+Backslash** opens Layout. Revealing controls never starts a scan, command or remote change. Native dialogs, Draw.io controls and Desktop dragging/resizing retain their existing behavior.
 
 
 ### AD group inspection and comparison
@@ -439,11 +418,6 @@ Queries use the Windows account running Atlas and require RSAT/domain connectivi
 Performance and machine views use dense layouts: compact process rows with inline PID/session, small metric charts, expandable logical-processor detail, and compact machine facts. Long process lists scroll inside the list with sticky column headings; full records remain available. Touch devices retain larger action targets.
 
 
-### One Atlas, two layouts
-Use **Ctrl+K > DESKTOP MODE (beta)** to switch between Classic Atlas and the dock/window layout. The command works in Map, Workspace and Knowledge Base, including Demo and Preview. The browser remembers the choice per origin. Save diagrams before switching layouts, since app windows reload.
-
-
-Desktop layout: open Search Atlas (Ctrl+K), search DESKTOP MODE (beta), then run the command to switch between Classic and Desktop. The choice is remembered in this browser. Save unsaved diagrams before leaving Desktop.
 
 
 ### AD health and comparison

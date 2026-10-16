@@ -963,7 +963,7 @@ window.AtlasGroups = {
   open(kind, identity, action = "groups") {
     if (window.AtlasAD) return AtlasAD.show(kind, identity, true, action);
     const url = "/installer?" + new URLSearchParams({command: "ad-open", adkind: kind, adidentity: identity || "", adaction: action});
-    if (!window.AtlasDesktop?.navigate(url)) location.assign(url);
+    if (!window.AtlasNavigate?.(url)) location.assign(url);
   }
 };
 window.AtlasContext = (() => {
@@ -981,7 +981,7 @@ window.AtlasContext = (() => {
   }
   function navigate(params) {
     const url = "/installer?" + new URLSearchParams(params);
-    if (!window.AtlasDesktop?.navigate(url)) location.assign(url);
+    if (!window.AtlasNavigate?.(url)) location.assign(url);
   }
   function search(term) {
     return handlers.search ? handlers.search(term) : navigate({lookup: term});
@@ -1129,9 +1129,6 @@ window.AtlasContext = (() => {
 (() => {
   function install() {
     if (window.AtlasInteractions?.ready || document.querySelector('.atlas-reachable-toggle') || !document.querySelector('main')) return;
-    // The Desktop shell already owns window/dock controls. App and utility
-    // documents keep their own action indexes inside their browsing context.
-    if (document.body?.classList.contains('atlas-desktop') && document.getElementById('desktopArea')) return;
     const toggle = document.createElement('button');
     toggle.className = 'atlas-reachable-toggle'; toggle.type = 'button';
     toggle.textContent = 'Actions'; toggle.setAttribute('aria-expanded', 'false');

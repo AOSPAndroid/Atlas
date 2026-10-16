@@ -1,12 +1,12 @@
 # React interaction layer
 
-Atlas now bundles React, Motion, Tailwind CSS and Radix UI locally. The first shared component is a Tools button that morphs into an inline panel: searchable actions and fields, animated cards, and a moving tab indicator. It runs in Classic and Desktop console/map windows, Admin, Demo, the prepared Preview, and the Admin database manager.
+Atlas now bundles React, Motion, Tailwind CSS and Radix UI locally. The first shared component is a Tools button that morphs into an inline panel: searchable actions and fields, animated cards, and a moving tab indicator. It runs in the console and map, Admin, Demo, the prepared Preview, and the Admin database manager.
 
 The panel stays in document flow. Workspace and Active Directory remain separate, and opening Tools never queries a directory, scans a machine, stops a service, or starts a deployment. Action cards invoke the original visible control; the current visibility and disabled state are checked again at activation. Read-only restrictions and existing confirmation dialogs remain authoritative. Large inventory and process tables keep their existing renderers.
 
 Radix Collapsible, Tabs and Tooltip provide accessible component behavior. Motion adds size/layout transitions, card entrances, button press feedback and menu entrances. Animations respect Atlas's existing animation preference, the operating-system preference, and Citrix display mode. Effects finish promptly; there is no idle animation loop or table-wide mutation observer. Keyboard users can select tabs with arrow keys, use the search field, and close Tools with Escape. Activating a field retains focus after the closing animation.
 
-Tailwind utilities use the `atl:` prefix and omit Preflight. Component geometry and Atlas tokens remain in `frontend/assets/design-system.css`, loaded after the generated CSS. Map labels, Draw.io and Desktop dock/window ownership remain unchanged.
+Tailwind utilities use the `atl:` prefix and omit Preflight. Component geometry and Atlas tokens remain in `frontend/assets/design-system.css`, loaded after the generated CSS. Map labels and Draw.io remain unchanged.
 
 ## Development
 

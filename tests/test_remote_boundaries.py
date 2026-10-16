@@ -42,7 +42,7 @@ class RemoteBoundaries(unittest.TestCase):
             self.assertEqual(share.call_count, 3)
 
     def test_admin_documents_only_allow_same_origin_embedding(self):
-        for path in ['/installer', '/assets/desktop.html']:
+        for path in ['/installer', '/manage-database']:
             response = self.client.get(path)
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.headers['content-security-policy'], "frame-ancestors 'self'")

@@ -1,4 +1,5 @@
-function atlasMapNavigate(url){if(!window.AtlasDesktop?.navigate(url))location.assign(url);}
+// window.AtlasNavigate lets tests observe navigation (jsdom cannot replace location.assign).
+function atlasMapNavigate(url){if(!window.AtlasNavigate?.(url))location.assign(url);}
 import { applyFurnitureCorrections } from "./map-furniture.js?v=7";
 import { applyMapAmenities } from "./map-amenities.js?v=13";
 import { createCameraMotion } from "./camera-motion.js";
@@ -1800,10 +1801,10 @@ window.addEventListener("atlas-display-change", () => {
   draw();
 });
 function draw() {
-  if (!ready || pendingDraw || document.hidden || window.AtlasDesktopHidden) return;
+  if (!ready || pendingDraw || document.hidden) return;
   pendingDraw = requestAnimationFrame((time) => {
     pendingDraw = 0;
-    if (document.hidden || window.AtlasDesktopHidden) return;
+    if (document.hidden) return;
     // Coalesce changes into at most 30 rendered frames/s in remote mode.
     if (
       AtlasUI.performance.isCitrix() &&
@@ -2858,7 +2859,6 @@ setView(view);
     export: () => $("#export").click(),
     daas: () => openSiteInfo("daas"),
     vdi: () => openSiteInfo("vdi"),
-    "desktop-mode": () => window.AtlasDesktop?.open(),
     animations: () =>
       document.querySelector(".atlas-motion-toggle input").click(),
     ...(readOnly ? { shortcuts: viewerHelp } : {}),
@@ -2905,11 +2905,6 @@ setView(view);
         : atlasMapNavigate(
             "/installer?" + new URLSearchParams({ machine: value }),
           ),
-  });
-  window.addEventListener('atlas-desktop-route',event=>{
-    const params=new URLSearchParams(event.detail),desk=params.get('desk'),command=params.get('command');
-    if(desk&&records.some(r=>r.id===desk))selectRecord(desk);
-    if(command)runCommand(command);
   });
   const params = new URLSearchParams(location.search),
     desk = params.get("desk"),

@@ -43,7 +43,7 @@ class ViewerTests(unittest.TestCase):
         html=self.client.get('/installer?mode=admin').text
         self.assertIn('content="viewer"',html)
         self.assertIn('atlas-demo-badge',html)
-        self.assertIn('content="viewer"', self.client.get('/assets/desktop.html').text)
+        self.assertEqual(self.client.get('/assets/desktop.html').status_code, 404, 'The Desktop layout was removed')
         for page in ('workspace','admin','bulk','history','psexec'):
             self.assertIn('data-page="'+page+'"',html)
         for filename in re.findall(r'/assets/([\w.-]+)',html):

@@ -30,7 +30,7 @@
   }
   function measureLayout(){
     layoutFrame=0;
-    if(!root?.isConnected||window.AtlasDesktopHidden||!root.classList.contains('active')||!root.getClientRects().length)return;
+    if(!root?.isConnected||!root.classList.contains('active')||!root.getClientRects().length)return;
     const layout=q('.kb-layout'),rect=layout.getBoundingClientRect(),width=root.getBoundingClientRect().width;
     if(!width)return;
     const viewport=window.visualViewport,viewportTop=viewport?.offsetTop||0;
@@ -51,7 +51,7 @@
     if(!dockDefaults){dockDefaults=true;docks.documents=width>=960;syncDocks();}
   }
   function scheduleLayout(){
-    if(!layoutFrame&&root?.isConnected&&!window.AtlasDesktopHidden&&root.classList.contains('active'))layoutFrame=requestAnimationFrame(measureLayout);
+    if(!layoutFrame&&root?.isConnected&&root.classList.contains('active'))layoutFrame=requestAnimationFrame(measureLayout);
   }
   function observeLayout(){
     layoutObserver?.disconnect?.();visibilityObserver?.disconnect();

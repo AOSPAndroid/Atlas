@@ -29,7 +29,7 @@ This saves files; it does not execute downloaded code. If raw downloads are rest
 4. Finish active deployments, queues, imports, terminal commands and other remote work. Save open Knowledge Base documents and browser drafts before services stop.
 5. Double-click **Update-Atlas.bat**. A successful update starts Admin and Demo without opening duplicate browser tabs. Read the result before closing its window, then refresh your open Atlas tabs. If you already have the current version, Atlas stays running and no update backup is needed.
 
-Git is needed for updating, but it is not required just to run a ZIP installation. Classic and Desktop share this folder and its two local services, so one update covers both local Admin layouts and Demo. The separately hosted Preview is published through its own release workflow.
+Git is needed for updating, but it is not required just to run a ZIP installation. Admin and Demo share this folder and its two local services, so one update covers both. The separately hosted Preview is published through its own release workflow.
 
 ## What stays in place
 

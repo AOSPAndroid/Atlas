@@ -1,4 +1,4 @@
-function atlasConsoleNavigate(url){if(!window.AtlasDesktop?.navigate(url))location.assign(url);}
+function atlasConsoleNavigate(url){if(!window.AtlasNavigate?.(url))location.assign(url);}
 window.addEventListener("atlas:open-inbox", () => page("inbox"));
 window.addEventListener("atlas:inbox-person", event => {
   const id = event.detail?.id;
@@ -19,9 +19,6 @@ async function copy(v, n = "Value") {
   toast(`${n} copied`);
 }
 function page(id) {
-  const desktopApp=window.AtlasDesktop?.app;
-  if(desktopApp==='workspace'&&id==='knowledge'){window.AtlasDesktop.navigate('/installer?command=knowledge');return;}
-  if(desktopApp==='knowledge'&&id!=='knowledge'){window.AtlasDesktop.navigate('/installer?command='+id);return;}
 
   document.body.classList.toggle("knowledge-open",id === "knowledge");
   if(id === "knowledge" || location.hash === "#knowledge") {
@@ -648,7 +645,6 @@ async function runInitialSharedCommand(params) {
   await runSharedCommand(id);
 }
 async function runSharedCommand(id) {
-  if(window.AtlasDesktop?.app==='workspace'&&(id==='knowledge'||id.startsWith('kb-'))){window.AtlasDesktop.navigate('/installer?command='+encodeURIComponent(id));return;}
 
   if (window.AtlasReadOnly) {
     const { COMMANDS } = await import("/command-registry.js");
@@ -667,7 +663,6 @@ async function runSharedCommand(id) {
     const { openSiteInfo } = await import("/site-info.js?v=1");
     return openSiteInfo(id);
   }
-  if (id === "desktop-mode") return window.AtlasDesktop?.open();
   if (id === "animations") return AtlasUI.motion.toggle();
   if (id === "packages" || id === "inbox") { page(id); return; }
   if (id === "catalogue") return openConsoleCatalogue();
