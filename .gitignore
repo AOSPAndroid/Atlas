@@ -3,6 +3,9 @@ __pycache__/
 .venv/
 .venv-assistant/
 models/
+# Local Assistant: llama.cpp and model files stay on the PC.
+llm/*
+!llm/README.md
 venv/
 logs/
 data/

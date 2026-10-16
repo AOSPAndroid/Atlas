@@ -105,6 +105,7 @@
     const templates = el("select");
     templates.setAttribute("aria-label", "New article from template");
     templates.append(el("option", { value: "", textContent: "New article…" }), ...TEMPLATES.map(([name], i) => el("option", { value: String(i), textContent: name })));
+    if (window.AtlasAssistant && !readonly()) templates.append(el("option", { value: "assistant", textContent: "Draft from notes with the Assistant…" }));
     templates.disabled = readonly();
     const tagsBox = el("div", { className: "kb-tag-filter" });
     const list = el("ul", { className: "kb-article-results" });
@@ -117,8 +118,11 @@
     host.prepend(bar, section);
     ui = { tabs, search, everything, templates, tagsBox, list, status, view };
     search.addEventListener("input", () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => { state.query = search.value.trim(); refreshList(); }, 200); });
-    everything.onchange = () => { state.everything = everything.checked; search.placeholder = everything.checked ? "Search articles, requests, deployments…" : "Search articles…"; refreshList(); };
-    templates.onchange = () => { const t = TEMPLATES[Number(templates.value)]; templates.value = ""; if (t) edit({ title: t[0] === "Blank article" ? "" : t[0], tags: t[1], categories: t[2], markdown: t[3], revision: 0 }, true); };
+    everything.onchange = () => { state.everything = everything.checked; search.placeholder = everything.checked ? "Search articles, requests, deployments, notes…" : "Search articles…"; refreshList(); };
+    templates.onchange = () => {
+      if (templates.value === "assistant") { templates.value = ""; return draftFromNotes(); }
+      const t = TEMPLATES[Number(templates.value)]; templates.value = ""; if (t) edit({ title: t[0] === "Blank article" ? "" : t[0], tags: t[1], categories: t[2], markdown: t[3], revision: 0 }, true);
+    };
     let mode = "articles";
     try { mode = localStorage.getItem(MODE_KEY) || "articles"; } catch {}
     setMode(mode);
@@ -165,7 +169,7 @@
       ui.list.replaceChildren(...shown.map((a) => item("article", a.id, a.title, a.excerpt, a.updated, a.tags)));
       return;
     }
-    const kinds = state.everything ? "article,diagram,inbox,deployment" : "article";
+    const kinds = state.everything ? "article,diagram,inbox,deployment,file" : "article";
     try {
       const { results } = await api(`/api/search-everything?q=${encodeURIComponent(state.query)}&kinds=${kinds}&limit=40`);
       if (serial !== state.serial) return;
@@ -174,7 +178,7 @@
     } catch (error) { if (serial === state.serial) ui.status.textContent = error.message; }
   }
 
-  const KIND = { article: "Article", diagram: "Diagram", inbox: "Request", deployment: "Deployment" };
+  const KIND = { article: "Article", diagram: "Diagram", inbox: "Request", deployment: "Deployment", file: "Note" };
   function item(kind, ref, title, text, at, tags, result) {
     const open_ = button("", () => openResult(kind, ref, result));
     open_.className = "kb-result";
@@ -189,6 +193,7 @@
     if (kind === "article") return open(ref);
     if (kind === "diagram") { setMode("diagrams"); return original.show(ref); }
     if (kind === "inbox") { page("inbox"); return window.dispatchEvent(new CustomEvent("atlas:inbox-open", { detail: { id: Number(ref) } })); }
+    if (kind === "file") return openFile(ref);
     const x = result?.extra || {};
     state.current = null;
     ui.view.replaceChildren(el("div", { className: "kb-deployment" },
@@ -219,7 +224,7 @@
     await render(article.markdown, body);
   }
 
-  function edit(article, isNew = false) {
+  function edit(article, isNew = false, review = null) {
     state.editing = true;
     const draft = { ...article, id: article.id || null };
     const title = el("input", { value: draft.title || "", maxLength: 180, placeholder: "Article title", required: true });
@@ -271,6 +276,7 @@
       el("div", { className: "kb-editor-split" }, text, preview),
       el("div", { className: "kb-article-actions" }, el("button", { type: "submit", className: "primary", textContent: isNew ? "Create article" : "Save" }), button("Cancel", cancel), message));
     form.addEventListener("keydown", (e) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") { e.preventDefault(); save(); } });
+    if (review) form.prepend(reviewPanel(review, text, update));
     ui.view.replaceChildren(form);
     update();
     (draft.title ? text : title).focus();
@@ -284,6 +290,110 @@
     } catch (error) { ui.status.textContent = error.message; }
   }
 
+  // Local Assistant: notes and files -> a draft article, checked line by line against the notes.
+  const post = (url, body) => api(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+
+  async function openFile(path) {
+    if (state.editing && !confirm("Discard the changes to this article?")) return;
+    state.editing = false; state.current = null;
+    let file;
+    try { file = await post("/api/assistant/file", { path }); }
+    catch (error) { ui.status.textContent = error.message; return; }
+    ui.view.replaceChildren(el("div", { className: "kb-file" },
+      el("header", { className: "kb-article-head" }, el("h2", { textContent: file.name }),
+        el("p", { className: "kb-article-meta" }, el("small", { textContent: file.path + (file.modified ? " · " + date(file.modified * 1000) : "") })),
+        el("div", { className: "kb-article-actions" },
+          button("Draft article from this file", () => draftFromNotes({ files: [{ path: file.path, name: file.name }] }), { className: "primary" }),
+          button("Copy text", () => navigator.clipboard?.writeText(file.text).then(() => toast?.("Text copied"))))),
+      el("pre", { className: "kb-file-text", textContent: file.text + (file.truncated ? "\n\n[Only the beginning of this file is shown]" : "") })));
+  }
+
+  function draftFromNotes(prefill = {}) {
+    if (state.editing && !confirm("Discard the changes to this article?")) return;
+    state.editing = false; state.current = null;
+    const chosen = new Map((prefill.files || []).map((f) => [f.path, f.name]));
+    const title = el("input", { value: prefill.title || "", maxLength: 180, placeholder: "Title (optional)" });
+    title.setAttribute("aria-label", "Article title (optional)");
+    const notes = el("textarea", { value: prefill.notes || "", rows: 10, spellcheck: true,
+      placeholder: "Paste rough notes, a chat with the fix, or an email thread. The Assistant only uses what is here and in the files you choose." });
+    notes.setAttribute("aria-label", "Notes");
+    const picked = el("p", { className: "kb-picked" });
+    const browser = el("div", { className: "kb-file-browser" });
+    const message = el("p", { className: "kb-note", role: "status" });
+    const status = el("p", { className: "kb-note kb-assistant-status" });
+    const showStatus = (s) => { status.textContent = window.AtlasAssistant.describe(s); };
+    window.AtlasAssistant.status().then(showStatus);
+    const renderPicked = () => picked.replaceChildren(...(chosen.size ? [...chosen].map(([path, name]) =>
+      el("span", { className: "kb-tag" }, name + " ", button("×", () => { chosen.delete(path); renderPicked(); browse(browser.dataset.path || ""); }, { title: "Remove " + name, className: "kb-chip-remove" })))
+      : [el("span", { className: "kb-note", textContent: "No files chosen." })]));
+    async function browse(path) {
+      browser.dataset.path = path;
+      let list;
+      try { list = await post("/api/assistant/files", { path }); }
+      catch (error) { browser.replaceChildren(el("p", { className: "kb-note", textContent: error.message }), button("Assistant settings", () => window.AtlasAssistant.openSettings())); return; }
+      if (!list.items.length && !path) {
+        browser.replaceChildren(el("p", { className: "kb-note", textContent: "No notes folders yet. Add them in Assistant settings to pick files here." }), button("Assistant settings", () => window.AtlasAssistant.openSettings()));
+        return;
+      }
+      const rows = list.items.map((item) => {
+        if (item.folder) return el("li", {}, button(item.name + " ›", () => browse(item.path), { className: "kb-folder", title: "Open folder " + item.name }));
+        const box = el("input", { type: "checkbox", checked: chosen.has(item.path) });
+        box.onchange = () => {
+          if (box.checked && chosen.size >= 10) { box.checked = false; message.textContent = "Choose up to 10 files."; return; }
+          box.checked ? chosen.set(item.path, item.name) : chosen.delete(item.path); renderPicked();
+        };
+        return el("li", {}, el("label", {}, box, " " + item.name, el("small", { textContent: " " + date(item.modified * 1000) })));
+      });
+      browser.replaceChildren(el("p", { className: "kb-browser-path" }, path ? button("↑ Up", () => browse(list.parent || "")) : null, el("small", { textContent: path || "Notes folders" })),
+        el("ul", {}, ...rows));
+    }
+    const submit = el("button", { type: "submit", className: "primary", textContent: "Draft article" });
+    const form = el("form", { className: "kb-assistant-form", onsubmit: async (event) => {
+      event.preventDefault();
+      if (!notes.value.trim() && !chosen.size) { message.textContent = "Paste some notes or choose a file first."; return; }
+      submit.disabled = true;
+      const started = Date.now();
+      const tick = setInterval(() => { message.textContent = `Drafting… ${Math.round((Date.now() - started) / 1000)} s. The model writes the draft, then Atlas checks every line against your notes.`; }, 500);
+      try {
+        const draft = await post("/api/assistant/draft-article", { notes: notes.value, files: [...chosen.keys()], title: title.value.trim() });
+        clearInterval(tick);
+        edit({ title: draft.title, markdown: draft.markdown, tags: draft.tags, categories: draft.categories, revision: 0 }, true, draft);
+      } catch (error) {
+        clearInterval(tick); message.textContent = error.message; submit.disabled = false;
+        window.AtlasAssistant.status().then(showStatus);
+      }
+    } },
+      el("header", { className: "kb-article-head" }, el("h2", { textContent: "Draft an article from notes" }),
+        el("div", { className: "kb-article-actions" }, status, button("Assistant settings", () => window.AtlasAssistant.openSettings()))),
+      title, notes, el("h3", { textContent: "Files from your notes folders" }), picked, browser,
+      el("div", { className: "kb-article-actions" }, submit, button("Cancel", () => welcome()), message));
+    ui.view.replaceChildren(form);
+    renderPicked(); browse("");
+    notes.focus();
+  }
+
+  function reviewPanel(draft, text, update) {
+    const flagged = draft.checks.filter((c) => !c.minor), minor = draft.checks.filter((c) => c.minor);
+    const items = el("ul", {}, ...flagged.map((check) => {
+      const line = el("li", {}, el("strong", { textContent: check.section + ": " }), check.text, el("small", { textContent: " — " + check.reasons.join("; ") }));
+      const index = text.value.indexOf(check.text);
+      if (index >= 0) line.append(" ", button("Remove from draft", () => {
+        const start = text.value.lastIndexOf("\n", index) + 1, end = text.value.indexOf("\n", index);
+        text.value = text.value.slice(0, start) + text.value.slice(end < 0 ? text.value.length : end + 1);
+        line.remove(); update();
+      }));
+      return line;
+    }));
+    const panel = el("section", { className: "kb-review" + (flagged.length ? " kb-review-warn" : "") },
+      el("p", {}, el("strong", { textContent: flagged.length ? `Check ${flagged.length} line${flagged.length === 1 ? "" : "s"} before saving` : "Every line matches your notes" }),
+        el("small", { textContent: ` · Drafted by ${draft.model || "the local model"} in ${draft.seconds} s from ${draft.sources.join(", ")}. Review it like any draft.` })),
+      flagged.length ? items : null);
+    if (draft.dropped.length) panel.append(el("p", { className: "kb-note", textContent: `Left out because they are not in your notes as written: ${draft.dropped.map((d) => d.text).join(" · ")}` }));
+    if (minor.length) panel.append(el("p", { className: "kb-note", textContent: `${minor.length} line${minor.length === 1 ? "" : "s"} quote the notes with small differences (typos or OCR).` }));
+    if (draft.cut) panel.append(el("p", { className: "kb-note", textContent: "Long notes were shortened to fit the model. Check that nothing important is missing." }));
+    return panel;
+  }
+
   // Wrap the existing Knowledge Base entry points; diagrams keep working exactly as before.
   const original = { open: window.AtlasKnowledge.open, show: window.AtlasKnowledge.show };
   window.AtlasKnowledge.open = async (...args) => { const result = await original.open(...args); install(); return result; };
@@ -292,8 +402,12 @@
       page("knowledge"); await window.AtlasKnowledge.open(); setMode("articles");
       return open(String(id).slice(8));
     }
+    if (String(id).startsWith("file:")) {
+      page("knowledge"); await window.AtlasKnowledge.open(); setMode("articles");
+      return openFile(String(id).slice(5));
+    }
     setMode("diagrams");
     return original.show(id);
   };
-  window.AtlasKnowledgeArticles = { install, open, edit, refresh, render, setMode, state };
+  window.AtlasKnowledgeArticles = { install, open, edit, refresh, render, setMode, state, draftFromNotes, openFile };
 })();

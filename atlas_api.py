@@ -313,6 +313,9 @@ def register_atlas(app):
  # Reads only the operator's own session; never registered on the LAN viewer.
  from screen_reader import register as register_screen_reader
  register_screen_reader(app,wmi,check_token)
+ # Local model on this PC, only for text Atlas gives it; never registered on the LAN viewer.
+ from local_assistant import register as register_assistant
+ register_assistant(app,wmi,check_token)
 
  @app.get('/legacy-atlas')
  def previous_atlas():

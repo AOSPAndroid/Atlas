@@ -1,4 +1,5 @@
-"""Search everything: Knowledge Base articles and diagrams, Live Inbox requests and deployments.
+"""Search everything: Knowledge Base articles and diagrams, Live Inbox requests, deployments and the
+note files in the Assistant folders.
 
 A SQLite FTS5 index (search-index.sqlite3 beside the Knowledge Base) is brought up to date
 before each search: new inbox messages are added by id, small sources are re-indexed only when
@@ -12,7 +13,7 @@ from contextlib import closing
 
 from fastapi import HTTPException, Query
 
-KINDS = ('article', 'diagram', 'inbox', 'deployment')
+KINDS = ('article', 'diagram', 'inbox', 'deployment', 'file')
 STOP = set('''a an and are as at be been but by can could did do does for from had has have hello hi how i if in into is it its
 me my no not of on or our please so thank thanks that the their them then there these they this to too was we were what when
 where which who why will with would you your yes dear regards best kind team bonjour merci de des du la le les un une et est

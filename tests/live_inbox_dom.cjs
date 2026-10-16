@@ -17,7 +17,7 @@ const response = data => ({ ok: true, status: 200, json: async () => data });
   let rows = [one], offline = false, requests = [], deferred, holdDetail = false, opened;
   const notifications = { running: true, stale: false, state: 'watching', last_success_at: one.received_at };
   const control = { configured: true, state: 'running', mail_user: 'TEST\\MailUser', atlas_user: 'TEST\\AtlasAdmin', agent_running: true, desired: { running: true, outlook: true, notifications: true, outlook_previews: false } };
-  const actions = [];
+  const actions = [], assistantBodies = [];
   const f = await fixture({ fetch: async (url, options = {}) => {
     const parsed = new URL(url, 'http://localhost'); requests.push(parsed);
     if (parsed.pathname === '/api/session') return response({ token: 'fixture-token' });
@@ -35,6 +35,15 @@ const response = data => ({ ok: true, status: 200, json: async () => data });
         else if (body.action === 'preferences') Object.assign(control.desired, body);
       }
       return response(structuredClone(control));
+    }
+    if (parsed.pathname === '/api/assistant/status') return response({ ready: true, configured: true, model_name: 'Qwen3-4B.gguf' });
+    if (parsed.pathname === '/api/assistant/read') {
+      assistantBodies.push(JSON.parse(options.body));
+      return response({ summary: 'Laptop cannot connect to VPN.', asks: [{ text: 'Help with VPN', quote: 'cannot connect' }],
+        facts: [{ label: 'machine', value: 'LAPTOP-01', quote: 'LAPTOP-01' }], questions: ['Which VPN client <b>version</b>?'],
+        steps: [{ text: 'Reinstall GlobalProtect.', source: 'S1', quote: 'Reinstall GlobalProtect' }],
+        hidden: [{ section: 'Facts', text: 'machine: LAPTOP-99', reasons: ['not in the message: LAPTOP-99'] }],
+        sources: [{ id: 'S1', kind: 'file', ref: 'C:\\Notes\\vpn.md', title: 'vpn.md' }], model: 'Qwen3-4B.gguf', seconds: 9.5 });
     }
     if (parsed.pathname.startsWith('/api/search-everything/similar/')) return response(parsed.pathname.endsWith('/1')
       ? { terms: ['vpn', 'connect'], articles: [{ kind: 'article', ref: 'vpn', title: '\u0002VPN\u0003 or network', snippet: '' }],
@@ -57,6 +66,7 @@ const response = data => ({ ok: true, status: 200, json: async () => data });
   w.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
   w.AtlasUI.motion.isReduced = () => true;
   w.addEventListener('atlas:inbox-person', event => opened = event.detail.id);
+  run(fs.readFileSync('frontend/assets/assistant-settings.js', 'utf8'));
   run(fs.readFileSync('frontend/assets/atlas-interactions.js', 'utf8'));
   await sleep(150); assert.equal(requests.length, 0, 'Hidden inbox does not read mail');
   d.getElementById('workspace').classList.remove('active'); d.getElementById('inbox').classList.add('active');
@@ -102,6 +112,31 @@ const response = data => ({ ok: true, status: 200, json: async () => data });
   similar.querySelector('[data-similar-request="2"]').click();
   await until(() => d.querySelector('[data-mail-id="2"][aria-current]') && d.querySelector('.inbox-candidates'));
   assert(!d.querySelector('.inbox-similar-card'));
+  // Assistant: reads the selected message only when asked; only checked lines are shown, with their sources.
+  await until(() => /Ready · Qwen3-4B\.gguf/.test(d.querySelector('.assistant-card')?.textContent || ''));
+  assert.equal(assistantBodies.length, 0, 'Nothing is sent to the model until asked');
+  const readButton = () => [...d.querySelectorAll('.assistant-card button')].find(button => /Read with Assistant|Read again/.test(button.textContent));
+  readButton().click();
+  await until(() => d.querySelector('.assistant-result'));
+  assert.equal(assistantBodies[0].subject, two.subject);
+  assert.match(assistantBodies[0].text, /My laptop cannot connect/);
+  const card = d.querySelector('.assistant-card');
+  assert.equal(card.querySelector('.assistant-summary').textContent, 'Laptop cannot connect to VPN.');
+  assert.deepEqual([...card.querySelectorAll('.assistant-facts :is(dt, dd)')].map(n => n.textContent), ['Machine', 'LAPTOP-01']);
+  assert.equal(card.querySelector('.assistant-facts dd').title, '“LAPTOP-01”', 'Hover shows the words it came from');
+  assert(card.textContent.includes('Which VPN client <b>version</b>?') && !card.querySelector('.assistant-result b'), 'Model text is shown as text');
+  assert.match(card.querySelector('.assistant-hidden summary').textContent, /1 line hidden/);
+  assert.match(card.querySelector('.assistant-hidden').textContent, /not in the message: LAPTOP-99/);
+  assert.match(card.textContent, /Qwen3-4B\.gguf · 9\.5 s/);
+  shown.length = 0;
+  card.querySelector('.assistant-cite').click();
+  await until(() => shown.length);
+  assert.deepEqual(shown.map(action => [action.action, action.document]), [['knowledge', 'file:C:\\Notes\\vpn.md']], 'Sources open in the Knowledge Base');
+  d.querySelector('[data-mail-id="1"]').click();
+  await until(() => d.querySelector('[data-mail-id="1"][aria-current]') && !d.querySelector('.assistant-result'));
+  d.querySelector('[data-mail-id="2"]').click();
+  await until(() => d.querySelector('[data-mail-id="2"][aria-current]') && d.querySelector('.inbox-candidates'));
+  assert(!d.querySelector('.assistant-result'), 'Another message starts from a clean card');
   offline = true;
   d.querySelector('.inbox-toolbar button').click();
   await until(() => /Connection interrupted/.test(d.querySelector('[data-inbox-status]').textContent));
@@ -147,5 +182,5 @@ const response = data => ({ ok: true, status: 200, json: async () => data });
   await until(() => /available in Atlas Admin/.test(viewer.w.document.getElementById('liveInbox').textContent));
   assert(!viewer.w.document.querySelector('[data-mail-id]'));
   assert.deepEqual(viewer.errors, []); viewer.w.dispatchEvent(new viewer.w.Event('pagehide')); viewer.w.close();
-  console.log('PASS: live arrivals, stable selection, Seen before (safe marks, article and request links), sender/device lookup, ambiguity, safe text, stale responses, disconnect recovery, hidden-page polling and private viewer boundary');
+  console.log('PASS: live arrivals, stable selection, Seen before (safe marks, article and request links), Assistant on request (checked lines, sources, hidden lines, reset per message), sender/device lookup, ambiguity, safe text, stale responses, disconnect recovery, hidden-page polling and private viewer boundary');
 })().catch(error => { console.error(error); process.exit(1); });

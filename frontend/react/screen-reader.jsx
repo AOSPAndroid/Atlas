@@ -4,6 +4,7 @@ import { Button } from "./components/ui/button";
 import { Badge } from "./components/ui/badge";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "./components/ui/card";
 import { RequestCard, MachineActions } from "./inbox-request";
+import { AssistantCard } from "./assistant-card";
 
 const sourceLabels = { window: "Window in front", screen: "Whole screen", clipboard: "Clipboard" };
 const matchLabels = { email: "Email in text", name: "Name in window title · verify", ambiguous: "Choose a person", unmatched: "No Atlas match" };
@@ -64,6 +65,7 @@ export function ScreenReader() {
             : match?.kind === "unmatched" && <p>No email address or person name from the text matched Atlas. Machine names and requests are still checked below.</p>}
         </CardContent>{user && <CardFooter><Button variant="outline" size="sm" onClick={() => window.dispatchEvent(new CustomEvent("atlas:inbox-person", { detail: { id: user.id } }))}>Open in Workspace<ArrowUpRight data-icon="inline-end" /></Button></CardFooter>}</Card>
         <RequestCard detail={detail} user={user} />
+        <AssistantCard subject={title} text={text} />
         {(user || mentioned.length > 0) && <Card><CardHeader><CardTitle role="heading" aria-level={2}><Monitor aria-hidden="true" />Machines <Badge variant="secondary">{(user ? result.machines.length : 0) + mentioned.length}</Badge></CardTitle></CardHeader><CardContent>
           <ul className="inbox-devices">
             {mentioned.map((machine) => <li key={"named-" + machine.name} data-screen-machine={machine.name}><div><strong>{machine.name}</strong><Badge variant="outline">In captured text</Badge>{machine.written_as && machine.written_as !== machine.name.toUpperCase() && <small className="inbox-read-as" title="Found despite look-alike characters such as 0/O or 1/I">read as {machine.written_as}</small>}</div><MachineActions machine={machine} user={user} /></li>)}

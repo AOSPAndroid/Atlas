@@ -2792,6 +2792,43 @@ body #knowledge .kb-editor-split textarea { resize:none; min-height:0; height:10
 body #knowledge .kb-preview { overflow:auto; border:1px dashed var(--atlas-line); border-radius:var(--atlas-control-radius); padding:6px 10px; }
 body #knowledge .kb-welcome { max-width:560px; color:#374151; } body #knowledge .kb-welcome h2 { font-size:16px; margin:4px 0; }
 body #knowledge .kb-deployment dl { display:grid; grid-template-columns:90px minmax(0, 1fr); gap:2px 8px; font-size:12px; }
+body #knowledge .kb-assistant-form { display:flex; flex-direction:column; gap:6px; }
+body #knowledge .kb-assistant-form textarea { min-height:140px; resize:vertical; font:12px/1.5 "Cascadia Mono", Consolas, monospace; padding:6px 8px; }
+body #knowledge .kb-assistant-form h3 { margin:4px 0 0; font-size:12px; }
+body #knowledge .kb-assistant-status { margin-right:auto; }
+body #knowledge .kb-picked { display:flex; flex-wrap:wrap; gap:3px; margin:0; }
+body #knowledge .kb-chip-remove { min-height:0; height:16px; padding:0 4px; border:0; background:none; font-size:11px; }
+body #knowledge .kb-file-browser { border:1px solid var(--atlas-line); border-radius:var(--atlas-control-radius); padding:4px 6px; max-height:220px; overflow:auto; font-size:12px; }
+body #knowledge .kb-file-browser ul { list-style:none; margin:0; padding:0; display:grid; gap:1px; }
+body #knowledge .kb-file-browser label { display:flex; align-items:center; gap:4px; } body #knowledge .kb-file-browser small { color:var(--atlas-muted); font-size:10px; }
+body #knowledge .kb-file-browser .kb-folder { min-height:0; height:20px; padding:0 4px; border:0; background:none; font-weight:600; }
+body #knowledge .kb-browser-path { display:flex; align-items:center; gap:6px; margin:0 0 3px; color:var(--atlas-muted); }
+body #knowledge .kb-browser-path button { min-height:0; height:20px; padding:0 6px; font-size:11px; }
+body #knowledge .kb-review { flex:none; max-height:132px; overflow:auto; border:1px solid #d5e8de; background:#edf7f2; border-radius:var(--atlas-control-radius); padding:4px 8px; margin-bottom:6px; font-size:12px; }
+body #knowledge .kb-review.kb-review-warn { border-color:#eadbbd; background:#fff3da; }
+body #knowledge .kb-review p { margin:0; } body #knowledge .kb-review small { color:var(--atlas-muted); }
+body #knowledge .kb-review ul { margin:3px 0; padding-left:16px; display:grid; gap:2px; }
+body #knowledge .kb-review button { min-height:0; height:18px; padding:0 6px; font-size:10px; }
+body #knowledge .kb-file-text { white-space:pre-wrap; font:12px/1.5 "Cascadia Mono", Consolas, monospace; margin:0; }
+body #knowledge .kb-kind-file { background:#f1ecfb; }
+body.atlas-console .assistant-card [data-slot="card-footer"] { display:flex; flex-wrap:wrap; align-items:center; gap:4px; }
+body.atlas-console .assistant-result { display:grid; gap:6px; font-size:12px; }
+body.atlas-console .assistant-result h3 { margin:0 0 2px; font-size:11px; color:var(--atlas-muted); font-weight:600; }
+body.atlas-console .assistant-result :is(ul, ol) { margin:0; padding-left:18px; display:grid; gap:2px; }
+body.atlas-console .assistant-summary { margin:0; font-weight:500; }
+body.atlas-console .assistant-facts { display:grid; grid-template-columns:auto minmax(0, 1fr); gap:1px 8px; margin:0; }
+body.atlas-console .assistant-facts dt { color:var(--atlas-muted); } body.atlas-console .assistant-facts dd { margin:0; overflow-wrap:anywhere; }
+body.atlas-console .assistant-result button { height:20px; min-height:0; padding:0 4px; }
+body.atlas-console .assistant-cite { font-size:11px; color:var(--atlas-accent); }
+body.atlas-console .assistant-hidden { font-size:11px; color:var(--atlas-muted); } body.atlas-console .assistant-hidden summary { cursor:pointer; }
+body .assistant-dialog { width:min(620px, calc(100vw - 32px)); }
+body .assistant-dialog .atlas-dialog-body { display:grid; gap:6px; font-size:12px; }
+body .assistant-dialog .assistant-field { display:grid; gap:2px; } body .assistant-dialog .assistant-field small, body .assistant-dialog .assistant-note { color:var(--atlas-muted); font-size:11px; margin:0; }
+body .assistant-dialog .assistant-state { margin:0; padding:4px 8px; border-radius:var(--atlas-control-radius); background:#fff3da; color:var(--atlas-warning); font-weight:600; }
+body .assistant-dialog .assistant-state[data-ready="true"] { background:#edf7f2; color:var(--atlas-success); }
+body .assistant-dialog .assistant-advanced { border:1px solid var(--atlas-line); border-radius:var(--atlas-control-radius); padding:4px 8px; display:grid; gap:6px; }
+body .assistant-dialog .assistant-advanced summary { cursor:pointer; font-weight:600; } body .assistant-dialog ol { margin:4px 0; padding-left:18px; display:grid; gap:3px; }
+body .assistant-dialog .assistant-actions { display:flex; gap:4px; }
 @media (max-width: 760px) {
   body #knowledge .kb-articles { grid-template-columns:1fr; height:auto; }
   body #knowledge .kb-article-list { max-height:40vh; }

@@ -8,6 +8,7 @@ import { Skeleton } from "./components/ui/skeleton";
 import { InboxControls } from "./inbox-controls";
 import { AppControls } from "./app-controls";
 import { RequestCard, MachineActions, SimilarCard } from "./inbox-request";
+import { AssistantCard } from "./assistant-card";
 import { ScreenReader } from "./screen-reader";
 
 const matchLabels = { email: "Email match", name: "Name match · verify", ambiguous: "Choose a person", unmatched: "No Atlas match" };
@@ -147,6 +148,7 @@ export function LiveInbox() {
           </CardContent>{user && <CardFooter><Button variant="outline" size="sm" onClick={() => window.dispatchEvent(new CustomEvent("atlas:inbox-person", { detail: { id: user.id } }))}>Open in Workspace<ArrowUpRight data-icon="inline-end" /></Button></CardFooter>}</Card>
           <RequestCard detail={detail} user={user} />
           <SimilarCard messageId={message.id} />
+          <AssistantCard subject={message.subject} text={message.body} />
           {(user || mentioned.length > 0) && <Card><CardHeader><CardTitle role="heading" aria-level={2}><Monitor aria-hidden="true" />{user ? "Linked machines" : "Machines named in message"} <Badge variant="secondary">{(user ? detail.machines.length : 0) + mentioned.length}</Badge></CardTitle><CardDescription>Stored inventory relationships and status</CardDescription></CardHeader><CardContent>
             {mentioned.length > 0 && <ul className="inbox-devices" aria-label="Machines named in the message">{mentioned.map(machine => <li key={"named-" + machine.name} data-mentioned-machine={machine.name}><div><strong>{machine.name}</strong><Badge variant="outline">Named in message</Badge>{machine.written_as && machine.written_as !== machine.name.toUpperCase() && <small className="inbox-read-as" title="Found despite look-alike characters such as 0/O or 1/I">read as {machine.written_as}</small>}</div><p>{machine.model_id || "Model not supplied"}</p><p>Not linked to this sender in inventory · check before acting</p><MachineActions machine={machine} user={user} /></li>)}</ul>}
             {user && (detail.machines.length ? <ul className="inbox-devices">{detail.machines.map((machine, index) => <li key={index}><div><strong>{machine.name || machine.machine_name}</strong><Badge variant="outline">{machine.device_kind || "Device"}</Badge></div><p>{machine.model_id || machine.model_category || "Model not supplied"}</p><p>{machine.match_type || "Linked in inventory"}</p><small>{[machine.operational_status && "Inventory: " + machine.operational_status, machine.last_discovered && "Discovered: " + machine.last_discovered].filter(Boolean).join(" · ") || "Inventory timestamp not supplied"}</small><MachineActions machine={{ ...machine, name: machine.name || machine.machine_name }} user={user} /></li>)}</ul> : <p>No linked machines in the current Atlas database.</p>)}

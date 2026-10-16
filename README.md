@@ -371,6 +371,10 @@ Use Map / Workspace / Knowledge Base in the header, then **Diagrams**. Atlas emb
 
 Restart Atlas after updating to register editor and document routes. Remote-administration permissions remain unchanged.
 
+### Local Assistant: notes to articles, reading requests
+
+A small language model running on this PC (llama.cpp, no Ollama, no cloud) drafts Knowledge Base articles from your notes and files, reads Live Inbox requests and screen text, and adds your notes folders to Search everything. Every line it writes is checked in code against your text: invented machine names, numbers, commands or steps are flagged or hidden, never shown as fact. Put `llama-server.exe` and one `.gguf` model in the `llm` folder; see [docs/local-assistant.md](docs/local-assistant.md) for downloads, model choice for 8 GB graphics cards and how the checks work.
+
 ### Optional Atlas Desktop
 
 Choose **Desktop** beside the Map / Workspace / Knowledge Base links, or open `/assets/desktop.html`. Classic remains the initial layout; this browser remembers the chosen layout. Use **Window > Switch to Classic Atlas** to return.

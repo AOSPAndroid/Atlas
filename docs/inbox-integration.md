@@ -38,6 +38,10 @@ Each selected message shows a **Request** card and buttons on every machine:
 - **Knowledge Base** shows articles and diagrams whose title or text mention the
   matched words. Articles tagged for the request's issue type (see **Suggest in
   Live Inbox for** in the article editor) come first.
+- **Assistant** (optional, local model): **Read with Assistant** gives a summary,
+  the details the user mentions, questions to ask and steps from your own
+  articles and notes, each linked to its source. Lines that cannot be traced
+  back to the message or a source are hidden. See [local-assistant.md](local-assistant.md).
 - **Seen before** lists earlier requests and articles that share at least two
   distinctive words with this one (greetings, signatures, disclaimers found in
   most mail, hostnames and ticket numbers are ignored). Click a request to open
