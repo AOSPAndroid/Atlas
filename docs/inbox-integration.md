@@ -90,7 +90,9 @@ share a name, choose the right one.
    `Install-Inbox-Collectors.bat "C:\Approved\Atlas.NotificationListener.msix"`
    with your approved, signed package. This installs pywin32 for classic Outlook
    and registers the notification package for that Windows account. To install
-   only the email dependency, use `Install-Outlook-Watcher.bat`.
+   only the email dependency, use `Install-Outlook-Watcher.bat`. Run without a package,
+   `Install-Inbox-Collectors.bat` sets up email and reports Teams notifications as
+   skipped; add the package later to enable them.
    `WMI_PYTHON` can select the Python used by these BAT files.
 3. Open Atlas from the usual elevated PowerShell (`x01426046_dsk`). In Live Inbox,
    expand **Connect collectors**, enter the normal Windows account as
