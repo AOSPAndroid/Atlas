@@ -117,6 +117,22 @@ class InboxControlTests(unittest.TestCase):
             self.assertEqual(client.post('/api/inbox/control', json={'action': 'start'}, headers={'X-Atlas-Token': 'wrong'}).status_code, 403)
             self.ps.assert_not_called()
 
+    def test_setup_accepts_pasted_paths_in_quotes(self):
+        # Windows "Copy as path" adds quotes; pasted values often carry spaces.
+        app = FastAPI()
+        control.register(app, self.integration, token_getter=lambda: 'test-session')
+        with patch.object(self.integration, 'configure', return_value={'configured': True}) as configure, \
+                TestClient(app, headers={'X-Atlas-Token': 'test-session'}) as client:
+            response = client.post('/api/inbox/control/setup', json={'mail_user': ' INTRANET\\x01426046 ',
+                                   'python': '"C:\\devhome\\tools\\python3.12\\current\\python.exe"'})
+            self.assertEqual(response.status_code, 200, response.text)
+            configure.assert_called_once_with('INTRANET\\x01426046', 'C:\\devhome\\tools\\python3.12\\current\\python.exe')
+            configure.reset_mock()
+            self.assertEqual(client.post('/api/inbox/control/setup', json={'mail_user': 'INTRANET\\x01426046', 'python': '  '}).status_code, 200)
+            configure.assert_called_once_with('INTRANET\\x01426046', None)
+            self.assertEqual(client.post('/api/inbox/control/setup', json={'mail_user': 'user', 'python': 'C:\\a"b.exe'}).status_code, 422,
+                             'A quote inside the path is still refused')
+
     def test_two_atlas_processes_cannot_overwrite_each_others_preferences(self):
         with outlook.process_lock(self.commands, 'control.lock'):
             with self.assertRaisesRegex(control.IntegrationError, 'Another Atlas window'):

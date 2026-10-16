@@ -18,7 +18,7 @@ from typing import Literal
 import uuid
 
 from fastapi import HTTPException, Depends, Request
-from pydantic import BaseModel, ConfigDict, Field, StrictBool
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_validator
 from outlook_watcher import AlreadyRunning, is_running, process_lock, stamp, utcnow, write_json
 
 ROOT = Path(__file__).resolve().parent
@@ -175,6 +175,15 @@ class Setup(BaseModel):
     model_config = ConfigDict(extra='forbid')
     mail_user: str = Field(min_length=1, max_length=256, pattern=r'^[^\x00-\x1f\"/]+$')
     python: str | None = Field(default=None, max_length=1024, pattern=r'^[^\x00-\x1f\"]+$')
+
+    @field_validator('mail_user', 'python', mode='before')
+    @classmethod
+    def unquote(cls, value):
+        # Windows "Copy as path" wraps paths in quotes; spaces come from pasting.
+        if isinstance(value, str):
+            value = value.strip().strip('"\'').strip()
+            return value or None
+        return value
 
 
 class Command(BaseModel):
