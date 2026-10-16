@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 
 import search_index
 from search_index import SearchIndex, fts_query, key_terms, register
+from sqlite_fixture import connect as fixture_connect
 
 BOILERPLATE = 'This message is confidential and intended for the addressee only.'
 
@@ -97,7 +98,7 @@ class SearchEverything(unittest.TestCase):
 
     def test_old_index_layout_is_rebuilt(self):
         self.search('outlook')
-        with sqlite3.connect(self.path) as c:
+        with fixture_connect(self.path) as c:
             c.execute("UPDATE sources SET signature='0' WHERE kind='__version__'")
         self.src.calls.clear()
         self.assertEqual(len(self.search('outlook')), 3)

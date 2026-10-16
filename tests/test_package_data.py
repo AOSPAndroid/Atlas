@@ -317,12 +317,11 @@ class PackageBrowsing(unittest.TestCase):
                 self.assertIsNone(joined[long_name], 'An overlong literal remains metadata only even if an identically named folder is enumerated')
 
     def test_exact_name_union_filters_ambiguity_and_missing_metadata(self):
-        with tempfile.TemporaryDirectory() as temp, fixture_connect(':memory:') as con:
-            repo = Path(temp)
-            for name in ['ixExample', 'ixExample-extra', 'ixOther', 'ixCOLLISION', 'ixcollision']:
-                (repo / name).mkdir()
+        names = ['ixExample', 'ixExample-extra', 'ixOther', 'ixCOLLISION', 'ixcollision']
+        # Case-only siblings cannot be created on ordinary Windows filesystems.
+        with fixture_connect(':memory:') as con, patch.object(data, 'repository_names', return_value=(names, True, '')):
             data.initialize(con); seed(con, [('ixexample', 'Live'), ('ixBuilding', 'Work in Progress'), ('ixcollision', 'Live')])
-            result = data.browse(con, repo)
+            result = data.browse(con)
             self.assertEqual(result['stats'], {'source_packages': 5, 'metadata_packages': 3, 'matched': 1, 'source_only': 2, 'metadata_only': 2, 'ambiguous': 2})
             items = {item['id']: item for item in result['items']}
             self.assertEqual(items['repo:ixExample']['state'], 'Live')
@@ -332,11 +331,19 @@ class PackageBrowsing(unittest.TestCase):
             self.assertNotIn('raw_json', items['repo:ixExample'])
             self.assertNotIn('source_rows_json', items['repo:ixExample'])
             self.assertNotIn('source_rows_json', items['data:ixbuilding'])
-            self.assertEqual(data.browse(con, repo, state='Work in Progress')['total'], 1)
-            self.assertEqual(data.browse(con, repo, term='EPP123', coverage='matched')['total'], 1)
-            self.assertEqual(data.browse(con, repo, coverage='source-only')['total'], 2)
-            (repo / 'ixLink').symlink_to(repo / 'ixExample', target_is_directory=True)
-            self.assertEqual(data.browse(con, repo)['stats']['source_packages'], 5)
+            self.assertEqual(data.browse(con, state='Work in Progress')['total'], 1)
+            self.assertEqual(data.browse(con, term='EPP123', coverage='matched')['total'], 1)
+            self.assertEqual(data.browse(con, coverage='source-only')['total'], 2)
+
+    def test_repository_enumeration_excludes_symlinks(self):
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp)
+            (repo / 'ixExample').mkdir()
+            try:
+                (repo / 'ixLink').symlink_to(repo / 'ixExample', target_is_directory=True)
+            except OSError as error:
+                self.skipTest(f'This platform does not allow the fixture link: {error}')
+            self.assertEqual(data.repository_names(repo), (['ixExample'], True, ''))
 
     def test_eight_thousand_source_packages_two_thousand_records_all_accessible(self):
         with fixture_connect(':memory:') as con:
