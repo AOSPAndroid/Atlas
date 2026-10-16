@@ -126,8 +126,8 @@ export function SimilarCard({ messageId }) {
     let current = true;
     setData(null);
     window.AtlasClient.request("/api/search-everything/similar/" + messageId, { atlasSilent: true })
-      .then((value) => { if (current) setData(value); })
-      .catch(() => { if (current) setData({ requests: [], articles: [] }); });
+      .then((value) => { if (current) setData({ terms: value?.terms || [], requests: value?.requests || [], articles: value?.articles || [] }); })
+      .catch(() => { if (current) setData({ terms: [], requests: [], articles: [] }); });
     return () => { current = false; };
   }, [messageId]);
   if (!data || (!data.requests.length && !data.articles.length)) return null;
