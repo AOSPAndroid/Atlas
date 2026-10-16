@@ -24,7 +24,7 @@ from fastapi import HTTPException, Request
 from pydantic import BaseModel, Field
 
 DEFAULTS = {'url': '', 'server': '', 'model': '', 'gpu_layers': 99, 'context': 8192, 'port': 8775, 'idle_minutes': 30, 'folders': []}
-LOAD_TIMEOUT = 180
+LOAD_TIMEOUT = 600  # the first load reads the whole model; slow or network drives can take minutes
 
 
 def _end_with_atlas():
