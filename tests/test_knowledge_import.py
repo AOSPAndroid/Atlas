@@ -25,8 +25,12 @@ INVOICE = 'Invoice 2024-118 for 40 toner cartridges, total 1,240 EUR, payable in
 
 
 def article(title, text, quote, **extra):
-    return {'useful': True, 'reason': '', 'title': title, 'summary': {'text': text, 'quote': quote}, 'symptoms': [], 'causes': [],
+    return {'title': title, 'summary': {'text': text, 'quote': quote}, 'symptoms': [], 'causes': [],
             'steps': [], 'commands': [], 'escalate': [], 'tags': [], 'categories': [], **extra}
+
+
+FIX = {'kind': 'fix or how-to', 'reason': 'Explains how to clear a stuck print queue.'}
+INVOICE_KIND = {'kind': 'invoice, order or finance', 'reason': 'An invoice, not IT knowledge.'}
 
 
 class Import(unittest.TestCase):
@@ -44,6 +48,8 @@ class Import(unittest.TestCase):
         self.runtime = local_assistant.Runtime(self.config, self.root)
         self.db = self.root / 'knowledge.sqlite3'
         self.importer = knowledge_import.Importer(self.db, self.runtime, self.config, assistant_files.every_file)
+        # Files in path order, so canned answers line up: F/IT/spooler copy.txt, F/IT/spooler.txt, F/IT/todo.txt, F/invoice.txt.
+        self.importer.files = lambda config, limit: sorted(assistant_files.every_file(config, limit), key=lambda f: f[0])
 
     def tearDown(self):
         self.importer.stop()
@@ -73,23 +79,26 @@ class Import(unittest.TestCase):
 
     def test_files_become_checked_drafts_or_are_skipped_with_a_reason(self):
         self.model.answers += [
+            FIX,
             {**article('Spooler', 'Jobs stay in deleting on PRN-PAR-03.', 'jobs stay in "deleting"'),
              'steps': [{'text': 'Reinstall the driver on PRN-PAR-09.', 'quote': 'reprint'}], 'categories': ['printer']},
-            {**article('', '', ''), 'useful': False, 'reason': 'An invoice, not IT knowledge.'},
+            INVOICE_KIND,
         ]
-        self.importer.files = lambda config, limit: sorted(assistant_files.every_file(config, limit), key=lambda f: f[0])
         status = self.importer.start(str(self.notes))
         self.assertEqual(status['total'], 4)
         status = self.wait()
         self.assertEqual((status['drafted'], status['skipped'], status['failed'], status['done']), (1, 3, 0, 4))
         outcomes = self.outcomes()
         self.assertEqual(outcomes['todo.txt'], ('skipped', 'too short to be an article'))
-        self.assertEqual(outcomes['invoice.txt'], ('skipped', 'not IT knowledge: An invoice, not IT knowledge.'))
+        self.assertEqual(outcomes['invoice.txt'], ('skipped', 'not IT knowledge: invoice, order or finance: An invoice, not IT knowledge.'))
         self.assertEqual(outcomes['spooler copy.txt'], ('drafted', ''))
         self.assertEqual(outcomes['spooler.txt'], ('duplicate', 'same text as spooler copy.txt'), 'Copies are drafted once')
-        self.assertEqual(len(self.model.requests), 2, 'Short files and copies never reach the model')
-        self.assertIn('First decide "useful"', self.model.requests[0]['messages'][0]['content'])
-        self.assertIn('Suggested title: spooler', self.model.requests[0]['messages'][1]['content'])
+        self.assertEqual(len(self.model.requests), 3, 'Short files and copies never reach the model; the invoice is not drafted')
+        triage = self.model.requests[2]
+        self.assertIn('FILE NAME: invoice.txt', triage['messages'][1]['content'])
+        self.assertEqual(triage['max_tokens'], 120, 'Sorting a file is one short answer')
+        self.assertIn('invoice, order or finance', triage['response_format']['json_schema']['schema']['properties']['kind']['enum'])
+        self.assertIn('Suggested title: spooler copy', self.model.requests[1]['messages'][1]['content'])
         self.assertEqual(status['drafts'], {'pending': 1})
         with knowledge_import.closing(knowledge_import.connect(self.db)) as c:
             draft = knowledge_import._draft(c.execute('SELECT * FROM article_drafts').fetchone())
@@ -97,22 +106,34 @@ class Import(unittest.TestCase):
         self.assertEqual(draft['review']['checks'][0]['text'], 'Reinstall the driver on PRN-PAR-09.')
 
     def test_imports_resume_without_drafting_twice_and_redo_changed_files(self):
-        self.model.answers += [article('Spooler', 'Jobs stay in deleting.', 'jobs stay in "deleting"'),
-                               {**article('', '', ''), 'useful': False, 'reason': 'invoice'}]
+        self.model.answers += [FIX, article('Spooler', 'Jobs stay in deleting.', 'jobs stay in "deleting"'), INVOICE_KIND]
         self.importer.start(str(self.notes))
         self.wait()
         self.assertEqual(self.importer.plan(str(self.notes))['new'], 0)
         self.assertEqual(self.importer.start(str(self.notes))['total'], 0, 'Everything was done before')
         self.wait()
         (self.notes / 'invoice.txt').write_text(INVOICE + ' Updated.', encoding='utf-8')
-        self.model.answers.append({**article('', '', ''), 'useful': False, 'reason': 'still an invoice'})
+        self.model.answers.append({'kind': 'invoice, order or finance', 'reason': 'still an invoice'})
         self.assertEqual(self.importer.start(str(self.notes))['total'], 1, 'Only the changed file')
         self.wait()
-        self.assertEqual(self.outcomes()['invoice.txt'], ('skipped', 'not IT knowledge: still an invoice'))
+        self.assertEqual(self.outcomes()['invoice.txt'], ('skipped', 'not IT knowledge: invoice, order or finance: still an invoice'))
+
+    def test_logs_and_exports_are_skipped_without_the_model(self):
+        log = '\n'.join(f'2026-10-{d:02d} 08:12:44 INFO Sync completed for user{d} in {d * 10} ms' for d in range(1, 30))
+        (self.notes / 'sync.log').write_text(log, encoding='utf-8')
+        (self.notes / 'export.txt').write_text('\n'.join(f'PC{n:04d},Dell,Latitude 5440,Paris,{n}' for n in range(40)), encoding='utf-8')
+        plan = self.importer.plan(str(self.notes))
+        self.assertEqual(plan['suggested_types'], ['.txt'], 'Log files start unticked')
+        self.model.answers += [FIX, article('Spooler', 'Jobs stay in deleting.', 'jobs stay in "deleting"'), INVOICE_KIND]
+        self.importer.start(str(self.notes))
+        self.wait()
+        outcomes = self.outcomes()
+        self.assertEqual(outcomes['sync.log'], ('skipped', 'not IT knowledge: looks like a log (mostly timestamped lines)'))
+        self.assertEqual(outcomes['export.txt'], ('skipped', 'not IT knowledge: looks like a data export (mostly rows of values)'))
+        self.assertEqual(len(self.model.requests), 3)
 
     def test_your_own_requests_go_first(self):
-        self.model.answers += [article('Spooler', 'Jobs stay in deleting.', 'jobs stay in "deleting"'),
-                               {**article('', '', ''), 'useful': False, 'reason': 'invoice'}]
+        self.model.answers += [FIX, article('Spooler', 'Jobs stay in deleting.', 'jobs stay in "deleting"'), INVOICE_KIND]
         self.runtime.waiting = 1
         self.importer.start(str(self.notes))
         time.sleep(0.6)
@@ -121,7 +142,7 @@ class Import(unittest.TestCase):
         self.assertEqual(self.wait()['drafted'], 1)
 
     def test_pause_resume_and_stop(self):
-        self.model.answers += [article('Spooler', 'Jobs stay in deleting.', 'jobs stay in "deleting"')]
+        self.model.answers += [FIX, article('Spooler', 'Jobs stay in deleting.', 'jobs stay in "deleting"')]
         self.importer.pause()
         self.assertEqual(self.importer.state['state'], 'idle', 'Nothing to pause')
         self.runtime.waiting = 1  # hold the job before its first file
@@ -136,8 +157,7 @@ class Import(unittest.TestCase):
         self.assertEqual(self.model.requests, [])
 
     def test_resume_after_pause(self):
-        self.model.answers += [article('Spooler', 'Jobs stay in deleting.', 'jobs stay in "deleting"'),
-                               {**article('', '', ''), 'useful': False, 'reason': 'invoice'}]
+        self.model.answers += [FIX, article('Spooler', 'Jobs stay in deleting.', 'jobs stay in "deleting"'), INVOICE_KIND]
         self.runtime.waiting = 1
         self.importer.start(str(self.notes))
         self.importer.pause()

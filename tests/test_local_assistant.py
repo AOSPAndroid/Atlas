@@ -112,6 +112,11 @@ class ModelCalls(Base):
         with self.assertRaisesRegex(AssistantError, 'does not answer'):
             self.runtime.chat('s', 'u', {})
 
+    def test_a_broken_answer_is_retried_once(self):
+        self.model.answers += ['{"ok": tru', {'ok': True}]
+        self.assertEqual(self.runtime.chat('s', 'u', {})[0], {'ok': True})
+        self.assertEqual([r['seed'] for r in self.model.requests], [1, 2])
+
     def test_one_request_at_a_time(self):
         self.runtime.turn_timeout = 0.2
         self.runtime.lock.acquire()
@@ -180,6 +185,21 @@ class DraftArticle(Base):
         self.assertEqual(draft['checks'], [{'section': 'Commands', 'text': 'del /Q C:\\Windows\\System32\\spool\\PRINTERS\\*',
                                             'reasons': ['copied from your notes because the model changed it'], 'minor': True}])
         self.assertEqual(draft['categories'], ['printer'], 'Nothing in the notes is about the network')
+
+    def test_a_draft_with_nothing_to_act_on_is_flagged(self):
+        self.model.answers.append({'title': 'Invoice INV-2026-0042', 'summary': {'text': 'Invoice INV-2026-0042 for 40 toner cartridges.', 'quote': 'Invoice INV-2026-0042'},
+                                   'symptoms': [], 'causes': [], 'steps': [], 'commands': [], 'escalate': [], 'tags': [], 'categories': []})
+        draft = assistant_tasks.draft_article(self.runtime, [{'name': 'invoice.txt', 'text': 'Invoice INV-2026-0042 for 40 toner cartridges, due in 30 days.'}])
+        self.assertEqual(draft['checks'], [{'section': 'Article', 'text': 'Invoice INV-2026-0042', 'reasons': ['no steps, symptoms, cause, commands or escalation were found']}])
+
+    def test_classify(self):
+        log = '\n'.join(f'[2026-10-{d:02d} 08:00:01] job ok' for d in range(1, 20))
+        self.assertEqual(assistant_tasks.classify(self.runtime, 'a.log', log), (False, 'looks like a log (mostly timestamped lines)'))
+        self.assertEqual(self.model.requests, [])
+        self.model.answers += [{'kind': 'known issue and workaround', 'reason': 'Teams camera fix.'}, {'kind': 'nonsense', 'reason': ''}]
+        self.assertEqual(assistant_tasks.classify(self.runtime, 'cam.docx', 'Teams camera black: toggle privacy.'), (True, 'known issue and workaround: Teams camera fix.'))
+        self.assertEqual(assistant_tasks.classify(self.runtime, 'x.txt', 'hello'), (False, 'other, not IT support knowledge'))
+        self.assertIn('BEGINNING OF THE FILE:\n<<<\nTeams camera black', self.model.requests[0]['messages'][1]['content'])
 
     def test_long_notes_are_shortened_and_reported(self):
         self.model.answers.append({'title': 'x', 'summary': {'text': '', 'quote': ''}, 'symptoms': [], 'causes': [], 'steps': [],
@@ -335,7 +355,7 @@ class Routes(Base):
         self.assertEqual(read['sources'], [], 'No search index here: the message alone')
 
     def test_model_errors_are_explained(self):
-        self.model.answers.append('not json at all')
+        self.model.answers += ['not json at all', 'still not json']
         response = self.post('/api/assistant/read', {'subject': 'VPN', 'text': MESSAGE})
         self.assertEqual(response.status_code, 502)
         self.assertIn('usable answer', response.json()['detail'])

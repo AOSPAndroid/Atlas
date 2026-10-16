@@ -48,16 +48,45 @@ Rules:
 - Write in the same language as the notes."""
 
 
-TRIAGE = """
-- First decide "useful": true only if the notes explain how to diagnose, fix, set up or handle something in IT support
-  (a procedure, a fix, a known issue, a how-to, contacts and escalation rules). false for logs, data exports, lists,
-  inventories, invoices, personal or unrelated documents. When false, give a short "reason" and leave the other fields empty."""
+# Bulk import: before drafting, one short, focused question about what kind of document this is.
+KINDS = {'fix or how-to': True, 'known issue and workaround': True, 'procedure or checklist': True,
+         'IT reference (contacts, settings, escalation rules)': True, 'log or data export': False,
+         'invoice, order or finance': False, 'meeting notes, email chatter or personal': False, 'other, not IT support knowledge': False}
+TRIAGE_SYSTEM = """You sort the files of an IT support engineer. Read the beginning of one file and say what kind of document it is.
+Only "fix or how-to", "known issue and workaround", "procedure or checklist" and "IT reference" are useful as Knowledge Base articles:
+they tell an engineer how to diagnose, fix, set up or escalate something. Logs, exports, invoices, orders, meeting notes and
+personal documents are not, even when they mention IT products. "reason" is one short sentence."""
+TIMESTAMP = re.compile(r'^\s*\[?\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4}[ T]\d{1,2}:\d{2}')
 
 
-def draft_schema(categories, triage=False):
-    extra = {'useful': {'type': 'boolean'}, 'reason': {'type': 'string'}} if triage else {}
+def looks_like_data(text):
+    """Logs and exports, recognised without the model: mostly timestamped lines, or mostly delimited rows."""
+    lines = [line for line in text.splitlines() if line.strip()][:400]
+    if len(lines) < 10:
+        return ''
+    if sum(bool(TIMESTAMP.match(line)) for line in lines) > 0.5 * len(lines):
+        return 'looks like a log (mostly timestamped lines)'
+    if sum(line.count(',') >= 3 or line.count('\t') >= 2 or line.count(';') >= 3 for line in lines) > 0.6 * len(lines):
+        return 'looks like a data export (mostly rows of values)'
+    return ''
+
+
+def classify(runtime, name, text, background=True):
+    """(useful, reason) for one file. Code checks first, then one short model question on the first 3,000 characters."""
+    reason = looks_like_data(text)
+    if reason:
+        return False, reason
+    schema = {'type': 'object', 'additionalProperties': False, 'required': ['kind', 'reason'],
+              'properties': {'kind': {'type': 'string', 'enum': list(KINDS)}, 'reason': {'type': 'string'}}}
+    answer, _ = runtime.chat(TRIAGE_SYSTEM, f'FILE NAME: {name}\nBEGINNING OF THE FILE:\n<<<\n{text[:3000]}\n>>>', schema,
+                             max_tokens=120, background=background)
+    kind = answer.get('kind') if answer.get('kind') in KINDS else 'other, not IT support knowledge'
+    return KINDS[kind], f"{kind}: {' '.join(str(answer.get('reason') or '').split())[:160]}".rstrip(': ')
+
+
+def draft_schema(categories):
     return {'type': 'object', 'additionalProperties': False,
-            'properties': {**extra,
+            'properties': {
                 'title': {'type': 'string'},
                 'summary': _item(),
                 'symptoms': _item(8), 'causes': _item(5), 'steps': _item(15),
@@ -66,7 +95,7 @@ def draft_schema(categories, triage=False):
                 'escalate': _item(5),
                 'tags': {'type': 'array', 'maxItems': 6, 'items': {'type': 'string'}},
                 'categories': {'type': 'array', 'maxItems': 3, 'items': {'type': 'string', 'enum': categories}}},
-            'required': [*extra, 'title', 'summary', 'symptoms', 'causes', 'steps', 'commands', 'escalate', 'tags', 'categories']}
+            'required': ['title', 'summary', 'symptoms', 'causes', 'steps', 'commands', 'escalate', 'tags', 'categories']}
 
 
 SECTIONS = [('symptoms', 'Symptoms', '-'), ('causes', 'Cause', '-'), ('steps', 'Steps', '1.'), ('escalate', 'Escalate when', '-')]
@@ -84,17 +113,13 @@ def _items(value):
     return out
 
 
-def draft_article(runtime, sources, title_hint='', triage=False, background=False):
-    """triage: let the model say the text is not IT knowledge (bulk import); returns {'useful': False, 'reason'} then."""
+def draft_article(runtime, sources, title_hint='', background=False):
     from inbox_analysis import CATEGORIES, contains, plain
     categories = [key for key, *_ in CATEGORIES]
     sources, cut = _clip(sources, _budget(runtime, 1800))
     notes = '\n\n'.join(f"### {s['name']}\n{s['text']}" for s in sources)
     hint = f'Suggested title: {title_hint}\n\n' if title_hint.strip() else ''
-    answer, meta = runtime.chat(DRAFT_SYSTEM + (TRIAGE if triage else ''), f'{hint}NOTES:\n<<<\n{notes}\n>>>',
-                                draft_schema(categories, triage), max_tokens=1800, background=background)
-    if triage and answer.get('useful') is False:
-        return {'useful': False, 'reason': ' '.join(str(answer.get('reason') or 'Not IT knowledge').split())[:200], **meta}
+    answer, meta = runtime.chat(DRAFT_SYSTEM, f'{hint}NOTES:\n<<<\n{notes}\n>>>', draft_schema(categories), max_tokens=1800, background=background)
     texts = [s['text'] for s in sources] + ([title_hint] if title_hint else [])
     checks, dropped, lines = [], [], []
 
@@ -144,6 +169,9 @@ def draft_article(runtime, sources, title_hint='', triage=False, background=Fals
             code = f'{fence} {command} {fence}' if fence == '``' else f'`{command}`'
             lines.append(f'- {purpose}: {code}' if purpose and not missing_specifics(purpose, texts) else f'- {code}')
         lines.append('')
+    if not any(line.startswith('## ') and line != '## Summary' for line in lines):
+        # Only a summary: nothing an engineer can act on (an invoice or a report summarised faithfully is still not knowledge).
+        checks.append({'section': 'Article', 'text': title, 'reasons': ['no steps, symptoms, cause, commands or escalation were found']})
     lines += ['## Sources'] + [f"- {s['name']}" for s in sources]
     known = {normalize(t) for t in texts}
     tags = []
@@ -155,7 +183,7 @@ def draft_article(runtime, sources, title_hint='', triage=False, background=Fals
     # An issue type is kept only when one of its words is in the notes (the same words Live Inbox uses).
     words = plain('\n'.join(texts))
     chosen = [key for key, _, terms, *_ in CATEGORIES if key in (answer.get('categories') or []) and any(contains(words, t) for t in terms)][:3]
-    return {'useful': True, 'title': title, 'markdown': '\n'.join(lines).strip() + '\n', 'tags': tags, 'categories': list(dict.fromkeys(chosen)),
+    return {'title': title, 'markdown': '\n'.join(lines).strip() + '\n', 'tags': tags, 'categories': list(dict.fromkeys(chosen)),
             'checks': checks, 'dropped': dropped, 'sources': [s['name'] for s in sources], 'cut': cut or meta['truncated'], **meta}
 
 

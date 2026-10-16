@@ -439,9 +439,10 @@
       summary.textContent = "Counting files…";
       try {
         const plan = await post("/api/knowledge/import/plan", { ...body(), types: [] });
-        const chosen = new Set(body().types);
+        // Logs and data exports start unticked; tick them to include them anyway.
+        const chosen = new Set(types.children.length ? body().types : plan.suggested_types || Object.keys(plan.by_type));
         types.replaceChildren(...Object.entries(plan.by_type).map(([type, count]) => el("label", {},
-          el("input", { type: "checkbox", value: type, checked: !chosen.size || chosen.has(type) }), ` ${type} ${count.toLocaleString()}`)));
+          el("input", { type: "checkbox", value: type, checked: chosen.has(type) }), ` ${type} ${count.toLocaleString()}`)));
         const each = plan.seconds_per_file;
         summary.textContent = `${plan.files.toLocaleString()} files, ${plan.new.toLocaleString()} not imported yet` +
           (plan.done_before ? ` (${plan.done_before.toLocaleString()} already done or unchanged).` : ".") +

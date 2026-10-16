@@ -238,6 +238,20 @@ class Runtime:
         self._watcher.start()
 
     # Model calls ----------------------------------------------------------------------------
+    def _post(self, body):
+        request = urllib.request.Request(self.url() + '/v1/chat/completions', data=json.dumps(body).encode(),
+                                         headers={'Content-Type': 'application/json'}, method='POST')
+        try:
+            with urllib.request.urlopen(request, timeout=600) as response:
+                return json.loads(response.read())
+        except urllib.error.HTTPError as error:
+            detail = error.read().decode('utf-8', 'replace')[:300]
+            raise AssistantError(f'The model server refused the request ({error.code}): {detail}', 502) from error
+        except (OSError, ValueError) as error:
+            raise AssistantError(f'The model server did not answer: {error}', 502) from error
+        finally:
+            self.last_used = time.time()
+
     def chat(self, system, user, schema, max_tokens=1500, background=False):
         """One deterministic, schema-constrained answer as a dict.
 
@@ -267,24 +281,17 @@ class Runtime:
                     'chat_template_kwargs': {'enable_thinking': False},
                     'response_format': {'type': 'json_object', 'schema': schema} if python else
                                        {'type': 'json_schema', 'json_schema': {'name': 'answer', 'strict': True, 'schema': schema}}}
-            request = urllib.request.Request(self.url() + '/v1/chat/completions', data=json.dumps(body).encode(),
-                                             headers={'Content-Type': 'application/json'}, method='POST')
             started = time.time()
-            try:
-                with urllib.request.urlopen(request, timeout=600) as response:
-                    data = json.loads(response.read())
-            except urllib.error.HTTPError as error:
-                detail = error.read().decode('utf-8', 'replace')[:300]
-                raise AssistantError(f'The model server refused the request ({error.code}): {detail}', 502) from error
-            except (OSError, ValueError) as error:
-                raise AssistantError(f'The model server did not answer: {error}', 502) from error
-            finally:
-                self.last_used = time.time()
-            choice = (data.get('choices') or [{}])[0]
-            content = (choice.get('message') or {}).get('content') or ''
-            result = parse_json(content)
+            for _ in range(2):  # an occasional broken answer is retried once with another seed
+                data = self._post(body)
+                choice = (data.get('choices') or [{}])[0]
+                result = parse_json((choice.get('message') or {}).get('content') or '')
+                if result is not None or choice.get('finish_reason') == 'length':
+                    break
+                body['seed'] = 2
             if result is None:
-                raise AssistantError('The model did not return a usable answer. Try again or use a larger model.', 502)
+                raise AssistantError('The model did not return a usable answer' + (' (it ran out of room; try shorter notes)' if choice.get('finish_reason') == 'length'
+                                     else '. Try again or use a larger model.'), 502)
             usage = data.get('usage') or {}
             return result, {'seconds': round(time.time() - started, 1), 'tokens': usage.get('completion_tokens'),
                             'truncated': choice.get('finish_reason') == 'length', 'model': Path(self.settings()['model']).name or data.get('model', '')}

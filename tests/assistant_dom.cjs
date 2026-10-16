@@ -35,7 +35,7 @@ function api(requests, overrides = {}) {
     else if (url === '/api/assistant/file') data = { path: body.path, name: body.path.split('\\').pop(), text: 'net stop spooler\n<b>not html</b>', modified: 1790000000 };
     else if (url === '/api/assistant/draft-article') data = DRAFT;
     else if (url === '/api/knowledge/import') data = importState;
-    else if (url === '/api/knowledge/import/plan') data = { files: 1200, new: 900, done_before: 300, by_type: { '.docx': 700, '.txt': 500 }, seconds_per_file: 12 };
+    else if (url === '/api/knowledge/import/plan') data = { files: 1240, new: 900, done_before: 340, by_type: { '.docx': 700, '.txt': 500, '.log': 40 }, suggested_types: ['.docx', '.txt'], seconds_per_file: 12 };
     else if (url === '/api/knowledge/import/start') { Object.assign(importState, { state: 'running', total: 900, done: 3, drafted: 2, skipped: 1, current: 'vpn.docx', eta_seconds: 10764 }); data = importState; }
     else if (url === '/api/knowledge/import/pause') { importState.state = 'paused'; data = importState; }
     else if (url === '/api/knowledge/drafts') data = { drafts: [{ id: 7, title: 'VPN fix', path: 'F:\\IT\\vpn.docx', flags: 0, created: '2026-10-16T09:00:00Z', tags: [], categories: [] },
@@ -145,9 +145,10 @@ const fakeMarkdown = (w) => {
   await until(() => !kb.querySelector('.kb-drafts-button').hidden);
   assert.equal(kb.querySelector('.kb-drafts-button').textContent, 'Review imported drafts (2)');
   templates.value = 'import'; templates.dispatchEvent(new w.Event('change'));
-  await until(() => /1,200 files, 900 not imported yet/.test(kb.querySelector('.kb-import [role="status"]')?.textContent || ''));
+  await until(() => /1,240 files, 900 not imported yet/.test(kb.querySelector('.kb-import [role="status"]')?.textContent || ''));
   assert.match(kb.querySelector('.kb-import [role="status"]').textContent, /About 3.0 h at 12 s per file/);
-  assert.deepEqual([...kb.querySelectorAll('.kb-import-types label')].map((l) => l.textContent.trim()), ['.docx 700', '.txt 500']);
+  assert.deepEqual([...kb.querySelectorAll('.kb-import-types label')].map((l) => l.textContent.trim()), ['.docx 700', '.txt 500', '.log 40']);
+  assert.deepEqual([...kb.querySelectorAll('.kb-import-types input')].map((i) => i.checked), [true, true, false], 'Logs start unticked');
   kb.querySelector('.kb-import-types input[value=".txt"]').click();
   kb.querySelector('.kb-import-fields input[aria-label="Only this folder inside it"]').value = 'C:\\Notes\\IT';
   [...kb.querySelectorAll('.kb-import button')].find((b) => b.textContent === 'Start import').click();

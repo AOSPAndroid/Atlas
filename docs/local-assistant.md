@@ -38,8 +38,9 @@ Speed, as a guide: on an 8 GB NVIDIA card a 4B model writes a draft in about 10�
 3. **Start import.** The Assistant goes through the files one at a time:
    - very short files (under 80 characters) are skipped;
    - copies of a file already imported (same text, any name) are skipped;
-   - the model first decides whether the file is IT knowledge (a fix, procedure, known issue, how-to, contacts or escalation rules). Logs, exports, invoices, lists and personal documents are skipped with its reason;
-   - everything else becomes a **draft**, checked line by line exactly like **Draft from notes**.
+   - logs and data exports are recognised in code (mostly timestamped lines, or mostly rows of values) and skipped; `.log`, `.csv`, `.json` and `.xml` files also start unticked;
+   - the model then answers one short question about the beginning of the file: what kind of document is it? Only a fix or how-to, a known issue and workaround, a procedure or checklist, or an IT reference (contacts, settings, escalation rules) goes on; invoices, orders, meeting notes, personal and unrelated documents are skipped with its reason;
+   - everything else becomes a **draft**, checked line by line exactly like **Draft from notes**. A draft that has no steps, symptoms, cause, commands or escalation (only a summary) is flagged, so it is never published by **Publish clean drafts**.
 
    Progress, time left and the current file are shown; **Pause**, **Resume** and **Stop** work at any time. Your own Assistant requests (reading a request, drafting from notes) go first: the import waits for them. Progress is saved, so a stopped or interrupted import continues where it left off, and files already imported are skipped unless they changed. Leave it running overnight for a large drive: at 10–20 seconds per file on an 8 GB graphics card, 1,000 knowledge files take 3–6 hours.
 4. **Review.** The **Review imported drafts (N)** button above the article list opens the queue, clean drafts first. For each draft: **Publish**, **Edit, then publish** (the full editor, with the check panel), **Reject** (not drafted again unless the file changes) or **Open the file**. **Publish N clean drafts** publishes every draft whose lines all passed the checks, except drafts made from shortened text.

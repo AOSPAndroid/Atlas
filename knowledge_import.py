@@ -21,6 +21,7 @@ from fastapi import HTTPException, Request
 from pydantic import BaseModel, Field
 
 MIN_CHARS = 80  # a three-line fix is still knowledge
+DATA_TYPES = {'.log', '.csv', '.json', '.xml'}  # unticked by default: almost never written knowledge
 SCHEMA = [
     '''CREATE TABLE IF NOT EXISTS import_files(path TEXT PRIMARY KEY, signature TEXT NOT NULL, digest TEXT, outcome TEXT NOT NULL,
        reason TEXT, draft INTEGER, updated TEXT NOT NULL)''',
@@ -82,8 +83,9 @@ class Importer:
         with closing(connect(self.path)) as c:
             known = dict(c.execute('SELECT path, signature FROM import_files').fetchall())
         new = [p for p, s in found if known.get(p) != s]
-        return {'files': len(found), 'new': len(new), 'done_before': len(found) - len(new),
-                'by_type': _count_types(p for p, _ in found), 'seconds_per_file': self.state['seconds_per_file']}
+        types = _count_types(p for p, _ in found)
+        return {'files': len(found), 'new': len(new), 'done_before': len(found) - len(new), 'by_type': types,
+                'suggested_types': [t for t in types if t not in DATA_TYPES], 'seconds_per_file': self.state['seconds_per_file']}
 
     # Running ---------------------------------------------------------------------------------
     def start(self, folder, types=(), since=0, limit=0):
@@ -177,10 +179,11 @@ class Importer:
                              (self._digest, path)).fetchone()
         if twin:
             return 'duplicate', 'same text as ' + Path(twin['path']).name, None
+        useful, why = assistant_tasks.classify(self.runtime, Path(path).name, text)
+        if not useful:
+            return 'skipped', 'not IT knowledge: ' + why, None
         stem = re.sub(r'[_-]+', ' ', Path(path).stem).strip()
-        draft = assistant_tasks.draft_article(self.runtime, [{'name': Path(path).name, 'text': text}], stem, triage=True, background=True)
-        if not draft.get('useful'):
-            return 'skipped', 'not IT knowledge: ' + draft.get('reason', ''), None
+        draft = assistant_tasks.draft_article(self.runtime, [{'name': Path(path).name, 'text': text}], stem, background=True)
         flags = len([c for c in draft['checks'] if not c.get('minor')]) + len(draft['dropped'])
         review = {k: draft[k] for k in ('checks', 'dropped', 'sources', 'cut', 'seconds', 'model')}
         with closing(connect(self.path)) as c:
