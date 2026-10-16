@@ -186,6 +186,13 @@ class DraftArticle(Base):
                                             'reasons': ['copied from your notes because the model changed it'], 'minor': True}])
         self.assertEqual(draft['categories'], ['printer'], 'Nothing in the notes is about the network')
 
+    def test_issue_types_come_from_the_article_when_the_model_gives_none(self):
+        self.model.answers.append({'title': 'GlobalProtect VPN after Windows update', 'summary': {'text': 'VPN will not connect after the update.', 'quote': 'VPN'},
+                                   'symptoms': [{'text': 'Portal unreachable', 'quote': 'portal unreachable'}], 'causes': [],
+                                   'steps': [{'text': 'Reinstall GlobalProtect.', 'quote': 'reinstall GlobalProtect'}], 'commands': [], 'escalate': [], 'tags': [], 'categories': []})
+        draft = assistant_tasks.draft_article(self.runtime, [{'name': 'vpn.md', 'text': 'GlobalProtect VPN wont connect after the update, portal unreachable. Fix: reinstall GlobalProtect. Outlook was fine.'}])
+        self.assertEqual(draft['categories'], ['network'], 'Outlook is only mentioned in passing, not what the article is about')
+
     def test_a_draft_with_nothing_to_act_on_is_flagged(self):
         self.model.answers.append({'title': 'Invoice INV-2026-0042', 'summary': {'text': 'Invoice INV-2026-0042 for 40 toner cartridges.', 'quote': 'Invoice INV-2026-0042'},
                                    'symptoms': [], 'causes': [], 'steps': [], 'commands': [], 'escalate': [], 'tags': [], 'categories': []})

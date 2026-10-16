@@ -18,10 +18,12 @@ class PaletteTests(unittest.TestCase):
  def test_bad_or_missing_person(self):
   self.assertEqual(self.client.get('/api/palette/person/id:999999999').status_code,404)
   self.assertEqual(self.client.get('/api/palette/person/not-an-id').status_code,400)
- def test_removed_assistant_has_no_registered_or_accessible_routes(self):
-  for app in (main.app,viewer.app):
-   self.assertFalse(any(getattr(route,'path','').startswith('/api/assistant/') for route in app.routes))
-  self.assertEqual(self.client.get('/api/assistant/status').status_code,404)
+ def test_assistant_is_admin_only_and_has_no_free_form_chat(self):
+  # The earlier free-form chat assistant stays removed. The local Assistant (docs/local-assistant.md) only runs
+  # checked tasks on text you give it, and exists in Admin only.
+  self.assertFalse(any(getattr(route,'path','').startswith('/api/assistant/') for route in viewer.app.routes))
+  self.assertTrue(any(getattr(route,'path','')=='/api/assistant/status' for route in main.app.routes))
+  self.assertFalse(any(getattr(route,'path','') in ('/api/assistant/ask','/api/assistant/chat') for route in main.app.routes))
   self.assertEqual(self.client.post('/api/assistant/ask',json={'question':'Hello'}).status_code,404)
   with TestClient(viewer.app) as client:
    self.assertEqual(client.get('/api/assistant/status').status_code,404)

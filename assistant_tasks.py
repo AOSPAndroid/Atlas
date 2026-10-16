@@ -183,6 +183,12 @@ def draft_article(runtime, sources, title_hint='', background=False):
     # An issue type is kept only when one of its words is in the notes (the same words Live Inbox uses).
     words = plain('\n'.join(texts))
     chosen = [key for key, _, terms, *_ in CATEGORIES if key in (answer.get('categories') or []) and any(contains(words, t) for t in terms)][:3]
+    if not chosen:
+        # The model chose none: use the issue words in what the article is about (title, summary, symptoms),
+        # the same words Live Inbox matches requests with.
+        about = plain(' '.join([title] + [i['text'] for i in summary] + [i['text'] for i in _items(answer.get('symptoms'))]))
+        hits = sorted(((sum(contains(about, t) for t in terms), key) for key, _, terms, *_ in CATEGORIES), reverse=True)
+        chosen = [key for count, key in hits if count][:2]
     return {'title': title, 'markdown': '\n'.join(lines).strip() + '\n', 'tags': tags, 'categories': list(dict.fromkeys(chosen)),
             'checks': checks, 'dropped': dropped, 'sources': [s['name'] for s in sources], 'cut': cut or meta['truncated'], **meta}
 
