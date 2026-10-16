@@ -49,8 +49,10 @@
     const intro = document.createElement("p");
     intro.className = "assistant-note";
     intro.textContent = "A small language model on this PC turns your notes into articles and reads requests. It only works on the text you give it, and Atlas checks every line against that text. Nothing leaves this PC.";
-    const server = input(s.server, { placeholder: s.detected?.server || "C:\\Atlas\\llm\\llama-server.exe", spellcheck: false });
-    const model = input(s.model, { placeholder: s.detected?.model || "C:\\Atlas\\llm\\Qwen3-4B-Instruct-2507-Q4_K_M.gguf", spellcheck: false });
+    // Files found in Atlas\\llm show as hints; the fields stay empty so saving does not pin them.
+    const own = (value, found) => (value && value !== found ? value : "");
+    const server = input(own(s.server, s.detected?.server), { placeholder: s.detected?.server || "C:\\Atlas\\llm\\llama-server.exe", spellcheck: false });
+    const model = input(own(s.model, s.detected?.model), { placeholder: s.detected?.model || "C:\\Atlas\\llm\\Qwen3-4B-Instruct-2507-Q4_K_M.gguf", spellcheck: false });
     const folders = Object.assign(document.createElement("textarea"), { value: (s.folders || []).join("\n"), rows: 3, spellcheck: false,
       placeholder: "C:\\Users\\you\\Documents\\IT notes" });
     const layers = input(s.gpu_layers ?? 99, { type: "number", min: 0, max: 999 });

@@ -75,6 +75,9 @@ const fakeMarkdown = (w) => {
   const inputs = [...dialog.querySelectorAll('.assistant-field')];
   const fieldValue = (label) => inputs.find((f) => f.textContent.startsWith(label)).querySelector('input, textarea');
   assert.match(inputs.find((f) => f.textContent.startsWith('llama-server')).textContent, /Found in Atlas\\llm/);
+  assert.equal(fieldValue('llama-server').value, '', 'A file found in Atlas\\llm stays a hint, so saving does not pin its path');
+  assert.equal(fieldValue('llama-server').placeholder, 'C:\\Atlas\\llm\\llama-server.exe');
+  assert.equal(fieldValue('Model file').value, 'C:\\Atlas\\llm\\Qwen3-4B-Instruct-2507-Q4_K_M.gguf', 'A chosen model that was not found automatically is shown');
   fieldValue('Notes folders').value = 'C:\\Notes\n\n D:\\Runbooks ';
   fieldValue('GPU layers').value = '20';
   [...dialog.querySelectorAll('button')].find((b) => b.textContent === 'Save').click();
@@ -157,7 +160,10 @@ const fakeMarkdown = (w) => {
   assert.match(kb.querySelector('.kb-import-progress').textContent, /vpn\.docx/);
   [...kb.querySelectorAll('.kb-import-progress button')].find((b) => b.textContent === 'Pause').click();
   await until(() => /Paused/.test(kb.querySelector('.kb-import-progress').textContent));
-  importState.state = 'idle';
+  importState.state = 'idle'; importState.message = 'Finished.';
+  await w.AtlasKnowledgeArticles.importView();
+  await until(() => /Finished\./.test(kb.querySelector('.kb-import-progress')?.textContent || ''));
+  assert(!/null/.test(kb.querySelector('.kb-import-progress').textContent), 'No empty slots shown as text');
   await w.AtlasKnowledgeArticles.reviewQueue();
   const queue = kb.querySelector('.kb-review-queue');
   assert.deepEqual([...queue.querySelectorAll('.kb-kind')].map((k) => k.textContent), ['Clean', '2 to check']);

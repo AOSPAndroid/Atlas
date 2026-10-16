@@ -457,7 +457,7 @@
     const show = (s) => {
       const active = s.state === "running" || s.state === "paused" || s.state === "stopping";
       const files = s.files || {};
-      progress.replaceChildren(
+      progress.replaceChildren(...[
         el("p", {}, el("strong", { textContent: active ? (s.state === "paused" ? "Paused" : s.state === "stopping" ? "Stopping after this file…" : "Importing") : (s.message || "No import running") }),
           active ? ` · ${s.done.toLocaleString()} of ${s.total.toLocaleString()} files` : "",
           active && s.eta_seconds ? ` · about ${duration(s.eta_seconds)} left` : "",
@@ -468,7 +468,7 @@
         el("div", { className: "kb-article-actions" },
           s.state === "running" ? button("Pause", control("pause")) : null, s.state === "paused" ? button("Resume", control("resume")) : null,
           active && s.state !== "stopping" ? button("Stop", control("stop")) : null,
-          s.drafts?.pending ? button(`Review ${s.drafts.pending} drafts`, () => reviewQueue(), { className: "primary" }) : null));
+          s.drafts?.pending ? button(`Review ${s.drafts.pending} drafts`, () => reviewQueue(), { className: "primary" }) : null)].filter(Boolean));
       startButton.disabled = active;
     };
     let timer = 0;

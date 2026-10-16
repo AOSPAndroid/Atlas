@@ -314,7 +314,7 @@ def read_request(runtime, subject, text, sources):
             hidden.append({'section': 'Questions', 'text': question, 'reasons': ['mentions details that are not in the message']})
         elif word_support(question, [message]) >= 0.8:
             hidden.append({'section': 'Questions', 'text': question, 'reasons': ['the message probably answers it already']})
-        else:
+        elif normalize(question) not in {normalize(q) for q in questions}:
             questions.append(question)
     by_id = {s['id']: s for s in sources}
     steps = []
@@ -325,6 +325,8 @@ def read_request(runtime, subject, text, sources):
         source = by_id.get(step.get('source'))
         if source is None:
             hidden.append({'section': 'Steps', 'text': item['text'], 'reasons': ['it cites no source']})
+        elif normalize(item['text']) in {normalize(s['text']) for s in steps}:
+            continue  # the model repeated a step
         elif keep('Steps', item, [source['text']], 0.34, min_tie=0.3):
             steps.append({**item, 'source': source['id']})
     return {'summary': summary[0]['text'] if summary else '',

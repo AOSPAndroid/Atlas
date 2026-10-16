@@ -255,6 +255,13 @@ class ReadRequest(Base):
         self.assertIn('SOURCE S1 (Knowledge Base article: VPN after update)', prompt)
         self.assertEqual(self.model.requests[0]['response_format']['json_schema']['schema']['properties']['steps']['items']['properties']['source']['enum'], ['S1'])
 
+    def test_repeated_steps_and_questions_are_shown_once(self):
+        step = {'text': 'Reinstall GlobalProtect from Software Center, then reboot.', 'source': 'S1', 'quote': 'Reinstall GlobalProtect from Software Center, then reboot.'}
+        result = self.read({'summary': {'text': 'VPN times out.', 'quote': ''}, 'asks': [], 'facts': [],
+                            'questions': ['Which VPN client?', 'which VPN client?'], 'steps': [step, {**step, 'text': step['text'].upper()}]})
+        self.assertEqual(len(result['steps']), 1)
+        self.assertEqual(result['questions'], ['Which VPN client?'])
+
     def test_a_summary_built_from_the_sources_is_hidden(self):
         result = self.read({'summary': {'text': 'Reinstall GlobalProtect from Software Center and check GRP-VPN-USERS.', 'quote': 'cannot connect to VPN'},
                             'asks': [], 'facts': [], 'questions': [], 'steps': []})
