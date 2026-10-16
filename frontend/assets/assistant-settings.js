@@ -91,6 +91,7 @@
       "Unzip it into the Atlas\\llm folder.",
       "Download one model file (.gguf) into Atlas\\llm. For 8 GB: Qwen3-4B-Instruct-2507 Q4_K_M (fast, about 2.5 GB) or Qwen3-8B Q4_K_M (more careful, about 5 GB).",
       "Leave the paths above empty: Atlas finds them in Atlas\\llm. Add your notes folders, save, then click Start.",
+      "No .exe allowed? Skip step 1 and double-click Install-Assistant.bat in the Atlas folder: it installs the llama-cpp-python library with pip. With an NVIDIA card use the Qwen2.5-7B-Instruct Q4_K_M model with it (that library cannot read Qwen3).",
     ]) steps.append(Object.assign(document.createElement("li"), { textContent: text }));
     help.append(steps);
     help.open = !s.configured;

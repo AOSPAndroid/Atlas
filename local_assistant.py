@@ -1,7 +1,8 @@
 """Local Assistant: a small language model running on this PC through llama.cpp, used only on text
 Atlas gives it (notes, emails, screen text, Knowledge Base articles) and checked in code before
 anything is shown. No cloud service and no Ollama: Atlas starts llama.cpp's llama-server itself
-(or the llama-cpp-python server), listening on 127.0.0.1 only, and stops it when idle.
+(or, without it, the llama-cpp-python library in assistant_worker.py), listening on 127.0.0.1 only,
+and stops it when idle.
 
 Admin only; never registered on the LAN viewer.
 """
@@ -119,8 +120,9 @@ class Runtime:
             return 'llama-server', [s['server'], '-m', s['model'], '--host', '127.0.0.1', '--port', port,
                                     '-ngl', layers, '-c', context, '-np', '1', '--jinja']
         if importlib.util.find_spec('llama_cpp') is not None:
-            return 'python', [sys.executable, '-m', 'llama_cpp.server', '--model', s['model'], '--host', '127.0.0.1',
-                              '--port', port, '--n_gpu_layers', layers, '--n_ctx', context]
+            # No llama-server.exe: the Python library (Install-Assistant.bat) in its own process.
+            return 'python', [sys.executable, str(Path(__file__).with_name('assistant_worker.py')), '--model', s['model'],
+                              '--port', port, '--gpu-layers', layers, '--context', context]
         return '', []
 
     # Health ---------------------------------------------------------------------------------
@@ -153,7 +155,7 @@ class Runtime:
             'gpu_layers': s['gpu_layers'], 'context': s['context'], 'idle_minutes': s['idle_minutes'],
             'folders': [str(f) for f in s['folders']], 'external': external, 'error': self.error,
             'detected': {'server': s['detected_server'], 'model': s['detected_model']},
-            'python_server': importlib.util.find_spec('llama_cpp') is not None,
+            'python_library': importlib.util.find_spec('llama_cpp') is not None,
             'started_by_atlas': self.running(),
         }
 
@@ -184,7 +186,7 @@ class Runtime:
             mode, command = self.launch_command(s)
             if not command:
                 raise AssistantError('No model server found. Put llama-server.exe in the Atlas\\llm folder '
-                                     '(from the llama.cpp releases) or install llama-cpp-python[server].', 409)
+                                     '(from the llama.cpp releases), or run Install-Assistant.bat to use the Python library instead.', 409)
             if mode == 'llama-server' and not Path(s['server']).is_file():
                 raise AssistantError(f"llama-server was not found at {s['server']}.", 409)
             log = open(self._log_path(), 'w', encoding='utf-8', errors='replace')
@@ -274,13 +276,11 @@ class Runtime:
                 self.start()
                 self.wait_ready()
             self.last_used = time.time()
-            python = self.mode == 'python' and not self.settings()['url']
             body = {'messages': [{'role': 'system', 'content': system}, {'role': 'user', 'content': user}],
                     'temperature': 0, 'top_p': 1, 'seed': 1, 'max_tokens': max_tokens, 'stream': False,
                     # Qwen3 and similar: answer directly, without a long hidden "thinking" section.
                     'chat_template_kwargs': {'enable_thinking': False},
-                    'response_format': {'type': 'json_object', 'schema': schema} if python else
-                                       {'type': 'json_schema', 'json_schema': {'name': 'answer', 'strict': True, 'schema': schema}}}
+                    'response_format': {'type': 'json_schema', 'json_schema': {'name': 'answer', 'strict': True, 'schema': schema}}}
             started = time.time()
             for _ in range(2):  # an occasional broken answer is retried once with another seed
                 data = self._post(body)

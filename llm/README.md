@@ -13,3 +13,7 @@ Put the two files the Assistant needs here. They are not part of the Atlas repos
    - `Qwen3-8B-Q4_K_M.gguf` (about 5 GB, more careful; from huggingface.co/Qwen/Qwen3-8B-GGUF).
 
 Atlas finds both files here by itself. See docs/local-assistant.md.
+
+**No .exe allowed?** Skip step 1 and run `Install-Assistant.bat` instead: it installs the llama-cpp-python library
+with pip (ready-built, no compiler). With an NVIDIA card that library is an older release that cannot read Qwen3:
+use `Qwen2.5-7B-Instruct-Q4_K_M.gguf` (4.7 GB, huggingface.co/bartowski/Qwen2.5-7B-Instruct-GGUF) instead.

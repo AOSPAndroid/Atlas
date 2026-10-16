@@ -27,7 +27,20 @@ No cloud service, no Ollama. Atlas starts llama.cpp's `llama-server` itself, lis
    Larger models (12B and up) do not fit in 8 GB with room for the text. With 64 GB of RAM they can still run with **GPU layers** lowered (part on the processor), but slowly.
 3. In Atlas: **Knowledge Base → New article… → Draft from notes with the Assistant… → Assistant settings**. Leave the two paths empty (Atlas finds them in `llm`), add your notes folders (one per line), **Save**, then **Start**. The first start loads the model (10–60 seconds); later requests start it by themselves.
 
-If your PC blocks downloaded programs, the Python route works too: `pip install "llama-cpp-python[server]"` (a CUDA build is needed for the graphics card). Atlas uses it automatically when no `llama-server.exe` is present. If you already run an OpenAI-compatible server on this PC, put its address (for example `http://127.0.0.1:8080`) under **Graphics card and advanced → Existing model server**. Only addresses on this PC are accepted.
+### Without llama-server.exe: the Python library
+
+If downloaded programs are blocked, or you prefer pip packages, use the **llama-cpp-python** library instead. Double-click **Install-Assistant.bat**. It installs ready-built packages only (no compiler, no CUDA toolkit) into the same Python 3.12 as Atlas:
+
+| Your PC | What it installs | Model to use |
+| --- | --- | --- |
+| NVIDIA graphics card (found with `nvidia-smi`) | llama-cpp-python 0.3.4 for CUDA 12.4, plus NVIDIA's CUDA runtime and cuBLAS from pip (about 600 MB) | `Qwen2.5-7B-Instruct-Q4_K_M.gguf` (4.7 GB, huggingface.co/bartowski/Qwen2.5-7B-Instruct-GGUF) |
+| No NVIDIA card, or `Install-Assistant.bat --cpu` | llama-cpp-python 0.3.19 for the processor | `Qwen3-4B-Instruct-2507-Q4_K_M.gguf` (2.5 GB) |
+
+The ready-built graphics-card package is an older release (December 2024) and **cannot read Qwen3 models**: use Qwen2.5-7B-Instruct with it. It needs an NVIDIA driver that supports CUDA 12.4 (version 550 or later). The processor build reads Qwen3 but is several times slower than a graphics card.
+
+Then put the model in `llm` and leave `llama-server.exe` out of that folder: when there is no `llama-server.exe`, Atlas runs the model with the library in a separate Python process (`assistant_worker.py`), on `127.0.0.1` only, stopped when idle like llama-server. Everything else (checks, drafts, import) is the same. pip needs to reach `pypi.org` and `abetlen.github.io` (where the ready-built packages are published).
+
+If you already run an OpenAI-compatible server on this PC, put its address (for example `http://127.0.0.1:8080`) under **Graphics card and advanced → Existing model server**. Only addresses on this PC are accepted.
 
 Speed, as a guide: on an 8 GB NVIDIA card a 4B model writes a draft in about 10–20 seconds; on a 4-core processor alone it takes about 2 minutes.
 
@@ -76,7 +89,9 @@ The checks cannot tell whether your notes are right, whether steps are in the be
 | Message | What to do |
 | --- | --- |
 | No model file | Put a `.gguf` file in `llm`, or choose it in settings. |
-| No model server found | Put `llama-server.exe` (and the cudart DLLs for NVIDIA) in `llm`. |
+| No model server found | Put `llama-server.exe` (and the cudart DLLs for NVIDIA) in `llm`, or run `Install-Assistant.bat`. |
+| failed to load … with llama-cpp-python 0.3.4 | That model is newer than the graphics-card library (Qwen3): use Qwen2.5-7B-Instruct, or llama-server.exe. |
+| cannot load llama-cpp-python | Run `Install-Assistant.bat` again; for the graphics-card build, update the NVIDIA driver, or use `Install-Assistant.bat --cpu`. |
 | The model server stopped while loading: … out of memory | Use a smaller model or quantisation (Q4_K_M), lower **Context size** to 4096, or lower **GPU layers** (for example 28). |
 | The model is still loading | The first start reads the whole model from disk; try again in a few seconds. |
 | The Assistant is busy | One request at a time; wait for the current draft or reading to finish. |
