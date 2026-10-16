@@ -759,6 +759,8 @@ def inbox_documents():
   documents.append({'id':doc_id,'title':title,'notes':str(notes)[:20000]})
  return documents
 register_inbox(app, db, packages=inbox_packages, documents=inbox_documents)
+from package_matching import prewarm as prewarm_package_aliases
+prewarm_package_aliases()
 from inbox_control import register as register_inbox_control
 register_inbox_control(app)
 

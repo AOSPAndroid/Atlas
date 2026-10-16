@@ -12,6 +12,10 @@ const toolLabels = {
   "machine-groups": "Machine's AD groups",
 };
 const machineTools = new Set(["performance", "health", "reboot", "machine-groups"]);
+// Why a package was suggested: its catalogue name, a Windows package alias or a close spelling.
+const matchReason = (p) => p.reason === "alias" ? `Known as "${p.matched}" (Windows package name)`
+  : p.reason === "spelling" ? `Close spelling of "${p.matched}"`
+  : p.score >= 0.99 ? "Full name in message" : "Partial name match";
 const kindLabels = { software: "Software request", issue: "Issue", other: "General message" };
 
 // Live Inbox actions run in the classic console scripts (inbox-actions.js).
@@ -76,7 +80,7 @@ export function RequestCard({ detail, user }) {
       {(analysis.packages || []).length > 0 && <section aria-label="Suggested packages" className="inbox-request-section">
         <h3><PackagePlus aria-hidden="true" />Packages · {action}</h3>
         <ul className="inbox-request-list">{analysis.packages.map((p) => <li key={p.folder} data-package={p.folder}>
-          <span><strong>{p.display_name}</strong><small>{p.score >= 0.99 ? "Full name in message" : "Partial name match"}{p.display_name !== p.folder ? " · " + p.folder : ""}</small></span>
+          <span><strong>{p.display_name}</strong><small>{matchReason(p)}{p.display_name !== p.folder ? " · " + p.folder : ""}</small></span>
           <Button size="sm" variant="outline" disabled={noMachine} title={machineTitle} onClick={() => send("deploy", { pkg: p, deployAction: action })}>{action}…</Button>
           <Button size="sm" variant="outline" disabled={noMachine} title={machineTitle} onClick={() => send("queue", { pkg: p, deployAction: action })}>Add to queue</Button>
         </li>)}</ul>

@@ -116,14 +116,20 @@ def score_package(words, package):
 
 
 def match_packages(words, packages, limit=5):
+    from package_matching import alias_matches
+    packages = list(packages)
+    extra = alias_matches(words, packages) if packages else {}
     scored = []
     for package in packages:
-        score = score_package(words, package)
+        score, reason, matched = score_package(words, package), 'name', ''
+        alias_score, alias_reason, alias_text = extra.get(package['folder'], (0, '', ''))
+        if alias_score > score:
+            score, reason, matched = alias_score, alias_reason, alias_text
         if score >= 0.4:
-            scored.append((score, len(package_tokens(package.get('display_name'))), package))
+            scored.append((score, len(package_tokens(package.get('display_name'))), package, reason, matched))
     scored.sort(key=lambda row: (-row[0], -row[1], str(row[2].get('display_name') or row[2].get('folder')).casefold()))
-    return [{'folder': p['folder'], 'display_name': p.get('display_name') or p['folder'], 'score': round(s, 2)}
-            for s, _, p in scored[:limit]]
+    return [{'folder': p['folder'], 'display_name': p.get('display_name') or p['folder'], 'score': round(s, 2),
+             'reason': reason, 'matched': matched} for s, _, p, reason, matched in scored[:limit]]
 
 
 def hostname_candidates(text):

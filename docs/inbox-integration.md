@@ -26,6 +26,13 @@ Each selected message shows a **Request** card and buttons on every machine:
   **Add to queue** adds it to the deployment queue, which still needs
   **Start queue**. If nothing matches, **Search catalogue** opens the package
   picker with the words after "install". Saved deployment kits can be added too.
+- **Other names and typos.** Each catalogue package is linked to the same product
+  in an offline copy of the Windows Package Manager index (`resources/winget_aliases.json.gz`,
+  from github.com/microsoft/winget-pkgs, MIT), so "powerbi", "acrobat reader" or
+  "visual studio code" find your packages even when their folder names differ.
+  Close spellings ("acrobat reder") are matched with RapidFuzz. The card says why
+  a package was suggested. Rebuild the alias file with
+  `python tools/build_winget_aliases.py` (downloads about 20 MB).
 - **Suggested checks** depend on the issue: performance scan, health check,
   reboot (with the usual confirmation), and the user's or machine's AD groups.
 - **Knowledge Base** shows documents whose title or notes mention the matched
