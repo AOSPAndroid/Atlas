@@ -44,7 +44,7 @@ class MapAssetCaching(unittest.TestCase):
     def test_demo_serves_the_knowledge_base_files_but_not_articles(self):
         for name in ('knowledge-articles.js', 'assistant-settings.js', 'marked-18.0.14.js', 'dompurify-3.4.16.js', 'mermaid-12.0.0.js'):
             self.assertEqual(self.client.get('/assets/' + name).status_code, 200, name)
-        for url in ('/api/knowledge/articles', '/api/search-everything?q=vpn', '/api/search-everything/similar/1'):
+        for url in ('/api/knowledge/articles', '/api/search-everything?q=vpn', '/api/search-everything/similar/1', '/api/knowledge/import', '/api/knowledge/drafts'):
             self.assertNotEqual(self.client.get(url).status_code, 200, url)
         self.assertNotEqual(self.client.get('/api/assistant/status').status_code, 200, 'No local model on the LAN viewer')
         for url in ('/api/assistant/file', '/api/assistant/read', '/api/assistant/start'):

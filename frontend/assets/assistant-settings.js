@@ -37,7 +37,14 @@
     const state = document.createElement("p");
     state.className = "assistant-state";
     state.setAttribute("role", "status");
-    const show = (value) => { state.textContent = describe(value); state.dataset.ready = String(!!value?.ready); };
+    const indexed = document.createElement("p");
+    indexed.className = "assistant-note";
+    const show = (value) => {
+      state.textContent = describe(value); state.dataset.ready = String(!!value?.ready);
+      const i = value?.index || {};
+      indexed.textContent = i.running ? `Indexing notes folders for Search everything… ${i.done || 0} of ${i.total || "?"} new or changed files`
+        : i.items != null ? `Search everything knows ${Number(i.items).toLocaleString()} files from your notes folders.${i.error ? " Last problem: " + i.error : ""}` : "";
+    };
     show(s);
     const intro = document.createElement("p");
     intro.className = "assistant-note";
@@ -93,7 +100,8 @@
     body.append(intro, state, help,
       field("llama-server", server, s.detected?.server ? "Found in Atlas\\llm. Leave empty to use it." : "Path to llama-server.exe, or leave empty if it is in Atlas\\llm."),
       field("Model file (.gguf)", model, s.detected?.model ? "Found in Atlas\\llm. Leave empty to use it." : "Path to the .gguf model file."),
-      field("Notes folders (one per line)", folders, "The Assistant and Search everything can read files here (txt, md, docx, pptx, eml, html, pdf). Read only."),
+      field("Notes folders (one per line)", folders, "The Assistant and Search everything can read files here (txt, md, docx, pptx, xlsx, eml, html, pdf). Read only. A whole drive such as F:\\ works: system and program folders are skipped."),
+      indexed,
       advanced, actions, message);
     const timer = setInterval(async () => { if (!element.isConnected) return clearInterval(timer); show(await status()); }, 3000);
     element.addEventListener("close", () => clearInterval(timer), { once: true });

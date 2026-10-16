@@ -93,6 +93,8 @@ class Runtime:
         self.error = ''
         self.started = self.last_used = 0.0
         self.lock = threading.Lock()      # one model call at a time; small GPUs cannot run two
+        self.waiting = 0                  # your own requests waiting; background imports step aside for them
+        self.turn_timeout = 240           # how long your request waits for a background draft to finish
         self.state_lock = threading.Lock()
         self._watcher = None
         self.job = None
@@ -236,10 +238,21 @@ class Runtime:
         self._watcher.start()
 
     # Model calls ----------------------------------------------------------------------------
-    def chat(self, system, user, schema, max_tokens=1500):
-        """One deterministic, schema-constrained answer as a dict."""
-        if not self.lock.acquire(blocking=False):
-            raise AssistantError('The Assistant is busy with another request. Try again when it finishes.', 409)
+    def chat(self, system, user, schema, max_tokens=1500, background=False):
+        """One deterministic, schema-constrained answer as a dict.
+
+        Your own requests wait for a background import's current file; background work never waits for them."""
+        if background:
+            if self.waiting or not self.lock.acquire(blocking=False):
+                raise AssistantError('The Assistant is busy with your request.', 409)
+        else:
+            self.waiting += 1
+            try:
+                acquired = self.lock.acquire(timeout=self.turn_timeout)
+            finally:
+                self.waiting -= 1
+            if not acquired:
+                raise AssistantError('The Assistant is busy with another request. Try again when it finishes.', 409)
         try:
             if not self.ready():
                 if self.settings()['url']:
@@ -331,9 +344,14 @@ def register(app, wmi, check_token):
     def failure(error):
         return HTTPException(error.status, str(error))
 
+    def index_state():
+        index = getattr(wmi, 'search_index', None)
+        state = dict(index.progress.get('file') or {}) if index is not None else {}
+        return {k: state.get(k) for k in ('running', 'done', 'total', 'items', 'error', 'finished')}
+
     @app.get('/api/assistant/status')
     def status():
-        return runtime.status()
+        return {**runtime.status(), 'index': index_state()}
 
     @app.post('/api/assistant/settings')
     def save(body: Settings, request: Request):
@@ -362,7 +380,11 @@ def register(app, wmi, check_token):
         wmi.CONFIG['assistant'] = changed
         if restart:
             runtime.stop()
-        return runtime.status()
+        index = getattr(wmi, 'search_index', None)
+        if index is not None and folders:
+            index.start_background()
+            index.refresh()  # index the new folders now
+        return {**runtime.status(), 'index': index_state()}
 
     @app.post('/api/assistant/start')
     def start(request: Request):

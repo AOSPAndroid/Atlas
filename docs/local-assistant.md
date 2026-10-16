@@ -4,7 +4,8 @@ A small language model that runs on your own PC and helps with three jobs:
 
 - **Notes → Knowledge Base article.** In Knowledge Base, choose **New article… → Draft from notes with the Assistant…**, paste rough notes and/or tick files from your notes folders, then **Draft article**. The draft opens in the normal article editor. Nothing is saved until you click **Create article**.
 - **Reading a request.** In Live Inbox (and under **Read from screen**), click **Read with Assistant** on the Assistant card. It gives a one-line summary, what the user asks for, the details they mention, up to three questions to ask, and steps taken from your own articles and note files, each with a link to its source.
-- **Your notes in Search everything.** Files in the folders you choose are searched together with articles, requests, deployments and diagrams. Open one to read it or to draft an article from it.
+- **Your notes in Search everything.** Files in the folders you choose (a whole drive such as `F:\` works) are searched together with articles, requests, deployments and diagrams. Open one to read it or to draft an article from it.
+- **Importing a whole drive.** **New article… → Import knowledge from folders…** turns years of notes into a review queue of drafts. See [Import a drive of notes](#import-a-drive-of-notes).
 
 No cloud service, no Ollama. Atlas starts llama.cpp's `llama-server` itself, listening on `127.0.0.1` only, and stops it after 30 idle minutes to free the graphics card. The Demo viewer and Preview have no Assistant.
 
@@ -30,6 +31,21 @@ If your PC blocks downloaded programs, the Python route works too: `pip install 
 
 Speed, as a guide: on an 8 GB NVIDIA card a 4B model writes a draft in about 10–20 seconds; on a 4-core processor alone it takes about 2 minutes.
 
+## Import a drive of notes
+
+1. Add the drive or folder (for example `F:\`) under **Notes folders** in Assistant settings and save. Atlas starts indexing it for Search everything straight away, in the background: system, program, recycle-bin and code folders are skipped, files over 5 MB are skipped, and only new or changed files are read again later (every 10 minutes). Settings shows how far it is. Search works without the model.
+2. **Knowledge Base → New article… → Import knowledge from folders…** Choose the folder (or a folder inside it), optionally a date ("changed since") and the file types, then **Count files**: Atlas shows how many files there are, how many are new, and an estimate of the time.
+3. **Start import.** The Assistant goes through the files one at a time:
+   - very short files (under 80 characters) are skipped;
+   - copies of a file already imported (same text, any name) are skipped;
+   - the model first decides whether the file is IT knowledge (a fix, procedure, known issue, how-to, contacts or escalation rules). Logs, exports, invoices, lists and personal documents are skipped with its reason;
+   - everything else becomes a **draft**, checked line by line exactly like **Draft from notes**.
+
+   Progress, time left and the current file are shown; **Pause**, **Resume** and **Stop** work at any time. Your own Assistant requests (reading a request, drafting from notes) go first: the import waits for them. Progress is saved, so a stopped or interrupted import continues where it left off, and files already imported are skipped unless they changed. Leave it running overnight for a large drive: at 10–20 seconds per file on an 8 GB graphics card, 1,000 knowledge files take 3–6 hours.
+4. **Review.** The **Review imported drafts (N)** button above the article list opens the queue, clean drafts first. For each draft: **Publish**, **Edit, then publish** (the full editor, with the check panel), **Reject** (not drafted again unless the file changes) or **Open the file**. **Publish N clean drafts** publishes every draft whose lines all passed the checks, except drafts made from shortened text.
+
+Published articles are normal articles: searchable, suggested in Live Inbox for their issue types, and editable.
+
 ## How it avoids making things up
 
 Small models invent details. Atlas does not trust the model; it checks every line in code:
@@ -48,7 +64,8 @@ The checks cannot tell whether your notes are right, whether steps are in the be
 
 ## Files and privacy
 
-- The Assistant reads only the folders you list, read-only: `.txt .md .log .csv .json .ps1 .bat .cmd .xml .ini .yaml .reg .sql .py .html .eml .docx .pptx`, and `.pdf` if `pypdf` is installed. Files over 5 MB are skipped. Paths outside the chosen folders are refused.
+- The Assistant reads only the folders you list, read-only: `.txt .md .log .csv .json .ps1 .bat .cmd .xml .ini .yaml .reg .sql .py .html .eml .docx .pptx .xlsx`, and `.pdf` if `pypdf` is installed (`pip install pypdf`). Old `.doc`, `.xls` and Outlook `.msg` files are not read: save them as `.docx`, `.xlsx` or `.eml`. Files over 5 MB are skipped. Paths outside the chosen folders are refused. Up to 50,000 files are indexed (`"max_files"` under `"assistant"` in `config.json` changes it).
+- Import progress and drafts are kept in `knowledge.sqlite3` (tables `import_files` and `article_drafts`).
 - Text goes from Atlas to the model server on `127.0.0.1` and nowhere else. Nothing is stored except the article you save and the search index (`search-index.sqlite3`, a cache that is safe to delete).
 - The model server's output is logged to `data\assistant-server.log` (startup messages only, not your text).
 - Settings are saved under `"assistant"` in `config.json`: `server`, `model`, `url`, `gpu_layers`, `context`, `idle_minutes`, `folders`.

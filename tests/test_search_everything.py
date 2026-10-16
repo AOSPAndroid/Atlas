@@ -103,6 +103,52 @@ class SearchEverything(unittest.TestCase):
         self.assertEqual(len(self.search('outlook')), 3)
         self.assertEqual(self.src.calls, [0], 'Everything is indexed again from scratch')
 
+    def test_large_sources_are_indexed_item_by_item_in_the_background(self):
+        class Files:
+            def __init__(self):
+                self.files = {'a.txt': ('1', 'Printer spooler fix'), 'b.txt': ('1', 'VPN GlobalProtect reinstall'), 'bad.txt': ('1', None)}
+                self.reads = []
+
+            def listing(self):
+                return {ref: signature for ref, (signature, _) in self.files.items()}
+
+            def row(self, ref):
+                self.reads.append(ref)
+                text = self.files[ref][1]
+                if text is None:
+                    raise OSError('locked')
+                return {'ref': ref, 'title': ref, 'body': text}
+        files = Files()
+        self.index.sources['file'] = files
+        self.assertEqual(self.search('spooler', kinds='file'), [], 'Searching never waits for a large source')
+        self.index.update('file', batch=2)
+        self.assertEqual(sorted(files.reads), ['a.txt', 'b.txt', 'bad.txt'])
+        self.assertEqual({k: self.index.progress['file'][k] for k in ('running', 'done', 'total', 'items', 'error')},
+                         {'running': False, 'done': 3, 'total': 3, 'items': 3, 'error': ''})
+        self.assertEqual([r['ref'] for r in self.search('spooler', kinds='file')], ['a.txt'])
+        files.reads.clear()
+        self.index.update('file')
+        self.assertEqual(files.reads, [], 'Unchanged and unreadable files are not read again')
+        files.files['a.txt'] = ('2', 'Printer toner replacement')
+        files.files['c.txt'] = ('1', 'Outlook profile rebuild')
+        del files.files['b.txt']
+        self.index.update('file')
+        self.assertEqual(sorted(files.reads), ['a.txt', 'c.txt'])
+        self.assertEqual(self.search('spooler', kinds='file'), [], 'The old text of a changed file is gone')
+        self.assertEqual([r['ref'] for r in self.search('toner', kinds='file')], ['a.txt'])
+        self.assertEqual(self.search('globalprotect', kinds='file'), [], 'Deleted files leave the index')
+        files.files['d.txt'] = ('1', 'Teams camera fix')
+        self.index.start_background(interval=60)
+        self.index.refresh()
+        for _ in range(100):
+            if self.search('camera', kinds='file'):
+                break
+            import time
+            time.sleep(0.05)
+        self.assertEqual([r['ref'] for r in self.search('camera', kinds='file')], ['d.txt'])
+        self.index.stop_background()
+        self.assertFalse(self.index._thread.is_alive())
+
     def test_similar_requests_share_distinctive_words(self):
         similar = self.client.get('/api/search-everything/similar/1').json()
         self.assertIn('outlook', similar['terms'])

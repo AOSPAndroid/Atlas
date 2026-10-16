@@ -9,6 +9,7 @@ import json
 import re
 import sqlite3
 import threading
+import time
 from contextlib import closing
 
 from fastapi import HTTPException, Query
@@ -19,7 +20,7 @@ me my no not of on or our please so thank thanks that the their them then there 
 where which who why will with would you your yes dear regards best kind team bonjour merci de des du la le les un une et est
 pour sur dans avec pas que qui mon ma mes vous nous je il elle cordialement svp very also just need since still every after
 before today morning time some more much there here have help''' .split())
-INDEX_VERSION = '3'  # bump when the table layout or tokenizer changes; the cache is rebuilt
+INDEX_VERSION = '4'  # bump when the table layout or tokenizer changes; the cache is rebuilt
 _lock = threading.Lock()
 
 
@@ -46,8 +47,88 @@ def key_terms(text, limit=10):
 
 class SearchIndex:
     def __init__(self, path, sources):
-        """sources: {kind: callable returning (signature, rows)} or, for 'inbox', callable(after_id)."""
+        """sources: {kind: callable returning (signature, rows)}, for 'inbox' callable(after_id), or an object with
+        listing() -> {ref: signature} and row(ref) -> row, indexed item by item in the background."""
         self.path, self.sources = path, sources
+        self.progress = {}
+        self._wake = threading.Event()
+        self._thread = None
+
+    @staticmethod
+    def incremental(source):
+        return hasattr(source, 'listing') and hasattr(source, 'row')
+
+    def update(self, kind, batch=100):
+        """Bring one item-by-item source up to date. Files are read outside the lock, a batch at a time."""
+        source = self.sources[kind]
+        state = self.progress.setdefault(kind, {})
+        state.update(running=True, done=0, total=0, error='')
+        try:
+            listing = source.listing()
+            with _lock, closing(self.connect()) as c:
+                known = dict(c.execute('SELECT ref, signature FROM items WHERE kind=?', (kind,)).fetchall())
+            removed = [ref for ref in known if ref not in listing]
+            changed = [ref for ref, signature in listing.items() if known.get(ref) != signature]
+            state.update(total=len(changed), items=len(listing))
+            for start in range(0, len(removed), 500):
+                with _lock, closing(self.connect()) as c:
+                    for ref in removed[start:start + 500]:
+                        self._forget(c, kind, ref)
+                    c.commit()
+            for start in range(0, len(changed), batch):
+                rows = []
+                for ref in changed[start:start + batch]:
+                    try:
+                        rows.append((ref, source.row(ref)))
+                    except Exception:  # unreadable now: remembered, retried when the file changes
+                        rows.append((ref, None))
+                with _lock, closing(self.connect()) as c:
+                    for ref, row in rows:
+                        self._forget(c, kind, ref)
+                        entry = None
+                        if row:
+                            entry = c.execute('INSERT INTO entries(kind,ref,title,body,at,extra) VALUES(?,?,?,?,?,?)',
+                                              (kind, str(ref), row['title'], row['body'], row.get('at') or '', json.dumps(row.get('extra') or {}))).lastrowid
+                        c.execute('INSERT INTO items VALUES(?,?,?,?)', (kind, str(ref), listing[ref], entry))
+                    c.commit()
+                state['done'] = min(len(changed), start + batch)
+        except (OSError, sqlite3.Error) as error:
+            state['error'] = str(error)
+        finally:
+            state.update(running=False, finished=time.time())
+
+    @staticmethod
+    def _forget(c, kind, ref):
+        old = c.execute('SELECT entry FROM items WHERE kind=? AND ref=?', (kind, str(ref))).fetchone()
+        if old and old['entry']:
+            c.execute('DELETE FROM entries WHERE rowid=?', (old['entry'],))
+        c.execute('DELETE FROM items WHERE kind=? AND ref=?', (kind, str(ref)))
+
+    def start_background(self, interval=600):
+        """Keep item-by-item sources (note files) indexed: now, every `interval` seconds, and on refresh()."""
+        if self._thread and self._thread.is_alive():
+            return
+
+        self._stopped = False
+
+        def loop():
+            while not self._stopped:
+                for kind, source in list(self.sources.items()):
+                    if self.incremental(source) and not self._stopped:
+                        self.update(kind)
+                self._wake.wait(interval)
+                self._wake.clear()
+        self._thread = threading.Thread(target=loop, name='search-index-files', daemon=True)
+        self._thread.start()
+
+    def refresh(self):
+        self._wake.set()
+
+    def stop_background(self):
+        self._stopped = True
+        self._wake.set()
+        if self._thread:
+            self._thread.join(10)
 
     def connect(self):
         self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -57,19 +138,22 @@ class SearchIndex:
         version = c.execute("SELECT signature FROM sources WHERE kind='__version__'").fetchone()
         if not version or version['signature'] != INDEX_VERSION:
             c.execute('DROP TABLE IF EXISTS entries')
+            c.execute('DROP TABLE IF EXISTS items')
             c.execute('DELETE FROM sources')
             c.execute("INSERT INTO sources VALUES('__version__', ?)", (INDEX_VERSION,))
         # Porter stemming: "freezes" finds "freezing"; accents are ignored ("reseau" finds "réseau").
         c.execute("CREATE VIRTUAL TABLE IF NOT EXISTS entries USING fts5(kind UNINDEXED, ref UNINDEXED, title, body,"
                   " at UNINDEXED, extra UNINDEXED, tokenize='porter unicode61 remove_diacritics 2')")
+        # Per-item signatures for large sources (note files): only new or changed items are read again.
+        c.execute('CREATE TABLE IF NOT EXISTS items(kind TEXT, ref TEXT, signature TEXT NOT NULL, entry INTEGER, PRIMARY KEY(kind, ref))')
         c.commit()
         return c
 
     def sync(self):
         with _lock, closing(self.connect()) as c:
             for kind, load in self.sources.items():
-                if kind == '__version__':
-                    continue
+                if kind == '__version__' or self.incremental(load):
+                    continue  # item-by-item sources are kept up to date in the background
                 state = c.execute('SELECT signature FROM sources WHERE kind=?', (kind,)).fetchone()
                 try:
                     if kind == 'inbox':

@@ -16,6 +16,7 @@ const DRAFT = { title: 'Printer queue stuck', tags: ['printer'], categories: ['p
            { section: 'Summary', text: 'x', reasons: ['its quote only nearly matches the notes'], minor: true }],
   dropped: [{ section: 'Commands', text: 'Restart-Service Spooler -Force', reasons: ['not in the notes'] }] };
 
+const importState = { state: 'idle', total: 0, done: 0, drafted: 0, skipped: 0, failed: 0, current: '', message: '', drafts: { pending: 2 }, files: { drafted: 2 } };
 function api(requests, overrides = {}) {
   return async (url, o = {}) => {
     const body = o.body ? JSON.parse(o.body) : undefined;
@@ -33,6 +34,16 @@ function api(requests, overrides = {}) {
         { name: 'spooler.txt', path: 'C:\\Notes\\spooler.txt', folder: false, size: 10, modified: 1790000000 }] };
     else if (url === '/api/assistant/file') data = { path: body.path, name: body.path.split('\\').pop(), text: 'net stop spooler\n<b>not html</b>', modified: 1790000000 };
     else if (url === '/api/assistant/draft-article') data = DRAFT;
+    else if (url === '/api/knowledge/import') data = importState;
+    else if (url === '/api/knowledge/import/plan') data = { files: 1200, new: 900, done_before: 300, by_type: { '.docx': 700, '.txt': 500 }, seconds_per_file: 12 };
+    else if (url === '/api/knowledge/import/start') { Object.assign(importState, { state: 'running', total: 900, done: 3, drafted: 2, skipped: 1, current: 'vpn.docx', eta_seconds: 10764 }); data = importState; }
+    else if (url === '/api/knowledge/import/pause') { importState.state = 'paused'; data = importState; }
+    else if (url === '/api/knowledge/drafts') data = { drafts: [{ id: 7, title: 'VPN fix', path: 'F:\\IT\\vpn.docx', flags: 0, created: '2026-10-16T09:00:00Z', tags: [], categories: [] },
+      { id: 8, title: 'Printer', path: 'F:\\IT\\printer.txt', flags: 2, created: '2026-10-16T09:00:00Z', tags: [], categories: [] }] };
+    else if (url === '/api/knowledge/drafts/8') data = { id: 8, title: 'Printer', path: 'F:\\IT\\printer.txt', flags: 2, tags: ['printer'], categories: ['printer'],
+      markdown: '## Steps\n1. Reinstall the driver on PRN-PAR-04.\n', review: { checks: DRAFT.checks, dropped: [], sources: ['printer.txt'], cut: false, seconds: 9, model: 'm' } };
+    else if (url === '/api/knowledge/drafts/8/publish') data = { article: 'printer-1' };
+    else if (url === '/api/knowledge/drafts/publish-clean') data = { published: 1, articles: ['vpn-fix-1'] };
     else if (url.startsWith('/api/knowledge/articles/') && o.method === 'PUT') data = { revision: 1, updated: '2026-10-16T09:00:00Z' };
     else if (url.startsWith('/api/knowledge/articles/')) data = { id: 'x', title: 'Saved', markdown: '', tags: [], categories: [], revision: 1, updated: '' };
     else if (url.startsWith('/api/search-everything')) data = { results: [{ kind: 'file', ref: 'C:\\Notes\\spooler.txt', title: '\u0002spooler\u0003.txt', snippet: 'net stop', at: '', extra: {} }] };
@@ -130,6 +141,43 @@ const fakeMarkdown = (w) => {
   await w.AtlasKnowledge.show('file:C:\\Notes\\vpn.md'); await sleep(20);
   assert.equal(requests.filter((r) => r.url === '/api/assistant/file').at(-1).body.path, 'C:\\Notes\\vpn.md');
 
+  // Import from folders and the review queue.
+  await until(() => !kb.querySelector('.kb-drafts-button').hidden);
+  assert.equal(kb.querySelector('.kb-drafts-button').textContent, 'Review imported drafts (2)');
+  templates.value = 'import'; templates.dispatchEvent(new w.Event('change'));
+  await until(() => /1,200 files, 900 not imported yet/.test(kb.querySelector('.kb-import [role="status"]')?.textContent || ''));
+  assert.match(kb.querySelector('.kb-import [role="status"]').textContent, /About 3.0 h at 12 s per file/);
+  assert.deepEqual([...kb.querySelectorAll('.kb-import-types label')].map((l) => l.textContent.trim()), ['.docx 700', '.txt 500']);
+  kb.querySelector('.kb-import-types input[value=".txt"]').click();
+  kb.querySelector('.kb-import-fields input[aria-label="Only this folder inside it"]').value = 'C:\\Notes\\IT';
+  [...kb.querySelectorAll('.kb-import button')].find((b) => b.textContent === 'Start import').click();
+  await until(() => /Importing · 3 of 900 files · about 3.0 h left/.test(kb.querySelector('.kb-import-progress').textContent));
+  assert.deepEqual(requests.find((r) => r.url === '/api/knowledge/import/start').body, { folder: 'C:\\Notes\\IT', since: 0, types: ['.docx'], limit: 0 });
+  assert.match(kb.querySelector('.kb-import-progress').textContent, /vpn\.docx/);
+  [...kb.querySelectorAll('.kb-import-progress button')].find((b) => b.textContent === 'Pause').click();
+  await until(() => /Paused/.test(kb.querySelector('.kb-import-progress').textContent));
+  importState.state = 'idle';
+  await w.AtlasKnowledgeArticles.reviewQueue();
+  const queue = kb.querySelector('.kb-review-queue');
+  assert.deepEqual([...queue.querySelectorAll('.kb-kind')].map((k) => k.textContent), ['Clean', '2 to check']);
+  [...queue.querySelectorAll('.kb-result')][1].click();
+  await until(() => kb.querySelector('.kb-article-view .kb-review'));
+  assert.match(kb.querySelector('.kb-article-view').textContent, /From F:\\IT\\printer\.txt/);
+  assert.equal(kb.querySelector('.kb-article-view .kb-review button'), null, 'The preview has no edit buttons');
+  [...kb.querySelectorAll('.kb-article-view button')].find((b) => b.textContent === 'Edit, then publish').click();
+  const draftEditor = kb.querySelector('.kb-article-editor');
+  assert.equal(draftEditor.querySelector('button[type="submit"]').textContent, 'Publish');
+  [...draftEditor.querySelectorAll('.kb-review button')].find((b) => b.textContent === 'Remove from draft').click();
+  draftEditor.dispatchEvent(new w.Event('submit', { cancelable: true }));
+  await until(() => requests.some((r) => r.url === '/api/knowledge/drafts/8/publish'));
+  const published = requests.find((r) => r.url === '/api/knowledge/drafts/8/publish').body;
+  assert.equal(published.title, 'Printer');
+  assert(!published.markdown.includes('PRN-PAR-04'), 'The edited text is what gets published');
+  w.confirm = () => true;
+  await w.AtlasKnowledgeArticles.reviewQueue();
+  [...kb.querySelectorAll('.kb-review-queue button')].find((b) => b.textContent === 'Publish 1 clean draft').click();
+  await until(() => requests.some((r) => r.url === '/api/knowledge/drafts/publish-clean'));
+
   // A failed draft keeps the form and explains why.
   w.close();
   const failing = [];
@@ -156,5 +204,5 @@ const fakeMarkdown = (w) => {
   assert.equal(demo.w.document.querySelector('.assistant-dialog'), null);
   assert(!demoRequests.some((r) => r.url.startsWith('/api/assistant')));
   demo.w.close();
-  console.log('PASS: Assistant settings save/start, Draft from notes with file picker, empty-input guard, review panel with flagged and dropped lines, remove flagged line, save, note files from search as text, draft from a file, file links, error kept in form, read-only Demo without Assistant');
+  console.log('PASS: Assistant settings save/start, folder import with counts/types/estimate/progress/pause, review queue preview, edit then publish, publish clean drafts, Draft from notes with file picker, empty-input guard, review panel with flagged and dropped lines, remove flagged line, save, note files from search as text, draft from a file, file links, error kept in form, read-only Demo without Assistant');
 })().catch((e) => { console.error(e); process.exit(1); });

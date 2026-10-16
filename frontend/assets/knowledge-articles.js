@@ -105,22 +105,25 @@
     const templates = el("select");
     templates.setAttribute("aria-label", "New article from template");
     templates.append(el("option", { value: "", textContent: "New article…" }), ...TEMPLATES.map(([name], i) => el("option", { value: String(i), textContent: name })));
-    if (window.AtlasAssistant && !readonly()) templates.append(el("option", { value: "assistant", textContent: "Draft from notes with the Assistant…" }));
+    if (window.AtlasAssistant && !readonly()) templates.append(el("option", { value: "assistant", textContent: "Draft from notes with the Assistant…" }),
+      el("option", { value: "import", textContent: "Import knowledge from folders…" }));
     templates.disabled = readonly();
     const tagsBox = el("div", { className: "kb-tag-filter" });
+    const drafts = button("", () => reviewQueue(), { className: "kb-drafts-button", hidden: true });
     const list = el("ul", { className: "kb-article-results" });
     list.setAttribute("aria-label", "Articles");
     const status = el("p", { className: "kb-note", role: "status" });
     const view = el("article", { className: "kb-article-view" });
     view.setAttribute("aria-live", "polite");
-    const aside = el("aside", { className: "kb-article-list" }, el("div", { className: "kb-article-search" }, search, scope), templates, tagsBox, status, list);
+    const aside = el("aside", { className: "kb-article-list" }, el("div", { className: "kb-article-search" }, search, scope), templates, drafts, tagsBox, status, list);
     const section = el("section", { className: "kb-articles" }, aside, view);
     host.prepend(bar, section);
-    ui = { tabs, search, everything, templates, tagsBox, list, status, view };
+    ui = { tabs, search, everything, templates, tagsBox, list, status, view, drafts };
     search.addEventListener("input", () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => { state.query = search.value.trim(); refreshList(); }, 200); });
     everything.onchange = () => { state.everything = everything.checked; search.placeholder = everything.checked ? "Search articles, requests, deployments, notes…" : "Search articles…"; refreshList(); };
     templates.onchange = () => {
       if (templates.value === "assistant") { templates.value = ""; return draftFromNotes(); }
+      if (templates.value === "import") { templates.value = ""; return importView(); }
       const t = TEMPLATES[Number(templates.value)]; templates.value = ""; if (t) edit({ title: t[0] === "Blank article" ? "" : t[0], tags: t[1], categories: t[2], markdown: t[3], revision: 0 }, true);
     };
     let mode = "articles";
@@ -138,7 +141,7 @@
       const [{ articles }, { categories }] = await Promise.all([api("/api/knowledge/articles"), state.categories.length ? { categories: state.categories } : api("/api/knowledge/article-categories")]);
       state.articles = articles || []; state.categories = categories || [];
     } catch (error) { ui.status.textContent = error.message; return; }
-    renderTags(); refreshList();
+    renderTags(); refreshList(); refreshDrafts();
     if (select) open(select);
     else if (!state.current && !state.editing) welcome();
   }
@@ -261,6 +264,13 @@
         tags: tags.value.split(",").map((t) => t.trim()).filter(Boolean),
         categories: [...cats.querySelectorAll("input:checked")].map((c) => c.value) };
       if (!payload.title) { message.textContent = "Give the article a title."; title.focus(); return; }
+      if (review?.draftId) {  // an imported draft: publishing marks it done in the review queue
+        try {
+          const { article: id } = await post(`/api/knowledge/drafts/${review.draftId}/publish`, payload);
+          state.editing = false; toast?.("Article published"); await refresh(id);
+        } catch (error) { message.textContent = error.message; }
+        return;
+      }
       const id = draft.id || slug(payload.title);
       try {
         const saved = await api("/api/knowledge/articles/" + encodeURIComponent(id), { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
@@ -274,7 +284,7 @@
     const form = el("form", { className: "kb-article-editor", onsubmit: (e) => { e.preventDefault(); save(); } },
       el("div", { className: "kb-editor-fields" }, title, tags), cats, tools,
       el("div", { className: "kb-editor-split" }, text, preview),
-      el("div", { className: "kb-article-actions" }, el("button", { type: "submit", className: "primary", textContent: isNew ? "Create article" : "Save" }), button("Cancel", cancel), message));
+      el("div", { className: "kb-article-actions" }, el("button", { type: "submit", className: "primary", textContent: review?.draftId ? "Publish" : isNew ? "Create article" : "Save" }), button("Cancel", cancel), message));
     form.addEventListener("keydown", (e) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") { e.preventDefault(); save(); } });
     if (review) form.prepend(reviewPanel(review, text, update));
     ui.view.replaceChildren(form);
@@ -376,7 +386,7 @@
     const flagged = draft.checks.filter((c) => !c.minor), minor = draft.checks.filter((c) => c.minor);
     const items = el("ul", {}, ...flagged.map((check) => {
       const line = el("li", {}, el("strong", { textContent: check.section + ": " }), check.text, el("small", { textContent: " — " + check.reasons.join("; ") }));
-      const index = text.value.indexOf(check.text);
+      const index = text ? text.value.indexOf(check.text) : -1;
       if (index >= 0) line.append(" ", button("Remove from draft", () => {
         const start = text.value.lastIndexOf("\n", index) + 1, end = text.value.indexOf("\n", index);
         text.value = text.value.slice(0, start) + text.value.slice(end < 0 ? text.value.length : end + 1);
@@ -394,6 +404,138 @@
     return panel;
   }
 
+  // Bulk import from notes folders (for example all of F:\) into a review queue.
+  async function refreshDrafts() {
+    if (!window.AtlasAssistant || readonly() || !ui) return;
+    try {
+      const s = await api("/api/knowledge/import");
+      const pending = s.drafts?.pending || 0, running = s.state === "running" || s.state === "paused";
+      ui.drafts.hidden = !pending && !running;
+      ui.drafts.textContent = running ? `Importing… ${s.done}/${s.total} · ${pending} to review` : `Review imported drafts (${pending})`;
+      return s;
+    } catch { ui.drafts.hidden = true; }
+  }
+  const duration = (seconds) => seconds == null ? "" : seconds < 90 ? `${Math.round(seconds)} s` : seconds < 5400 ? `${Math.round(seconds / 60)} min` : `${(seconds / 3600).toFixed(1)} h`;
+
+  async function importView() {
+    if (state.editing && !confirm("Discard the changes to this article?")) return;
+    state.editing = false; state.current = null;
+    const settings = await window.AtlasAssistant.status();
+    const folder = el("select");
+    folder.setAttribute("aria-label", "Folder to import");
+    folder.append(...(settings.folders || []).map((f) => el("option", { value: f, textContent: f })));
+    const sub = el("input", { placeholder: "Optional: a folder inside it, e.g. F:\\IT\\Runbooks", spellcheck: false });
+    sub.setAttribute("aria-label", "Only this folder inside it");
+    const since = el("input", { type: "date" });
+    since.setAttribute("aria-label", "Only files changed since");
+    const limit = el("input", { type: "number", min: 0, value: 0 });
+    limit.setAttribute("aria-label", "Stop after this many files (0 for all)");
+    const types = el("div", { className: "kb-import-types" });
+    const summary = el("p", { className: "kb-note", role: "status" });
+    const progress = el("section", { className: "kb-import-progress" });
+    const body = () => ({ folder: sub.value.trim() || folder.value, since: since.value ? new Date(since.value).getTime() / 1000 : 0,
+      types: [...types.querySelectorAll("input:checked")].map((t) => t.value), limit: Number(limit.value) || 0 });
+    const scan = async () => {
+      summary.textContent = "Counting files…";
+      try {
+        const plan = await post("/api/knowledge/import/plan", { ...body(), types: [] });
+        const chosen = new Set(body().types);
+        types.replaceChildren(...Object.entries(plan.by_type).map(([type, count]) => el("label", {},
+          el("input", { type: "checkbox", value: type, checked: !chosen.size || chosen.has(type) }), ` ${type} ${count.toLocaleString()}`)));
+        const each = plan.seconds_per_file;
+        summary.textContent = `${plan.files.toLocaleString()} files, ${plan.new.toLocaleString()} not imported yet` +
+          (plan.done_before ? ` (${plan.done_before.toLocaleString()} already done or unchanged).` : ".") +
+          (plan.new ? each ? ` About ${duration(plan.new * each)} at ${each} s per file.` : " Expect about 10–20 s per file on an 8 GB graphics card, plus files that are skipped quickly." : "");
+      } catch (error) { summary.textContent = error.message; }
+    };
+    const start = async () => {
+      try { await post("/api/knowledge/import/start", body()); watch(); }
+      catch (error) { summary.textContent = error.message; }
+    };
+    const control = (action) => async () => { try { show(await post("/api/knowledge/import/" + action, {})); } catch (error) { summary.textContent = error.message; } };
+    const show = (s) => {
+      const active = s.state === "running" || s.state === "paused" || s.state === "stopping";
+      const files = s.files || {};
+      progress.replaceChildren(
+        el("p", {}, el("strong", { textContent: active ? (s.state === "paused" ? "Paused" : s.state === "stopping" ? "Stopping after this file…" : "Importing") : (s.message || "No import running") }),
+          active ? ` · ${s.done.toLocaleString()} of ${s.total.toLocaleString()} files` : "",
+          active && s.eta_seconds ? ` · about ${duration(s.eta_seconds)} left` : "",
+          active && s.current ? el("small", { textContent: " · " + s.current }) : null),
+        active ? el("progress", { max: s.total || 1, value: s.done }) : null,
+        el("p", { className: "kb-note", textContent: `This run: ${s.drafted} drafted, ${s.skipped} skipped, ${s.failed} failed. ` +
+          `All imports: ${files.drafted || 0} drafted, ${(files.skipped || 0) + (files.duplicate || 0)} skipped, ${files.failed || 0} failed · ${(s.drafts?.pending || 0)} drafts to review.` }),
+        el("div", { className: "kb-article-actions" },
+          s.state === "running" ? button("Pause", control("pause")) : null, s.state === "paused" ? button("Resume", control("resume")) : null,
+          active && s.state !== "stopping" ? button("Stop", control("stop")) : null,
+          s.drafts?.pending ? button(`Review ${s.drafts.pending} drafts`, () => reviewQueue(), { className: "primary" }) : null));
+      startButton.disabled = active;
+    };
+    let timer = 0;
+    const watch = async () => {
+      clearTimeout(timer);
+      if (!form.isConnected) return;
+      const s = await refreshDrafts();
+      if (s) show(s);
+      if (s && s.state !== "idle") timer = setTimeout(watch, 2000);
+    };
+    const startButton = button("Start import", start, { className: "primary" });
+    const form = el("div", { className: "kb-import" },
+      el("header", { className: "kb-article-head" }, el("h2", { textContent: "Import knowledge from your notes folders" }),
+        el("p", { className: "kb-note", textContent: "The Assistant reads each file, skips what is not IT knowledge (logs, exports, duplicates, very short files) and turns the rest into drafts checked line by line against the file. Drafts wait in a review queue; nothing is published until you choose. Files already imported are skipped unless they changed. You can keep using Atlas: your own Assistant requests go first." })),
+      settings.folders?.length ? el("div", { className: "kb-import-fields" },
+        el("label", {}, "Folder", folder), el("label", {}, "Inside it (optional)", sub), el("label", {}, "Changed since (optional)", since), el("label", {}, "Stop after (files, 0 = all)", limit))
+        : el("p", {}, "No notes folders yet. ", button("Assistant settings", () => window.AtlasAssistant.openSettings()), " Add F:\\ or the folders with your notes, then come back."),
+      el("div", { className: "kb-article-actions" }, button("Count files", scan), startButton, button("Review drafts", () => reviewQueue())), types, summary, progress);
+    ui.view.replaceChildren(form);
+    if (settings.folders?.length) scan();
+    watch();
+  }
+
+  async function reviewQueue() {
+    if (state.editing && !confirm("Discard the changes to this article?")) return;
+    state.editing = false; state.current = null;
+    let list;
+    try { list = (await api("/api/knowledge/drafts")).drafts; }
+    catch (error) { ui.status.textContent = error.message; return; }
+    const clean = list.filter((d) => !d.flags).length;
+    const items = el("ul", { className: "kb-draft-list" }, ...list.map((d) => el("li", {}, button("", () => openDraft(d.id), { className: "kb-result" }))));
+    items.querySelectorAll("button").forEach((b, i) => {
+      const d = list[i];
+      b.append(el("span", { className: "kb-result-top" }, el("span", { className: "kb-kind " + (d.flags ? "kb-kind-flagged" : "kb-kind-clean"), textContent: d.flags ? `${d.flags} to check` : "Clean" }),
+        el("strong", { textContent: d.title }), el("small", { textContent: date(d.created) })), el("span", { className: "kb-result-text", textContent: d.path }));
+    });
+    const publishClean = async () => {
+      if (!confirm(`Publish ${clean} draft${clean === 1 ? "" : "s"} whose lines all match their files? You can still edit or delete them later.`)) return;
+      try { const r = await post("/api/knowledge/drafts/publish-clean", {}); toast?.(`${r.published} articles published`); await refresh(); reviewQueue(); }
+      catch (error) { ui.status.textContent = error.message; }
+    };
+    ui.view.replaceChildren(el("div", { className: "kb-review-queue" },
+      el("header", { className: "kb-article-head" }, el("h2", { textContent: `Imported drafts to review (${list.length})` }),
+        el("div", { className: "kb-article-actions" }, clean ? button(`Publish ${clean} clean draft${clean === 1 ? "" : "s"}`, publishClean, { className: "primary" }) : null,
+          button("Import settings", () => importView()))),
+      list.length ? items : el("p", { className: "kb-note", textContent: "Nothing to review. Start an import from New article… → Import knowledge from folders…" })));
+  }
+
+  async function openDraft(id) {
+    let d;
+    try { d = await api("/api/knowledge/drafts/" + id); }
+    catch (error) { ui.status.textContent = error.message; return; }
+    const body = el("div", { className: "kb-markdown" });
+    const review = { ...d.review, draftId: d.id };
+    const act = (path, done) => async () => { try { await post(path, {}); toast?.(done); await refresh(); reviewQueue(); } catch (error) { ui.status.textContent = error.message; } };
+    ui.view.replaceChildren(el("header", { className: "kb-article-head" },
+      el("h2", { textContent: d.title }),
+      el("p", { className: "kb-article-meta" }, ...d.categories.map((c) => el("span", { className: "kb-category", textContent: label(c) })),
+        ...d.tags.map((t) => el("span", { className: "kb-tag", textContent: t })), el("small", { textContent: "From " + d.path })),
+      el("div", { className: "kb-article-actions" },
+        button("Publish", act(`/api/knowledge/drafts/${d.id}/publish`, "Article published"), { className: "primary" }),
+        button("Edit, then publish", () => edit({ title: d.title, markdown: d.markdown, tags: d.tags, categories: d.categories, revision: 0 }, true, review)),
+        button("Reject", act(`/api/knowledge/drafts/${d.id}/reject`, "Draft rejected")),
+        button("Open the file", () => openFile(d.path)), button("Back to the list", () => reviewQueue()))),
+      reviewPanel(review, null, () => {}), body);
+    await render(d.markdown, body);
+  }
+
   // Wrap the existing Knowledge Base entry points; diagrams keep working exactly as before.
   const original = { open: window.AtlasKnowledge.open, show: window.AtlasKnowledge.show };
   window.AtlasKnowledge.open = async (...args) => { const result = await original.open(...args); install(); return result; };
@@ -409,5 +551,5 @@
     setMode("diagrams");
     return original.show(id);
   };
-  window.AtlasKnowledgeArticles = { install, open, edit, refresh, render, setMode, state, draftFromNotes, openFile };
+  window.AtlasKnowledgeArticles = { install, open, edit, refresh, render, setMode, state, draftFromNotes, openFile, importView, reviewQueue, openDraft };
 })();

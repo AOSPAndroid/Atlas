@@ -808,11 +808,11 @@ def search_message(message_id):
   row=queue.execute('select subject,body from messages where id=?',(message_id,)).fetchone() if queue else None
  if row is None:raise HTTPException(404,'Message not found in the local inbox.')
  return dict(row)
-def search_files():
- from assistant_files import search_source
- return search_source(CONFIG)
+from assistant_files import FileSource
 search_index=SearchIndex(knowledge_path().parent/'search-index.sqlite3',
- {'article':search_articles,'diagram':search_diagrams,'deployment':search_deployments,'inbox':search_inbox,'file':search_files})
+ {'article':search_articles,'diagram':search_diagrams,'deployment':search_deployments,'inbox':search_inbox,'file':FileSource(CONFIG)})
+# Notes folders (for example all of F:\) are indexed in the background, only new or changed files.
+if (CONFIG.get('assistant') or {}).get('folders'):search_index.start_background()
 register_search(app,search_index,search_message)
 from inbox_control import register as register_inbox_control
 register_inbox_control(app)

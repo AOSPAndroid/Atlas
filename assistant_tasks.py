@@ -48,9 +48,16 @@ Rules:
 - Write in the same language as the notes."""
 
 
-def draft_schema(categories):
+TRIAGE = """
+- First decide "useful": true only if the notes explain how to diagnose, fix, set up or handle something in IT support
+  (a procedure, a fix, a known issue, a how-to, contacts and escalation rules). false for logs, data exports, lists,
+  inventories, invoices, personal or unrelated documents. When false, give a short "reason" and leave the other fields empty."""
+
+
+def draft_schema(categories, triage=False):
+    extra = {'useful': {'type': 'boolean'}, 'reason': {'type': 'string'}} if triage else {}
     return {'type': 'object', 'additionalProperties': False,
-            'properties': {
+            'properties': {**extra,
                 'title': {'type': 'string'},
                 'summary': _item(),
                 'symptoms': _item(8), 'causes': _item(5), 'steps': _item(15),
@@ -59,7 +66,7 @@ def draft_schema(categories):
                 'escalate': _item(5),
                 'tags': {'type': 'array', 'maxItems': 6, 'items': {'type': 'string'}},
                 'categories': {'type': 'array', 'maxItems': 3, 'items': {'type': 'string', 'enum': categories}}},
-            'required': ['title', 'summary', 'symptoms', 'causes', 'steps', 'commands', 'escalate', 'tags', 'categories']}
+            'required': [*extra, 'title', 'summary', 'symptoms', 'causes', 'steps', 'commands', 'escalate', 'tags', 'categories']}
 
 
 SECTIONS = [('symptoms', 'Symptoms', '-'), ('causes', 'Cause', '-'), ('steps', 'Steps', '1.'), ('escalate', 'Escalate when', '-')]
@@ -77,13 +84,17 @@ def _items(value):
     return out
 
 
-def draft_article(runtime, sources, title_hint=''):
+def draft_article(runtime, sources, title_hint='', triage=False, background=False):
+    """triage: let the model say the text is not IT knowledge (bulk import); returns {'useful': False, 'reason'} then."""
     from inbox_analysis import CATEGORIES, contains, plain
     categories = [key for key, *_ in CATEGORIES]
     sources, cut = _clip(sources, _budget(runtime, 1800))
     notes = '\n\n'.join(f"### {s['name']}\n{s['text']}" for s in sources)
     hint = f'Suggested title: {title_hint}\n\n' if title_hint.strip() else ''
-    answer, meta = runtime.chat(DRAFT_SYSTEM, f'{hint}NOTES:\n<<<\n{notes}\n>>>', draft_schema(categories), max_tokens=1800)
+    answer, meta = runtime.chat(DRAFT_SYSTEM + (TRIAGE if triage else ''), f'{hint}NOTES:\n<<<\n{notes}\n>>>',
+                                draft_schema(categories, triage), max_tokens=1800, background=background)
+    if triage and answer.get('useful') is False:
+        return {'useful': False, 'reason': ' '.join(str(answer.get('reason') or 'Not IT knowledge').split())[:200], **meta}
     texts = [s['text'] for s in sources] + ([title_hint] if title_hint else [])
     checks, dropped, lines = [], [], []
 
@@ -144,7 +155,7 @@ def draft_article(runtime, sources, title_hint=''):
     # An issue type is kept only when one of its words is in the notes (the same words Live Inbox uses).
     words = plain('\n'.join(texts))
     chosen = [key for key, _, terms, *_ in CATEGORIES if key in (answer.get('categories') or []) and any(contains(words, t) for t in terms)][:3]
-    return {'title': title, 'markdown': '\n'.join(lines).strip() + '\n', 'tags': tags, 'categories': list(dict.fromkeys(chosen)),
+    return {'useful': True, 'title': title, 'markdown': '\n'.join(lines).strip() + '\n', 'tags': tags, 'categories': list(dict.fromkeys(chosen)),
             'checks': checks, 'dropped': dropped, 'sources': [s['name'] for s in sources], 'cut': cut or meta['truncated'], **meta}
 
 

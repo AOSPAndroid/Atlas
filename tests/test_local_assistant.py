@@ -113,6 +113,7 @@ class ModelCalls(Base):
             self.runtime.chat('s', 'u', {})
 
     def test_one_request_at_a_time(self):
+        self.runtime.turn_timeout = 0.2
         self.runtime.lock.acquire()
         try:
             with self.assertRaises(AssistantError) as caught:
@@ -256,7 +257,8 @@ class ReadRequest(Base):
         (notes / 'vpn.md').write_text('GlobalProtect VPN times out after update: reinstall GlobalProtect, reboot.', encoding='utf-8')
         (notes / 'printer.md').write_text('Printer queue stuck: restart spooler.', encoding='utf-8')
         config = {'assistant': {'folders': [str(notes)]}}
-        index = SearchIndex(self.root / 'index.sqlite3', {'file': lambda: assistant_files.search_source(config)})
+        index = SearchIndex(self.root / 'index.sqlite3', {'file': assistant_files.FileSource(config)})
+        index.update('file')
         wmi = SimpleNamespace(CONFIG=config, search_index=index)
         found = assistant_tasks.references(wmi, 'VPN times out', 'GlobalProtect VPN times out after the update')
         self.assertEqual([(r['id'], r['kind'], r['title']) for r in found], [('S1', 'file', 'vpn.md')])

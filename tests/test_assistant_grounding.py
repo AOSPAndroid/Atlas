@@ -121,13 +121,27 @@ class Files(unittest.TestCase):
         with self.assertRaisesRegex(FileError, 'not supported'):
             read('image.png')
 
-    def test_search_source_changes_when_files_change(self):
-        signature, rows = assistant_files.search_source(self.config)
-        self.assertEqual(sorted(r['title'] for r in rows), ['deck.pptx', 'fix.eml', 'page.html', 'runbook.docx', 'spooler.txt', 'vpn.md'])
-        self.assertEqual(assistant_files.search_source(self.config)[0], signature)
-        (self.notes / 'new.txt').write_text('new note', encoding='utf-8')
-        self.assertNotEqual(assistant_files.search_source(self.config)[0], signature)
-        self.assertEqual(assistant_files.search_source({})[1], [])
+    def test_file_source_lists_signatures_and_skips_system_folders(self):
+        for skipped in ('$RECYCLE.BIN', 'node_modules', 'AppData'):
+            (self.notes / skipped).mkdir()
+            (self.notes / skipped / 'x.txt').write_text('hidden', encoding='utf-8')
+        source = assistant_files.FileSource(self.config)
+        listing = source.listing()
+        self.assertEqual(sorted(Path(p).name for p in listing), ['deck.pptx', 'fix.eml', 'page.html', 'runbook.docx', 'spooler.txt', 'vpn.md'])
+        row = source.row(str(self.notes / 'vpn.md'))
+        self.assertEqual((row['title'], row['body'], row['extra']['folder']), ('vpn.md', '# VPN\nReinstall GlobalProtect', str(self.notes.resolve())))
+        path = str(self.notes / 'vpn.md')
+        (self.notes / 'vpn.md').write_text('# VPN\nReinstall GlobalProtect, then reboot', encoding='utf-8')
+        self.assertNotEqual(source.listing()[path], listing[path], 'A changed file gets a new signature')
+        self.assertEqual(len(assistant_files.every_file(self.config, limit=2)), 2, 'Large drives stop at the limit')
+        self.assertEqual(assistant_files.FileSource({}).listing(), {})
+
+    def test_excel_cells(self):
+        with zipfile.ZipFile(self.notes / 'contacts.xlsx', 'w') as z:
+            z.writestr('xl/sharedStrings.xml', '<sst><si><t>Team</t></si><si><t>Phone</t></si><si><r><t>Print</t></r><r><t> &amp; scan</t></r></si></sst>')
+            z.writestr('xl/worksheets/sheet1.xml', '<worksheet><sheetData><row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c></row>'
+                       '<row r="2"><c r="A2" t="s"><v>2</v></c><c r="B2"><v>4021</v></c></row><row r="3"><c t="inlineStr"><is><t>Note</t></is></c></row></sheetData></worksheet>')
+        self.assertEqual(assistant_files.read(self.config, self.notes / 'contacts.xlsx')['text'], 'Team\tPhone\nPrint & scan\t4021\nNote')
 
 
 if __name__ == '__main__':

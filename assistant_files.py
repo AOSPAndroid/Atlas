@@ -4,6 +4,7 @@ Only files inside those folders can be listed or read; paths are resolved first,
 and other drives are refused. Nothing is ever written, moved or deleted here.
 """
 import html
+import os
 import re
 import zipfile
 from email import policy
@@ -11,10 +12,13 @@ from email.parser import BytesParser
 from pathlib import Path
 
 TEXT = {'.txt', '.md', '.markdown', '.log', '.csv', '.json', '.ps1', '.psm1', '.bat', '.cmd', '.xml', '.ini', '.cfg', '.yaml', '.yml', '.reg', '.sql', '.py'}
-SUPPORTED = TEXT | {'.docx', '.pptx', '.eml', '.html', '.htm', '.pdf'}
+SUPPORTED = TEXT | {'.docx', '.pptx', '.xlsx', '.eml', '.html', '.htm', '.pdf'}
 MAX_BYTES = 5 * 1024 * 1024
 MAX_TEXT = 200000
-MAX_FILES = 3000
+MAX_FILES = 50000
+# Folders that never hold your notes: system, recycle bin, program and tool folders, Atlas's own data.
+SKIP_DIRS = {'$recycle.bin', 'system volume information', 'windows', 'program files', 'program files (x86)', 'programdata',
+             'appdata', 'node_modules', '.git', '.svn', '__pycache__', 'venv', '.venv', 'site-packages', 'llm', 'drawio'}
 _cache = {}
 
 
@@ -109,6 +113,8 @@ def extract(path):
         if body is not None and body.get_content_type() == 'text/html':
             content = html.unescape(re.sub(r'<[^>]+>', ' ', re.sub(r'(?is)<(script|style)[^>]*>.*?</\1>', ' ', content)))
         return f"From: {message.get('from', '')}\nSubject: {message.get('subject', '')}\nDate: {message.get('date', '')}\n\n{content}"
+    if suffix == '.xlsx':
+        return _xlsx_text(path)
     if suffix in ('.docx', '.pptx'):
         try:
             with zipfile.ZipFile(path) as archive:
@@ -126,6 +132,38 @@ def extract(path):
         return '\n\n'.join(page.extract_text() or '' for page in PdfReader(str(path)).pages[:200])
     except Exception as error:  # pypdf raises many types for damaged files
         raise FileError(f'{path.name} could not be read as a PDF.') from error
+
+
+def _xlsx_text(path, sheets=10, rows=2000):
+    """Cell text of the first sheets, one row per line, cells separated by tabs."""
+    try:
+        with zipfile.ZipFile(path) as archive:
+            names = set(archive.namelist())
+            shared = []
+            if 'xl/sharedStrings.xml' in names:
+                for item in re.findall(r'<si>(.*?)</si>', archive.read('xl/sharedStrings.xml').decode('utf-8', 'replace'), re.S):
+                    shared.append(html.unescape(''.join(re.findall(r'<t[^>]*>(.*?)</t>', item, re.S))))
+            parts = []
+            files = sorted((n for n in names if re.fullmatch(r'xl/worksheets/sheet\d+\.xml', n)), key=lambda n: int(re.findall(r'\d+', n)[0]))
+            for name in files[:sheets]:
+                lines = []
+                for row in re.findall(r'<row[^>]*>(.*?)</row>', archive.read(name).decode('utf-8', 'replace'), re.S)[:rows]:
+                    cells = []
+                    for attrs, body in re.findall(r'<c([^>]*)>(.*?)</c>', row, re.S):
+                        value = re.search(r'<v>(.*?)</v>', body, re.S)
+                        if 't="s"' in attrs and value:
+                            index = int(value.group(1))
+                            cells.append(shared[index] if index < len(shared) else '')
+                        elif 't="inlineStr"' in attrs:
+                            cells.append(html.unescape(''.join(re.findall(r'<t[^>]*>(.*?)</t>', body, re.S))))
+                        elif value:
+                            cells.append(html.unescape(value.group(1)))
+                    if any(c.strip() for c in cells):
+                        lines.append('\t'.join(cells))
+                parts.append('\n'.join(lines))
+            return '\n\n'.join(p for p in parts if p)
+    except (zipfile.BadZipFile, KeyError, ValueError) as error:
+        raise FileError(f'{path.name} could not be opened as an Excel file.') from error
 
 
 def read(config, value):
@@ -147,41 +185,51 @@ def read(config, value):
     return {'path': str(path), 'name': path.name, 'text': text[:MAX_TEXT], 'truncated': len(text) > MAX_TEXT, 'modified': stat.st_mtime}
 
 
-def every_file(config):
-    """Supported files in the chosen folders, newest first, for the search index."""
+def every_file(config, limit=None):
+    """Supported files in the chosen folders, skipping system and program folders, up to the limit."""
+    limit = limit or int((config.get('assistant') or {}).get('max_files') or MAX_FILES)
     found = []
     for root in folders(config):
-        for path in root.rglob('*'):
-            if len(found) >= MAX_FILES:
-                break
+        stack = [root]
+        while stack and len(found) < limit:
+            folder = stack.pop()
             try:
-                if path.suffix.lower() in SUPPORTED and path.is_file() and not path.name.startswith(('.', '~$')) and path.stat().st_size <= MAX_BYTES:
-                    found.append(path)
+                entries = list(os.scandir(folder))
             except OSError:
-                continue
+                continue  # no access: skip quietly
+            for entry in entries:
+                name = entry.name
+                if name.startswith(('.', '~$')):
+                    continue
+                try:
+                    if entry.is_dir(follow_symlinks=False):
+                        if name.casefold() not in SKIP_DIRS:
+                            stack.append(entry.path)
+                    elif Path(name).suffix.lower() in SUPPORTED and entry.is_file(follow_symlinks=False):
+                        stat = entry.stat()
+                        if 0 < stat.st_size <= MAX_BYTES:
+                            found.append((entry.path, f'{stat.st_mtime_ns}:{stat.st_size}', stat.st_mtime_ns))
+                            if len(found) >= limit:
+                                break
+                except OSError:
+                    continue
     return found
 
 
-def search_source(config):
-    """(signature, rows) for search_index: one entry per readable file."""
-    files = every_file(config)
-    signature = []
-    for path in files:
-        try:
-            stat = path.stat()
-            signature.append((str(path), stat.st_mtime_ns, stat.st_size))
-        except OSError:
-            continue
-    rows = []
-    for path, modified, _ in signature:
-        try:
-            item = read(config, path)
-        except (FileError, OSError):
-            continue
-        rows.append({'ref': path, 'title': item['name'], 'body': item['text'][:50000],
-                     'at': _iso(modified), 'extra': {'folder': str(Path(path).parent)}})
-    import hashlib
-    return hashlib.sha256(repr(signature).encode()).hexdigest(), rows
+class FileSource:
+    """Search index source that only reads files that are new or changed (see search_index.SearchIndex)."""
+    background = True
+
+    def __init__(self, config):
+        self.config = config
+
+    def listing(self):
+        return {path: signature for path, signature, _ in every_file(self.config)}
+
+    def row(self, path):
+        item = read(self.config, path)
+        return {'ref': item['path'], 'title': item['name'], 'body': item['text'][:50000],
+                'at': _iso(int(item['modified'] * 1e9)), 'extra': {'folder': str(Path(item['path']).parent)}}
 
 
 def _iso(nanoseconds):
