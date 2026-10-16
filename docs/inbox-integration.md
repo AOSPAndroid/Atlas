@@ -35,8 +35,14 @@ Each selected message shows a **Request** card and buttons on every machine:
   `python tools/build_winget_aliases.py` (downloads about 20 MB).
 - **Suggested checks** depend on the issue: performance scan, health check,
   reboot (with the usual confirmation), and the user's or machine's AD groups.
-- **Knowledge Base** shows documents whose title or notes mention the matched
-  words.
+- **Knowledge Base** shows articles and diagrams whose title or text mention the
+  matched words. Articles tagged for the request's issue type (see **Suggest in
+  Live Inbox for** in the article editor) come first.
+- **Seen before** lists earlier requests and articles that share at least two
+  distinctive words with this one (greetings, signatures, disclaimers found in
+  most mail, hostnames and ticket numbers are ignored). Click a request to open
+  it, or an article to read the fix you wrote last time. It uses the local search
+  index (`search-index.sqlite3`), which picks up new mail by itself.
 - **Machine buttons** (Select, Health, Groups, Reboot…) work on any listed machine.
 
 The package list is read from the repository at most every two minutes. If the

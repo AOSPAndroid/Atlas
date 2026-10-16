@@ -13,6 +13,9 @@ FILES = {
     '@xterm/xterm': [('lib/xterm.js', 'xterm-{v}.js'), ('css/xterm.css', 'xterm-{v}.css'), ('LICENSE', 'xterm-LICENSE.txt')],
     '@xterm/addon-fit': [('lib/addon-fit.js', 'xterm-addon-fit-{v}.js')],
     '@xterm/addon-search': [('lib/addon-search.js', 'xterm-addon-search-{v}.js')],
+    'marked': [('lib/marked.umd.js', 'marked-{v}.js'), ('LICENSE', 'marked-LICENSE.txt')],
+    'dompurify': [('dist/purify.min.js', 'dompurify-{v}.js'), ('LICENSE', 'dompurify-LICENSE.txt')],
+    'mermaid': [('dist/mermaid.min.js', 'mermaid-{v}.js'), ('LICENSE', 'mermaid-LICENSE.txt')],
 }
 
 

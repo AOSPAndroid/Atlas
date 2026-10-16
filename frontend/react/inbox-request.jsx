@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { ClipboardList, PackagePlus, Wrench, BookOpen } from "lucide-react";
+import { ClipboardList, PackagePlus, Wrench, BookOpen, History } from "lucide-react";
 import { Button } from "./components/ui/button";
 import { Badge } from "./components/ui/badge";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "./components/ui/card";
@@ -112,6 +112,36 @@ export function RequestCard({ detail, user }) {
 
       {analysis.kind === "other" && !(analysis.machines || []).length && <p className="inbox-muted">No software request or known issue was recognised. Use the machine actions below.</p>}
       {(analysis.warnings || []).map((warning) => <p key={warning} className="inbox-muted" role="note">{warning}</p>)}
+    </CardContent>
+  </Card>;
+}
+
+const markText = (text) => String(text || "").split(/(\u0002[^\u0003]*\u0003)/).map((part, i) =>
+  part.startsWith("\u0002") ? <mark key={i}>{part.slice(1, -1)}</mark> : part);
+
+/** Earlier requests and Knowledge Base articles that share distinctive words with this message. */
+export function SimilarCard({ messageId }) {
+  const [data, setData] = useState(null);
+  useEffect(() => {
+    let current = true;
+    setData(null);
+    window.AtlasClient.request("/api/search-everything/similar/" + messageId, { atlasSilent: true })
+      .then((value) => { if (current) setData(value); })
+      .catch(() => { if (current) setData({ requests: [], articles: [] }); });
+    return () => { current = false; };
+  }, [messageId]);
+  if (!data || (!data.requests.length && !data.articles.length)) return null;
+  const date = (value) => value ? new Date(value).toLocaleDateString([], { day: "numeric", month: "short" }) : "";
+  return <Card className="inbox-similar-card">
+    <CardHeader><CardTitle role="heading" aria-level={2}><History aria-hidden="true" />Seen before</CardTitle>
+      <CardDescription>Earlier requests and articles with the same key words: {data.terms.slice(0, 5).join(", ")}</CardDescription></CardHeader>
+    <CardContent>
+      {data.articles.length > 0 && <ul className="inbox-similar-list" aria-label="Related articles">{data.articles.map((a) => <li key={a.kind + a.ref}>
+        <Button size="sm" variant="ghost" onClick={() => sendInboxAction("knowledge", { document: a.kind === "article" ? "article:" + a.ref : a.ref })}><BookOpen aria-hidden="true" />{markText(a.title)}</Button></li>)}</ul>}
+      {data.requests.length > 0 && <ul className="inbox-similar-list" aria-label="Similar requests">{data.requests.map((r) => <li key={r.ref}>
+        <Button size="sm" variant="ghost" data-similar-request={r.ref} onClick={() => window.dispatchEvent(new CustomEvent("atlas:inbox-open", { detail: { id: Number(r.ref) } }))}>
+          <span className="inbox-similar-title">{markText(r.title)}</span><small>{[r.extra?.sender, date(r.at)].filter(Boolean).join(" · ")}</small></Button>
+        <p className="inbox-muted">{markText(r.snippet)}</p></li>)}</ul>}
     </CardContent>
   </Card>;
 }

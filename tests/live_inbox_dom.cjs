@@ -36,6 +36,10 @@ const response = data => ({ ok: true, status: 200, json: async () => data });
       }
       return response(structuredClone(control));
     }
+    if (parsed.pathname.startsWith('/api/search-everything/similar/')) return response(parsed.pathname.endsWith('/1')
+      ? { terms: ['vpn', 'connect'], articles: [{ kind: 'article', ref: 'vpn', title: '\u0002VPN\u0003 or network', snippet: '' }],
+          requests: [{ kind: 'inbox', ref: '2', title: '<img src=x onerror="window.mailExecuted=true"> \u0002VPN\u0003 down', snippet: 'Cannot \u0002connect\u0003', at: '2026-10-01', extra: { sender: 'Sam' } }] }
+      : { terms: [], articles: [], requests: [] });
     assert(parsed.pathname.startsWith('/api/inbox/messages'), 'Inbox requests stay in its local API');
     if (offline) throw Error('Connection lost');
     if (parsed.pathname === '/api/inbox/messages') {
@@ -82,6 +86,22 @@ const response = data => ({ ok: true, status: 200, json: async () => data });
   await until(() => deferred); holdDetail = false; d.querySelector('[data-mail-id="2"]').click();
   await until(() => d.querySelector('.inbox-candidates') && !d.querySelector('.inbox-devices'));
   deferred(); await sleep(60); assert(d.querySelector('.inbox-candidates'));
+  // "Seen before": earlier requests and articles sharing key words; text is never parsed as HTML.
+  const shown = [];
+  w.addEventListener('atlas:inbox-action', event => shown.push(event.detail));
+  assert(!d.querySelector('.inbox-similar-card'), 'Nothing similar, no card');
+  d.querySelector('[data-mail-id="1"]').click();
+  await until(() => d.querySelector('.inbox-similar-card'));
+  const similar = d.querySelector('.inbox-similar-card');
+  assert.match(similar.textContent, /same key words: vpn, connect/);
+  assert.deepEqual([...similar.querySelectorAll('mark')].map(mark => mark.textContent), ['VPN', 'VPN', 'connect']);
+  assert(!similar.querySelector('img')); assert(!w.mailExecuted);
+  similar.querySelector('[aria-label="Related articles"] button').click();
+  await until(() => shown.length);
+  assert.deepEqual(shown.map(action => [action.action, action.document]), [['knowledge', 'article:vpn']], 'Articles open in the Knowledge Base');
+  similar.querySelector('[data-similar-request="2"]').click();
+  await until(() => d.querySelector('[data-mail-id="2"][aria-current]') && d.querySelector('.inbox-candidates'));
+  assert(!d.querySelector('.inbox-similar-card'));
   offline = true;
   d.querySelector('.inbox-toolbar button').click();
   await until(() => /Connection interrupted/.test(d.querySelector('[data-inbox-status]').textContent));
@@ -127,5 +147,5 @@ const response = data => ({ ok: true, status: 200, json: async () => data });
   await until(() => /available in Atlas Admin/.test(viewer.w.document.getElementById('liveInbox').textContent));
   assert(!viewer.w.document.querySelector('[data-mail-id]'));
   assert.deepEqual(viewer.errors, []); viewer.w.dispatchEvent(new viewer.w.Event('pagehide')); viewer.w.close();
-  console.log('PASS: live arrivals, stable selection, sender/device lookup, ambiguity, safe text, stale responses, disconnect recovery, hidden-page polling and private viewer boundary');
-})().catch(error => { console.error(error); process.exitCode = 1; });
+  console.log('PASS: live arrivals, stable selection, Seen before (safe marks, article and request links), sender/device lookup, ambiguity, safe text, stale responses, disconnect recovery, hidden-page polling and private viewer boundary');
+})().catch(error => { console.error(error); process.exit(1); });

@@ -729,6 +729,9 @@ register_activity(app,sys.modules[__name__])
 # Knowledge documents stay in the local Admin runtime, never in published assets.
 from knowledge_base import register as register_knowledge
 from runtime_paths import knowledge_path
+# Articles first: "/api/knowledge/articles" must not be read as a diagram ID.
+from knowledge_articles import register as register_articles
+register_articles(app, knowledge_path())
 register_knowledge(app, knowledge_path())
 
 # Private local Outlook queue: intentionally absent from backend.viewer.
@@ -746,7 +749,7 @@ def inbox_packages():
  items=[{'folder':n,'display_name':saved.get(n) or (info.get(n) or {}).get('display_name') or n} for n in names]
  cache.update(at=now,repo=str(REPO),items=items)
  return items
-def inbox_documents():
+def knowledge_diagrams():
  path=knowledge_path()
  if not path.is_file():return []
  c=sqlite3.connect(path.resolve().as_uri()+'?mode=ro',uri=True,timeout=5,factory=ClosingConnection)
@@ -758,9 +761,56 @@ def inbox_documents():
   except (ValueError,AttributeError):notes=''
   documents.append({'id':doc_id,'title':title,'notes':str(notes)[:20000]})
  return documents
+def inbox_documents():
+ # Diagrams and articles; articles carry their tags and linked issue categories.
+ from knowledge_articles import all_articles
+ articles=[{'id':'article:'+a['id'],'title':a['title'],'notes':a['markdown'][:20000]+'\n'+' '.join(a['tags']),'categories':a['categories']}
+           for a in all_articles(knowledge_path())]
+ return knowledge_diagrams()+articles
 register_inbox(app, db, packages=inbox_packages, documents=inbox_documents)
 from package_matching import prewarm as prewarm_package_aliases
 prewarm_package_aliases()
+
+# Search everything (Admin only): articles, diagrams, Live Inbox requests and deployments.
+import hashlib
+from search_index import SearchIndex, register as register_search
+def _signature(rows):
+ return hashlib.sha256(json.dumps(rows,sort_keys=True,default=str).encode()).hexdigest()
+def search_articles():
+ from knowledge_articles import all_articles,plain_text
+ from inbox_analysis import CATEGORIES
+ labels={key:label for key,label,*_ in CATEGORIES}
+ articles=all_articles(knowledge_path())
+ rows=[{'ref':a['id'],'title':a['title'],'at':a['updated'],'extra':{'tags':a['tags'],'categories':a['categories']},
+        'body':plain_text(a['markdown'])+'\n'+' '.join(a['tags'])+' '+' '.join(labels.get(c,c) for c in a['categories'])} for a in articles]
+ return _signature([(a['id'],a['revision']) for a in articles]),rows
+def search_diagrams():
+ documents=knowledge_diagrams()
+ return _signature([(d['id'],d['title'],d['notes']) for d in documents]),[{'ref':d['id'],'title':d['title'],'body':d['notes']} for d in documents]
+def search_deployments():
+ with hist_db() as c:
+  rows=[dict(r) for r in c.execute('select id,started,finished,operator,target,package,action,state,details from deployments order by started desc limit 3000')]
+ return _signature([(r['id'],r['state'],r['finished']) for r in rows]),[{'ref':r['id'],'title':f"{r['action'] or 'Deploy'} {r['package'] or ''} on {r['target'] or ''}",
+   'body':' '.join(str(r[k] or '') for k in ('state','details','operator','package','target')),'at':r['started'] or '',
+   'extra':{k:r[k] for k in ('target','package','action','state','finished')}} for r in rows]
+def search_inbox(after):
+ from mail_inbox import mail_directory,queue_reader
+ with queue_reader(mail_directory()) as queue:
+  if queue is None:return 0,[]
+  newest=queue.execute('select coalesce(max(id),0) from messages').fetchone()[0]
+  rows=queue.execute('select * from messages where id>? order by id limit 5000',(after,)).fetchall()
+ return newest,[{'ref':r['id'],'title':r['subject'] or (r['body'] or '')[:80] or '(No subject)','at':r['received_at'],
+   'body':f"{r['sender_name'] or ''} {r['sender_address'] or ''}\n{(r['body'] or '')[:20000]}",
+   'extra':{'sender':r['sender_name'] or r['sender_address'] or ''}} for r in rows]
+def search_message(message_id):
+ from mail_inbox import mail_directory,queue_reader
+ with queue_reader(mail_directory()) as queue:
+  row=queue.execute('select subject,body from messages where id=?',(message_id,)).fetchone() if queue else None
+ if row is None:raise HTTPException(404,'Message not found in the local inbox.')
+ return dict(row)
+search_index=SearchIndex(knowledge_path().parent/'search-index.sqlite3',
+ {'article':search_articles,'diagram':search_diagrams,'deployment':search_deployments,'inbox':search_inbox})
+register_search(app,search_index,search_message)
 from inbox_control import register as register_inbox_control
 register_inbox_control(app)
 

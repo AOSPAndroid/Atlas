@@ -7,7 +7,7 @@ import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from "./
 import { Skeleton } from "./components/ui/skeleton";
 import { InboxControls } from "./inbox-controls";
 import { AppControls } from "./app-controls";
-import { RequestCard, MachineActions } from "./inbox-request";
+import { RequestCard, MachineActions, SimilarCard } from "./inbox-request";
 import { ScreenReader } from "./screen-reader";
 
 const matchLabels = { email: "Email match", name: "Name match · verify", ambiguous: "Choose a person", unmatched: "No Atlas match" };
@@ -88,6 +88,12 @@ export function LiveInbox() {
     return () => { current = false; controller.abort(); };
   }, [selected, chosen, visible, readonly, refresh]);
   function choose(id) { setSelected(id); setChosen(null); }
+  // Search results and "Seen before" open a specific message, even one not loaded in the list.
+  useEffect(() => {
+    const open = (event) => { const id = Number(event.detail?.id); if (Number.isSafeInteger(id) && id > 0) choose(id); };
+    window.addEventListener("atlas:inbox-open", open);
+    return () => window.removeEventListener("atlas:inbox-open", open);
+  }, []);
   async function loadOlder() {
     const token = session.current;
     setOlder(true);
@@ -140,6 +146,7 @@ export function LiveInbox() {
             {user ? <><h3>{user.full_name || user.name}</h3><p>{[user.user_name, user.email].filter(Boolean).join(" · ")}</p><p className="inbox-muted">{[user.department, user.location, user.job_role].filter(Boolean).join(" · ") || "No additional directory details"}</p>{match.basis === "name" && <p className="inbox-match-note">{message.content_kind === "notification" ? "Matched the notification title. It may be a chat or group name; verify the sender in Teams or Outlook before taking action." : "Display names can be shared. Verify this person against the sender address before taking action."}</p>}</> : match.kind === "unmatched" && <p>No exact email or full-name match was found in the Atlas database.</p>}
           </CardContent>{user && <CardFooter><Button variant="outline" size="sm" onClick={() => window.dispatchEvent(new CustomEvent("atlas:inbox-person", { detail: { id: user.id } }))}>Open in Workspace<ArrowUpRight data-icon="inline-end" /></Button></CardFooter>}</Card>
           <RequestCard detail={detail} user={user} />
+          <SimilarCard messageId={message.id} />
           {(user || mentioned.length > 0) && <Card><CardHeader><CardTitle role="heading" aria-level={2}><Monitor aria-hidden="true" />{user ? "Linked machines" : "Machines named in message"} <Badge variant="secondary">{(user ? detail.machines.length : 0) + mentioned.length}</Badge></CardTitle><CardDescription>Stored inventory relationships and status</CardDescription></CardHeader><CardContent>
             {mentioned.length > 0 && <ul className="inbox-devices" aria-label="Machines named in the message">{mentioned.map(machine => <li key={"named-" + machine.name} data-mentioned-machine={machine.name}><div><strong>{machine.name}</strong><Badge variant="outline">Named in message</Badge>{machine.written_as && machine.written_as !== machine.name.toUpperCase() && <small className="inbox-read-as" title="Found despite look-alike characters such as 0/O or 1/I">read as {machine.written_as}</small>}</div><p>{machine.model_id || "Model not supplied"}</p><p>Not linked to this sender in inventory · check before acting</p><MachineActions machine={machine} user={user} /></li>)}</ul>}
             {user && (detail.machines.length ? <ul className="inbox-devices">{detail.machines.map((machine, index) => <li key={index}><div><strong>{machine.name || machine.machine_name}</strong><Badge variant="outline">{machine.device_kind || "Device"}</Badge></div><p>{machine.model_id || machine.model_category || "Model not supplied"}</p><p>{machine.match_type || "Linked in inventory"}</p><small>{[machine.operational_status && "Inventory: " + machine.operational_status, machine.last_discovered && "Discovered: " + machine.last_discovered].filter(Boolean).join(" · ") || "Inventory timestamp not supplied"}</small><MachineActions machine={{ ...machine, name: machine.name || machine.machine_name }} user={user} /></li>)}</ul> : <p>No linked machines in the current Atlas database.</p>)}

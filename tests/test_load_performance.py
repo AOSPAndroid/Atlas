@@ -41,6 +41,12 @@ class MapAssetCaching(unittest.TestCase):
         for name in ('xterm-6.0.0.js', 'xterm-6.0.0.css', 'xterm-addon-fit-0.11.0.js', 'xterm-addon-search-0.16.0.js', 'terminal-view.js'):
             self.assertEqual(self.client.get('/assets/' + name).status_code, 200, name)
 
+    def test_demo_serves_the_knowledge_base_files_but_not_articles(self):
+        for name in ('knowledge-articles.js', 'marked-18.0.14.js', 'dompurify-3.4.16.js', 'mermaid-12.0.0.js'):
+            self.assertEqual(self.client.get('/assets/' + name).status_code, 200, name)
+        for url in ('/api/knowledge/articles', '/api/search-everything?q=vpn', '/api/search-everything/similar/1'):
+            self.assertNotEqual(self.client.get(url).status_code, 200, url)
+
     def test_stale_etag_gets_the_current_file(self):
         response = self.client.get('/official-app.js', headers={'if-none-match': '"stale"'})
         self.assertEqual(response.status_code, 200)

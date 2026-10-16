@@ -143,11 +143,13 @@ def hostname_candidates(text):
     return seen[:30]
 
 
-def rank_documents(words, documents, terms, limit=3):
+def rank_documents(words, documents, terms, limit=3, categories=()):
     results = []
     for document in documents:
         title, notes = plain(document.get('title')), plain(document.get('notes'))
         score = sum(3 for term in terms if contains(title, term)) + sum(1 for term in terms if contains(notes, term))
+        # An article written for this kind of issue ranks first.
+        score += 5 * len(set(document.get('categories') or ()) & set(categories))
         if score:
             results.append((score, document))
     results.sort(key=lambda row: (-row[0], str(row[1].get('title', '')).casefold()))
@@ -222,4 +224,5 @@ def analyse(subject, body, *, packages=(), documents=(), find_machines=lambda na
     terms = [t for c in categories for t in c['matched']] + [t for p in suggestions[:2] for t in package_tokens(p['display_name'])]
     hint = search_hint(words, dict(ACTIONS)[action]) if kind == 'software' and not suggestions else ''
     return {'kind': kind, 'action': action, 'packages': suggestions, 'search': hint, 'categories': categories, 'tools': tools,
-            'machines': mentioned, 'knowledge': rank_documents(words, documents, list(dict.fromkeys(terms)))}
+            'machines': mentioned, 'knowledge': rank_documents(words, documents, list(dict.fromkeys(terms)),
+                                                      categories=[c['id'] for c in categories])}

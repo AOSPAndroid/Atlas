@@ -27,8 +27,8 @@ Start opens Admin and Demo in the selected layout. Both editions share local ser
 
 ## Choose your Atlas edition
 
-- **[Classic Atlas](Classic-Atlas/README.md)** — normal Atlas layout, with Admin, Demo and Preview folders.
-- **[Desktop Atlas](Desktop-Atlas/README.md)** — desktop layout, with Admin, Demo and Preview folders.
+- **[Classic Atlas](Classic-Atlas/README.md)** â€” normal Atlas layout, with Admin, Demo and Preview folders.
+- **[Desktop Atlas](Desktop-Atlas/README.md)** â€” desktop layout, with Admin, Demo and Preview folders.
 
 Both editions use the shared application below, keeping fixes, data and permissions consistent. Clone/download the complete repository; the edition folders contain launch profiles rather than duplicated application code. Existing root launchers still work.
 
@@ -347,9 +347,19 @@ NetFx3 enable applies to Windows 10 and Windows 11 through 25H2. Windows 11 26H1
 
 Workspace package selection applies immediately: clicking elsewhere, switching machines or refreshing filtered results keeps the chosen package. Workspace and Bulk deploy use the same Install / Repair / Uninstall switch and load the corresponding scripts. The launch button names the action and target (or bulk machine count). Bulk submissions are blocked while scripts load or a request is being submitted, and each request captures its package, action and targets. Demo and hosted preview show the controls with execution disabled.
 
-### Knowledge Base: Draw.io diagrams and notes
+### Knowledge Base: articles, search everything and diagrams
 
-Use Map / Workspace / Knowledge Base in the header. Atlas embeds the actual open-source Draw.io 31.5.3 editor, bundled under `frontend/drawio` with licenses and provenance. It loads only when opened. No external diagram or AI service is used; the editor blocks external network connections.
+The Knowledge Base opens on **Articles**: written runbooks in Markdown. **Diagrams** (the tab beside it) is the Draw.io editor described below; Atlas remembers which one you used last.
+
+- **New articleâ€¦** starts from a template (software install, slow PC, Outlook, VPN, printer, locked account, blank). The editor has a formatting toolbar, a live preview and Ctrl+S to save. Tables, checklists, code and links work as usual in Markdown; a ` ```mermaid ` block draws a flowchart (the **Diagram** button inserts one). Mermaid loads only for articles that contain a diagram.
+- Add **tags** to group articles (the tag chips filter the list), and tick the issue types under **Suggest in Live Inbox for**: matching requests then show the article first under Knowledge Base on the request card.
+- **Search** finds words in any form ("freezes" finds "freezing", accents ignored) and highlights them. Tick **Everything** to also search past Live Inbox requests, deployment history and diagram notes: a request opens in Live Inbox, a deployment shows its details with **Select this machine in Workspace**.
+- Articles are saved in `knowledge.sqlite3` (next to the diagrams) with the same revision check. The search index `search-index.sqlite3` beside it is a cache that Atlas rebuilds by itself; it is safe to delete. Articles stay in Admin: in the Demo viewer and Preview the Articles tab only shows a note, and the Diagrams tab works as before.
+- Markdown is rendered with marked 18.0.14 and cleaned by DOMPurify 3.4.16; diagrams use Mermaid 12.0.0. All three are bundled in `frontend/assets` with their licences (`python tools/vendor_frontend.py` refreshes them from `node_modules`).
+
+#### Diagrams (Draw.io)
+
+Use Map / Workspace / Knowledge Base in the header, then **Diagrams**. Atlas embeds the actual open-source Draw.io 31.5.3 editor, bundled under `frontend/drawio` with licenses and provenance. It loads only when opened. No external diagram or AI service is used; the editor blocks external network connections.
 
 - **Documents** and **Notes** toggle docked panels beside the editor. Notes starts closed to leave room for the diagram; narrow windows also start with Documents closed. **Focus editor** temporarily hides both panels and the Operations sidebar, then restores their previous state. These controls resize the existing editor without reopening the document or clearing its draft. The canvas uses the available window height, including inside Atlas Desktop.
 - Native Draw.io shapes, connectors, pages, layers, formatting, undo/redo and zoom, with incident-triage and network templates.
@@ -469,7 +479,7 @@ AD group rows provide Copy (group name) and See members. Left-click a group name
 ### Workspace Terminal and PowerShell ISE-style editor
 Open Terminal in the Workspace sidebar or search Terminal / ISE in the command palette. Commands run on the Atlas host with the Windows account running Atlas, not automatically on the selected machine. Choose PowerShell or CMD, or use the PowerShell script editor to open/save .ps1 files and run a script or selected text. Ctrl+Enter runs the editor contents. Each run starts a fresh, noninteractive process; variables and working-directory changes do not persist between runs. Interactive applications and password prompts are not supported.
 
-Output streams into the embedded terminal with an exit code, Copy output and Stop. One local command runs at a time, with a 15-minute limit and bounded, in-memory output. Stop ends the local shell; child or remote processes may require separate inspection. No execution-policy bypass is added. Execution requires elevated local Admin and a session token; Demo/Preview allow editing and downloading scripts only. Script contents are not saved to browser storage.
+Output streams into the embedded terminal with an exit code, Copy output and Stop. Terminal and PsTools output is shown in a real terminal view (xterm.js 6, bundled, loaded the first time either page opens): colours from tools are displayed, long output scrolls quickly, and the **Find in output** box (Enter for the next match, Shift+Enter for the previous one) searches it. The plain text stays underneath for Copy and screen readers; if the terminal view cannot load, the plain output is shown as before. One local command runs at a time, with a 15-minute limit and bounded, in-memory output. Stop ends the local shell; child or remote processes may require separate inspection. No execution-policy bypass is added. Execution requires elevated local Admin and a session token; Demo/Preview allow editing and downloading scripts only. Script contents are not saved to browser storage.
 
 
 ### Atlas visual system
