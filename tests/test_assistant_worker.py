@@ -181,6 +181,13 @@ class Installer(unittest.TestCase):
         self.assertIn('Qwen2.5-3B', install_assistant.model_for('gpu', 'Quadro P620, 4096 MiB'))
         self.assertIn('Qwen3-4B', install_assistant.model_for('cpu', ''))
 
+    def test_the_check_adds_nvidia_dlls_before_loading_the_library(self):
+        with patch.object(install_assistant.subprocess, 'run') as run:
+            run.return_value.returncode, run.return_value.stdout, run.return_value.stderr = 0, '0.3.4 True\n', ''
+            self.assertEqual(install_assistant.check(), (True, ['0.3.4 True']))
+        script = run.call_args.args[0][2]
+        self.assertLess(script.index('add_cuda_dlls()'), script.index('import llama_cpp'))
+
     def test_no_nvidia_tool_means_no_card(self):
         with patch.object(install_assistant.shutil, 'which', return_value=None), \
                 patch.object(install_assistant.subprocess, 'run', side_effect=OSError('not found')):

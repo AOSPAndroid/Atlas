@@ -95,7 +95,8 @@ def commands(choice, package=None, card=''):
 
 def check():
     """Load the library the way the Assistant will, and report whether it can use the graphics card."""
-    script = ('import assistant_worker, llama_cpp; assistant_worker.add_cuda_dlls(); '
+    # NVIDIA's DLL folders must be added before llama_cpp is imported: its library loads the CUDA runtime at import.
+    script = ('import assistant_worker; assistant_worker.add_cuda_dlls(); import llama_cpp; '
               'print(llama_cpp.__version__, bool(llama_cpp.llama_supports_gpu_offload()))')
     result = subprocess.run([sys.executable, '-c', script], cwd=str(Path(__file__).parent), capture_output=True, text=True, timeout=120)
     return result.returncode == 0, (result.stdout or result.stderr).strip().splitlines()[-1:] or ['']
