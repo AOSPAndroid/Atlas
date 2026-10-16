@@ -65,12 +65,13 @@
   function mount(pre) {
     if (pre.dataset.xterm) return;
     pre.dataset.xterm = "loading";
+    let term, host, bar, outputObserver, resizeObserver;
     load().then(() => {
-      const host = document.createElement("div");
+      host = document.createElement("div");
       host.className = "atlas-xterm";
       // The <pre> remains for screen readers; the drawn terminal duplicates it visually.
       host.setAttribute("aria-hidden", "true");
-      const term = new window.Terminal({
+      term = new window.Terminal({
         convertEol: true, disableStdin: true, cursorBlink: false, cursorStyle: "bar", cursorInactiveStyle: "none",
         scrollback: 20000, fontSize: 12, lineHeight: 1.15, theme,
         fontFamily: '"Cascadia Mono", "Cascadia Code", Consolas, "Courier New", monospace',
@@ -79,8 +80,8 @@
       term.loadAddon(fit);
       term.loadAddon(search);
       pre.after(host);
-      host.before(searchBar(term, search));
-      pre.classList.add("atlas-xterm-source");
+      bar = searchBar(term, search);
+      host.before(bar);
       term.open(host);
       let written = "";
       const sync = () => {
@@ -90,15 +91,27 @@
         else { term.reset(); term.write(text); }
         written = text;
       };
-      new MutationObserver(sync).observe(pre, { childList: true, characterData: true, subtree: true });
+      outputObserver = new MutationObserver(sync);
+      outputObserver.observe(pre, { childList: true, characterData: true, subtree: true });
       sync();
       const resize = () => { if (host.offsetParent) try { fit.fit(); } catch {} };
-      if (window.ResizeObserver) new ResizeObserver(resize).observe(host);
+      if (window.ResizeObserver) {
+        resizeObserver = new ResizeObserver(resize);
+        resizeObserver.observe(host);
+      }
       resize();
       terminals.set(pre.id, { term, sync });
+      pre.classList.add("atlas-xterm-source");
       pre.dataset.xterm = "ready";
     }).catch(() => {
-      // Keep the plain output; try again next time the page opens.
+      // Initialization can fail after loading; restore plain output and remove partial UI too.
+      outputObserver?.disconnect();
+      resizeObserver?.disconnect();
+      try { term?.dispose(); } catch {}
+      bar?.remove();
+      host?.remove();
+      pre.classList.remove("atlas-xterm-source");
+      terminals.delete(pre.id);
       pre.dataset.xterm = "";
     });
   }

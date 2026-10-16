@@ -60,5 +60,32 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
   assert.equal(w2.document.getElementById('termOutput').dataset.xterm, '');
   assert(!w2.document.getElementById('termOutput').classList.contains('atlas-xterm-source'));
   w2.close();
+
+  // A loaded renderer can still fail to open. Restore plain output, clean up, and allow a retry.
+  const dom3 = new JSDOM(fs.readFileSync('frontend/index.html', 'utf8'), { runScripts: 'outside-only', url: 'http://127.0.0.1/installer' });
+  const w3 = dom3.window, d3 = w3.document;
+  let disposed = 0;
+  w3.Terminal = class extends FakeTerminal {
+    open() { throw Error('Renderer unavailable'); }
+    dispose() { disposed++; }
+  };
+  w3.FitAddon = { FitAddon: class { fit() {} } };
+  w3.SearchAddon = { SearchAddon: class {} };
+  w3.eval(fs.readFileSync('frontend/assets/terminal-view.js', 'utf8'));
+  d3.getElementById('terminal').classList.add('active');
+  await sleep(20);
+  const pre3 = d3.getElementById('termOutput');
+  assert.equal(pre3.dataset.xterm, '');
+  assert(!pre3.classList.contains('atlas-xterm-source'), 'Failed initialization keeps plain output visible');
+  assert.equal(d3.querySelectorAll('.atlas-xterm, .atlas-xterm-search').length, 0, 'No partial terminal UI remains');
+  assert.equal(disposed, 1, 'The failed renderer releases its resources');
+  assert.equal(w3.AtlasTerminalView.terminals.size, 0);
+  w3.Terminal = FakeTerminal;
+  w3.AtlasTerminalView.check();
+  await sleep(20);
+  assert.equal(pre3.dataset.xterm, 'ready', 'Opening the page can retry initialization');
+  assert.equal(d3.querySelectorAll('.atlas-xterm').length, 1);
+  assert.equal(d3.querySelectorAll('.atlas-xterm-search').length, 1);
+  w3.close();
   console.log('PASS: terminal view loads xterm only when Terminal/PsTools opens, appends new output, redraws trimmed output, clears, searches, keeps the <pre> accessible and falls back to plain output');
 })().catch(e => { console.error(e); process.exit(1); });
