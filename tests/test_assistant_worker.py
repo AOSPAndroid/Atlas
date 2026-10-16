@@ -142,6 +142,45 @@ class Installer(unittest.TestCase):
             install_assistant.main(['--dry-run'])
             self.assertIn('processor build', ' '.join(' '.join(map(str, c.args)) for c in printed.call_args_list))
 
+    def test_a_blocked_download_site_prints_the_file_to_download(self):
+        with patch.object(install_assistant, 'nvidia_card', return_value='NVIDIA RTX A2000 8GB, 8188 MiB'), \
+                patch.object(install_assistant, 'local_package', return_value=None), \
+                patch.object(install_assistant, 'reachable', return_value=False), \
+                patch.object(install_assistant.subprocess, 'run') as run, patch('builtins.print') as printed:
+            self.assertEqual(install_assistant.main([]), 1)
+        run.assert_not_called()
+        text = ' '.join(' '.join(map(str, c.args)) for c in printed.call_args_list)
+        self.assertIn('pip cannot reach abetlen.github.io', text)
+        self.assertIn('https://github.com/abetlen/llama-cpp-python/releases/download/v0.3.4-cu124/llama_cpp_python-0.3.4-cp312-cp312-win_amd64.whl', text)
+        self.assertIn('Atlas\\llm', text)
+
+    def test_a_downloaded_package_is_installed_from_the_file(self):
+        tag = f'cp{sys.version_info.major}{sys.version_info.minor}'
+        with tempfile.TemporaryDirectory() as folder:
+            self.assertIsNone(install_assistant.local_package([folder]))
+            wheel = Path(folder) / f'llama_cpp_python-0.3.4-{tag}-{tag}-win_amd64.whl'
+            wheel.write_bytes(b'')
+            (Path(folder) / 'llama_cpp_python-0.3.4-cp27-cp27-win_amd64.whl').write_bytes(b'')
+            self.assertEqual(install_assistant.local_package([folder]), wheel, 'Only a file for this Python version')
+        command, = install_assistant.commands('gpu', wheel, card='RTX A2000, 8188 MiB')
+        self.assertEqual(command[1:6], ['-m', 'pip', 'install', '--only-binary=:all:', str(wheel)])
+        self.assertNotIn('--extra-index-url', command, 'Only the normal package mirror is used')
+        self.assertEqual(command[6:], install_assistant.NVIDIA)
+        command, = install_assistant.commands('cpu', wheel, card='')
+        self.assertEqual(command[5:], [str(wheel)], 'No NVIDIA runtime without a card')
+        with patch.object(install_assistant, 'nvidia_card', return_value='RTX A2000, 8188 MiB'), \
+                patch.object(install_assistant, 'local_package', return_value=wheel), \
+                patch.object(install_assistant, 'reachable', side_effect=AssertionError('no network check needed')), \
+                patch('builtins.print') as printed:
+            self.assertEqual(install_assistant.main(['--dry-run']), 0)
+        self.assertIn('Using the downloaded package', ' '.join(' '.join(map(str, c.args)) for c in printed.call_args_list))
+
+    def test_model_advice_follows_graphics_memory(self):
+        self.assertEqual(install_assistant.memory_gb('RTX A2000 8GB, 8188 MiB'), 8.0)
+        self.assertIn('Qwen2.5-7B', install_assistant.model_for('gpu', 'RTX A2000 8GB, 8188 MiB'))
+        self.assertIn('Qwen2.5-3B', install_assistant.model_for('gpu', 'Quadro P620, 4096 MiB'))
+        self.assertIn('Qwen3-4B', install_assistant.model_for('cpu', ''))
+
     def test_no_nvidia_tool_means_no_card(self):
         with patch.object(install_assistant.shutil, 'which', return_value=None), \
                 patch.object(install_assistant.subprocess, 'run', side_effect=OSError('not found')):

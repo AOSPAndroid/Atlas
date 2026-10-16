@@ -81,7 +81,7 @@
     advanced.className = "assistant-advanced";
     advanced.append(Object.assign(document.createElement("summary"), { textContent: "Graphics card and advanced" }),
       field("GPU layers", layers, "99 puts the whole model on the graphics card (8 GB is enough for 4B–8B models). 0 uses the processor only."),
-      field("Context size", context, "How much text the model reads at once. 8192 fits 8 GB of video memory."),
+      field("Context size", context, "How much text the model reads at once. 8192 fits 8 GB of video memory; use 4096 on a 4 GB card."),
       field("Stop when idle (minutes)", idle, "Frees the graphics card memory. 0 keeps it loaded."),
       field("Existing model server", url, "Leave empty: Atlas starts llama-server itself."));
     const help = document.createElement("details");

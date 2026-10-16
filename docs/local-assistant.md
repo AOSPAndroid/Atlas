@@ -24,6 +24,8 @@ No cloud service, no Ollama. Atlas starts llama.cpp's `llama-server` itself, lis
    | Qwen3-4B-Instruct-2507, `Q4_K_M` | 2.5 GB | Recommended start: fast, follows the format well. huggingface.co/unsloth/Qwen3-4B-Instruct-2507-GGUF |
    | Qwen3-8B, `Q4_K_M` | 5.0 GB | More careful wording, about half the speed. huggingface.co/Qwen/Qwen3-8B-GGUF |
 
+   **4 GB cards** (for example a Quadro P620): use Qwen3-4B-Instruct-2507 Q4_K_M with llama-server and set **Context size** to 4096 in Assistant settings (model 2.5 GB + text). The 8B model does not fit.
+
    Larger models (12B and up) do not fit in 8 GB with room for the text. With 64 GB of RAM they can still run with **GPU layers** lowered (part on the processor), but slowly.
 3. In Atlas: **Knowledge Base → New article… → Draft from notes with the Assistant… → Assistant settings**. Leave the two paths empty (Atlas finds them in `llm`), add your notes folders (one per line), **Save**, then **Start**. The first start loads the model (10–60 seconds); later requests start it by themselves.
 
@@ -36,7 +38,9 @@ If downloaded programs are blocked, or you prefer pip packages, use the **llama-
 | NVIDIA graphics card (found with `nvidia-smi`) | llama-cpp-python 0.3.4 for CUDA 12.4, plus NVIDIA's CUDA runtime and cuBLAS from pip (about 600 MB) | `Qwen2.5-7B-Instruct-Q4_K_M.gguf` (4.7 GB, huggingface.co/bartowski/Qwen2.5-7B-Instruct-GGUF) |
 | No NVIDIA card, or `Install-Assistant.bat --cpu` | llama-cpp-python 0.3.19 for the processor | `Qwen3-4B-Instruct-2507-Q4_K_M.gguf` (2.5 GB) |
 
-The ready-built graphics-card package is an older release (December 2024) and **cannot read Qwen3 models**: use Qwen2.5-7B-Instruct with it. It needs an NVIDIA driver that supports CUDA 12.4 (version 550 or later). The processor build reads Qwen3 but is several times slower than a graphics card.
+The ready-built graphics-card package is an older release (December 2024) and **cannot read Qwen3 models**: use Qwen2.5-7B-Instruct with it (Qwen2.5-3B-Instruct, 1.9 GB, on a 4 GB card). If your network blocks `abetlen.github.io` (a company package mirror usually only has the source code, which needs a compiler), the installer says so before trying: use llama-server.exe instead. It needs an NVIDIA driver that supports CUDA 12.4 (version 550 or later). The processor build reads Qwen3 but is several times slower than a graphics card.
+
+**If pip cannot reach `abetlen.github.io`** (a company package mirror such as Nexus usually has only the source code), the installer stops before trying and prints one link. Download that file in your browser (it is on github.com, like the Atlas zip): for an NVIDIA card `llama_cpp_python-0.3.4-cp312-cp312-win_amd64.whl` (about 440 MB) from <https://github.com/abetlen/llama-cpp-python/releases/download/v0.3.4-cu124/llama_cpp_python-0.3.4-cp312-cp312-win_amd64.whl>. Save it, keeping its name, in `Atlas\llm` (or leave it in `Downloads`) and run `Install-Assistant.bat` again: it installs that file, and NVIDIA's runtime packages from your normal package mirror.
 
 Then put the model in `llm` and leave `llama-server.exe` out of that folder: when there is no `llama-server.exe`, Atlas runs the model with the library in a separate Python process (`assistant_worker.py`), on `127.0.0.1` only, stopped when idle like llama-server. Everything else (checks, drafts, import) is the same. pip needs to reach `pypi.org` and `abetlen.github.io` (where the ready-built packages are published).
 
