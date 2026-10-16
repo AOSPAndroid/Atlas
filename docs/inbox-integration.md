@@ -96,6 +96,10 @@ share a name, choose the right one.
    expand **Connect collectors**, enter the normal Windows account as
    `DOMAIN\x01426046` (use `whoami` in the normal session for the actual domain),
    and set the same Python executable used in step 2. Click **Connect and start collectors**.
+   A path pasted with quotes is fine. If that Python is reached through a link or
+   junction (for example `C:\devhome\tools\python3.12\current`), setup saves the real
+   folder it points to, so the collectors keep running that exact Python. After a
+   Python update replaces that folder, run this setup again.
 4. Click **Listener settings**. Its window opens in the normal user's session.
    Select **Allow access and start** to grant Windows notification permission.
    Generate a Teams test notification and check the source list; select the

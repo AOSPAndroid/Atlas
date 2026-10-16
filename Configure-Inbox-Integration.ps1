@@ -15,6 +15,35 @@ function Assert-LocalInboxPath([string]$Path) {
     }
 }
 
+function Resolve-LinkedPath([string]$Path) {
+    # Tool installs often reach Python through a link (for example ...\python3.12\current). Follow
+    # junctions and symbolic links once, here, and keep the real folder: it is then checked like any
+    # other path, so re-pointing the link later cannot change what the task runs. Other reparse
+    # points (cloud placeholders and similar) are left for Assert-LocalInboxPath to refuse.
+    $current = [IO.Path]::GetFullPath($Path)
+    for ($hop = 0; $hop -lt 32; $hop++) {
+        $root = [IO.Path]::GetPathRoot($current)
+        $parts = @($current.Substring($root.Length).Split([char[]]@('\', '/'), [StringSplitOptions]::RemoveEmptyEntries))
+        $prefix = $root
+        $followed = $false
+        for ($i = 0; $i -lt $parts.Count; $i++) {
+            $prefix = Join-Path $prefix $parts[$i]
+            $item = Get-Item -LiteralPath $prefix -Force -ErrorAction SilentlyContinue
+            if ($null -eq $item -or -not ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) { continue }
+            if ($item.LinkType -notin @('Junction', 'SymbolicLink')) { return $current }
+            $target = [string](@($item.Target)[0]) -replace '^\\\\\?\\|^\\\?\?\\', ''
+            if (-not $target) { return $current }
+            if (-not [IO.Path]::IsPathRooted($target)) { $target = Join-Path (Split-Path -Parent $prefix) $target }
+            if ($i + 1 -lt $parts.Count) { $target = Join-Path $target ($parts[($i + 1)..($parts.Count - 1)] -join [IO.Path]::DirectorySeparatorChar) }
+            $current = [IO.Path]::GetFullPath($target)
+            $followed = $true
+            break
+        }
+        if (-not $followed) { return $current }
+    }
+    throw "Too many links in $Path"
+}
+
 function New-InboxControlAcl($AtlasSid, $MailSid) {
     $acl = New-Object Security.AccessControl.DirectorySecurity
     $acl.SetAccessRuleProtection($true, $false)
@@ -85,7 +114,7 @@ $atlasSid = $identity.User
 $mailSid = ([Security.Principal.NTAccount]$MailUser).Translate([Security.Principal.SecurityIdentifier])
 if ($mailSid.Value -notlike 'S-1-5-21-*' -or $atlasSid.Value -notlike 'S-1-5-21-*') { throw 'Use named Windows user accounts.' }
 $mailAccount = $mailSid.Translate([Security.Principal.NTAccount]).Value
-$python = (Resolve-Path -LiteralPath $PythonPath).Path
+$python = Resolve-LinkedPath ((Resolve-Path -LiteralPath $PythonPath).Path)
 if ((Split-Path -Leaf $python) -notin @('python.exe', 'pythonw.exe') -or -not (Test-Path -LiteralPath $python -PathType Leaf)) { throw 'Select a Python 3.12+ python.exe that the mail account can run.' }
 Assert-LocalInboxPath $python
 Assert-LocalInboxPath $PSScriptRoot

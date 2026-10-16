@@ -1,5 +1,7 @@
 import json
 from pathlib import Path
+import shutil
+import subprocess
 import tempfile
 import time
 import unittest
@@ -206,6 +208,17 @@ class AgentTests(unittest.TestCase):
         outlook.write_json(self.queue / 'desired.json', dict(self.desired, outlook='execute'))
         with self.assertRaises(ValueError):
             self.agent.desired()
+
+
+class InboxSetupScript(unittest.TestCase):
+    @unittest.skipUnless(shutil.which('pwsh') or shutil.which('powershell.exe'), 'PowerShell is unavailable')
+    def test_python_reached_through_links_is_saved_as_its_real_path(self):
+        shell = shutil.which('pwsh') or shutil.which('powershell.exe')
+        script = Path(__file__).with_name('test_inbox_link_paths.ps1')
+        result = subprocess.run([shell, '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', str(script)],
+                                capture_output=True, text=True, timeout=120)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('PASS', result.stdout)
 
 
 if __name__ == '__main__':
