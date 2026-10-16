@@ -66,7 +66,7 @@ export function ScreenReader() {
         <RequestCard detail={detail} user={user} />
         {(user || mentioned.length > 0) && <Card><CardHeader><CardTitle role="heading" aria-level={2}><Monitor aria-hidden="true" />Machines <Badge variant="secondary">{(user ? result.machines.length : 0) + mentioned.length}</Badge></CardTitle></CardHeader><CardContent>
           <ul className="inbox-devices">
-            {mentioned.map((machine) => <li key={"named-" + machine.name} data-screen-machine={machine.name}><div><strong>{machine.name}</strong><Badge variant="outline">In captured text</Badge></div><MachineActions machine={machine} user={user} /></li>)}
+            {mentioned.map((machine) => <li key={"named-" + machine.name} data-screen-machine={machine.name}><div><strong>{machine.name}</strong><Badge variant="outline">In captured text</Badge>{machine.written_as && machine.written_as !== machine.name.toUpperCase() && <small className="inbox-read-as" title="Found despite look-alike characters such as 0/O or 1/I">read as {machine.written_as}</small>}</div><MachineActions machine={machine} user={user} /></li>)}
             {user && result.machines.map((machine, index) => <li key={index}><div><strong>{machine.name || machine.machine_name}</strong><Badge variant="outline">{machine.match_type || "Linked"}</Badge></div><MachineActions machine={{ ...machine, name: machine.name || machine.machine_name }} user={user} /></li>)}
           </ul>
           {user && !result.machines.length && !mentioned.length && <p>No linked machines in the current Atlas database.</p>}

@@ -84,13 +84,35 @@ def match_sender(connection, message, chosen=None):
             'candidates': people, 'chosen': chosen is not None}
 
 
+# Characters that text recognition (and hurried typing) confuse in hostnames: O/0, I/l/1, S/5, B/8, Z/2.
+LOOKALIKE = str.maketrans({'o': '0', 'i': '1', 'l': '1', 's': '5', 'b': '8', 'z': '2'})
+
+
+def lookalike_key(value):
+    return str(value or '').casefold().translate(LOOKALIKE)
+
+
 def mentioned_machines(connection, names):
     if not names:
         return []
-    rows = connection.execute(
-        'SELECT name,device_kind,model_id,operational_status,windows_remote_supported FROM legacy_machines '
-        'WHERE name_norm IN (%s) ORDER BY name' % ','.join('?' * len(names)), names).fetchall()
-    return [dict(row) for row in rows]
+    columns = 'name,name_norm,device_kind,model_id,operational_status,windows_remote_supported'
+    rows = [dict(row) for row in connection.execute(
+        f'SELECT {columns} FROM legacy_machines WHERE name_norm IN (%s) ORDER BY name' % ','.join('?' * len(names)), names)]
+    found = {row['name_norm'] for row in rows}
+    # Names with no exact match are retried with look-alike characters made equal, so a misread
+    # "GBRPWMK2O88I521" still finds GBRPWMK20881521. Only machines in inventory are returned.
+    missing = {lookalike_key(name): name for name in names if name not in found}
+    if missing:
+        connection.create_function('atlas_lookalike', 1, lookalike_key, deterministic=True)
+        lengths = sorted({len(name) for name in missing.values()})
+        for row in connection.execute(
+                f'SELECT {columns} FROM legacy_machines WHERE length(name_norm) IN (%s) AND atlas_lookalike(name_norm) IN (%s) '
+                'ORDER BY name LIMIT 20' % (','.join('?' * len(lengths)), ','.join('?' * len(missing))),
+                (*lengths, *missing)):
+            if row['name_norm'] not in found:
+                found.add(row['name_norm'])
+                rows.append({**dict(row), 'written_as': missing[lookalike_key(row['name_norm'])].upper()})
+    return [{key: value for key, value in row.items() if key != 'name_norm'} for row in rows]
 
 
 def safely(load, label, warnings):

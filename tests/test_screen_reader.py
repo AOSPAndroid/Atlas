@@ -75,6 +75,20 @@ class ScreenReader(unittest.TestCase):
         self.assertEqual(result['analysis']['packages'][0]['folder'], 'Example_App')
         self.assertEqual([(m['name'], m['linked']) for m in result['analysis']['machines']], [('SPARE-PC-0042', False)])
 
+    def test_ocr_lookalike_characters_still_find_the_machine(self):
+        # Windows OCR read 0 as O and 1 as I/l in hostnames.
+        self.capture = {'title': 'Notepad', 'process': 'notepad', 'text': 'SPARE-PC-OO42 is slow, so is LAPTOP-OOOl'}
+        machines = self.post('/api/screen/read', {'source': 'window'}).json()['analysis']['machines']
+        self.assertEqual(sorted((m['name'], m.get('written_as')) for m in machines),
+                         [('LAPTOP-0001', 'LAPTOP-OOOL'), ('SPARE-PC-0042', 'SPARE-PC-OO42')])
+
+    def test_exact_name_wins_and_unknown_lookalikes_find_nothing(self):
+        with connect(self.directory) as c:
+            c.execute("INSERT INTO machines(id,machine_name,machine_name_norm) VALUES(3,'SPARE-PC-OO42','spare-pc-oo42')")
+        self.capture = {'title': 'Notepad', 'process': 'notepad', 'text': 'SPARE-PC-OO42 and NOWHERE-PC-9999 are slow'}
+        machines = self.post('/api/screen/read', {'source': 'window'}).json()['analysis']['machines']
+        self.assertEqual([(m['name'], m.get('written_as')) for m in machines], [('SPARE-PC-OO42', None)])
+
     def test_title_name_and_ambiguous_people(self):
         self.capture = {'title': 'Chat | Sam Green | Microsoft Teams', 'process': 'ms-teams', 'text': 'printer is broken'}
         result = self.post('/api/screen/read', {'source': 'window', 'delay': 0}).json()

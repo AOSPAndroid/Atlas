@@ -62,6 +62,11 @@ share a name, choose the right one.
 - If Atlas itself is still in front when the countdown ends, nothing is read;
   switch windows sooner and retry. Very small text reads better after zooming in.
 - Recognition uses the languages installed for your Windows account.
+- Text recognition can confuse look-alike characters in hostnames (0/O, 1/I/l,
+  5/S, 8/B, 2/Z). If a machine name is not found exactly, Atlas retries with
+  those characters treated as equal and shows "read as …" next to the machine
+  it found. Only machines that exist in inventory are offered; check the name
+  before acting. The same applies to mistyped names in emails.
 
 ## One-time setup on the work PC
 

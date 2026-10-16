@@ -2725,3 +2725,5 @@ body.atlas-console #active-directory :is(.ad-group-list, .ad-browser-results) td
 body.atlas-console #active-directory .ad-group-list td:nth-child(3) { width:1%; }
 body.atlas-console #active-directory :is(.ad-icon, button.ad-object-link, details.ad-group-record:not([open])) { vertical-align:middle; }
 body.atlas-console #active-directory small.ad-account { text-transform:none; letter-spacing:0; font-weight:400; }
+
+body.atlas-console .inbox-read-as { color:#9a5b00; font-size:11px; }

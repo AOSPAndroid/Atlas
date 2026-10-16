@@ -130,7 +130,9 @@ def hostname_candidates(text):
     seen = []
     for match in HOSTNAME.finditer(str(text or '')):
         value = match.group(1).casefold()
-        if any(c.isdigit() for c in value) and 6 <= len(value) <= 30 and value not in seen:
+        # Names need a digit, or a numeric-looking last part that OCR read as letters ("LAPTOP-OOOl").
+        numeric = any(c.isdigit() for c in value) or re.search(r'-[0-9oil]{2,}$', value)
+        if numeric and 6 <= len(value) <= 30 and value not in seen:
             seen.append(value)
     return seen[:30]
 
@@ -182,7 +184,8 @@ def analyse(subject, body, *, packages=(), documents=(), find_machines=lambda na
     # Machine names and email addresses are not product names: "EXAMPLE-DESKTOP-02" or
     # "alex@example.test" must not suggest "Example App".
     for machine in found:
-        text = re.sub(re.escape(str(machine.get('name', ''))), ' ', text, flags=re.I)
+        for written in {str(machine.get('name', '')), str(machine.get('written_as') or '')} - {''}:
+            text = re.sub(re.escape(written), ' ', text, flags=re.I)
     text = re.sub(r'[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+', ' ', text)
     words = plain(text)
     action = next((name for name, phrases in ACTIONS if any(contains(words, p) for p in phrases)), None)
