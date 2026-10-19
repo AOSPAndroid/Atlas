@@ -115,6 +115,8 @@ const response = data => ({ ok: true, status: 200, json: async () => data });
   assert.match(d.querySelector('[data-inbox-status]').textContent, /Watching Outlook/, 'Notification permissions do not stop Outlook mail');
   const controls = d.querySelector('[data-inbox-controls]');
   assert(!d.getElementById('inbox-source-outlook').closest('details'), 'Watcher switches are always visible');
+  assert.equal(controls.querySelector('details.inbox-setup').open, false, 'Setup folds away once collectors are connected');
+  assert(controls.querySelector('details.inbox-setup .inbox-app-controls'), 'Desktop alerts live with the collector setup');
   const clickControl = label => [...controls.querySelectorAll('button')].find(button => button.textContent === label).click();
   clickControl('Stop collectors');
   await until(() => /Collectors stopped/.test(controls.textContent));

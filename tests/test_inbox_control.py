@@ -1,5 +1,7 @@
 import json
 from pathlib import Path
+import shutil
+import subprocess
 import tempfile
 import time
 import unittest
@@ -117,6 +119,22 @@ class InboxControlTests(unittest.TestCase):
             self.assertEqual(client.post('/api/inbox/control', json={'action': 'start'}, headers={'X-Atlas-Token': 'wrong'}).status_code, 403)
             self.ps.assert_not_called()
 
+    def test_setup_accepts_pasted_paths_in_quotes(self):
+        # Windows "Copy as path" adds quotes; pasted values often carry spaces.
+        app = FastAPI()
+        control.register(app, self.integration, token_getter=lambda: 'test-session')
+        with patch.object(self.integration, 'configure', return_value={'configured': True}) as configure, \
+                TestClient(app, headers={'X-Atlas-Token': 'test-session'}) as client:
+            response = client.post('/api/inbox/control/setup', json={'mail_user': ' INTRANET\\x01426046 ',
+                                   'python': '"C:\\devhome\\tools\\python3.12\\current\\python.exe"'})
+            self.assertEqual(response.status_code, 200, response.text)
+            configure.assert_called_once_with('INTRANET\\x01426046', 'C:\\devhome\\tools\\python3.12\\current\\python.exe')
+            configure.reset_mock()
+            self.assertEqual(client.post('/api/inbox/control/setup', json={'mail_user': 'INTRANET\\x01426046', 'python': '  '}).status_code, 200)
+            configure.assert_called_once_with('INTRANET\\x01426046', None)
+            self.assertEqual(client.post('/api/inbox/control/setup', json={'mail_user': 'user', 'python': 'C:\\a"b.exe'}).status_code, 422,
+                             'A quote inside the path is still refused')
+
     def test_two_atlas_processes_cannot_overwrite_each_others_preferences(self):
         with outlook.process_lock(self.commands, 'control.lock'):
             with self.assertRaisesRegex(control.IntegrationError, 'Another Atlas window'):
@@ -190,6 +208,17 @@ class AgentTests(unittest.TestCase):
         outlook.write_json(self.queue / 'desired.json', dict(self.desired, outlook='execute'))
         with self.assertRaises(ValueError):
             self.agent.desired()
+
+
+class InboxSetupScript(unittest.TestCase):
+    @unittest.skipUnless(shutil.which('pwsh') or shutil.which('powershell.exe'), 'PowerShell is unavailable')
+    def test_python_reached_through_links_is_saved_as_its_real_path(self):
+        shell = shutil.which('pwsh') or shutil.which('powershell.exe')
+        script = Path(__file__).with_name('test_inbox_link_paths.ps1')
+        result = subprocess.run([shell, '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', str(script)],
+                                capture_output=True, text=True, timeout=120)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('PASS', result.stdout)
 
 
 if __name__ == '__main__':

@@ -8,10 +8,11 @@ import { Field, FieldGroup, FieldLabel, FieldDescription, FieldSet, FieldLegend 
 
 const labels = { running: "Collector task connected", attention: "Collector needs attention", stopped: "Collectors stopped", stopping: "Stopping collectors", unresponsive: "Collector not responding", error: "Setup needs attention", not_configured: "Connect collectors" };
 const sources = [["outlook", "Email watcher"], ["notifications", "Notification watcher"]];
-export function InboxControls({ active, onChange }) {
+// Watcher switches stay in view; the rarely used setup folds away once collectors are connected.
+export function InboxControls({ active, onChange, children }) {
   const [control, setControl] = useState(null), [error, setError] = useState(""), [busy, setBusy] = useState(false);
   const [readError, setReadError] = useState("");
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(false), [setupOpen, setSetupOpen] = useState(null);
   const [mailUser, setMailUser] = useState(""), [python, setPython] = useState("");
   const version = useRef(0), working = useRef(false), mounted = useRef(true);
   useEffect(() => () => { mounted.current = false; }, []);
@@ -44,30 +45,27 @@ export function InboxControls({ active, onChange }) {
     finally { working.current = false; if (mounted.current) setBusy(false); }
   }
   const configured = !!control?.configured, desired = control?.desired || {};
+  const attention = !!control && (!configured || editing || ["error", "unresponsive", "attention"].includes(control.state));
   return <div className="inbox-controls" data-inbox-controls>
-    <div className="inbox-controls-bar">
-      <span role="status"><Badge variant="outline">{control ? labels[control.state] || "Connecting collectors" : "Checking collector setup…"}</Badge>{configured && <span className="inbox-muted"> {control.mail_user}</span>}</span>
-      {configured && <div className="inbox-control-actions">
-        <Button size="sm" variant="outline" disabled={busy} onClick={() => send({ action: "start" })}>Start collectors</Button>
-        <Button size="sm" variant="outline" disabled={busy} onClick={() => send({ action: "stop" })}>Stop collectors</Button>
-        <Button size="sm" variant="secondary" disabled={busy} onClick={() => send({ action: "show" })}>Listener settings</Button>
-      </div>}
-    </div>
     <FieldSet className="inbox-watcher-switches"><FieldLegend variant="label">Live watchers</FieldLegend><FieldGroup className="inbox-source-fields">
       {sources.map(([key, label]) => <Field orientation="horizontal" data-disabled={busy || !configured} key={key}>
         <Switch id={"inbox-source-" + key} size="sm" checked={!!(desired.running && desired[key])} disabled={busy || !configured} onCheckedChange={value => send({ action: "source", [key]: value })} />
         <FieldLabel htmlFor={"inbox-source-" + key}>{label}</FieldLabel>
         <span className="inbox-muted" aria-hidden="true">{desired.running && desired[key] ? "On" : "Off"}</span>
       </Field>)}
-    </FieldGroup></FieldSet>
-    <p className="inbox-muted">{configured ? "Switches apply immediately and are remembered for the next Atlas start. Status above confirms when each watcher is ready." : "Connect collectors below to enable the watcher switches."}</p>
+    </FieldGroup>{!configured && control && <span className="inbox-muted">Connect collectors to enable these switches.</span>}</FieldSet>
     {(error || readError) && <Alert variant="destructive"><AlertDescription>{error || readError}</AlertDescription></Alert>}
     {control?.detail && (control.state === "error" || control.state === "unresponsive" || (desired.running && !control.agent_running)) && <Alert><AlertDescription>{control.detail}</AlertDescription></Alert>}
     {Object.entries(control?.errors || {}).map(([source, message]) => <Alert key={source}><AlertDescription><strong>{source === "outlook" ? "Outlook emails" : "Notification listener"}</strong>{message}</AlertDescription></Alert>)}
     {configured && control.pending && desired.running && <p role="status" className="inbox-muted">Start requested. Waiting for the collector task in your signed-in mail account.</p>}
-    <details className="inbox-connection" open={control ? !configured || editing : false}>
-      <summary>{configured ? "Sources and connection" : "Connect collectors"}</summary>
-      {configured && !editing ? <>
+    <details className="inbox-setup" open={setupOpen ?? attention} onToggle={event => setSetupOpen(event.currentTarget.open)}>
+      <summary><span role="status"><Badge variant="outline">{control ? labels[control.state] || "Connecting collectors" : "Checking collector setup…"}</Badge></span><span>Collectors and alerts</span>{configured && <span className="inbox-muted">{control.mail_user}</span>}</summary>
+      {configured && <div className="inbox-control-actions">
+        <Button size="sm" variant="outline" disabled={busy} onClick={() => send({ action: "start" })}>Start collectors</Button>
+        <Button size="sm" variant="outline" disabled={busy} onClick={() => send({ action: "stop" })}>Stop collectors</Button>
+        <Button size="sm" variant="secondary" disabled={busy} onClick={() => send({ action: "show" })}>Listener settings</Button>
+      </div>}
+      {configured && !editing ? <div className="inbox-connection">
         <FieldSet><FieldLegend variant="label">Notification sources</FieldLegend><FieldGroup className="inbox-source-fields">
           <Field orientation="horizontal" data-disabled={busy}>
             <Switch id="inbox-source-outlook_previews" size="sm" checked={!!desired.outlook_previews} disabled={busy} onCheckedChange={value => send({ action: "preferences", outlook_previews: value })} />
@@ -79,7 +77,7 @@ export function InboxControls({ active, onChange }) {
         <p className="inbox-muted">Queue: {control.directory}</p>
         <Button size="sm" variant="outline" disabled={busy || control.agent_running} onClick={() => { setMailUser(control.mail_user); setPython(control.python || ""); setEditing(true); }}>Change connection</Button>
         {control.agent_running && <p className="inbox-muted">Stop collectors before changing the account or Python path.</p>}
-      </> : <form onSubmit={event => { event.preventDefault(); send({ mail_user: mailUser.trim(), python: python.trim() || control?.default_python || null }, true); }}>
+      </div> : <form className="inbox-connection" onSubmit={event => { event.preventDefault(); send({ mail_user: mailUser.trim(), python: python.trim() || control?.default_python || null }, true); }}>
         <FieldGroup className="inbox-setup-fields">
           <Field data-disabled={busy}><FieldLabel htmlFor="inbox-mail-user">Outlook / Teams Windows account</FieldLabel><Input id="inbox-mail-user" autoComplete="off" placeholder="DOMAIN\username" required value={mailUser} disabled={busy} onChange={event => setMailUser(event.target.value)} /><FieldDescription>Use the normal Windows account, not its email address.</FieldDescription></Field>
           <Field data-disabled={busy}><FieldLabel htmlFor="inbox-python">Python available to that account</FieldLabel><Input id="inbox-python" autoComplete="off" placeholder={control?.default_python || "C:\\Python312\\python.exe"} value={python} disabled={busy} onChange={event => setPython(event.target.value)} /><FieldDescription>Leave blank to use Atlas’s Python. Both accounts must be able to read the Atlas folder.</FieldDescription></Field>
@@ -89,6 +87,7 @@ export function InboxControls({ active, onChange }) {
         <div className="inbox-control-actions"><Button type="submit" size="sm" disabled={busy || !control}>{busy ? "Connecting…" : editing ? "Save and start collectors" : "Connect and start collectors"}</Button>
           {editing && <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => setEditing(false)}>Cancel</Button>}</div>
       </form>}
+      {children}
     </details>
   </div>;
 }

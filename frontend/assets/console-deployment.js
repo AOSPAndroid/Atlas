@@ -511,10 +511,13 @@ async function loadDeploymentHistory() {
     const records = await api("/api/history");
     if (sequence !== deploymentHistorySequence) return;
     if (!Array.isArray(records)) throw Error("Invalid history response");
+    // State badges and a machine link: open the target in Workspace from its history row.
     body.innerHTML = records.length ? records.map((x) =>
-      `<tr><td>${esc(x.started)}</td><td>${esc(x.target)}</td><td>${esc(x.package)}</td><td>${esc(x.action)}</td><td>${esc(x.mode)}</td><td>${esc(x.state)}</td><td>${esc(x.exit_code)}</td></tr>`
+      `<tr data-state="${esc(x.state)}"><td>${esc(x.started)}</td><td><button type="button" class="history-target" data-history-target="${esc(x.target)}" title="Select in Workspace">${esc(x.target)}</button></td><td>${esc(x.package)}</td><td>${esc(x.action)}</td><td>${esc(x.mode)}</td><td><span class="history-state" data-state="${esc(x.state)}">${esc(x.state)}</span></td><td>${esc(x.exit_code)}</td></tr>`
     ).join("") : empty("No recent operations", "Deployment operations will appear here when they are recorded. Use Refresh to check again.");
-    status.textContent = records.length ? `${records.length} recorded operation${records.length === 1 ? "" : "s"}` : "No recorded deployment operations returned.";
+    const failures = records.filter((x) => x.state === "failed").length;
+    status.textContent = records.length ? `${records.length} recorded operation${records.length === 1 ? "" : "s"}${failures ? ` · ${failures} failed` : ""}` : "No recorded deployment operations returned.";
+    filterDeploymentHistory();
     status.dataset.state = "ready";
   } catch (error) {
     if (sequence !== deploymentHistorySequence) return;
@@ -529,6 +532,20 @@ async function loadDeploymentHistory() {
     }
   }
 }
+function filterDeploymentHistory() {
+  const words = ($("#historyFilter")?.value || "").toLowerCase().split(/\s+/).filter(Boolean);
+  $("#historyBody").querySelectorAll("tr:not(.atlas-table-empty)").forEach((row) => {
+    const text = row.textContent.toLowerCase();
+    row.hidden = !words.every((word) => text.includes(word));
+  });
+}
+$("#historyFilter")?.addEventListener("input", filterDeploymentHistory);
+$("#historyBody")?.addEventListener("click", (event) => {
+  const machine = event.target.closest("[data-history-target]")?.dataset.historyTarget;
+  if (!machine || window.AtlasReadOnly) return;
+  page("workspace");
+  setTarget(machine, "Deployment history", false);
+});
 function exportCsv() {
   if (!S.rows.length) return;
   let k = [
