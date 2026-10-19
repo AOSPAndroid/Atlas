@@ -44,13 +44,17 @@ function page(id) {
     bulk: "Prepare packages and actions across multiple devices.",
     history: "Review deployment activity and execution details.",
     terminal: "Write scripts and run commands from one place.",
-    psexec: "Remote utilities, command templates and execution output.",
+    scripts: "Run saved PowerShell scripts against a list of machines.",
+    psexec: "PsTools command templates and execution output.",
     knowledge: "Diagrams, notes and shared support knowledge."
   };
   const description = document.getElementById("pageDescription");
   if (description) description.textContent = descriptions[id] || "";
+  // PsTools opens from Scripts, so Scripts stays highlighted there.
+  const current = id === "psexec" ? "scripts" : id;
   document.querySelectorAll("nav [data-page]").forEach((b) => {
-    if (b.dataset.page === id) b.setAttribute("aria-current", "page");
+    b.classList.toggle("active", b.dataset.page === current);
+    if (b.dataset.page === current) b.setAttribute("aria-current", "page");
     else b.removeAttribute("aria-current");
   });
   document.querySelectorAll('[data-section]').forEach(link => {
@@ -61,6 +65,7 @@ function page(id) {
   if (id === "packages") window.dispatchEvent(new CustomEvent("atlas:packages-open"));
   if (id === "terminal") window.AtlasTerminal?.open();
   if (id === "psexec") window.AtlasPsExec?.open();
+  if (id === "scripts") window.AtlasScripts?.open();
   if (id === "active-directory") window.AtlasAD?.open();
   if (id === "bulk" && !bulkCatalogueLoaded && !bulkBusy) bulkPackages();
   syncDeploymentPanel();
@@ -606,6 +611,7 @@ function bindCommandDiscovery() {
 async function openPaletteTarget() {
   if (location.hash === "#active-directory") page("active-directory");
   if (location.hash === "#psexec") page("psexec");
+  if (location.hash === "#scripts") page("scripts");
   if (location.hash === "#knowledge") page("knowledge");
   const params = new URLSearchParams(location.search),
     person = params.get("person"),
@@ -765,6 +771,7 @@ async function runSharedCommand(id) {
     bulk: () => page("bulk"),
     history: () => page("history"),
     terminal: () => page("terminal"),
+    scripts: () => page("scripts"),
     psexec: () => page("psexec"),
     active: () => openDeploymentMonitor("active"),
     recent: () => openDeploymentMonitor("recent"),

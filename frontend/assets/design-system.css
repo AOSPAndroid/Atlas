@@ -2993,3 +2993,55 @@ html[data-theme="dark"] body .atlas-relation { background:#12324a; border-color:
 html[data-theme="dark"] body .atlas-relation.logon { background:#241a36; border-color:#5b4691; color:#c4b5fd !important; }
 html[data-theme="dark"] body kbd { background:#1c232c; border-color:#344050; color:var(--atlas-muted); }
 html[data-theme="dark"] body :is(hr,[role="separator"]) { border-color:var(--atlas-line); background-color:var(--atlas-line); color:var(--atlas-line); }
+
+/* Scripts: library on the left, the selected script with targets, code and output on the right. */
+body.atlas-console #scripts.active { display:block; }
+body.atlas-console .scripts-layout { display:grid; grid-template-columns:minmax(240px,300px) minmax(0,1fr); gap:8px; align-items:start; }
+body.atlas-console .scripts-library { display:flex; flex-direction:column; gap:6px; padding:8px; position:sticky; top:8px; max-height:calc(100vh - 16px); overflow:auto; }
+body.atlas-console .scripts-list { display:grid; gap:2px; }
+body.atlas-console .scripts-list h3 { margin:8px 2px 2px; font-size:11px; font-weight:600; color:var(--atlas-muted); }
+body.atlas-console #scripts .scripts-item { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:2px 6px; align-items:center; justify-items:start; width:100%; height:auto; min-height:0; padding:6px 8px; text-align:left; white-space:normal; border:1px solid transparent; background:transparent; }
+body.atlas-console #scripts .scripts-item:hover { background:var(--atlas-surface-subtle); }
+body.atlas-console #scripts .scripts-item[aria-current="true"] { background:var(--atlas-selected); border-color:var(--atlas-line); box-shadow:inset 2px 0 var(--atlas-accent); }
+body.atlas-console .scripts-item strong { font-size:12px; }
+body.atlas-console .scripts-item > span { font-size:10px !important; padding:0 6px !important; }
+body.atlas-console .scripts-item small { grid-column:1/-1; color:var(--atlas-muted); font-size:11px; line-height:1.35; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+body.atlas-console .scripts-library-actions { display:flex; gap:6px; flex-wrap:wrap; }
+body.atlas-console .scripts-library-actions button { flex:1; }
+body.atlas-console #scripts .scripts-pstools { justify-content:flex-start; color:var(--atlas-accent); }
+body.atlas-console .scripts-empty { color:var(--atlas-muted); font-size:12px; margin:6px 2px; }
+body.atlas-console .scripts-detail { display:flex; flex-direction:column; gap:8px; padding:10px; min-width:0; }
+body.atlas-console .scripts-head { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
+body.atlas-console .scripts-head > div { flex:1; min-width:0; }
+body.atlas-console #scriptName { width:100%; font-size:16px; font-weight:650; color:var(--atlas-ink); border-color:transparent; background:transparent; padding:2px 4px; height:auto; }
+body.atlas-console #scriptName:not([readonly]) { border-color:var(--atlas-line); background:var(--atlas-surface); }
+body.atlas-console #scriptDescription { margin:2px 4px 0; color:var(--atlas-muted); font-size:12px; }
+body.atlas-console .scripts-run-grid { display:grid; grid-template-columns:minmax(0,1.2fr) minmax(0,1fr); gap:8px; }
+body.atlas-console .scripts-run-grid label { display:grid; gap:4px; font-size:12px; font-weight:600; }
+body.atlas-console .scripts-run-grid label small { font-weight:400; color:var(--atlas-muted); }
+body.atlas-console #scriptTargetCount[data-tone="bad"] { color:var(--atlas-danger-text, var(--atlas-danger)); }
+body.atlas-console .scripts-params { display:grid; gap:8px; align-content:start; }
+body.atlas-console .scripts-run-grid textarea { font:12px/1.45 "Cascadia Mono", Consolas, monospace; resize:vertical; }
+body.atlas-console .scripts-target-actions, body.atlas-console .scripts-actions { display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+body.atlas-console .scripts-actions-gap { flex:1; }
+body.atlas-console .scripts-code { border:1px solid var(--atlas-line); border-radius:var(--atlas-control-radius); padding:6px 8px; }
+body.atlas-console .scripts-code summary { cursor:pointer; font-weight:600; font-size:12px; }
+body.atlas-console .scripts-code summary small { font-weight:400; color:var(--atlas-muted); }
+body.atlas-console #scriptCode { width:100%; margin-top:6px; font:12px/1.5 "Cascadia Mono", Consolas, monospace; resize:vertical; tab-size:4; }
+body.atlas-console #scriptCode[readonly] { background:var(--atlas-surface-subtle); }
+body.atlas-console .scripts-changes { display:flex; align-items:center; gap:6px; margin-top:6px; font-size:12px; }
+body.atlas-console #scriptMessage { margin:0; font-size:12px; min-height:0; }
+body.atlas-console #scriptMessage:empty { display:none; }
+body.atlas-console #scriptMessage[data-tone="bad"] { color:var(--atlas-danger-text, var(--atlas-danger)); }
+body.atlas-console #scriptMessage[data-tone="good"] { color:var(--atlas-success); }
+body.atlas-console .scripts-output-head { display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:12px; }
+body.atlas-console #scriptStatus { margin-left:auto; color:var(--atlas-muted); }
+body.atlas-console .scripts-output { margin:0; min-height:180px; max-height:60vh; overflow:auto; padding:8px 10px; border-radius:var(--atlas-control-radius); background:#0f1720; color:#d6dee8; font:12px/1.5 "Cascadia Mono", Consolas, monospace; white-space:pre-wrap; overflow-wrap:anywhere; }
+body.atlas-console .scripts-output:empty::before { content:"Pick a script, add machines, then Run. Results appear here line by line."; color:#7c8a99; }
+body.atlas-console .scripts-output [data-tone="good"] { color:#4ade80; }
+body.atlas-console .scripts-output [data-tone="bad"] { color:#f87171; font-weight:600; }
+body.atlas-console .scripts-output [data-tone="warn"] { color:#fbbf24; }
+body.atlas-console .scripts-output [data-tone="info"] { color:#93c5fd; }
+body.atlas-console .scripts-output [data-tone="atlas"] { color:#7c8a99; }
+html[data-theme="dark"] body.atlas-console .scripts-output { background:#0b0f14; border:1px solid var(--atlas-line); }
+@media(max-width:900px) { body.atlas-console .scripts-layout, body.atlas-console .scripts-run-grid { grid-template-columns:minmax(0,1fr); } body.atlas-console .scripts-library { position:static; max-height:none; } }

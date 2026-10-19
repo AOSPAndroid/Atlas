@@ -38,6 +38,7 @@ const viewerCommands = new Set(["ad-browser","ad-support-summary","daas","vdi","
   "history",
   "active-directory",
   "terminal",
+  "scripts",
   "psexec",
   "catalogue",
   "packages",
@@ -223,6 +224,7 @@ export const COMMANDS = [
     "history results",
   ],
   ["terminal", "Terminal & PowerShell ISE", "Open the local command console and script editor", "terminal powershell ise cmd script console"],
+  ["scripts", "Scripts", "Run PowerShell scripts on a list of machines: services, processes, health, software", "scripts script powershell services disable enable tanium processes kill uptime disk gpupdate restart bulk machines"],
   [
     "psexec",
     "PsTools / PsExec",
