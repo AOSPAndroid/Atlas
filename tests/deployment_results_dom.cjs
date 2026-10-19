@@ -53,11 +53,22 @@ const deferred = () => {let resolve;const promise = new Promise(done=>{resolve=d
   history.at(-1).resolve({ok:false,status:503,json:async()=>({detail:'Retry unavailable'})});await preserve;
   assert.equal(body.innerHTML,accepted);assert.equal(status.dataset.state,'error');
 
+  const pair=run('loadDeploymentHistory()');await settle();
+  history.at(-1).resolve(reply([row,{...row,target:'OTHER-PC',state:'failed',exit_code:1603}]));await pair;
+  assert.equal(status.textContent,'2 recorded operations · 1 failed');
+  assert.equal(body.querySelector('tr[data-state=failed] .history-state').textContent,'failed');
+  const filter=d.querySelector('#historyFilter');filter.value='other failed';filter.dispatchEvent(new w.Event('input'));
+  assert.deepEqual([...body.querySelectorAll('tr')].map(tr=>tr.hidden),[true,false],'Every filter word must match');
+  filter.value='';filter.dispatchEvent(new w.Event('input'));assert(![...body.querySelectorAll('tr')].some(tr=>tr.hidden));
+  const opened=[];run('window.__page=page;window.__setTarget=setTarget');w.page=name=>opened.push(name);w.setTarget=(name,source)=>opened.push(name,source);
+  body.querySelector('[data-history-target="OTHER-PC"]').click();
+  assert.deepEqual(opened,['workspace','OTHER-PC','Deployment history'],'A machine name opens it in Workspace');
+  run('page=window.__page;setTarget=window.__setTarget');
   const late=run('loadDeploymentHistory()');await settle();const lateReply=history.at(-1);
   w.AtlasReadOnly={reason:'Read-only fixture'};const beforeReadonly=requests.length;await run('loadDeploymentHistory()');
   assert.equal(requests.length,beforeReadonly,'Read-only view does not request unavailable history');
   assert(body.textContent.includes('not included in this read-only view'));assert(status.textContent.includes('Atlas Admin'));assert(refresh.disabled);assert.equal(body.getAttribute('aria-busy'),'false');
   lateReply.resolve(reply([row]));await late;assert(body.textContent.includes('not included'));assert(refresh.disabled);
   assert.equal(f.errors.length,0,f.errors.join('\n'));w.dispatchEvent(new w.Event('pagehide'));w.close();
-  console.log('PASS: truthful empty/progress bulk rows and result actions, history loading/empty/error/retry, escaped recorded rows, stale refresh isolation and no read-only history requests or background retries');
+  console.log('PASS: truthful empty/progress bulk rows and result actions, history loading/empty/error/retry, escaped recorded rows, state badges, failure count, filter and machine links, stale refresh isolation and no read-only history requests or background retries');
 })().catch(error=>{console.error(error);process.exitCode=1});

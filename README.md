@@ -132,7 +132,7 @@ The host must remain awake and network-reachable. Windows Firewall or your organ
 
 ## Machine details
 
-The console, map and shared viewer use the same Atlas header, blue eagle branding and sidebar dimensions. The console keeps its Workspace, Remote Admin, Bulk Deploy and History navigation below the header. Map import, export and database backup actions are grouped under **More**.
+The console, map and shared viewer use the same Atlas header, blue eagle branding and sidebar dimensions. The console keeps its Workspace, Remote Admin, Bulk Deploy and History navigation below the header. Map import, export and database backup actions are grouped under **More**. **History** colours each run by state, counts failures, filters by machine, package or state, and opens a machine in Workspace when you click its name.
 
 Workspace keeps user/machine lookup and compact health on the left, with deployment on the right. Active Directory has its own navigation entry, searchable group list and comparison. Controls stay in their normal layout. Open the package selector to search or choose a favourite/recent package; Escape restores the previous selection. **Install / Repair / Uninstall** choose the action. **Advanced** contains threads, fresh copy, alternative execution modes and package checks. The left column scrolls on shorter screens; on phones, the columns stack and the **Deployment · hostname** control toggles deployment. Selection is retained when minimized, and clearing the target hides the panel. A job's compact status and expandable log appear only for its original target; failures open the log automatically.
 
@@ -457,7 +457,7 @@ Output streams into the embedded terminal with an exit code, Copy output and Sto
 
 
 ### Atlas visual system
-The shared UI uses a blue/slate palette, layered white surfaces, restrained borders/shadows, a strong navigation selection and consistent table, form, dialog and terminal styling. The final rules live in frontend/assets/design-system.css; the command palette mirrors them inside its shadow root. Map, Workspace, AD, Packages, Remote Admin, Bulk Deploy, History, Terminal, PsTools, Knowledge Base, database management and Desktop share these rules. Dense row/control geometry, semantic warning colours, map labels and the Draw.io canvas remain intact. The refresh adds no animation loops, remote fonts, image dependencies or JavaScript runtime work.
+The shared UI uses a blue/slate palette, layered white surfaces, restrained borders/shadows, a strong navigation selection and consistent table, form, dialog and terminal styling. The final rules live in frontend/assets/design-system.css; the command palette mirrors them inside its shadow root. Map, Workspace, AD, Packages, Remote Admin, Bulk Deploy, History, Terminal, PsTools, Knowledge Base and database management share these rules. Dense row/control geometry, semantic warning colours, map labels and the Draw.io canvas remain intact. The refresh adds no animation loops, remote fonts, image dependencies or JavaScript runtime work.
 
 ### shadcn UI components
 

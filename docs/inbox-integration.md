@@ -95,7 +95,7 @@ share a name, choose the right one.
    skipped; add the package later to enable them.
    `WMI_PYTHON` can select the Python used by these BAT files.
 3. Open Atlas from the usual elevated PowerShell (`x01426046_dsk`). In Live Inbox,
-   expand **Connect collectors**, enter the normal Windows account as
+   the **Collectors and alerts** section opens by itself until collectors are connected. Enter the normal Windows account as
    `DOMAIN\x01426046` (use `whoami` in the normal session for the actual domain),
    and set the same Python executable used in step 2. Click **Connect and start collectors**.
    A path pasted with quotes is fine. If that Python is reached through a link or
@@ -133,7 +133,9 @@ shows the error; the rest of the GUI remains available.
   stopped. On means requested; the status badges above confirm actual readiness,
   waiting for Outlook, missing permission or errors. With email still on,
   notification Off pauses capture; the companion may remain in the tray.
-- **Sources and connection** contains the optional Outlook preview setting.
+- **Collectors and alerts** (folded away once collectors run; the watcher switches stay
+  visible above it) holds Start/Stop, Listener settings, the optional Outlook preview
+  setting, desktop alerts and connection details.
 - **Listener settings** opens Windows consent and notification-source selection
   even when preview capture is disabled. Enabling Outlook previews alongside
   full emails can show both forms of the same incoming message.
@@ -242,7 +244,7 @@ files and their manifest. `tests/test_inbox_package.py` rejects stale packages.
   available. Hidden previews, app-only banners and notifications cleared between
   polls cannot supply complete messages. This is not a full Teams connector.
 - **Changing accounts/Python:** Stop collectors, wait for shutdown, then use
-  **Sources and connection > Change connection**. The equivalent script is
+  **Collectors and alerts > Change connection**. The equivalent script is
   `Configure-Inbox-Integration.ps1 -MailUser 'DOMAIN\user' -PythonPath 'C:\Python312\python.exe'`
   from the elevated Atlas account and relaunch Atlas. Old queues are retained.
 

@@ -116,17 +116,18 @@ export function LiveInbox() {
       <Button variant="outline" size="sm" onClick={() => setRefresh(value => value + 1)}><RefreshCw data-icon="inline-start" />Refresh now</Button>
     </div>
     {error && <p role="alert" className="inbox-error">{error} Retrying automatically; displayed messages may be out of date.</p>}
+    <InboxControls active={visible} onChange={() => setRefresh(value => value + 1)}>
+      <AppControls />
+      <details className="inbox-connection">
+        <summary>Connection details · Outlook {date(watcher?.last_success_at)} · notifications {date(notifications?.last_success_at)}</summary>
+        <p>{watcher?.detail || "Connect the collectors above, then open classic Outlook in your normal Windows account."}</p>
+        <p>Run the watcher under the same Windows account and elevation level as Outlook. Atlas checks the local feed every 2 seconds; Outlook is checked every {watcher?.interval || 5} seconds. The watcher keeps collecting when you leave this page.</p>
+        <p>{notifications?.detail || "Use Listener settings above to grant Windows notification permission and check the Teams source."}</p>
+        <p>Notifications are checked every 2 seconds. The listener’s source check shows whether Windows exposes Teams alerts. Previews may be incomplete; app-only banners and messages without notifications are not captured. Outlook previews are optional because the mail watcher already reads complete emails.</p>
+        <p>Connection settings are saved on this PC and used by every Atlas launcher. Setup guide: docs/inbox-integration.md in the Atlas folder.</p>
+      </details>
+    </InboxControls>
     <ScreenReader />
-    <InboxControls active={visible} onChange={() => setRefresh(value => value + 1)} />
-    <AppControls />
-    <details className="inbox-connection">
-      <summary>Connection details · Outlook {date(watcher?.last_success_at)} · notifications {date(notifications?.last_success_at)}</summary>
-      <p>{watcher?.detail || "Connect the collectors above, then open classic Outlook in your normal Windows account."}</p>
-      <p>Run the watcher under the same Windows account and elevation level as Outlook. Atlas checks the local feed every 2 seconds; Outlook is checked every {watcher?.interval || 5} seconds. The watcher keeps collecting when you leave this page.</p>
-      <p>{notifications?.detail || "Use Listener settings above to grant Windows notification permission and check the Teams source."}</p>
-      <p>Notifications are checked every 2 seconds. The listener’s source check shows whether Windows exposes Teams alerts. Previews may be incomplete; app-only banners and messages without notifications are not captured. Outlook previews are optional because the mail watcher already reads complete emails.</p>
-      <p>Connection settings are saved on this PC and used by every Atlas launcher. Setup guide: docs/inbox-integration.md in the Atlas folder.</p>
-    </details>
     <div className="inbox-grid">
       <div className="inbox-mail-list">
         <div className="inbox-list-heading"><h2>Incoming messages</h2>{pending > 0 && <Button variant="secondary" size="sm" onClick={() => { choose(items[0].id); setPending(0); }}>Show newest ({pending})</Button>}</div>
@@ -145,13 +146,13 @@ export function LiveInbox() {
             {match.kind === "ambiguous" && <div className="inbox-candidates"><p>More than one person matches this {match.basis}. Choose the correct record to view machines.</p>{match.candidates.map(candidate => <Button key={candidate.id} size="sm" variant={chosen === candidate.id ? "secondary" : "outline"} onClick={() => setChosen(candidate.id)}>{candidate.name} · {candidate.email || candidate.user_name || candidate.id}</Button>)}</div>}
             {user ? <><h3>{user.full_name || user.name}</h3><p>{[user.user_name, user.email].filter(Boolean).join(" · ")}</p><p className="inbox-muted">{[user.department, user.location, user.job_role].filter(Boolean).join(" · ") || "No additional directory details"}</p>{match.basis === "name" && <p className="inbox-match-note">{message.content_kind === "notification" ? "Matched the notification title. It may be a chat or group name; verify the sender in Teams or Outlook before taking action." : "Display names can be shared. Verify this person against the sender address before taking action."}</p>}</> : match.kind === "unmatched" && <p>No exact email or full-name match was found in the Atlas database.</p>}
           </CardContent>{user && <CardFooter><Button variant="outline" size="sm" onClick={() => window.dispatchEvent(new CustomEvent("atlas:inbox-person", { detail: { id: user.id } }))}>Open in Workspace<ArrowUpRight data-icon="inline-end" /></Button></CardFooter>}</Card>
-          <RequestCard detail={detail} user={user} />
-          <SimilarCard messageId={message.id} />
           {(user || mentioned.length > 0) && <Card><CardHeader><CardTitle role="heading" aria-level={2}><Monitor aria-hidden="true" />{user ? "Linked machines" : "Machines named in message"} <Badge variant="secondary">{(user ? detail.machines.length : 0) + mentioned.length}</Badge></CardTitle><CardDescription>Stored inventory relationships and status</CardDescription></CardHeader><CardContent>
-            {mentioned.length > 0 && <ul className="inbox-devices" aria-label="Machines named in the message">{mentioned.map(machine => <li key={"named-" + machine.name} data-mentioned-machine={machine.name}><div><strong>{machine.name}</strong><Badge variant="outline">Named in message</Badge>{machine.written_as && machine.written_as !== machine.name.toUpperCase() && <small className="inbox-read-as" title="Found despite look-alike characters such as 0/O or 1/I">read as {machine.written_as}</small>}</div><p>{machine.model_id || "Model not supplied"}</p><p>Not linked to this sender in inventory · check before acting</p><MachineActions machine={machine} user={user} /></li>)}</ul>}
-            {user && (detail.machines.length ? <ul className="inbox-devices">{detail.machines.map((machine, index) => <li key={index}><div><strong>{machine.name || machine.machine_name}</strong><Badge variant="outline">{machine.device_kind || "Device"}</Badge></div><p>{machine.model_id || machine.model_category || "Model not supplied"}</p><p>{machine.match_type || "Linked in inventory"}</p><small>{[machine.operational_status && "Inventory: " + machine.operational_status, machine.last_discovered && "Discovered: " + machine.last_discovered].filter(Boolean).join(" · ") || "Inventory timestamp not supplied"}</small><MachineActions machine={{ ...machine, name: machine.name || machine.machine_name }} user={user} /></li>)}</ul> : <p>No linked machines in the current Atlas database.</p>)}
+            {mentioned.length > 0 && <ul className="inbox-devices" aria-label="Machines named in the message">{mentioned.map(machine => <li key={"named-" + machine.name} data-mentioned-machine={machine.name}><div><strong>{machine.name}</strong><Badge variant="outline">Named in message</Badge>{machine.written_as && machine.written_as !== machine.name.toUpperCase() && <small className="inbox-read-as" title="Found despite look-alike characters such as 0/O or 1/I">read as {machine.written_as}</small>}</div><p>{machine.model_id || "Model not supplied"} · not linked to this sender in inventory, check before acting</p><MachineActions machine={machine} user={user} /></li>)}</ul>}
+            {user && (detail.machines.length ? <ul className="inbox-devices">{detail.machines.map((machine, index) => <li key={index}><div><strong>{machine.name || machine.machine_name}</strong><Badge variant="outline">{machine.device_kind || "Device"}</Badge></div><p>{machine.model_id || machine.model_category || "Model not supplied"} · {machine.match_type || "Linked in inventory"}</p><small>{[machine.operational_status && "Inventory: " + machine.operational_status, machine.last_discovered && "Discovered: " + machine.last_discovered].filter(Boolean).join(" · ") || "Inventory timestamp not supplied"}</small><MachineActions machine={{ ...machine, name: machine.name || machine.machine_name }} user={user} /></li>)}</ul> : <p>No linked machines in the current Atlas database.</p>)}
           </CardContent></Card>}
+          <RequestCard detail={detail} user={user} />
           <Card className="inbox-message-card"><CardHeader><CardTitle role="heading" aria-level={2}>{message.subject || "(No subject)"}</CardTitle><CardDescription>{sourceLabel(message)} · {message.sender_name}{message.sender_address ? " <" + message.sender_address + ">" : ""} · {date(message.received_at)}</CardDescription></CardHeader><CardContent>{message.content_kind === "notification" && <p className="inbox-match-note">Notification preview from {message.app_name || (message.channel === "teams" ? "Teams" : "Outlook")}. Text may be incomplete or hidden by notification settings. Open the source app for the full conversation.</p>}<pre className="inbox-body">{message.body || (message.content_kind === "notification" ? "No message preview was supplied by Windows." : "No plain-text body was supplied.")}</pre>{!!message.body_truncated && <p className="inbox-muted">Showing the first 100,000 characters. Open Outlook for the full message.</p>}</CardContent></Card>
+          <SimilarCard messageId={message.id} />
         </>}
       </div>
     </div>

@@ -59,7 +59,7 @@ work PC; the package publisher must match its signing certificate.
    task. The source settings and queue location are remembered.
 
 Atlas shows separate Outlook and notification status, including permission denial,
-retrying, stopped and stale heartbeat states. **Connection details** contains setup
+retrying, stopped and stale heartbeat states. **Collectors and alerts > Connection details** contains setup
 reminders and the last successful checks. The browser and Windows listener poll
 every two seconds.
 

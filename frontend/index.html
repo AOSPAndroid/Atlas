@@ -639,7 +639,10 @@
               <small>DEPLOYMENT HISTORY</small>
               <h2>Recent operations</h2>
             </div>
-            <button id="refreshHistory">Refresh</button>
+            <div class="history-tools">
+              <input id="historyFilter" type="search" placeholder="Filter by machine, package or state" aria-label="Filter history" autocomplete="off">
+              <button id="refreshHistory">Refresh</button>
+            </div>
           </div>
           <p id="historyStatus" class="atlas-table-status" role="status" aria-live="polite"></p>
           <div class="tablewrap">

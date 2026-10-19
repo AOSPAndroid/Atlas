@@ -2492,21 +2492,21 @@ body.atlas-console .inbox-muted { color:var(--atlas-muted); }
 body.atlas-console .inbox-connection { margin-bottom:8px; padding:6px 8px; border:1px solid var(--atlas-line); border-radius:var(--atlas-control-radius); background:var(--atlas-surface-subtle); }
 body.atlas-console .inbox-connection summary { cursor:pointer; }
 body.atlas-console .inbox-connection p { margin:6px 0 0; }
-body.atlas-console .inbox-grid { display:grid; grid-template-columns:minmax(270px,.9fr) minmax(340px,1.25fr); align-items:start; gap:8px; }
+body.atlas-console .inbox-grid { display:grid; grid-template-columns:minmax(270px,.8fr) minmax(340px,1.3fr); align-items:start; gap:8px; }
 body.atlas-console .inbox-mail-list { min-width:0; border:1px solid var(--atlas-line); border-radius:var(--atlas-panel-radius); background:var(--atlas-surface); padding:6px; }
 body.atlas-console .inbox-list-heading { padding:2px 2px 6px; }
 body.atlas-console .inbox-list-heading h2 { font-size:13px; margin:0; }
 body.atlas-console .inbox-mail-list > ul { list-style:none; margin:0 0 6px; padding:0; max-height:calc(100vh - 250px); min-height:160px; overflow:auto; scrollbar-gutter:stable; }
 body.atlas-console .inbox-mail-list li + li { border-top:1px solid var(--atlas-line); }
-body.atlas-console #liveInbox .inbox-mail-row { display:flex; flex-direction:column; align-items:stretch; gap:4px; width:100%; height:auto; min-height:82px; padding:8px 6px; text-align:left; white-space:normal; border-radius:var(--atlas-control-radius); }
+body.atlas-console #liveInbox .inbox-mail-row { display:flex; flex-direction:column; align-items:stretch; gap:4px; width:100%; height:auto; min-height:66px; padding:6px; text-align:left; white-space:normal; border-radius:var(--atlas-control-radius); }
 body.atlas-console #liveInbox .inbox-mail-row[aria-current="true"] { background:var(--atlas-selected); box-shadow:inset 2px 0 var(--atlas-accent); }
 body.atlas-console .inbox-mail-top,
 body.atlas-console .inbox-mail-bottom { display:flex; justify-content:space-between; align-items:center; gap:6px; }
 body.atlas-console .inbox-mail-top strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 body.atlas-console .inbox-mail-top time { flex-shrink:0; color:var(--atlas-muted); font-size:11px; }
 body.atlas-console .inbox-subject { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-body.atlas-console .inbox-address { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:11px; color:var(--atlas-muted); }
-body.atlas-console .inbox-context { display:grid; gap:8px; min-width:0; }
+body.atlas-console .inbox-address { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:11px; color:var(--atlas-muted); }
+body.atlas-console .inbox-context { display:grid; gap:8px; min-width:0; position:sticky; top:8px; max-height:calc(100vh - 16px); overflow:auto; overscroll-behavior:contain; scrollbar-gutter:stable; }
 body.atlas-console #liveInbox [data-slot="card"] { gap:6px; padding:8px 0; box-shadow:none; border-color:var(--atlas-line); border-radius:var(--atlas-panel-radius); }
 body.atlas-console #liveInbox :is([data-slot="card-header"],[data-slot="card-content"],[data-slot="card-footer"]) { padding:0 8px; }
 body.atlas-console #liveInbox [data-slot="card-header"] { gap:4px; }
@@ -2529,7 +2529,14 @@ body.atlas-console #liveInbox [data-slot="empty-title"] { font-size:14px; }
 body.atlas-console #liveInbox [data-slot="empty-description"] { font-size:12px; }
 body.atlas-console .inbox-loading { min-height:180px; width:100%; }
 body.atlas-console .inbox-error { color:var(--atlas-danger); margin:6px 0; overflow-wrap:anywhere; }
-body.atlas-console .inbox-controls { margin-bottom:6px; }
+body.atlas-console .inbox-controls { display:flex; flex-wrap:wrap; align-items:flex-start; gap:6px; margin-bottom:6px; }
+body.atlas-console .inbox-controls > :not(.inbox-watcher-switches,.inbox-setup:not([open])) { flex-basis:100%; }
+body.atlas-console .inbox-setup { flex:1 1 260px; min-width:0; border:1px solid var(--atlas-line); border-radius:var(--atlas-control-radius); background:var(--atlas-surface); }
+body.atlas-console .inbox-setup > summary { display:flex; align-items:center; flex-wrap:wrap; gap:6px; min-height:30px; padding:4px 8px; cursor:pointer; font-weight:600; }
+body.atlas-console .inbox-setup > summary .inbox-muted { font-weight:400; }
+body.atlas-console .inbox-setup[open] > summary { border-bottom:1px solid var(--atlas-line); }
+body.atlas-console .inbox-setup > :not(summary) { margin:8px; }
+body.atlas-console .inbox-setup .inbox-connection { margin:8px; }
 body.atlas-console .inbox-controls-bar, body.atlas-console .inbox-control-actions { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:6px; margin-bottom:6px; }
 body.atlas-console .inbox-control-actions { justify-content:flex-start; margin:0; }
 body.atlas-console .inbox-controls [data-slot="alert"] { margin:6px 0; padding:6px 8px; overflow-wrap:anywhere; }
@@ -2548,13 +2555,15 @@ body.atlas-console #liveInbox [data-slot="switch-thumb"] { display:block; width:
 body.atlas-console #liveInbox [data-slot="switch-thumb"][data-state="checked"] { transform:translateX(14px); }
 body.atlas-console .inbox-controls form > button { margin-top:8px; }
 body.atlas-console .inbox-controls p { overflow-wrap:anywhere; }
-body.atlas-console .inbox-controls .inbox-watcher-switches { padding:6px 8px; border:1px solid var(--atlas-line); border-radius:var(--atlas-control-radius); background:var(--atlas-surface); }
-body.atlas-console .inbox-controls .inbox-watcher-switches [data-slot="field-legend"] { margin:0; padding:0 4px; }
+body.atlas-console .inbox-controls .inbox-watcher-switches { display:flex; flex-direction:row; align-items:center; flex-wrap:wrap; flex:0 1 auto; max-width:100%; gap:6px 12px; margin:0; min-height:30px; padding:4px 8px; border:1px solid var(--atlas-line); border-radius:var(--atlas-control-radius); background:var(--atlas-surface); }
+body.atlas-console .inbox-controls .inbox-watcher-switches [data-slot="field-legend"] { float:left; margin:0; padding:0; font-weight:600; }
+body.atlas-console .inbox-controls .inbox-watcher-switches .inbox-source-fields { width:auto; flex-wrap:wrap; container-type:normal; }
+body.atlas-console .inbox-controls .inbox-watcher-switches [data-slot="field-label"] { white-space:nowrap; }
 body.atlas-console .inbox-controls > p, body.atlas-console .inbox-app-controls > p { margin:4px 0 6px; font-size:11px; }
 body.atlas-console .inbox-app-controls [data-slot="field"] { width:auto; gap:6px; }
 body.atlas-console .inbox-app-controls [data-slot="field-label"] { font-size:12px; }
 @media(max-width:650px) { body.atlas-console .inbox-controls .inbox-setup-fields { grid-template-columns:minmax(0,1fr); } }
-@media(max-width:950px) { body.atlas-console .inbox-grid { grid-template-columns:minmax(0,1fr); } body.atlas-console .inbox-mail-list > ul { max-height:300px; } }
+@media(max-width:950px) { body.atlas-console .inbox-grid { grid-template-columns:minmax(0,1fr); } body.atlas-console .inbox-context { position:static; max-height:none; overflow:visible; } body.atlas-console .inbox-mail-list > ul { max-height:300px; } }
 @media(max-width:460px) { body.atlas-console .inbox-mail-top { align-items:flex-start; flex-direction:column; gap:2px; } body.atlas-console .inbox-mail-bottom { flex-wrap:wrap; } }
 
 /* Live Inbox request suggestions and machine actions. */
@@ -2698,3 +2707,27 @@ body.atlas-console .inbox-similar-list button { display:flex; justify-content:fl
 body.atlas-console .inbox-similar-list small { margin-left:auto; color:var(--atlas-muted); font-size:10px; white-space:nowrap; }
 body.atlas-console .inbox-similar-list p { margin:0 0 4px 8px; font-size:11px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
 body.atlas-console .inbox-similar-list mark { background:#fff2a8; color:inherit; padding:0 1px; }
+
+/* Deployment history: state badges, filter and machine links. */
+body.atlas-console #history .head { flex-wrap:wrap; gap:6px; }
+body.atlas-console .history-tools { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+body.atlas-console #historyFilter { width:240px; max-width:100%; height:28px; font-size:12px; }
+body.atlas-console #historyBody .history-target { display:inline; min-height:0; height:auto; padding:0; border:0; border-radius:0; box-shadow:none; background:none; line-height:inherit; color:var(--atlas-accent); font:inherit; text-align:left; cursor:pointer; }
+body.atlas-console .history-target:hover { text-decoration:underline; }
+body.atlas-console .history-state { display:inline-block; line-height:16px; border-radius:999px; padding:1px 8px; font-size:11px; font-weight:600; background:var(--atlas-surface-subtle); color:var(--atlas-muted); }
+body.atlas-console .history-state:is([data-state="complete"],[data-state="completed"],[data-state="launched"]) { background:#e7f5ee; color:var(--atlas-success, #18724a); }
+body.atlas-console .history-state[data-state="failed"] { background:#fbeaec; color:var(--atlas-danger, #a32332); }
+body.atlas-console .history-state:is([data-state="queued"],[data-state="running"]) { background:#e8f2fa; color:var(--atlas-accent); }
+body.atlas-console #historyBody tr[data-state="failed"] td { background:#fdf5f6; }
+
+/* Nothing selected: the panel's own hint is enough; buttons wait for a selection. */
+body.atlas-console #selectionContext:has(.selection-empty:not([hidden])) [data-diagnostics-status] { display:none; }
+
+/* Workspace uses the full width until the deployment panel opens beside it. */
+body.atlas-console #workspace.active:not(:has(> .deployment-panel:not([hidden]))) { grid-template-columns:minmax(0,1fr); }
+body.atlas-console #workspace .machinegrid { grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr)); }
+body.atlas-console .workspace-launchers { grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr)); }
+body.atlas-console .inbox-setup > :is(form,div).inbox-connection { padding:0; border:0; background:none; }
+body.atlas-console .inbox-setup .inbox-setup-fields [data-slot="field"] { align-items:stretch; text-align:left; }
+body.atlas-console .inbox-setup .inbox-setup-fields [data-slot="field-label"] { justify-content:flex-start; align-items:flex-start; }
+body.atlas-console .inbox-setup .inbox-app-controls { margin:8px; }
