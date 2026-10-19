@@ -108,7 +108,11 @@
       const detail = document.createElement("small");
       detail.textContent = item.name;
       name.append(detail);
-      for (const value of [item.state, item.start_mode, item.pid ?? "—"])
+      const state = document.createElement("span");
+      state.textContent = item.state;
+      state.className = item.state === "Running" ? "status-ok" : item.state === "Stopped" ? "status-bad" : item.state ? "status-warn" : "";
+      row.insertCell().append(state);
+      for (const value of [item.start_mode, item.pid ?? "—"])
         row.insertCell().textContent = value;
       const buttons = document.createElement("div");
       buttons.className = "services-row-actions";

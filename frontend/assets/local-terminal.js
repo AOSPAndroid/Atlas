@@ -1,5 +1,6 @@
 (() => {
   const get = name => document.getElementById('term' + name);
+  const runTone = ({state, exit_code}) => exit_code != null ? (Number(exit_code) === 0 ? 'good' : 'bad') : /fail|error|timed out|timeout/i.test(state || '') ? 'bad' : '';
   let active = false, runId = null, timer;
   const done = new Set(['complete', 'failed', 'stopped', 'timed_out']);
   const post = (url, body) => AtlasClient.request(url, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
@@ -17,6 +18,7 @@
       output.textContent = (result.truncated ? '[Earlier output trimmed]\n' : '') + result.output;
       if (atBottom) output.scrollTop = output.scrollHeight;
       get('Status').textContent = `${result.target} · ${result.account} · ${result.state}${result.exit_code == null ? '' : ' · exit ' + result.exit_code}`;
+      get('Status').dataset.tone = runTone(result);
       active = !done.has(result.state); controls();
       if (active) timer = setTimeout(poll, 1000);
     } catch(error) {
@@ -30,7 +32,7 @@
     const code = selection ? editor.value.slice(editor.selectionStart, editor.selectionEnd) : editor.value;
     if (!code.trim()) { get('Message').textContent = selection ? 'Select some script text first.' : 'Enter a command first.'; return; }
     active = true; runId = null; controls(); get('Message').textContent = '';
-    get('Status').textContent = 'Starting…';
+    get('Status').textContent = 'Starting…'; get('Status').dataset.tone = '';
     const id = crypto.randomUUID();
     try {
       await post('/api/terminal/run', {id, shell:get('Mode').value === 'script' ? 'powershell' : get('Shell').value, code});

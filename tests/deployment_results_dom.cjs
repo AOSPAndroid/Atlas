@@ -28,6 +28,8 @@ const deferred = () => {let resolve;const promise = new Promise(done=>{resolve=d
   assert(d.querySelector('#bulkSummary').textContent.includes('Launched / complete'));
   assert.equal(d.querySelector('#bulkBody script'),null);assert(d.querySelector('#bulkBody').textContent.includes('<script>literal</script>'));
   run("S.rows[0].completion='Failed';renderBulk({state:'failed'})");assert(!d.querySelector('#copyFailed').disabled);
+  assert.equal(d.querySelector('#bulkBody tr[data-state=failed] .status-bad').textContent,'Failed','Failures are red');assert(d.querySelector('#bulkSummary .status-bad'),'The failed count is red');
+  assert.deepEqual(['0','1603',''].map(c=>run(`exitTone(${JSON.stringify(c)})`)),['status-ok','status-bad','status-neutral']);
   run("S.rows=[];renderBulk({state:'complete'})");assert(d.querySelector('#copyFailed').disabled);assert(d.querySelector('#exportCsv').disabled);
 
   const first=run('loadDeploymentHistory()');await settle();
@@ -70,5 +72,5 @@ const deferred = () => {let resolve;const promise = new Promise(done=>{resolve=d
   assert(body.textContent.includes('not included in this read-only view'));assert(status.textContent.includes('Atlas Admin'));assert(refresh.disabled);assert.equal(body.getAttribute('aria-busy'),'false');
   lateReply.resolve(reply([row]));await late;assert(body.textContent.includes('not included'));assert(refresh.disabled);
   assert.equal(f.errors.length,0,f.errors.join('\n'));w.dispatchEvent(new w.Event('pagehide'));w.close();
-  console.log('PASS: truthful empty/progress bulk rows and result actions, history loading/empty/error/retry, escaped recorded rows, state badges, failure count, filter and machine links, stale refresh isolation and no read-only history requests or background retries');
+  console.log('PASS: truthful empty/progress bulk rows and result actions, history loading/empty/error/retry, escaped recorded rows, state badges, green/red results and exit codes, failure count, filter and machine links, stale refresh isolation and no read-only history requests or background retries');
 })().catch(error=>{console.error(error);process.exitCode=1});

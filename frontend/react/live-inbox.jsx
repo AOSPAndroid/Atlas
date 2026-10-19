@@ -10,6 +10,7 @@ import { AppControls } from "./app-controls";
 import { RequestCard, MachineActions, SimilarCard } from "./inbox-request";
 import { ScreenReader } from "./screen-reader";
 
+const matchTones = { email: "good", name: "warn", ambiguous: "warn", unmatched: "bad" };
 const matchLabels = { email: "Email match", name: "Name match · verify", ambiguous: "Choose a person", unmatched: "No Atlas match" };
 const states = { watching: "Watching Outlook", scanning: "Checking Outlook", starting: "Starting watcher", stopped: "Watcher stopped", waiting_for_outlook: "Waiting for Outlook", retrying: "Retrying Outlook", error: "Watcher needs attention" };
 const notificationStates = { watching: "Listening for notifications", starting: "Waiting for Windows permission", stopped: "Notifications paused", not_started: "Notifications not connected", permission_required: "Notification permission needed", retrying: "Retrying notifications", error: "Notification listener needs attention" };
@@ -112,7 +113,7 @@ export function LiveInbox() {
   const mentioned = (detail?.analysis?.machines || []).filter(machine => !machine.linked);
   return <div className="live-inbox">
     <div className="inbox-toolbar">
-      <div role="status" aria-live="polite"><Badge variant={live ? "default" : "secondary"} data-inbox-status>{stateLabel}</Badge><Badge variant={notificationsLive ? "default" : "secondary"} data-notification-status>{notificationLabel}</Badge><span className="inbox-muted">{total.toLocaleString()} collected · {watcher?.config?.mailbox || "Default Inbox"}{watcher?.config?.subfolder ? " / " + watcher.config.subfolder : ""}</span></div>
+      <div role="status" aria-live="polite"><Badge variant={live ? "default" : "secondary"} data-tone={live ? "good" : error || watcher?.stale || watcher?.state === "error" ? "bad" : undefined} data-inbox-status>{stateLabel}</Badge><Badge variant={notificationsLive ? "default" : "secondary"} data-tone={notificationsLive ? "good" : error || notifications?.stale || ["error", "permission_required"].includes(notifications?.state) ? "bad" : undefined} data-notification-status>{notificationLabel}</Badge><span className="inbox-muted">{total.toLocaleString()} collected · {watcher?.config?.mailbox || "Default Inbox"}{watcher?.config?.subfolder ? " / " + watcher.config.subfolder : ""}</span></div>
       <Button variant="outline" size="sm" onClick={() => setRefresh(value => value + 1)}><RefreshCw data-icon="inline-start" />Refresh now</Button>
     </div>
     {error && <p role="alert" className="inbox-error">{error} Retrying automatically; displayed messages may be out of date.</p>}
@@ -135,7 +136,7 @@ export function LiveInbox() {
           <Button variant="ghost" className="inbox-mail-row" aria-current={selected === item.id ? "true" : undefined} onClick={() => choose(item.id)} data-mail-id={item.id}>
             <span className="inbox-mail-top"><strong>{item.sender_name || item.sender_address || "Sender not supplied"}</strong><time dateTime={item.received_at}>{date(item.received_at)}</time></span>
             <span className="inbox-subject">{item.content_kind === "notification" ? item.preview || "(No message preview)" : item.subject || "(No subject)"}</span>
-            <span className="inbox-mail-bottom"><Badge variant="secondary">{sourceLabel(item)}</Badge><span className="inbox-address">{item.sender_address}</span><Badge variant="outline">{matchLabels[item.match.kind]}</Badge></span>
+            <span className="inbox-mail-bottom"><Badge variant="secondary">{sourceLabel(item)}</Badge><span className="inbox-address">{item.sender_address}</span><Badge variant="outline" data-tone={matchTones[item.match.kind]}>{matchLabels[item.match.kind]}</Badge></span>
           </Button>
         </li>)}</ul>}
         {items.length > 0 && items.length < total && <Button variant="outline" size="sm" disabled={older} onClick={loadOlder}>Load older messages ({items.length} of {total})</Button>}
