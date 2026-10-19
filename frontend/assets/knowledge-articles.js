@@ -36,10 +36,12 @@
     : Promise.all([load(asset("marked")), load(asset("dompurify"))]);
   async function mermaidReady() {
     if (!window.mermaid) await load(asset("mermaid"));
-    if (!mermaidReady.done) {
+    // Re-initialised when the theme changes so diagrams match light or dark mode.
+    const theme = window.AtlasUI?.theme?.() === "dark" ? "dark" : "neutral";
+    if (mermaidReady.done !== theme) {
       // Plain SVG text labels (no embedded HTML), so the sanitiser keeps them.
-      window.mermaid.initialize({ startOnLoad: false, securityLevel: "strict", theme: "neutral", htmlLabels: false, flowchart: { htmlLabels: false } });
-      mermaidReady.done = true;
+      window.mermaid.initialize({ startOnLoad: false, securityLevel: "strict", theme, htmlLabels: false, flowchart: { htmlLabels: false } });
+      mermaidReady.done = theme;
     }
   }
 

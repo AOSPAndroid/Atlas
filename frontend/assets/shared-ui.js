@@ -27,6 +27,41 @@
     applyDisplay();
   }
   document.documentElement.dataset.atlasDisplay = displayChoice;
+  // Light or dark theme: follows Windows until the header button picks one.
+  // Applied here, before the page draws, so dark mode never flashes white.
+  const themeKey = "atlas-theme";
+  const themeMedia = window.matchMedia("(prefers-color-scheme: dark)");
+  let themeChoice = null;
+  const readTheme = () => {
+    try {
+      const saved = localStorage.getItem(themeKey);
+      themeChoice = saved === "dark" || saved === "light" ? saved : null;
+    } catch {}
+  };
+  const currentTheme = () => themeChoice || (themeMedia.matches ? "dark" : "light");
+  function applyTheme() {
+    const theme = currentTheme();
+    document.documentElement.dataset.theme = theme;
+    document.documentElement.style.colorScheme = theme;
+    document.querySelectorAll(".atlas-theme-toggle").forEach((button) => {
+      const next = theme === "dark" ? "light" : "dark";
+      button.setAttribute("aria-pressed", String(theme === "dark"));
+      button.setAttribute("aria-label", `Switch to ${next} mode`);
+      button.title = `Switch to ${next} mode`;
+    });
+    window.dispatchEvent(new Event("atlas-theme-change"));
+  }
+  function setTheme(value) {
+    themeChoice = value === "dark" ? "dark" : "light";
+    try { localStorage.setItem(themeKey, themeChoice); } catch {}
+    applyTheme();
+  }
+  readTheme();
+  applyTheme();
+  themeMedia.addEventListener?.("change", applyTheme);
+  window.addEventListener("storage", (event) => {
+    if (event.key === themeKey || event.key === null) { readTheme(); applyTheme(); }
+  });
   let motionChoice = "system";
   try {
     motionChoice = localStorage.getItem(motionKey) || "system";
@@ -274,7 +309,7 @@
       const menu = more.querySelector('.atlas-header-menu');
       const organize = () => {
         for (const item of [...actions.children]) {
-          if (item === more || item.matches('.atlas-palette-mount,#openCommands')) continue;
+          if (item === more || item.matches('.atlas-palette-mount,#openCommands,.atlas-theme-toggle')) continue;
           menu.append(item);
         }
       };
@@ -282,6 +317,15 @@
       new MutationObserver(organize).observe(actions, {childList:true});
     }
 
+    if (actions && !actions.querySelector(".atlas-theme-toggle")) {
+      const toggle = document.createElement("button");
+      toggle.type = "button";
+      toggle.className = "atlas-theme-toggle";
+      toggle.innerHTML = '<svg class="atlas-icon atlas-theme-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg><svg class="atlas-icon atlas-theme-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M2 12h2m16 0h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
+      toggle.onclick = () => setTheme(currentTheme() === "dark" ? "light" : "dark");
+      actions.insertBefore(toggle, actions.querySelector(".atlas-header-more"));
+      applyTheme();
+    }
     if (actions && !actions.querySelector(".atlas-display-mode")) {
       const label = document.createElement("label");
       label.className = "atlas-display-mode";
@@ -931,6 +975,8 @@
     update();
   }
   window.AtlasUI = {
+    setTheme,
+    theme: currentTheme,
     icon,
     installIcons,
     machineKind,
