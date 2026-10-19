@@ -89,8 +89,7 @@ share a name, choose the right one.
 2. In the normal Outlook/Teams account (`x01426046`), run
    `Install-Inbox-Collectors.bat "C:\Approved\Atlas.NotificationListener.msix"`
    with your approved, signed package. This installs pywin32 for classic Outlook
-   and registers the notification package for that Windows account. To install
-   only the email dependency, use `Install-Outlook-Watcher.bat`. Run without a package,
+   and registers the notification package for that Windows account. Run without a package,
    `Install-Inbox-Collectors.bat` sets up email and reports Teams notifications as
    skipped; add the package later to enable them.
    `WMI_PYTHON` can select the Python used by these BAT files.
@@ -118,9 +117,7 @@ shows the error; the rest of the GUI remains available.
 
 ## Normal use
 
-- `Start-Office-Atlas.bat`, `Start-Classic-Atlas.bat`, `Start-All-Atlas.bat`
-  and the Classic-Atlas Admin/Demo launchers all
-  use the same startup hook. After setup, they request collector startup once;
+- `Start-Office-Atlas.bat` and `Start-All-Atlas.bat` use the same startup hook. After setup, they request collector startup once;
   repeated launches reuse the task and collector locks. Preview-only launchers
   do not start any local process.
 - **Email watcher** and **Notification watcher** are always visible above the

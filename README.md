@@ -14,9 +14,9 @@ Double-click **[Start-All-Atlas.bat](Start-All-Atlas.bat)** to start the local s
 
 | Start Admin + Demo | Stop local services |
 | --- | --- |
-| [Start-Classic-Atlas.bat](Start-Classic-Atlas.bat) | [Stop-Classic-Atlas.bat](Stop-Classic-Atlas.bat) |
+| [Start-Office-Atlas.bat](Start-Office-Atlas.bat) | [Stop-All-Atlas.bat](Stop-All-Atlas.bat) |
 
-Start opens Admin and Demo. Stop stops both; finish queue jobs first. Hosted Preview stays online. To open only one mode, use the launchers in [Classic-Atlas](Classic-Atlas/README.md). (The optional Desktop layout with a dock and draggable windows was removed; old Desktop shortcuts open normal Atlas.)
+Start runs Admin and Demo. Stop stops both; finish queue jobs first. Hosted Preview stays online. (The optional Desktop layout with a dock and draggable windows was removed; old Desktop shortcuts open normal Atlas.)
 
 **[Database update guide](docs/database-update-guide.md)** covers imports, backups, recovery, seating and hosted Preview updates.
 
@@ -98,7 +98,7 @@ After updating and restarting Atlas, refresh any open browser tabs. Console scri
 
 Use the host computer's Wi-Fi/Ethernet IPv4 address in place of `YOUR-IP`. The launcher prints candidate addresses and saves them in `data/share-addresses.txt`. Share the address belonging to the network your colleagues use. The viewer requires only a browser, not Python or Windows elevation on their computers.
 
-**`Stop-Office-Atlas.bat` stops both servers.** Finish active deployments before stopping. Starting again reuses this folder's running servers. Occupied ports fail with an error rather than attaching to another installation. Closing a browser tab does not stop hosting.
+**`Stop-All-Atlas.bat` stops both servers.** Finish active deployments before stopping. Starting again reuses this folder's running servers. Occupied ports fail with an error rather than attaching to another installation. Closing a browser tab does not stop hosting.
 
 To change ports, set `ATLAS_ADMIN_PORT` and `ATLAS_VIEWER_PORT` before launching; they must be different. Logs are in `logs/admin-startup.log` and `logs/viewer-startup.log`.
 
@@ -106,7 +106,7 @@ To change ports, set `ATLAS_ADMIN_PORT` and `ATLAS_VIEWER_PORT` before launching
 
 - **Python 3.12 not found:** install Python 3.12 with the launcher, or configure `WMI_PYTHON` as described above.
 - **Dependency installation failed / Dependencies missing:** rerun `Install_Dependencies.bat` and check its error message; dependencies must be installed for the same Python that starts Atlas.
-- **Startup failed / port occupied:** check the startup log named in the error. If this folder has an unresponsive Atlas server, run `Stop-Office-Atlas.bat` before starting again. If another application uses the port, choose different Atlas ports.
+- **Startup failed / port occupied:** check the startup log named in the error. If this folder has an unresponsive Atlas server, run `Stop-All-Atlas.bat` before starting again. If another application uses the port, choose different Atlas ports.
 - **Browser tabs did not open:** try `http://127.0.0.1:8770` for admin or `http://127.0.0.1:8771` for the viewer after a successful startup.
 
 ## One command palette across Atlas, the IT console and the shared viewer
