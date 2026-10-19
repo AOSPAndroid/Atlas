@@ -309,11 +309,11 @@ function installSelectionSidebar() {
   context.open = window.innerWidth > 760;
   summary.innerHTML = `<p class="selection-empty">Select a user or device in Workspace to keep their details here.</p>
     <section class="selection-card selection-user" aria-label="Selected user" hidden>
-      <small class="selection-label">USER</small><button type="button" class="selection-name" data-selection-user><span class="selection-avatar" aria-hidden="true"></span><span class="selection-title"></span></button>
+      <small class="selection-label">User</small><button type="button" class="selection-name" data-selection-user><span class="selection-avatar" aria-hidden="true"></span><span class="selection-title"></span></button>
       <div class="selection-user-facts"></div>
     </section>
     <section class="selection-card selection-machine" aria-label="Selected device" hidden>
-      <small class="selection-label">DEVICE</small><button type="button" class="selection-name" data-selection-machine><span class="selection-device-icon" aria-hidden="true">${AtlasUI.icon("admin")}</span><span class="selection-title"></span></button>
+      <small class="selection-label">Device</small><button type="button" class="selection-name" data-selection-machine><span class="selection-device-icon" aria-hidden="true">${AtlasUI.icon("admin")}</span><span class="selection-title"></span></button>
       <div class="selection-device-facts"></div><div class="selection-readings"></div>
       <p class="selection-checked"></p><button type="button" class="selection-scan">Scan health</button>
     </section>`;
@@ -404,7 +404,7 @@ function renderRecentTargets() {
   if (!host) return;
   const values = targetPrefs().recent;
   host.innerHTML = values.length
-    ? `<small>RECENT TARGETS</small><div class="recent-target-list">${values.map((x) => `<button data-recent-target="${esc(x)}">${esc(x)}</button>`).join("")}</div>`
+    ? `<small>Recent targets</small><div class="recent-target-list">${values.map((x) => `<button data-recent-target="${esc(x)}">${esc(x)}</button>`).join("")}</div>`
     : "";
   document.querySelectorAll("[data-recent-target]").forEach(
     (b) =>

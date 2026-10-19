@@ -59,7 +59,7 @@ export function InboxControls({ active, onChange, children }) {
     {Object.entries(control?.errors || {}).map(([source, message]) => <Alert key={source}><AlertDescription><strong>{source === "outlook" ? "Outlook emails" : "Notification listener"}</strong>{message}</AlertDescription></Alert>)}
     {configured && control.pending && desired.running && <p role="status" className="inbox-muted">Start requested. Waiting for the collector task in your signed-in mail account.</p>}
     <details className="inbox-setup" open={setupOpen ?? attention} onToggle={event => setSetupOpen(event.currentTarget.open)}>
-      <summary><span role="status"><Badge variant="outline">{control ? labels[control.state] || "Connecting collectors" : "Checking collector setup…"}</Badge></span><span>Collectors and alerts</span>{configured && <span className="inbox-muted">{control.mail_user}</span>}</summary>
+      <summary><span role="status"><Badge variant="outline" data-tone={control?.state === "running" ? "good" : ["error", "unresponsive", "attention"].includes(control?.state) ? "bad" : undefined}>{control ? labels[control.state] || "Connecting collectors" : "Checking collector setup…"}</Badge></span><span>Collectors and alerts</span>{configured && <span className="inbox-muted">{control.mail_user}</span>}</summary>
       {configured && <div className="inbox-control-actions">
         <Button size="sm" variant="outline" disabled={busy} onClick={() => send({ action: "start" })}>Start collectors</Button>
         <Button size="sm" variant="outline" disabled={busy} onClick={() => send({ action: "stop" })}>Stop collectors</Button>

@@ -457,7 +457,7 @@ Output streams into the embedded terminal with an exit code, Copy output and Sto
 
 
 ### Atlas visual system
-The shared UI uses a blue/slate palette, layered white surfaces, restrained borders/shadows, a strong navigation selection and consistent table, form, dialog and terminal styling. The final rules live in frontend/assets/design-system.css; the command palette mirrors them inside its shadow root. Map, Workspace, AD, Packages, Remote Admin, Bulk Deploy, History, Terminal, PsTools, Knowledge Base and database management share these rules. Dense row/control geometry, semantic warning colours, map labels and the Draw.io canvas remain intact. The refresh adds no animation loops, remote fonts, image dependencies or JavaScript runtime work.
+The shared UI uses a blue/slate palette, Windows 11 Segoe UI Variable type, a light sidebar with a raised pill for the current page, white cards with hairline borders and soft shadows, sentence-case labels and table headers, soft focus rings and consistent table, form, dialog and terminal styling. The final rules live in frontend/assets/design-system.css; the command palette mirrors them inside its shadow root. Map, Workspace, AD, Packages, Remote Admin, Bulk Deploy, History, Terminal, PsTools, Knowledge Base and database management share these rules. Dense row/control geometry, semantic warning colours, map labels and the Draw.io canvas remain intact. The refresh adds no animation loops, remote fonts, image dependencies or JavaScript runtime work.
 
 ### shadcn UI components
 

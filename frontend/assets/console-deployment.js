@@ -475,18 +475,24 @@ function renderBulk(j) {
     failed = r.filter((x) => x.copy === "Failed" || x.completion === "Failed").length;
   $("#copyFailed").disabled = !failed;
   $("#exportCsv").disabled = !r.length;
+  const done = r.filter((x) => ["Complete", "Launched"].includes(x.completion)).length;
   $("#bulkSummary").innerHTML =
-    `<div class=summary><div>Phase<b>${esc(j.phase || j.state || "Waiting")}</b></div><div>Total<b>${r.length}</b></div><div>Failed<b>${failed}</b></div><div>Launched / complete<b>${r.filter((x) => ["Complete", "Launched"].includes(x.completion)).length}</b></div></div>`;
+    `<div class=summary><div>Phase<b>${esc(j.phase || j.state || "Waiting")}</b></div><div>Total<b>${r.length}</b></div><div${failed ? ' class="status-bad"' : ""}>Failed<b>${failed}</b></div><div${done ? ' class="status-ok"' : ""}>Launched / complete<b>${done}</b></div></div>`;
   $("#bulkBody").innerHTML = r.length ? r
     .map(
       (x) =>
-        `<tr><td><b>${esc(x.machine)}</b></td><td class="${x.copy === "Failed" ? "bad" : "good"}">${esc(x.copy)}</td><td>${esc(x.launch)}</td><td>${esc(x.pid)}</td><td>${esc(x.completion)}</td><td>${esc(x.exit_code)}</td><td>${esc(
+        `<tr${x.completion === "Failed" || x.copy === "Failed" ? ' data-state="failed"' : ""}><td><b>${esc(x.machine)}</b></td><td><span class="${statusAccent(x.copy)}">${esc(x.copy)}</span></td><td><span class="${statusAccent(x.launch)}">${esc(x.launch)}</span></td><td>${esc(x.pid)}</td><td><span class="${statusAccent(x.completion)}">${esc(x.completion)}</span></td><td><span class="${exitTone(x.exit_code)}">${esc(x.exit_code)}</span></td><td>${esc(
           String(x.details || "")
             .split("\n")
             .slice(-1)[0],
         )}</td></tr>`,
     )
     .join("") : `<tr class="atlas-table-empty"><td colspan="7"><b>${AtlasClient.terminal.has(j.state) ? "No per-device results returned" : "Waiting for device results…"}</b><span>${AtlasClient.terminal.has(j.state) ? "This run has no rows to copy or export." : "Results appear here as this run reports progress."}</span></td></tr>`;
+}
+// Exit code 0 is good news, any other number bad; blank stays neutral.
+function exitTone(code) {
+  const text = String(code ?? "").trim();
+  return !text || !/^-?\d+$/.test(text) ? "status-neutral" : Number(text) === 0 ? "status-ok" : "status-bad";
 }
 let deploymentHistorySequence = 0;
 async function loadDeploymentHistory() {
@@ -513,7 +519,7 @@ async function loadDeploymentHistory() {
     if (!Array.isArray(records)) throw Error("Invalid history response");
     // State badges and a machine link: open the target in Workspace from its history row.
     body.innerHTML = records.length ? records.map((x) =>
-      `<tr data-state="${esc(x.state)}"><td>${esc(x.started)}</td><td><button type="button" class="history-target" data-history-target="${esc(x.target)}" title="Select in Workspace">${esc(x.target)}</button></td><td>${esc(x.package)}</td><td>${esc(x.action)}</td><td>${esc(x.mode)}</td><td><span class="history-state" data-state="${esc(x.state)}">${esc(x.state)}</span></td><td>${esc(x.exit_code)}</td></tr>`
+      `<tr data-state="${esc(x.state)}"><td>${esc(x.started)}</td><td><button type="button" class="history-target" data-history-target="${esc(x.target)}" title="Select in Workspace">${esc(x.target)}</button></td><td>${esc(x.package)}</td><td>${esc(x.action)}</td><td>${esc(x.mode)}</td><td><span class="history-state" data-state="${esc(x.state)}">${esc(x.state)}</span></td><td><span class="${exitTone(x.exit_code)}">${esc(x.exit_code)}</span></td></tr>`
     ).join("") : empty("No recent operations", "Deployment operations will appear here when they are recorded. Use Refresh to check again.");
     const failures = records.filter((x) => x.state === "failed").length;
     status.textContent = records.length ? `${records.length} recorded operation${records.length === 1 ? "" : "s"}${failures ? ` · ${failures} failed` : ""}` : "No recorded deployment operations returned.";

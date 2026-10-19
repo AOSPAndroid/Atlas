@@ -44,6 +44,8 @@
     current = data;
     get("RunStatus").textContent =
       `${data.target} · ${data.title} · ${data.state}${data.exit_code == null ? "" : ` · exit ${data.exit_code}`}`;
+    get("RunStatus").dataset.tone = data.exit_code != null ? (Number(data.exit_code) === 0 ? "good" : "bad")
+      : /fail|error|timed out|timeout/i.test(data.state || "") ? "bad" : "";
     get("Host").textContent =
       `Atlas account: ${data.account} · ${data.host_elevated ? "Elevated" : "Not elevated"}`;
     get("Output").textContent =

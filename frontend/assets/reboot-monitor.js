@@ -21,7 +21,7 @@
     rows = data.reboots || [];
     const host = document.querySelector('#rebootMonitors');
     if (!host) return;
-    host.innerHTML = rows.map(row => `<article class="reboot-card"><header><strong>${escape(row.target)}</strong><span class="reboot-state ${row.state === 'complete' ? 'status-ok' : ''}">${escape(labels[row.state] || row.state)}</span></header><p>${escape(row.message)}</p><pre aria-label="Ping output for ${escape(row.target)}">${escape((row.events || []).map(e => `[${e.time}] ${e.message}`).join('\n'))}</pre><button data-stop-reboot="${escape(row.id)}">${active.has(row.state) ? 'Stop monitoring' : 'Dismiss'}</button></article>`).join('');
+    host.innerHTML = rows.map(row => `<article class="reboot-card"><header><strong>${escape(row.target)}</strong><span class="reboot-state ${row.state === 'complete' ? 'status-ok' : ['timeout', 'failed'].includes(row.state) ? 'status-bad' : row.state === 'cancelled' ? 'status-neutral' : 'status-warn'}">${escape(labels[row.state] || row.state)}</span></header><p>${escape(row.message)}</p><pre aria-label="Ping output for ${escape(row.target)}">${escape((row.events || []).map(e => `[${e.time}] ${e.message}`).join('\n'))}</pre><button data-stop-reboot="${escape(row.id)}">${active.has(row.state) ? 'Stop monitoring' : 'Dismiss'}</button></article>`).join('');
     host.querySelectorAll('pre').forEach(pre => pre.scrollTop = pre.scrollHeight);
     host.querySelectorAll('[data-stop-reboot]').forEach(button => button.onclick = async () => {
       button.disabled = true;

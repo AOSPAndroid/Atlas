@@ -2718,7 +2718,7 @@ body.atlas-console .history-state { display:inline-block; line-height:16px; bord
 body.atlas-console .history-state:is([data-state="complete"],[data-state="completed"],[data-state="launched"]) { background:#e7f5ee; color:var(--atlas-success, #18724a); }
 body.atlas-console .history-state[data-state="failed"] { background:#fbeaec; color:var(--atlas-danger, #a32332); }
 body.atlas-console .history-state:is([data-state="queued"],[data-state="running"]) { background:#e8f2fa; color:var(--atlas-accent); }
-body.atlas-console #historyBody tr[data-state="failed"] td { background:#fdf5f6; }
+body.atlas-console #historyBody tr[data-state="failed"] td { background:#fef2f2; }
 
 /* Nothing selected: the panel's own hint is enough; buttons wait for a selection. */
 body.atlas-console #selectionContext:has(.selection-empty:not([hidden])) [data-diagnostics-status] { display:none; }
@@ -2731,3 +2731,126 @@ body.atlas-console .inbox-setup > :is(form,div).inbox-connection { padding:0; bo
 body.atlas-console .inbox-setup .inbox-setup-fields [data-slot="field"] { align-items:stretch; text-align:left; }
 body.atlas-console .inbox-setup .inbox-setup-fields [data-slot="field-label"] { justify-content:flex-start; align-items:flex-start; }
 body.atlas-console .inbox-setup .inbox-app-controls { margin:8px; }
+
+/* Modern refresh: light sidebar, Windows 11 type, softer surfaces and calmer
+   labels. Geometry and density stay as above; only appearance changes here. */
+:root {
+  --atlas-font: "Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  --atlas-line: #e3e6eb;
+  --atlas-surface-subtle: #f6f7f9;
+  --atlas-selected: #eef6fb;
+  --atlas-control-radius: 7px;
+  --atlas-panel-radius: 10px;
+  --atlas-shadow-soft: 0 1px 2px #1018280a, 0 1px 3px #1018280d;
+  --atlas-ring: 0 0 0 3px #007ca826;
+}
+body:is(.atlas-console,.atlas-map,.atlas-database) { -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility; }
+body:is(.atlas-console,.atlas-map,.atlas-database) * { scrollbar-width:thin; scrollbar-color:#c9ced6 transparent; }
+
+/* Header: frosted bar with an underline tab for the current area. */
+body .atlas-app-header { background:#ffffffd9; backdrop-filter:saturate(1.6) blur(12px); -webkit-backdrop-filter:saturate(1.6) blur(12px); border-bottom:1px solid var(--atlas-line); box-shadow:none; }
+body .atlas-primary-nav a { border-radius:7px; transition:background-color var(--atlas-motion-fast) ease, color var(--atlas-motion-fast) ease; }
+body .atlas-primary-nav a:hover { background:var(--atlas-surface-subtle); }
+body .atlas-app-header .atlas-primary-nav a[aria-current="page"] { background:var(--atlas-selected); color:#075d80; box-shadow:none; font-weight:600; }
+
+/* Sidebar: light navigation with a raised pill for the current page. */
+body.atlas-console > .console-sidebar { background:#f8f9fb; border-right:1px solid var(--atlas-line); }
+body.atlas-console > .console-sidebar > div:first-child { background:transparent; border:0; border-radius:0; padding:2px 0; }
+body.atlas-console .console-sidebar .nav-section { color:var(--atlas-muted); font-size:11px; font-weight:600; letter-spacing:0; text-transform:none; padding:4px 10px; }
+body.atlas-console .console-sidebar nav button[data-page] { color:#3d4a5c; border:1px solid transparent; border-radius:7px; font-weight:500; transition:background-color var(--atlas-motion-fast) ease, color var(--atlas-motion-fast) ease; }
+body.atlas-console .console-sidebar nav .nav-icon { color:#7a8699; }
+body.atlas-console .console-sidebar nav button[data-page]:hover { background:#eef0f4; color:var(--atlas-ink); border-color:transparent; }
+body.atlas-console .console-sidebar nav button[data-page]:is(.active,[aria-current="page"]) { background:#fff; color:var(--atlas-ink); border-color:var(--atlas-line); box-shadow:var(--atlas-shadow-soft); font-weight:600; }
+body.atlas-console .console-sidebar nav button[data-page]:is(.active,[aria-current="page"]) .nav-icon { color:var(--atlas-accent); }
+body.atlas-console .console-sidebar nav :is([data-page="admin"],[data-page="history"])::before { background:var(--atlas-line); }
+body.atlas-console .console-sidebar .sidebar-status { border-radius:var(--atlas-panel-radius); }
+
+/* Page heading: larger title, no rule underneath. */
+body.atlas-console .console-page-heading { border-bottom:0; padding-bottom:4px; }
+body.atlas-console #pageTitle { font-size:22px; font-weight:650; letter-spacing:-.02em; color:var(--atlas-ink); }
+body.atlas-console #pageDescription { font-size:12px; }
+
+/* Surfaces: white cards with a hairline border and a soft lift. */
+body.atlas-console :is(.panel,.lookup-column,.inbox-mail-list,.kb-library,.kb-details,.tablewrap),
+body.atlas-console #liveInbox [data-slot="card"],
+body.atlas-database :is(.panel,.card,section.card) { border-color:var(--atlas-line); border-radius:var(--atlas-panel-radius); box-shadow:var(--atlas-shadow-soft); }
+body.atlas-console .tablewrap { box-shadow:none; }
+
+/* Small labels and section eyebrows: sentence case without wide tracking. */
+body:is(.atlas-console,.atlas-database) small { letter-spacing:0; }
+body.atlas-console .panel > .head small:first-child { font-size:11px; font-weight:600; color:var(--atlas-muted); }
+
+/* Tables: sentence-case headers, row hover. */
+body:is(.atlas-console,.atlas-database) thead th { text-transform:none; letter-spacing:0; font-size:11px; font-weight:600; color:#5b6678; background:#f8f9fb; }
+body:is(.atlas-console,.atlas-database) tbody tr { transition:background-color var(--atlas-motion-fast) ease; }
+body:is(.atlas-console,.atlas-database) tbody tr:not(.atlas-table-empty):hover > td { background:#f7fafc; }
+
+/* Controls: consistent radius, gentle hover and a soft focus ring. */
+body:is(.atlas-console,.atlas-map,.atlas-database) button:not(.map-name):not(.room-label) { font-weight:500; transition:background-color var(--atlas-motion-fast) ease, border-color var(--atlas-motion-fast) ease, color var(--atlas-motion-fast) ease, box-shadow var(--atlas-motion-fast) ease; }
+body:is(.atlas-console,.atlas-map,.atlas-database) button:not(.primary):not(.danger):not([aria-pressed="true"]):not(.active):not(:disabled):not([data-page]):hover { border-color:#c5ccd6; background-color:#f8f9fb; }
+body:is(.atlas-console,.atlas-map,.atlas-database) button.primary { background:var(--atlas-accent); border-color:var(--atlas-accent); box-shadow:0 1px 2px #10182814, inset 0 1px 0 #ffffff1f; }
+body:is(.atlas-console,.atlas-database) :is(input:not([type="checkbox"]):not([type="radio"]),select,textarea) { border-color:#d6dbe2; box-shadow:none; transition:border-color var(--atlas-motion-fast) ease, box-shadow var(--atlas-motion-fast) ease; }
+body:is(.atlas-console,.atlas-database) :is(input:not([type="checkbox"]):not([type="radio"]),select,textarea):hover:not(:disabled):not(:focus) { border-color:#c1c8d1; }
+body:is(.atlas-console,.atlas-database) :is(input,select,textarea):focus-visible { outline:0; border-color:var(--atlas-accent); box-shadow:var(--atlas-ring); }
+body :is(button,a,summary):focus-visible { outline:2px solid var(--atlas-accent); outline-offset:2px; }
+html:is([data-atlas-motion="reduce"],[data-atlas-display="citrix"]) body * { transition:none !important; }
+@media(prefers-reduced-motion:reduce) { body * { transition:none !important; } }
+body.atlas-map .eyebrow { letter-spacing:.06em; font-size:10px; font-weight:600; color:var(--atlas-muted); }
+body.atlas-map .pill { letter-spacing:.04em; }
+body.atlas-console #workspace .searchbox input:focus { border-color:var(--atlas-accent); box-shadow:var(--atlas-ring); outline:0; }
+body.atlas-console .selection-label { letter-spacing:0; font-weight:600; text-transform:capitalize; }
+
+/* Good and bad news: vivid green, red and amber, used the same way everywhere.
+   Inline status words become pills with a dot; table cells and lines get the colour. */
+:root {
+  --atlas-success: #15803d; --atlas-success-bg: #dcfce7; --atlas-success-line: #86efac;
+  --atlas-danger: #dc2626; --atlas-danger-text: #b91c1c; --atlas-danger-bg: #fee2e2; --atlas-danger-line: #fca5a5;
+  --atlas-warning: #b45309; --atlas-warning-bg: #fef3c7; --atlas-warning-line: #fcd34d;
+  --green: var(--atlas-success); --red: var(--atlas-danger-text); --status-yellow: var(--atlas-warning);
+}
+body:is(.atlas-console,.atlas-map,.atlas-database) :is(span,b,i,em,strong,small).status-ok,
+body:is(.atlas-console,.atlas-map,.atlas-database) :is(span,b,i,em,strong,small).status-bad,
+body:is(.atlas-console,.atlas-map,.atlas-database) :is(span,b,i,em,strong,small).status-warn,
+body:is(.atlas-console,.atlas-map,.atlas-database) .history-state,
+body:is(.atlas-console,.atlas-map,.atlas-database) .workspace-state,
+body:is(.atlas-console,.atlas-map,.atlas-database) .ad-health-strip > :is(.ad-health-good,.ad-health-bad,.ad-health-warn) {
+  display:inline-flex; align-items:center; gap:5px; padding:1px 8px; border-radius:999px; font-style:normal; font-weight:600; font-size:11px; line-height:16px; white-space:nowrap;
+}
+body:is(.atlas-console,.atlas-map,.atlas-database) :is(span,b,i,em,strong,small):is(.status-ok,.status-bad,.status-warn)::before,
+body:is(.atlas-console,.atlas-map,.atlas-database) .history-state::before,
+body:is(.atlas-console,.atlas-map,.atlas-database) .workspace-state::before,
+body:is(.atlas-console,.atlas-map,.atlas-database) .ad-health-strip > :is(.ad-health-good,.ad-health-bad,.ad-health-warn)::before {
+  content:""; width:6px; height:6px; border-radius:50%; background:currentColor; flex-shrink:0;
+}
+body:is(.atlas-console,.atlas-map,.atlas-database) :is(span,b,i,em,strong,small).status-ok,
+body:is(.atlas-console,.atlas-map,.atlas-database) .history-state:is([data-state="complete"],[data-state="completed"],[data-state="launched"]),
+body:is(.atlas-console,.atlas-map,.atlas-database) .workspace-state:is([data-state="launched"],[data-state="complete"],[data-state="completed"]),
+body:is(.atlas-console,.atlas-map,.atlas-database) .ad-health-strip > .ad-health-good { background:var(--atlas-success-bg); color:var(--atlas-success); box-shadow:inset 0 0 0 1px var(--atlas-success-line); }
+body:is(.atlas-console,.atlas-map,.atlas-database) :is(span,b,i,em,strong,small).status-bad,
+body:is(.atlas-console,.atlas-map,.atlas-database) .history-state[data-state="failed"],
+body:is(.atlas-console,.atlas-map,.atlas-database) .workspace-state[data-state="failed"],
+body:is(.atlas-console,.atlas-map,.atlas-database) .ad-health-strip > .ad-health-bad { background:var(--atlas-danger-bg); color:var(--atlas-danger-text); box-shadow:inset 0 0 0 1px var(--atlas-danger-line); }
+body:is(.atlas-console,.atlas-map,.atlas-database) :is(span,b,i,em,strong,small).status-warn,
+body:is(.atlas-console,.atlas-map,.atlas-database) .ad-health-strip > .ad-health-warn { background:var(--atlas-warning-bg); color:var(--atlas-warning); box-shadow:inset 0 0 0 1px var(--atlas-warning-line); }
+body:is(.atlas-console,.atlas-map,.atlas-database) .history-state:is([data-state="queued"],[data-state="running"]),
+body:is(.atlas-console,.atlas-map,.atlas-database) .workspace-state:is([data-state="running"],[data-state="queued"]) { background:#e0f2fe; color:#0369a1; box-shadow:inset 0 0 0 1px #7dd3fc; }
+body:is(.atlas-console,.atlas-map,.atlas-database) :is(td,div,p,li).status-ok, body:is(.atlas-console,.atlas-map,.atlas-database) td.good, body:is(.atlas-console,.atlas-map,.atlas-database) .check.ok { color:var(--atlas-success); font-weight:600; }
+body:is(.atlas-console,.atlas-map,.atlas-database) :is(td,div,p,li).status-bad, body:is(.atlas-console,.atlas-map,.atlas-database) td.bad { color:var(--atlas-danger-text); font-weight:600; }
+body:is(.atlas-console,.atlas-map,.atlas-database) :is(td,div,p,li).status-warn { color:var(--atlas-warning); font-weight:600; }
+body:is(.atlas-console,.atlas-database) tbody tr[data-state="failed"] > td { background:#fef2f2; }
+body:is(.atlas-console,.atlas-database) tbody tr[data-state="failed"]:hover > td { background:#fee2e2; }
+
+/* Run status lines (Terminal, PsTools): green when it worked, red when it did not. */
+body:is(.atlas-console,.atlas-map,.atlas-database) [role="status"][data-tone="good"] { color:var(--atlas-success); font-weight:600; }
+body:is(.atlas-console,.atlas-map,.atlas-database) [role="status"][data-tone="bad"] { color:var(--atlas-danger-text); font-weight:600; }
+
+/* Badges in React islands (Live Inbox status, sender matches). */
+body:is(.atlas-console,.atlas-map,.atlas-database) [data-slot="badge"][data-tone="good"] { background:var(--atlas-success-bg); color:var(--atlas-success); border-color:var(--atlas-success-line); }
+body:is(.atlas-console,.atlas-map,.atlas-database) [data-slot="badge"][data-tone="bad"] { background:var(--atlas-danger-bg); color:var(--atlas-danger-text); border-color:var(--atlas-danger-line); }
+body:is(.atlas-console,.atlas-map,.atlas-database) [data-slot="badge"][data-tone="warn"] { background:var(--atlas-warning-bg); color:var(--atlas-warning); border-color:var(--atlas-warning-line); }
+
+/* Health readings: unavailable checks stand out (overdue uptime is already red). */
+body:is(.atlas-console,.atlas-map,.atlas-database) .atlas-health [data-state="unavailable"] { color:var(--atlas-danger-text); font-weight:600; }
+body.atlas-console .summary > div.status-bad { background:var(--atlas-danger-bg); border-color:var(--atlas-danger-line); }
+body.atlas-console .summary > div.status-ok { background:var(--atlas-success-bg); border-color:var(--atlas-success-line); }
+body.atlas-console .summary > div:is(.status-bad,.status-ok) b { color:inherit; }
