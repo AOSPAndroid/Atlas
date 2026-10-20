@@ -258,6 +258,25 @@ class LiveFloorPlan(unittest.TestCase):
             self.assertEqual(response.status_code, 409)
             apply.assert_not_called()
 
+    def test_the_plan_wins_a_person_on_two_desks_is_placed_on_both(self):
+        twice = [row[:] for row in self.layout]
+        twice[2] = ['Christophe Duriez\n02R015079', 'Christophe Duriez\n02R016079', 'Credit Sales\n02R016081']
+        self.write('plan.xlsx', twice)
+        self.sync.configure(Settings(folder=str(self.folder), enabled=True))
+        result = self.sync.check()
+        self.assertEqual(result['status']['state'], 'synced', result['status'])
+        self.assertEqual([official(self.db, d)[0]['name'] for d in ('02R015079', '02R016079')], ['Christophe Duriez'] * 2)
+        self.assertIn('Same person on 02R015079, 02R016079 in the plan: placed on each, as written.', result['last']['notes'])
+
+    def test_large_changes_apply_straight_away_when_review_is_off(self):
+        self.sync.configure(Settings(folder=str(self.folder), enabled=True, review_large=False))
+        free = [[f'Open\n{desk}' for desk in self.desks[i:i + 6]] for i in range(0, 60, 6)]
+        self.write('plan.xlsx', free)
+        result = self.sync.check()
+        self.assertEqual(result['status']['state'], 'synced', result['status'])
+        self.assertFalse(result['review_large'])
+        self.assertEqual(official(self.db, self.desks[0])[0]['occupancy'], 'vacant')
+
     def test_review_threshold(self):
         self.assertFalse(large(40, 100))
         self.assertTrue(large(41, 100))

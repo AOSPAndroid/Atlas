@@ -36,6 +36,7 @@
     if (!editing) {
       $("live-plan-folder").value = data.folder || "";
       $("live-plan-enabled").checked = !!data.enabled;
+      $("live-plan-review").checked = data.review_large !== false;
     }
     const status = data.status || {}, state = status.state || "off";
     $("live-plan-state").className = tones[state] || "";
@@ -58,6 +59,7 @@
         details.append(read);
       }
       const notes = [
+        list("notes · the plan was applied as written", last.notes || [], "status-warn"),
         list("desk codes corrected", (reader.fixes || []).map((f) => `${f.written} → ${f.desk} (${f.cell})`), "status-warn"),
         list("names linked to a slightly different directory name (plan wording kept)", (reader.matched_partly || []).map((x) => `${x.name} → ${x.directory} (${x.account}) · ${x.desk} · ${{ fuller: "fuller name", paris: "same name, the one in Paris", spelling: "spelling corrected" }[x.how] || x.how}`), "status-ok"),
         list("names not matched to one person (shown as written)", (reader.not_in_directory || []).map((x) => `${x.name} · ${x.desk}${x.ambiguous ? " · several people share this name" : ""}`), "status-warn"),
@@ -114,8 +116,9 @@
   }
   $("live-plan-folder").addEventListener("input", () => (editing = true));
   $("live-plan-enabled").addEventListener("change", () => (editing = true));
+  $("live-plan-review").addEventListener("change", () => (editing = true));
   $("live-plan-save").onclick = () => act($("live-plan-save"), async () => {
-    const result = await post("/api/seating-sync/settings", { folder: $("live-plan-folder").value, enabled: $("live-plan-enabled").checked });
+    const result = await post("/api/seating-sync/settings", { folder: $("live-plan-folder").value, enabled: $("live-plan-enabled").checked, review_large: $("live-plan-review").checked });
     editing = false;
     return result;
   });

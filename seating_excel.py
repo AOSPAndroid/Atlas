@@ -70,9 +70,14 @@ def account_index(c):
 def occupied(r):
     return r['occupancy']!='vacant' and key(r['name']) not in ('','vacant desk','unconfirmed desk','unassigned','unnamed desk')
 
-def plan_sheet(c, rows, layout='official', complete=False, labels=frozenset()):
-    """labels: names of team/room labels ("Credit Sales") that are not people, so repeats are not duplicates."""
+def plan_sheet(c, rows, layout='official', complete=False, labels=frozenset(), lenient=False):
+    """labels: names of team/room labels ("Credit Sales") that are not people, so repeats are not duplicates.
+    lenient: the plan is the authority (the live floor plan). Nothing blocks the update: rows Atlas cannot
+    use are skipped, names it cannot link to one account are kept as written, a person placed twice is
+    placed twice, and every such case is listed in report['notes']."""
     records, links=layout_records(c,layout); index, users=account_index(c)
+    notes=[]
+    def problem(message): (notes if lenient else errors).append(message)
     def occupant(r): return occupied(r) and not (r['occupancy']=='unconfirmed' and key(r['name']) in labels)
     name_links=defaultdict(set)
     for d,r in records.items():
@@ -80,31 +85,35 @@ def plan_sheet(c, rows, layout='official', complete=False, labels=frozenset()):
     desired={}; warnings=[]; errors=[]
     for row in rows:
         d=row.get('desk','').strip(); prefix=f"Row {row.get('_row','?')}"
-        if d not in records: errors.append(f'{prefix}: unknown desk in {layout} layout: {d or "(blank)"}.'); continue
-        if d in desired: errors.append(f'{prefix}: duplicate desk {d}.'); continue
+        if d not in records: problem(f'{prefix}: unknown desk in {layout} layout: {d or "(blank)"}.'); continue
+        if d in desired: problem(f'{prefix}: duplicate desk {d}.'); continue
         old=records[d]; name=row.get('name','').strip(); account=row.get('account','').strip()
         status=key(row.get('status')) or ('assigned' if name or account else 'vacant')
-        if status not in ('assigned','vacant','unconfirmed'): errors.append(f'{prefix}: Status must be assigned, vacant or unconfirmed.'); continue
-        if status=='vacant' and (name or account): errors.append(f'{prefix}: a vacant desk must have blank Name and Account.'); continue
+        if status not in ('assigned','vacant','unconfirmed'): problem(f'{prefix}: Status must be assigned, vacant or unconfirmed.'); continue
+        if status=='vacant' and (name or account): problem(f'{prefix}: a vacant desk must have blank Name and Account.'); continue
         link=None
         if account:
             found=candidates(index,account,allow_names=False)
             # Keep an existing unavailable canonical link when round-tripping an export.
             if not found and account==links.get(d): link=account; warnings.append(f'{d}: linked account is no longer in the directory.')
-            elif len(found)!=1: errors.append(f'{prefix}: account {account} is unknown or ambiguous. Refresh the directory or correct Account.'); continue
+            elif len(found)!=1:
+                if not lenient: errors.append(f'{prefix}: account {account} is unknown or ambiguous. Refresh the directory or correct Account.'); continue
+                notes.append(f'{d}: {name or account} kept as written; account {account} is unknown or ambiguous.')
             else: link=next(iter(found))
             if not name: name=users.get(link,{}).get('name') or account
         elif name and status!='vacant':
             if key(name)==key(old['name']) and occupant(old): link=links.get(d)
             elif len(name_links[key(name)])==1: link=next(iter(name_links[key(name)]))
-            elif len(name_links[key(name)])>1: errors.append(f'{prefix}: this name has multiple existing accounts. Fill Account.'); continue
+            elif len(name_links[key(name)])>1:
+                if not lenient: errors.append(f'{prefix}: this name has multiple existing accounts. Fill Account.'); continue
+                notes.append(f'{d}: {name} kept as written; several accounts have this name.')
             else: warnings.append(f'{d}: {name} has no confirmed account link; machine lookup remains unconfirmed. Fill Account to link explicitly.')
-        if status=='assigned' and not name: errors.append(f'{prefix}: assigned desk needs a name or account.'); continue
+        if status=='assigned' and not name: problem(f'{prefix}: assigned desk needs a name or account.'); continue
         team=row.get('team',old['team']).strip() or 'Unassigned'
         label=name or (old['name'] if status==old['occupancy'] and not occupant(old) else ('Vacant desk' if status=='vacant' else 'Unconfirmed desk'))
         r=dict(old,name=label,team=team,occupancy=status)
         try: store.validate(r)
-        except ValueError as e: errors.append(f'{prefix}: {e}'); continue
+        except ValueError as e: problem(f'{prefix}: {e}'); continue
         desired[d]={'record':r,'link':link}
     # An identifiable person moving to a new desk also leaves their old desk.
     current_people=defaultdict(list)
@@ -115,8 +124,10 @@ def plan_sheet(c, rows, layout='official', complete=False, labels=frozenset()):
         if not occupant(item['record']): continue
         person=('account',item['link']) if item['link'] else ('name',key(item['record']['name']))
         origins=current_people.get(person,[])
-        if len(origins)==1 and origins[0]!=d and origins[0] not in desired:
-            source=origins[0]; old=records[source]
+        # The plan says where this person sits now: other desks it does not mention are freed.
+        leaving=[o for o in origins if o!=d and o not in desired] if lenient or len(origins)==1 else []
+        for source in leaving:
+            old=records[source]
             desired[source]={'record':dict(old,name='Vacant desk',team='Unassigned',occupancy='vacant'),'link':None}
             auto_vacated.append(source)
     if complete:
@@ -131,7 +142,8 @@ def plan_sheet(c, rows, layout='official', complete=False, labels=frozenset()):
         if len(desks)>1 and any(d in desired for d in desks):
             changed=any(d in desired and (any(desired[d]['record'][k]!=records[d][k] for k in ('name','occupancy')) or desired[d]['link']!=links.get(d)) for d in desks)
             message='Duplicate occupant at '+', '.join(sorted(desks))+'. Provide distinct Accounts for namesakes or correct the assignments.'
-            (errors if changed else warnings).append(message)
+            if lenient: notes.append('Same person on '+', '.join(sorted(desks))+' in the plan: placed on each, as written.')
+            else: (errors if changed else warnings).append(message)
     def identity(r,link): return ('account',link) if link else ('name',key(r['name']))
     before=defaultdict(list)
     for d,r in records.items():
@@ -147,7 +159,7 @@ def plan_sheet(c, rows, layout='official', complete=False, labels=frozenset()):
         kind='vacated' if new['occupancy']=='vacant' else ('moved' if len(origin)==1 and origin[0]!=d else ('assigned' if not occupant(old) or identity(old,links.get(d))!=identity(new,link) else 'updated'))
         def display(r,k): return {'name':r['name'],'team':r['team'],'status':r['occupancy'],'account':users.get(k,{}).get('account',k or '')}
         changes.append({'desk':d,'kind':kind,'from_desk':origin[0] if kind=='moved' else None,'fields':fields,'before':display(old,links.get(d)),'after':display(new,link)})
-    report={'changes':changes,'errors':sorted(set(errors)),'warnings':sorted(set(warnings)), 'unchanged':len(desired)-len(updates),'omitted':len(records)-len({r.get('desk') for r in rows}&set(records)), 'auto_vacated':auto_vacated,'complete':complete,'layout':layout,'rows':len(rows)}
+    report={'changes':changes,'errors':sorted(set(errors)),'warnings':sorted(set(warnings)),'notes':list(dict.fromkeys(notes)), 'unchanged':len(desired)-len(updates),'omitted':len(records)-len({r.get('desk') for r in rows}&set(records)), 'auto_vacated':auto_vacated,'complete':complete,'layout':layout,'rows':len(rows)}
     return {'fingerprint':stamp(c,layout),'layout':layout,'updates':updates,'report':report}
 
 def apply_sheet(db, plan, folder, source):

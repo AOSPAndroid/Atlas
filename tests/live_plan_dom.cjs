@@ -58,7 +58,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await sleep(20);
   assert.equal(get('live-plan-folder').value, '"C:\\Users\\me\\OneDrive\\02_Current_plan"', 'Typing is not overwritten by refreshes');
   get('live-plan-save').onclick(); await sleep(20);
-  assert.deepEqual(posts[0], ['/api/seating-sync/settings', { folder: '"C:\\Users\\me\\OneDrive\\02_Current_plan"', enabled: true }]);
+  assert.deepEqual(posts[0], ['/api/seating-sync/settings', { folder: '"C:\\Users\\me\\OneDrive\\02_Current_plan"', enabled: true, review_large: true }]);
   w.confirm = () => false; get('live-plan-apply').onclick(); await sleep(20);
   assert.equal(posts.length, 1, 'Cancelling the confirmation applies nothing');
   replaceOnApply = true;

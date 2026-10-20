@@ -59,6 +59,8 @@ class Settings(BaseModel):
     model_config = ConfigDict(extra='forbid')
     folder: str = Field(default='', max_length=1024)
     enabled: bool = False
+    # Off: every saved plan reaches the map straight away, however many desks change.
+    review_large: bool = True
 
 
 class ApplyReview(BaseModel):
@@ -109,7 +111,7 @@ class SeatingSync:
     def configure(self, settings):
         folder = settings.folder.strip().strip('"').strip()
         with self.lock:
-            self.state.update(folder=folder, enabled=settings.enabled and bool(folder))
+            self.state.update(folder=folder, enabled=settings.enabled and bool(folder), review_large=settings.review_large)
             self.state.pop('last', None)
             self.held = None
             if not self.state['enabled']:
@@ -122,7 +124,7 @@ class SeatingSync:
         status = dict(self.state.get('status', {}))
         proposal = self.held
         held = proposal and {'id': proposal['id'], 'reason': proposal['reason'], 'file': proposal['file'], 'report': proposal['report'], 'reader': proposal['reader']}
-        return {'folder': self.state.get('folder', ''), 'enabled': bool(self.state.get('enabled')), 'status': status,
+        return {'folder': self.state.get('folder', ''), 'enabled': bool(self.state.get('enabled')), 'review_large': self.state.get('review_large', True), 'status': status,
                 'checked': self.checked, 'last': self.state.get('last'), 'history': self.state.get('history', [])[:15], 'held': held}
 
     def candidates(self, folder):
@@ -194,12 +196,15 @@ class SeatingSync:
             labels = {key(row['name']) for row in reader['rows'] if row['kind'] == 'label'}
             labels |= {key(record['name']) for record in records.values() if record.get('occupancy') == 'unconfirmed'}
             rows = [{k: v for k, v in row.items() if k in ('desk', 'name', 'status', 'account', 'team', '_row')} for row in reader['rows']]
-            plan = plan_sheet(c, rows, 'official', False, frozenset(labels))
+            # The plan is the authority: nothing in it blocks the update; problems become notes.
+            plan = plan_sheet(c, rows, 'official', False, frozenset(labels), lenient=True)
         report = plan['report']
         info = {'file': path.name, 'modified': modified, 'signature': signature, 'desks': len(rows),
-                'reader': {k: reader[k] for k in ('fixes', 'matched_partly', 'not_in_directory', 'unknown_desks', 'conflicts', 'sheets', 'hidden_sheets', 'blank', 'other_floor')}}
+                'reader': {k: reader[k] for k in ('fixes', 'matched_partly', 'not_in_directory', 'unknown_desks', 'conflicts', 'sheets', 'hidden_sheets', 'blank', 'other_floor')},
+                'notes': report.get('notes', [])}
         counts = tally(report['changes'])
         reason = ('The plan has problems Atlas cannot resolve on its own.' if report['errors'] else
+                  '' if not self.state.get('review_large', True) else
                   'The same desk appears with different names in the plan.' if reader['conflicts'] else
                   f'{len(report["changes"])} changes in one save; review them before they reach the map.' if large(len(report['changes']), len(rows)) else '')
         if reason:
