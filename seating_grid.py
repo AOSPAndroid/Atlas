@@ -106,20 +106,67 @@ def column_name(index):
     return name
 
 
-def directory_people(c):
-    """Order-free name key -> [(canonical key, login or email, department)] for every directory person."""
-    people = defaultdict(list)
-    for canonical, login, email, name, department in c.execute('select canonical_key,user_id,email,full_name,department from users'):
-        if name:
-            people[name_key(name)].append((canonical, login or email or canonical, department or ''))
-    return people
+class Matcher:
+    """Plan name -> one directory person, or None. In order:
+    exact (word order, case, accents ignored); the same with several people, one of them in Paris;
+    a shorter plan name ("Sandrine Kone" for "Sandrine Kone Penali"); a near-identical spelling
+    ("Ons Belkicir" for "Ons Belkecir") of someone in Paris with no close second. Nothing else is guessed."""
+
+    def __init__(self, c):
+        self.exact, self.words, self.people = defaultdict(list), defaultdict(set), []
+        columns = {row[1] for row in c.execute('pragma table_info(users)')}
+        location = 'location' if 'location' in columns else "''"
+        for canonical, login, email, name, place in c.execute(f'select canonical_key,user_id,email,full_name,{location} from users'):
+            if not name:
+                continue
+            index = len(self.people)
+            place = plain(place)
+            self.people.append((canonical, login or email or canonical, name, 'paris' in place or 'hoche' in place))
+            self.exact[name_key(name)].append(index)
+            for word in set(name_key(name).split()):
+                self.words[word].add(index)
+        self.paris = [i for i, person in enumerate(self.people) if person[3]]
+        self.paris_names = [name_key(self.people[i][2]) for i in self.paris]
+
+    def local(self, found):
+        return {i for i in found if self.people[i][3]}
+
+    def find(self, label):
+        key = name_key(label)
+        words = key.split()
+        if not words:
+            return None
+        exact = set(self.exact.get(key, ()))
+        if len(exact) == 1:
+            return self.people[exact.pop()] + ('exact',)
+        if len(exact) > 1:
+            paris = self.local(exact)
+            return self.people[paris.pop()] + ('paris',) if len(paris) == 1 else None
+        if len(words) < 2 or any(len(word) < 2 for word in words):
+            return None
+        fuller = set.intersection(*(self.words.get(word, set()) for word in words))
+        if len(fuller) > 1:
+            fuller = self.local(fuller)
+        if len(fuller) == 1:
+            return self.people[fuller.pop()] + ('fuller',)
+        if fuller:
+            return None
+        try:
+            from rapidfuzz import fuzz, process
+        except ImportError:
+            return None
+        best = process.extract(key, self.paris_names, scorer=fuzz.ratio, limit=2)
+        if best and best[0][1] >= 90 and (len(best) == 1 or best[0][1] - best[1][1] >= 15):
+            return self.people[self.paris[best[0][2]]] + ('spelling',)
+        return None
 
 
 @workbook_scope
 def read_plan(path, c, known_desks=None):
     """Seating rows plus what the reader fixed or could not place."""
     path = Path(path)
-    people = directory_people(c)
+    matcher = Matcher(c)
+    matched_partly = []
     rows, by_desk, fixes, conflicts, unknown, sheets, not_found = [], {}, [], [], [], {}, []
     with zipfile.ZipFile(path) as book:
         if sum(item.file_size for item in book.infolist()) > 200 * 1024 * 1024:
@@ -144,16 +191,18 @@ def read_plan(path, c, known_desks=None):
             if words in VACANT or re.fullmatch(r'(open|vacant|free|libre)\b.*', words):
                 row.update(name='', status='vacant', kind='vacant')
             else:
-                matches = people.get(name_key(label), [])
-                if len(matches) == 1:
-                    canonical, account, department = matches[0]
+                person = matcher.find(label)
+                if person and person[4] != 'exact':
+                    matched_partly.append({'desk': desk, 'name': label, 'directory': person[2], 'account': person[1], 'how': person[4]})
+                if person:
+                    canonical, account = person[0], person[1]
                     # The map keeps its own team names (Credit, Markets...), so no team is set here.
                     row.update(name=label[:160], account=account, status='assigned', kind='person', canonical=canonical)
                 else:
                     # A team, room or someone not in the directory: shown exactly as written.
                     row.update(name=label[:160], status='unconfirmed', kind='label')
                     if re.fullmatch(r"[A-Za-zÀ-ÿ'’-]+(?: [A-Za-zÀ-ÿ'’-]+){1,3}", re.sub(r'\([^)]*\)', '', label).strip()):
-                        not_found.append({'desk': desk, 'name': label, 'ambiguous': len(matches) > 1})
+                        not_found.append({'desk': desk, 'name': label, 'ambiguous': len(matcher.exact.get(name_key(label), ())) > 1})
             by_desk[desk] = row
             rows.append(row)
     if not rows:
@@ -166,4 +215,4 @@ def read_plan(path, c, known_desks=None):
     teams |= {plain((record or {}).get('team', '')) for record in (known_desks or {}).values()} if isinstance(known_desks, dict) else set()
     not_found = [item for item in not_found if item['ambiguous'] or (repeats[plain(item['name'])] == 1 and plain(item['name']) not in teams)]
     return {'rows': rows, 'fixes': fixes, 'conflicts': conflicts, 'unknown_desks': unknown, 'sheets': sheets,
-            'not_in_directory': not_found}
+            'not_in_directory': not_found, 'matched_partly': matched_partly}

@@ -182,7 +182,7 @@ class SeatingSync:
             plan = plan_sheet(c, rows, 'official', False, frozenset(labels))
         report = plan['report']
         info = {'file': path.name, 'modified': modified, 'signature': signature, 'desks': len(rows),
-                'reader': {k: reader[k] for k in ('fixes', 'not_in_directory', 'unknown_desks', 'conflicts', 'sheets')}}
+                'reader': {k: reader[k] for k in ('fixes', 'matched_partly', 'not_in_directory', 'unknown_desks', 'conflicts', 'sheets')}}
         counts = tally(report['changes'])
         reason = ('The plan has problems Atlas cannot resolve on its own.' if report['errors'] else
                   'The same desk appears with different names in the plan.' if reader['conflicts'] else

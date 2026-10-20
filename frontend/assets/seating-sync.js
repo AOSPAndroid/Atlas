@@ -50,6 +50,7 @@
       const reader = last.reader || {};
       const notes = [
         list("desk codes corrected", (reader.fixes || []).map((f) => `${f.written} → ${f.desk} (${f.cell})`), "status-warn"),
+        list("names linked to a slightly different directory name (plan wording kept)", (reader.matched_partly || []).map((x) => `${x.name} → ${x.directory} (${x.account}) · ${x.desk} · ${{ fuller: "fuller name", paris: "same name, the one in Paris", spelling: "spelling corrected" }[x.how] || x.how}`), "status-ok"),
         list("names not matched to one person (shown as written)", (reader.not_in_directory || []).map((x) => `${x.name} · ${x.desk}${x.ambiguous ? " · several people share this name" : ""}`), "status-warn"),
         list("desk codes not on the map (skipped)", (reader.unknown_desks || []).map((x) => `${x.desk} ${x.label ? "· " + x.label : ""} (${x.cell})`), "status-bad"),
         list("desks with two different names in the plan", (reader.conflicts || []).map((x) => `${x.desk}: ${x.labels.join(" / ")} (${x.cells.join(", ")})`), "status-bad"),
