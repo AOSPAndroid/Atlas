@@ -3045,3 +3045,4 @@ body.atlas-console .scripts-output [data-tone="info"] { color:#93c5fd; }
 body.atlas-console .scripts-output [data-tone="atlas"] { color:#7c8a99; }
 html[data-theme="dark"] body.atlas-console .scripts-output { background:#0b0f14; border:1px solid var(--atlas-line); }
 @media(max-width:900px) { body.atlas-console .scripts-layout, body.atlas-console .scripts-run-grid { grid-template-columns:minmax(0,1fr); } body.atlas-console .scripts-library { position:static; max-height:none; } }
+body.atlas-database #directory-import[data-drop="true"] { outline:2px dashed var(--atlas-accent); outline-offset:-4px; background:var(--atlas-selected); }

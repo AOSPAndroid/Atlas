@@ -93,8 +93,9 @@
         <section class="panel atlas-upload-section" id="directory-import">
           <h2>Users &amp; devices</h2>
           <p>
-            Upload one Excel workbook with <b>users</b> and <b>devices</b> tabs.
-            Keep the extract as exported. Atlas handles duplicate records and
+            Select your two ServiceNow exports together (the <b>users</b> file and the
+            <b>devices</b> file, .xlsx or .csv, in any order; Ctrl-click both or drag them here),
+            or one workbook with <b>users</b> and <b>devices</b> tabs. Keep the exports as they are. Atlas handles duplicate records and
             identifies phones by their serial number or asset tag. Preview the
             changes, then back up and apply.
           </p>
@@ -104,13 +105,14 @@
           </p>
           <div class="atlas-import-controls" data-database-controls="directory">
             <label
-              >Users and devices workbook (.xlsx)<input
+              >Users and devices exports, or one workbook<input
                 id="file"
                 type="file"
-                accept=".xlsx" /></label
+                multiple
+                accept=".xlsx,.csv" /></label
             ><button id="validate" class="primary">Validate and preview</button>
             <p id="directory-message" role="status" aria-live="polite">
-              Choose your users and devices workbook, then validate it.
+              Choose your users and devices exports (or one workbook), then validate.
             </p>
             <progress
               id="directory-progress"

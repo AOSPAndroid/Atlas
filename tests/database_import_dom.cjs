@@ -32,6 +32,11 @@ const preview = {id: 'stage-one', source: 'emea.xlsx', report: {
       assert.equal(options.headers.get('X-Atlas-Token'), 'token-3');
       return response(preview);
     }
+    if (url === '/api/database/preview-pair') {
+      const headers = options.headers;
+      assert.deepEqual([headers.get('X-First-Size'), headers.get('X-First-Name'), headers.get('X-Second-Name')], ['10', 'devices.xlsx', 'users.csv']);
+      return response({...preview, id: 'stage-two', source: 'users.csv + devices.xlsx', pair: {users_file: 'users.csv', devices_file: 'devices.xlsx', rows: {users: 5, devices: 7}}});
+    }
     if (url === '/api/database/apply/stage-one') {
       assert.deepEqual(JSON.parse(options.body), {confirmation: 'APPLY', full_snapshot: true});
       if (++applications === 1) return response({detail: 'Jobs are active'}, 409);
@@ -105,7 +110,17 @@ const preview = {id: 'stage-one', source: 'emea.xlsx', report: {
   assert.match(get('directory-message').textContent, /Counts and history could not refresh/);
   assert(get('preview').hidden && get('apply').disabled);
   assert.equal(applications, 2);
+  const selectMany = files => {Object.defineProperty(get('file'), 'files', {configurable: true, value: files}); get('file').onchange();};
+  selectMany([{name: 'a.xlsx', size: 1}, {name: 'b.xlsx', size: 1}, {name: 'c.xlsx', size: 1}]); await get('validate').onclick();
+  assert.match(get('directory-message').textContent, /exactly two exports/);
+  selectMany([{name: 'devices.pdf', size: 1}, {name: 'users.csv', size: 1}]); await get('validate').onclick();
+  assert.match(get('directory-message').textContent, /\.xlsx or \.csv exports/);
+  selectMany([{name: 'devices.xlsx', size: 10}, {name: 'users.csv', size: 20}]);
+  assert.match(get('directory-message').textContent, /devices.xlsx \+ users.csv selected/);
+  await get('validate').onclick(); await sleep(20);
+  assert(!get('preview').hidden, 'Two separate exports open the same review');
+  assert.equal(get('source').textContent, 'Users: users.csv (5 rows) · Devices: devices.xlsx (7 rows)');
   assert.equal(f.errors.length, 0, f.errors.join('\n'));
   w.dispatchEvent(new w.Event('pagehide')); w.close();
-  console.log('PASS: visible import feedback, slow startup, upload progress, session recovery, scoped controls, stale-file invalidation and guarded apply retry.');
+  console.log('PASS: two separate exports (xlsx/csv) previewed together, visible import feedback, slow startup, upload progress, session recovery, scoped controls, stale-file invalidation and guarded apply retry.');
 })().catch(error => {console.error(error); process.exitCode = 1;});
