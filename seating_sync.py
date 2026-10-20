@@ -25,7 +25,7 @@ from pydantic import BaseModel, ConfigDict, Field
 import atlas_store as store
 from atlas_store import ClosingConnection
 from identity_links import key
-from seating_excel import apply_sheet, layout_records, plan_sheet
+from seating_excel import apply_sheet, layout_records, occupied, plan_sheet
 from seating_grid import VERSION as READER, floor_tabs, read_plan
 
 SOURCE = 'Live floor plan'
@@ -283,11 +283,16 @@ class SeatingSync:
                 raise HTTPException(409, 'Finish active jobs and queues first.')
             desks = entry.get('desks') or self.changed_desks(backup)
             plan = restore_plan(self.db, source, desks)
+            if plan['report']['errors']:
+                raise HTTPException(409, ' '.join(plan['report']['errors']))
             if not plan['updates']:
                 entry['undone'] = now()
                 self.save()
                 raise HTTPException(409, 'These desks already match the backup.')
-            done = apply_sheet(self.db, plan, self.backups, f'{SOURCE} · undo {entry["file"]}')
+            try:
+                done = apply_sheet(self.db, plan, self.backups, f'{SOURCE} · undo {entry["file"]}')
+            except store.Conflict:
+                raise HTTPException(409, 'Seating or directory changed while preparing Undo. Review the current map and try again.')
             entry['undone'] = now()
             self.state['history'] = [{'at': now(), 'file': f'Undo of {entry["file"]}', 'counts': {'restored': len(plan['updates'])}, 'backup': done, 'desks': sorted(plan['updates'])},
                                      *self.state['history']][:50]
@@ -308,7 +313,7 @@ class SeatingSync:
 
 
 def restore_plan(db, backup, desks):
-    """A plan (as plan_sheet makes) that sets these desks to their records and links in the backup."""
+    """Restore only seating fields, retaining current desk details and rejecting new duplicate occupants."""
     from seating_excel import stamp
     with sqlite3.connect(Path(backup).resolve().as_uri() + '?mode=ro', uri=True, factory=ClosingConnection) as old:
         before, before_links = layout_records(old, 'official')
@@ -319,13 +324,34 @@ def restore_plan(db, backup, desks):
         for desk in desks:
             if desk not in records or desk not in before:
                 continue
-            record, link = dict(before[desk], revision=records[desk].get('revision', 0)), before_links.get(desk)
+            record = dict(records[desk], **{field: before[desk][field] for field in ('name', 'team', 'occupancy')})
+            link = before_links.get(desk)
             if all(record.get(k) == records[desk].get(k) for k in ('name', 'team', 'occupancy')) and link == links.get(desk):
                 continue
+            record['verified'] = False
             updates[desk] = {'record': record, 'link': link}
             changes.append({'desk': desk, 'kind': 'restored', 'before': {'name': records[desk]['name']}, 'after': {'name': record['name']}})
+
+        def people(seats, account_links):
+            found = {}
+            for desk, record in seats.items():
+                link = account_links.get(desk)
+                # Unlinked unconfirmed text is a team/room label, as in live-plan imports.
+                if not occupied(record) or (record['occupancy'] == 'unconfirmed' and not link):
+                    continue
+                identity = ('account', link) if link else ('name', key(record['name']))
+                found.setdefault(identity, set()).add(desk)
+            return found
+
+        current_people = people(records, links)
+        final_people = people({**records, **{desk: item['record'] for desk, item in updates.items()}},
+                              {**links, **{desk: item['link'] for desk, item in updates.items()}})
+        errors = ['Cannot undo this update: the same person would occupy ' + ', '.join(sorted(locations))
+                  + '. A later seating change must be resolved first; no other desks were changed.'
+                  for identity, locations in final_people.items()
+                  if len(locations) > 1 and locations - current_people.get(identity, set())]
         return {'fingerprint': stamp(c, 'official'), 'layout': 'official', 'updates': updates,
-                'report': {'changes': changes, 'errors': [], 'warnings': []}}
+                'report': {'changes': changes, 'errors': errors, 'warnings': []}}
 
 
 class UndoUpdate(BaseModel):

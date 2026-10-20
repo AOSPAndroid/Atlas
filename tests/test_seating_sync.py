@@ -10,6 +10,7 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
+import atlas_store as store
 from atlas_store import ClosingConnection
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
@@ -126,6 +127,63 @@ class LiveFloorPlan(unittest.TestCase):
         os.utime(path, (past, past))
         self.sync.configure(Settings(folder=str(self.folder), enabled=True))
         self.assertEqual(self.sync.check()['last']['file'], 'Hoche Project_20261002.xlsx')
+
+    def moved_update(self):
+        self.write('plan.xlsx', self.layout)
+        self.sync.configure(Settings(folder=str(self.folder), enabled=True))
+        self.sync.check()
+        moved = [row[:] for row in self.layout]
+        moved[2] = ['Open\n02R015079', 'Christophe Duriez\n02R016079', 'Credit Sales\n02R016081']
+        self.write('plan.xlsx', moved, age=60)
+        return self.sync.check()['history'][0]
+
+    def test_undo_preserves_newer_desk_details_and_clears_verification(self):
+        update = self.moved_update()
+        desk = '02R016079'
+        original, _ = official(self.db, desk)
+        details = {'notes': 'Later manual note', 'asset': 'ASSET-NEW', 'hostname': 'PC-NEW',
+                   'outlet': 'NEW-OUTLET', 'status': 'Reviewed hardware', 'x': 0.123456, 'y': 0.654321, 'angle': 90}
+        with sqlite3.connect(self.db, factory=ClosingConnection) as c:
+            store.save_record(c, dict(original, **details, verified=True), original, 'fixture later desk edit')
+        history = json.dumps(self.sync.state['history'], sort_keys=True)
+        with patch('seating_sync.apply_sheet', side_effect=store.Conflict('fixture concurrent edit')):
+            with self.assertRaises(HTTPException) as caught:
+                self.sync.undo(update['backup'])
+            self.assertEqual(caught.exception.status_code, 409)
+        self.assertEqual(json.dumps(self.sync.state['history'], sort_keys=True), history)
+        self.sync.undo(update['backup'])
+        restored, _ = official(self.db, desk)
+        self.assertEqual({field: restored[field] for field in details}, details)
+        self.assertFalse(restored['verified'], 'Restored seating must be checked again')
+        self.assertEqual((restored['name'], restored['occupancy']), ('Credit Sales', 'unconfirmed'),
+                         'Repeated unconfirmed team labels remain valid')
+
+    def test_undo_older_update_refuses_later_move_without_writes(self):
+        update = self.moved_update()
+        source, target = '02R016079', '02R016081'
+        moving, person = official(self.db, source)
+        destination, _ = official(self.db, target)
+        with sqlite3.connect(self.db, factory=ClosingConnection) as c:
+            store.save_record(c, dict(moving, name='Vacant desk', occupancy='vacant'), moving, 'fixture later move')
+            store.save_record(c, dict(destination, **{field: moving[field] for field in ('name', 'team', 'occupancy')}),
+                              destination, 'fixture later move')
+            c.execute('delete from desk_user_links where desk_id in (?,?)', (source, target))
+            c.execute('insert into desk_user_links values(?,?,?,?)', (target, person, 'confirmed', 'fixture'))
+        with sqlite3.connect(self.db, factory=ClosingConnection) as c:
+            before = snapshot(c)
+            version = seating_version(c)
+        history = json.dumps(self.sync.state['history'], sort_keys=True)
+        backups = set(self.sync.backups.glob('*.db'))
+        with self.assertRaises(HTTPException) as caught:
+            self.sync.undo(update['backup'])
+        self.assertEqual(caught.exception.status_code, 409)
+        self.assertIn('same person', caught.exception.detail)
+        self.assertIn(target, caught.exception.detail)
+        with sqlite3.connect(self.db, factory=ClosingConnection) as c:
+            self.assertEqual(snapshot(c), before, 'Undo neither duplicates the person nor vacates their newer desk')
+            self.assertEqual(seating_version(c), version)
+        self.assertEqual(json.dumps(self.sync.state['history'], sort_keys=True), history)
+        self.assertEqual(set(self.sync.backups.glob('*.db')), backups, 'No replacement backup was created')
 
     def test_just_saved_busy_large_and_missing(self):
         self.sync.configure(Settings(folder=str(self.folder), enabled=True))
