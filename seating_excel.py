@@ -70,11 +70,13 @@ def account_index(c):
 def occupied(r):
     return r['occupancy']!='vacant' and key(r['name']) not in ('','vacant desk','unconfirmed desk','unassigned','unnamed desk')
 
-def plan_sheet(c, rows, layout='official', complete=False):
+def plan_sheet(c, rows, layout='official', complete=False, labels=frozenset()):
+    """labels: names of team/room labels ("Credit Sales") that are not people, so repeats are not duplicates."""
     records, links=layout_records(c,layout); index, users=account_index(c)
+    def occupant(r): return occupied(r) and not (r['occupancy']=='unconfirmed' and key(r['name']) in labels)
     name_links=defaultdict(set)
     for d,r in records.items():
-        if occupied(r) and links.get(d): name_links[key(r['name'])].add(links[d])
+        if occupant(r) and links.get(d): name_links[key(r['name'])].add(links[d])
     desired={}; warnings=[]; errors=[]
     for row in rows:
         d=row.get('desk','').strip(); prefix=f"Row {row.get('_row','?')}"
@@ -93,13 +95,13 @@ def plan_sheet(c, rows, layout='official', complete=False):
             else: link=next(iter(found))
             if not name: name=users.get(link,{}).get('name') or account
         elif name and status!='vacant':
-            if key(name)==key(old['name']) and occupied(old): link=links.get(d)
+            if key(name)==key(old['name']) and occupant(old): link=links.get(d)
             elif len(name_links[key(name)])==1: link=next(iter(name_links[key(name)]))
             elif len(name_links[key(name)])>1: errors.append(f'{prefix}: this name has multiple existing accounts. Fill Account.'); continue
             else: warnings.append(f'{d}: {name} has no confirmed account link; machine lookup remains unconfirmed. Fill Account to link explicitly.')
         if status=='assigned' and not name: errors.append(f'{prefix}: assigned desk needs a name or account.'); continue
         team=row.get('team',old['team']).strip() or 'Unassigned'
-        label=name or (old['name'] if status==old['occupancy'] and not occupied(old) else ('Vacant desk' if status=='vacant' else 'Unconfirmed desk'))
+        label=name or (old['name'] if status==old['occupancy'] and not occupant(old) else ('Vacant desk' if status=='vacant' else 'Unconfirmed desk'))
         r=dict(old,name=label,team=team,occupancy=status)
         try: store.validate(r)
         except ValueError as e: errors.append(f'{prefix}: {e}'); continue
@@ -107,10 +109,10 @@ def plan_sheet(c, rows, layout='official', complete=False):
     # An identifiable person moving to a new desk also leaves their old desk.
     current_people=defaultdict(list)
     for d,r in records.items():
-        if occupied(r): current_people[('account',links[d]) if links.get(d) else ('name',key(r['name']))].append(d)
+        if occupant(r): current_people[('account',links[d]) if links.get(d) else ('name',key(r['name']))].append(d)
     auto_vacated=[]
     for d,item in list(desired.items()):
-        if not occupied(item['record']): continue
+        if not occupant(item['record']): continue
         person=('account',item['link']) if item['link'] else ('name',key(item['record']['name']))
         origins=current_people.get(person,[])
         if len(origins)==1 and origins[0]!=d and origins[0] not in desired:
@@ -124,7 +126,7 @@ def plan_sheet(c, rows, layout='official', complete=False):
     # Only reject duplicates involving a supplied/cleared desk; unrelated historic issues stay untouched.
     seen=defaultdict(list)
     for d,item in final.items():
-        if occupied(item['record']): seen[('account',item['link']) if item['link'] else ('name',key(item['record']['name']))].append(d)
+        if occupant(item['record']): seen[('account',item['link']) if item['link'] else ('name',key(item['record']['name']))].append(d)
     for identity, desks in seen.items():
         if len(desks)>1 and any(d in desired for d in desks):
             changed=any(d in desired and (any(desired[d]['record'][k]!=records[d][k] for k in ('name','occupancy')) or desired[d]['link']!=links.get(d)) for d in desks)
@@ -133,7 +135,7 @@ def plan_sheet(c, rows, layout='official', complete=False):
     def identity(r,link): return ('account',link) if link else ('name',key(r['name']))
     before=defaultdict(list)
     for d,r in records.items():
-        if occupied(r): before[identity(r,links.get(d))].append(d)
+        if occupant(r): before[identity(r,links.get(d))].append(d)
     changes=[]; updates={}
     for d,item in desired.items():
         old=records[d]; new=item['record']; link=item['link']
@@ -141,8 +143,8 @@ def plan_sheet(c, rows, layout='official', complete=False):
         if links.get(d)!=link: fields.append('account')
         if not fields: continue
         new=dict(new,verified=False); updates[d]={'record':new,'link':link}
-        origin=before.get(identity(new,link),[]) if occupied(new) else []
-        kind='vacated' if new['occupancy']=='vacant' else ('moved' if len(origin)==1 and origin[0]!=d else ('assigned' if not occupied(old) or identity(old,links.get(d))!=identity(new,link) else 'updated'))
+        origin=before.get(identity(new,link),[]) if occupant(new) else []
+        kind='vacated' if new['occupancy']=='vacant' else ('moved' if len(origin)==1 and origin[0]!=d else ('assigned' if not occupant(old) or identity(old,links.get(d))!=identity(new,link) else 'updated'))
         def display(r,k): return {'name':r['name'],'team':r['team'],'status':r['occupancy'],'account':users.get(k,{}).get('account',k or '')}
         changes.append({'desk':d,'kind':kind,'from_desk':origin[0] if kind=='moved' else None,'fields':fields,'before':display(old,links.get(d)),'after':display(new,link)})
     report={'changes':changes,'errors':sorted(set(errors)),'warnings':sorted(set(warnings)), 'unchanged':len(desired)-len(updates),'omitted':len(records)-len({r.get('desk') for r in rows}&set(records)), 'auto_vacated':auto_vacated,'complete':complete,'layout':layout,'rows':len(rows)}

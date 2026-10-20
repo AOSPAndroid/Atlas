@@ -71,6 +71,17 @@ In **Manage Database > Import history**, choose **Restore directory before this 
 
 **Back up .db** downloads a consistent SQLite snapshot. Keep one before manually changing application files; `Update-Atlas.bat` creates backups as part of its update. Preserve the entire `data/` directory (including its backups and `knowledge.sqlite3`), any older installation-level `backups/` directory, local configuration and `config.json` when moving to a new checkout. Never replace your runtime database with the distributed seed. Use Atlas's backup feature rather than copying a running SQLite database as an ordinary file.
 
+## Live floor plan (the assistants' Excel)
+
+**Manage Database > Live floor plan** links official seating to the desk plan the administrative assistants keep in Excel. Enter the folder once, for example the OneDrive-synced `...\PA-IT_shared\02_Current_plan` (quotes from "Copy as path" are fine), tick **Live link on** and click **Save**.
+
+- Atlas checks the folder every minute and uses the newest `.xlsx` that contains desk codes. Other workbooks in the folder (New Joiners, Headcount files) are skipped. A file saved less than 30 seconds ago is read on the next check.
+- Every sheet is read. Each box with a desk code becomes a desk: a name that matches exactly one directory person (word order, case and accents ignored) is linked to that person and their machines. Atlas also accepts shorter names that identify one person, uses the Paris location to resolve duplicate names where possible, and recognises close spelling matches among Paris staff when there is no close second match. These matches are listed for checking. "Open", "Vacant" or an empty box frees the desk. Anything else ("Credit Sales", "Private Office (209) … GCAS (…)", someone not in the directory) is shown exactly as written. A code typed without its leading zero (`2R017069`) is corrected to `02R017069` and listed.
+- Normal changes are applied straight away with a backup, and open maps (Admin and Demo) refresh within a minute. The map footer names the plan and its time.
+- **Held for review** when the plan has problems, the same desk appears with two different names, or one save changes more than the greater of 40 desks and 15% of the plan. The card lists the changes; click **Apply these changes**, or correct the Excel and Atlas reads it again. Approval applies only to the proposal you reviewed; if it has changed, Atlas asks you to review it again.
+- Desks the plan does not mention are left as they are. Desk codes not on the map are skipped and listed.
+- The card shows what was read: corrected codes, names not matched to one person, unknown codes. The ten most recent live-plan backups are kept in `backups/`.
+
 ## Seating updates
 
 Use the separate seating Excel or Desk moves tools in Manage Database. A directory import does not automatically remap desk assignments. See [IT operations and imports](operations.md) for templates and preview steps.
