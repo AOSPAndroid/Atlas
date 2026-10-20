@@ -94,6 +94,13 @@ def palette_desks():
         return {'records': [json.loads(row[0]) for row in con.execute('select body from official_records order by id')]}
 
 
+@app.get('/api/official/version')
+def official_version():
+    from seating_sync import seating_version
+    with connect() as con:
+        return seating_version(con)
+
+
 @app.get('/api/official/state')
 def state():
     with connect() as con:

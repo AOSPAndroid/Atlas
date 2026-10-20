@@ -1,0 +1,81 @@
+"""The desk-plan reader on drawn layouts: same cell, stacked cells, merged boxes; synthetic data."""
+import sqlite3
+import tempfile
+import unittest
+import zipfile
+from pathlib import Path
+
+from atlas_store import ClosingConnection
+from seating_grid import name_key, read_plan
+
+NS = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'
+
+
+def sheet_xml(cells, merges=()):
+    rows = {}
+    for ref, text in cells.items():
+        number = int(''.join(ch for ch in ref if ch.isdigit()))
+        rows.setdefault(number, []).append(f'<c r="{ref}" t="inlineStr"><is><t xml:space="preserve">{text}</t></is></c>')
+    body = ''.join(f'<row r="{n}">{"".join(cells)}</row>' for n, cells in sorted(rows.items()))
+    merged = f'<mergeCells count="{len(merges)}">' + ''.join(f'<mergeCell ref="{m}"/>' for m in merges) + '</mergeCells>' if merges else ''
+    return f'<worksheet xmlns="{NS}"><sheetData>{body}</sheetData>{merged}</worksheet>'
+
+
+def plan(path, sheets):
+    with zipfile.ZipFile(path, 'w') as z:
+        tabs = ''.join(f'<sheet name="{name}" sheetId="{i}" r:id="r{i}"/>' for i, name in enumerate(sheets, 1))
+        z.writestr('xl/workbook.xml', f'<workbook xmlns="{NS}" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>{tabs}</sheets></workbook>')
+        rels = ''.join(f'<Relationship Id="r{i}" Target="worksheets/sheet{i}.xml"/>' for i in range(1, len(sheets) + 1))
+        z.writestr('xl/_rels/workbook.xml.rels', f'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">{rels}</Relationships>')
+        for i, (cells, merges) in enumerate(sheets.values(), 1):
+            z.writestr(f'xl/worksheets/sheet{i}.xml', sheet_xml(cells, merges))
+
+
+class DeskPlanReader(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.c = sqlite3.connect(':memory:', factory=ClosingConnection)
+        self.addCleanup(self.c.close)
+        self.c.execute('create table users(canonical_key,user_id,email,full_name,department)')
+        self.c.executemany('insert into users values(?,?,?,?,?)', [
+            ('k1', 'durc', 'c@x.test', 'DURIEZ Christophe', 'Sales'), ('k2', 'kone', 's@x.test', 'Sandrine Koné', 'Risk'),
+            ('k3', 'a1', 'a1@x.test', 'Alex Smith', ''), ('k4', 'a2', 'a2@x.test', 'Alex Smith', '')])
+
+    def test_layouts_people_labels_and_problems(self):
+        path = Path(self.temp.name) / 'plan.xlsx'
+        plan(path, {
+            '+2 (FINAL)': ({'B2': 'Christophe Duriez', 'B3': '02R015079',             # stacked cells
+                            'D2': 'Sandrine Kone', 'D4': '2R019073',                     # merged box D2:D3 above the code
+                            'F2': 'Open 02R016079', 'G2': 'Credit Sales\n02R016081', 'H2': 'Credit Sales\n02R017071',
+                            'B6': 'Alex Smith\n02R011079', 'C6': 'Oren Ruban (intern)\n02R010086', 'D6': 'Ghost\n02R999999'},
+                           ['D2:D3']),
+            'Desk Mapping (FINAL)': ({'A1': 'Pierre Haberer 02R015079', 'A2': 'Notes only'}, []),
+            'Headcount': ({'A1': 'Team', 'B1': '12'}, []),
+        })
+        known = {d: {'team': 'Credit'} for d in ('02R015079', '02R019073', '02R016079', '02R016081', '02R017071', '02R011079', '02R010086')}
+        result = read_plan(path, self.c, known)
+        rows = {row['desk']: row for row in result['rows']}
+        self.assertEqual((rows['02R015079']['kind'], rows['02R015079']['account']), ('person', 'durc'), 'Name in the cell above; order-free match')
+        self.assertEqual((rows['02R019073']['name'], rows['02R019073']['account']), ('Sandrine Kone', 'kone'), 'Merged box, accents ignored')
+        self.assertEqual(rows['02R016079']['status'], 'vacant')
+        self.assertEqual([rows[d]['kind'] for d in ('02R016081', '02R017071')], ['label', 'label'])
+        self.assertEqual(rows['02R011079']['kind'], 'label', 'Two directory people share the name: not guessed')
+        self.assertEqual(rows['02R010086']['name'], 'Oren Ruban (intern)')
+        self.assertEqual(result['fixes'], [{'cell': '+2 (FINAL)!D4', 'written': '2R019073', 'desk': '02R019073'}])
+        self.assertEqual(result['unknown_desks'], [{'cell': '+2 (FINAL)!D6', 'desk': '02R999999', 'label': 'Ghost'}])
+        self.assertEqual(result['conflicts'][0]['labels'], ['Christophe Duriez', 'Pierre Haberer'], 'Same desk, different names across sheets')
+        self.assertEqual(result['sheets'], {'+2 (FINAL)': 8, 'Desk Mapping (FINAL)': 1})
+        flagged = {item['name']: item['ambiguous'] for item in result['not_in_directory']}
+        self.assertEqual(flagged, {'Alex Smith': True, 'Oren Ruban (intern)': False}, 'Repeated team labels are not flagged as people')
+        self.assertEqual(name_key('Duriez,  CHRISTOPHE (intern)'), 'christophe duriez')
+
+    def test_no_desk_codes(self):
+        path = Path(self.temp.name) / 'joiners.xlsx'
+        plan(path, {'Sheet1': ({'A1': 'Name', 'B1': 'Start date'}, [])})
+        with self.assertRaisesRegex(ValueError, 'No desk codes'):
+            read_plan(path, self.c)
+
+
+if __name__ == '__main__':
+    unittest.main()

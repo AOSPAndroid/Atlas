@@ -391,21 +391,53 @@ const operations = createOperations({
   token: () => token,
   getSelection: () => selected,
   toast,
-  onChange: async () => {
-    const response = await fetch("/api/official/state");
-    if (!response.ok) throw Error("Refresh failed");
-    const result = await response.json();
-    const id = selected?.id;
-    records = result.records;
-    previousRecords = result.legacy || [];
-    previousMappings = result.mappings || {};
-    token = result.token;
-    selected = records.find((r) => r.id === id) || null;
-    setupFilters();
-    search();
-    if (selected) renderDetail();
-  },
+  onChange: () => reloadRecords(),
 });
+async function reloadRecords() {
+  const response = await fetch("/api/official/state");
+  if (!response.ok) throw Error("Refresh failed");
+  const result = await response.json();
+  const id = selected?.id;
+  records = result.records;
+  previousRecords = result.legacy || [];
+  previousMappings = result.mappings || {};
+  token = result.token;
+  selected = records.find((r) => r.id === id) || null;
+  setupFilters();
+  search();
+  if (selected) renderDetail();
+}
+// Live floor plan: seating changed by the assistants' plan (or another window) reloads in place,
+// in Admin and Demo alike. One small request a minute while the map is visible.
+let seatingVersion = null;
+function showLivePlan(plan) {
+  const footer = document.getElementById("mapSource");
+  if (!footer) return;
+  const when = plan && new Date(plan.at);
+  footer.textContent = plan && !Number.isNaN(when.getTime())
+    ? `Live plan: ${plan.source} · updated ${when.toLocaleString([], { dateStyle: "short", timeStyle: "short" })}`
+    : "Paris map · Europe-wide directory";
+}
+async function checkSeating() {
+  if (document.hidden) return;
+  try {
+    const response = await fetch("/api/official/version", { cache: "no-store" });
+    if (!response.ok) return;
+    const current = await response.json();
+    if (seatingVersion !== null && current.version !== seatingVersion) {
+      await reloadRecords();
+      toast(current.live_plan ? `Seating updated from ${current.live_plan.source}` : "Seating updated");
+    }
+    seatingVersion = current.version;
+    showLivePlan(current.live_plan);
+  } catch {}
+}
+async function watchSeating() {
+  await checkSeating();
+  setTimeout(watchSeating, 60000);
+}
+window.AtlasLivePlan = { check: checkSeating };
+setTimeout(watchSeating, 1500);
 function validRecord(r) {
   return (
     r &&

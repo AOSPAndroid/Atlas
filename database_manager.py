@@ -239,3 +239,6 @@ def register_database_manager(app,wmi,check_token):
 
  from seating_excel import register_seating_excel
  register_seating_excel(app,wmi,check_token,busy)
+ # Live floor plan: the assistants' desk-plan Excel keeps official seating current.
+ from seating_sync import register as register_seating_sync
+ register_seating_sync(app,wmi,check_token,busy,Path(wmi.MASTER_DB).resolve().parent/'seating-sync.json')

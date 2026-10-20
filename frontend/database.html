@@ -89,6 +89,25 @@
       <div id="message" role="status" aria-live="polite">
         Loading database status…
       </div>
+      <section class="panel atlas-live-plan" id="live-plan" aria-labelledby="live-plan-title">
+        <header class="atlas-live-plan-head"><h2 id="live-plan-title">Live floor plan</h2><span id="live-plan-state" role="status">Off</span></header>
+        <p>Atlas reads the assistants' desk plan (Excel boxes such as <b>Christophe Duriez 02R015079</b>, <b>Credit Sales 02R016079</b> or <b>Open 03R016079</b>) from a synced folder, and the map updates within a minute of each save, in Admin and Demo. Normal changes apply on their own with a backup; large or unclear ones wait here for you. Desks the plan does not mention are left as they are.</p>
+        <div class="atlas-live-plan-controls">
+          <label class="atlas-live-plan-folder">Plan folder<input id="live-plan-folder" autocomplete="off" spellcheck="false" placeholder="C:\Users\you\OneDrive - Company\Shortcuts\PA-IT_shared\02_Current_plan"></label>
+          <label class="atlas-live-plan-toggle"><input type="checkbox" id="live-plan-enabled"> Live link on</label>
+          <button type="button" id="live-plan-save" class="primary">Save</button>
+          <button type="button" id="live-plan-check">Check now</button>
+        </div>
+        <p id="live-plan-message" role="status"></p>
+        <div id="live-plan-details" class="atlas-live-plan-details"></div>
+        <section id="live-plan-held" class="atlas-live-plan-held" hidden>
+          <h3>Waiting for your review</h3>
+          <p id="live-plan-held-reason"></p>
+          <ul id="live-plan-changes"></ul>
+          <button type="button" id="live-plan-apply" class="primary">Apply these changes</button>
+        </section>
+        <details class="atlas-live-plan-history"><summary>Recent live updates</summary><ul id="live-plan-history"></ul></details>
+      </section>
       <div class="atlas-upload-grid">
         <section class="panel atlas-upload-section" id="directory-import">
           <h2>Users &amp; devices</h2>
@@ -573,6 +592,7 @@
     <script src="/assets/vdi-data-import.js"></script>
     <script src="/assets/desk-moves.js"></script>
     <script src="/assets/seating-excel.js"></script>
+    <script src="/assets/seating-sync.js"></script>
     <script
       type="module"
       src="/assets/atlas-interactions.js"
