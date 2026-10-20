@@ -204,7 +204,7 @@ window.AtlasADRows = (() => {
     const view = el("select");
     view.setAttribute("aria-label", "Membership comparison");
     const views = {};
-    for (const v of ["all", "second", "first", "both", "partial"]) {
+    for (const v of ["all", "diff", "second", "first", "partial", "both"]) {
       const o = el("option");
       o.value = v;
       views[v] = o;
@@ -216,7 +216,11 @@ window.AtlasADRows = (() => {
     const copyMissing = el("button", "Copy missing groups");
     copyMissing.type = "button";copyMissing.className = "ad-copy-missing";copyMissing.hidden = true;
     const copyStatus = el("span");copyStatus.setAttribute("role", "status");copyStatus.className = "ad-copy-status";
-    bar.append(search, mode, view, copyMissing, copyStatus);
+    // Large directories (200+ groups): fold the list into sections by name prefix (APP-, FS-, VPN-...).
+    const sectioned = el("label");sectioned.className = "ad-section-option";
+    const sectionBox = el("input");sectionBox.type = "checkbox";sectionBox.checked = true;sectionBox.setAttribute("aria-label", "Group by name prefix");
+    sectioned.append(sectionBox, " Group by prefix");sectioned.hidden = true;
+    bar.append(search, mode, view, sectioned, copyMissing, copyStatus);
     result.prepend(bar);
     // Always-visible object summary, like the title area of an AD properties sheet.
     const header=el('div');header.className='ad-object-header';
@@ -266,9 +270,12 @@ window.AtlasADRows = (() => {
     bar.after(chips,count,list);
     result.append(by('Overview').parentElement, result.querySelector('.workspace-ad-evidence'), accessDetails);
     let rows = [], all = [];
+    const collapsed = new Set(), SECTION_MIN = 40;
     const labels = () => {
       const a = nameOf(primary), many = others.length > 1;
       views.all.textContent = "All groups";
+      views.diff.textContent = "Differences only";
+      views.diff.hidden = views.diff.disabled = !others.length;
       views.second.textContent = "Missing from " + a;
       views.first.textContent = "Only " + a;
       views.both.textContent = many ? "Everyone has it" : "In both";
@@ -293,7 +300,8 @@ window.AtlasADRows = (() => {
         return;
       }
       const tally = v => all.filter(g => g.presence === v).length, a = nameOf(primary);
-      chips.append(chip("missing from " + a, tally("second"), "missing", "second"), chip("only " + a, tally("first"), "only", "first"));
+      chips.append(chip("differences", all.filter(g => g.presence !== "both").length, "diff", "diff"),
+                   chip("missing from " + a, tally("second"), "missing", "second"), chip("only " + a, tally("first"), "only", "first"));
       if (others.length > 1) chips.append(chip("partly shared", tally("partial"), "partial", "partial"));
       chips.append(chip(others.length > 1 ? "everyone has" : "in both", tally("both"), "shared", "both"), chip("all groups", all.length, "all", "all"));
     };
@@ -336,7 +344,7 @@ window.AtlasADRows = (() => {
                 exact: () => n === term,
                 excludes: () => !n.includes(term),
               }[mode.value]()) &&
-            (view.value === "all" || g.presence === view.value)
+            (view.value === "all" || g.presence === view.value || (view.value === "diff" && g.presence !== "both"))
           );
         })
         .sort((x, y) => (others.length ? order[x.presence] - order[y.presence] || y.count - x.count : 0) || String(x.name).localeCompare(String(y.name)));
@@ -358,7 +366,7 @@ window.AtlasADRows = (() => {
       const columns = others.length ? ['Name',...[primary, ...others].map(nameOf),'Comparison','Description','Actions'] : ['Name','Type','Membership','Description','Actions'];
       for(const [i, text] of columns.entries()){const th=el('th',text);th.scope='col';if(others.length&&i>=1&&i<=others.length+1){th.className='ad-matrix-head'+(i===1?' ad-matrix-target':'');th.title=text;}header.append(th);}
       head.append(header);table.append(head);const body=el('tbody');table.append(body);
-      for (const g of rows) {
+      const renderRow = (g) => {
         const row=el('tr'),name=el('td'),description=el('td');
         const actions=el('td');actions.className='ad-row-actions';
         AtlasADRows.attach(row,name,actions,{...g,kind:'group'},g.sourceServer,()=>AtlasAD.browseMembers(g.dn,g.sourceServer));
@@ -383,13 +391,58 @@ window.AtlasADRows = (() => {
           const m=el('td');const tag=el('span',g.membership||'—');tag.className='ad-cell ad-cell-'+({Nested:'nested',Primary:'primary'}[g.membership]||'has');m.append(tag);row.append(m);
         }
         row.append(description,actions);body.append(row);
+      };
+      sectioned.hidden = all.length < SECTION_MIN;
+      if (sectioned.hidden || !sectionBox.checked) rows.forEach(renderRow);
+      else {
+        // Small prefixes join "Other" so sections stay meaningful.
+        const prefixOf = g => (String(g.name || "").match(/^([A-Za-z0-9]+)[-_. ]/)?.[1] || "").toUpperCase();
+        const sizes = {};
+        for (const g of all) sizes[prefixOf(g)] = (sizes[prefixOf(g)] || 0) + 1;
+        const sections = new Map();
+        for (const g of rows) {
+          const p = sizes[prefixOf(g)] >= 3 && prefixOf(g) ? prefixOf(g) : "Other";
+          if (!sections.has(p)) sections.set(p, []);
+          sections.get(p).push(g);
+        }
+        const gaps = list => list.filter(g => g.presence === "second").length;
+        const ordered = [...sections].sort(([a, x], [b, y]) => (a === "Other") - (b === "Other") || gaps(y) - gaps(x) || a.localeCompare(b));
+        for (const [prefix, members] of ordered) {
+          const head = el("tr");head.className = "ad-section";
+          const cell = el("td");cell.colSpan = columns.length;
+          const toggle = el("button");toggle.type = "button";toggle.className = "ad-section-toggle";
+          const open = !collapsed.has(prefix);
+          toggle.setAttribute("aria-expanded", String(open));
+          toggle.append(el("span", open ? "▾" : "▸"), el("strong", prefix === "Other" ? "Other groups" : prefix + "-…"), el("small", members.length + " group" + (members.length === 1 ? "" : "s")));
+          if (others.length) for (const [presence, label] of [["second", "missing"], ["first", "only " + nameOf(primary)], ["partial", "partly shared"], ["both", "everyone has"]]) {
+            const n = members.filter(g => g.presence === presence).length;
+            if (n) {const tag = el("span", n + " " + label);tag.className = "ad-section-count ad-verdict-" + presence;toggle.append(tag);}
+          }
+          toggle.onclick = () => {open ? collapsed.add(prefix) : collapsed.delete(prefix);filter();};
+          cell.append(toggle);head.append(cell);body.append(head);
+          if (open) members.forEach(renderRow);
+        }
+        const fold = el("span");fold.className = "ad-section-all";
+        const collapseAll = el("button", "Collapse all"), expandAll = el("button", "Expand all");
+        collapseAll.type = expandAll.type = "button";
+        collapseAll.onclick = () => {for (const [prefix] of ordered) collapsed.add(prefix);filter();};
+        expandAll.onclick = () => {collapsed.clear();filter();};
+        fold.append(collapseAll, expandAll);count.append(fold);
       }
       if(rows.length)list.append(table);else list.append(el('p','No matching groups.'));
+      // Differences view: say how much is hidden so nothing looks lost.
+      const hidden = view.value === "diff" ? all.filter(g => g.presence === "both").length : 0;
+      if (hidden) {
+        const note = el("p");note.className = "ad-hidden-note";
+        const show = el("button", "Show them");show.type = "button";show.onclick = () => {view.value = "all";filter();};
+        note.append(`${hidden} group${hidden === 1 ? "" : "s"} everyone has ${hidden === 1 ? "is" : "are"} hidden · `, show);list.append(note);
+      }
       download.disabled = !rows.length;
     };
     search.oninput = filter;
     mode.onchange = filter;
     view.onchange = filter;
+    sectionBox.onchange = filter;
     copyMissing.onclick = async () => {
       const text = all.filter(g => g.presence === "second").map(g => g.name).join("\n");
       try {await navigator.clipboard.writeText(text);copyStatus.textContent = "Copied.";}
@@ -476,6 +529,8 @@ window.AtlasADRows = (() => {
         }
         others = found;
         view.disabled = !others.length;
+        // With hundreds of groups the gaps are what matter: start on the differences.
+        if (others.length) view.value = "diff";
         status.textContent = others.length
           ? "Comparison complete. " + [...others.flatMap(o => o.warnings || []), ...failed].join(" ")
           : failed.join(" ");

@@ -36,6 +36,7 @@ const findButton = (root, text) => [...root.querySelectorAll('button')].find(but
   // A form change or re-filter cannot redirect actions from an existing result.
   d.getElementById('adServer').value = 'unrelated.example.invalid';
   d.querySelector('[aria-label="Comparison domain or controller"]').value = 'unrelated-comparison.example.invalid';
+  d.querySelector('[aria-label="Membership comparison"]').value = 'all';
   d.querySelector('[aria-label="Filter AD groups"]').oninput();
   for (const name of ['Primary', 'Secondary', 'Shared']) findButton(d.querySelector('.ad-groups'), name).click();
   assert.deepEqual(opened.map(item => item.server), ['dc-primary.example.invalid', 'dc-secondary.example.invalid', 'dc-primary.example.invalid']);
