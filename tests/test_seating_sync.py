@@ -93,6 +93,31 @@ class LiveFloorPlan(unittest.TestCase):
         self.assertEqual(after['live_plan']['source'], 'Hoche Project_20261020.xlsx')
         self.assertEqual(self.sync.check()['history'], second['history'], 'An unchanged file is not applied twice')
 
+    def test_undo_puts_desks_back_and_a_reader_update_reads_again(self):
+        self.write('plan.xlsx', self.layout)
+        self.sync.configure(Settings(folder=str(self.folder), enabled=True))
+        self.assertEqual(self.sync.check()['status']['state'], 'synced')
+        seats = lambda: [(r['name'], r['team'], r['occupancy'], link) for r, link in (official(self.db, d) for d in ('02R015079', '02R016079'))]
+        before = seats()
+        moved = [row[:] for row in self.layout]
+        moved[2] = ['Open\n02R015079', 'Christophe Duriez\n02R016079', 'Credit Sales\n02R016081']
+        self.write('plan.xlsx', moved, age=60)
+        update = self.sync.check()['history'][0]
+        self.assertEqual(update['desks'], ['02R015079', '02R016079'])
+        # Updates made before desk lists were kept still undo, from the import log.
+        del self.sync.state['history'][0]['desks']
+        undone = self.sync.undo(update['backup'])
+        self.assertEqual(seats(), before)
+        self.assertEqual(undone['history'][0]['counts'], {'restored': 2})
+        self.assertTrue(undone['history'][1]['undone'])
+        self.assertEqual(self.sync.check()['history'], undone['history'], 'The same file is not applied again after an undo')
+        with self.assertRaises(HTTPException):
+            self.sync.undo(update['backup'])
+        # A newer reader reads the unchanged file again.
+        self.sync.state['last']['signature'] = self.sync.state['last']['signature'][:3]
+        self.assertEqual(self.sync.check()['history'][0]['file'], 'plan.xlsx')
+        self.assertEqual(official(self.db, '02R016079')[0]['name'], 'Christophe Duriez')
+
     def test_just_saved_busy_large_and_missing(self):
         self.sync.configure(Settings(folder=str(self.folder), enabled=True))
         self.write('plan.xlsx', self.layout, age=5)

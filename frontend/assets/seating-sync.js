@@ -4,7 +4,7 @@
   if (!$("live-plan")) return;
   const tones = { synced: "status-ok", held: "status-warn", waiting: "status-warn", checking: "status-warn", error: "status-bad", off: "" };
   const labels = { synced: "Synced", held: "Waiting for review", waiting: "Waiting", checking: "Checking", error: "Needs attention", off: "Off" };
-  const kinds = { moved: "moved", assigned: "assigned", vacated: "freed", updated: "updated" };
+  const kinds = { moved: "moved", assigned: "assigned", vacated: "freed", updated: "updated", restored: "restored" };
   let editing = false, timer, review = null;
   const canApply = () => !!review?.id && !review.report?.errors?.length && !!review.report?.changes?.length;
   const api = (url, options = {}) => window.AtlasClient.request(url, { ...options, atlasSilent: true });
@@ -49,11 +49,20 @@
       facts.textContent = `${last.file} · saved ${when(last.modified)} · ${last.desks} desks read · last checked ${when(data.checked)}`;
       details.append(facts);
       const reader = last.reader || {};
+      const tabs = Object.entries(reader.sheets || {});
+      if (tabs.length) {
+        const read = document.createElement("p");
+        read.className = "atlas-live-plan-tabs";
+        read.textContent = "Tabs read: " + tabs.map(([name, n]) => `${name} (${n})`).join(" · ") +
+          (reader.hidden_sheets?.length ? ` · hidden tabs skipped: ${reader.hidden_sheets.join(", ")}` : "");
+        details.append(read);
+      }
       const notes = [
         list("desk codes corrected", (reader.fixes || []).map((f) => `${f.written} → ${f.desk} (${f.cell})`), "status-warn"),
         list("names linked to a slightly different directory name (plan wording kept)", (reader.matched_partly || []).map((x) => `${x.name} → ${x.directory} (${x.account}) · ${x.desk} · ${{ fuller: "fuller name", paris: "same name, the one in Paris", spelling: "spelling corrected" }[x.how] || x.how}`), "status-ok"),
         list("names not matched to one person (shown as written)", (reader.not_in_directory || []).map((x) => `${x.name} · ${x.desk}${x.ambiguous ? " · several people share this name" : ""}`), "status-warn"),
         list("desk codes not on the map (skipped)", (reader.unknown_desks || []).map((x) => `${x.desk} ${x.label ? "· " + x.label : ""} (${x.cell})`), "status-bad"),
+        list("desk codes with nothing written beside them (desk left as it is)", (reader.blank || []).map((x) => `${x.desk} (${x.cell})`), "status-warn"),
         list("desks with two different names in the plan", (reader.conflicts || []).map((x) => `${x.desk}: ${x.labels.join(" / ")} (${x.cells.join(", ")})`), "status-bad"),
       ].filter(Boolean);
       details.append(...notes);
@@ -70,7 +79,23 @@
         ...(changes.length > 300 ? [item(`… and ${changes.length - 300} more`)] : []),
       );
     }
-    $("live-plan-history").replaceChildren(...(data.history || []).map((h) => item(`${when(h.at)} · ${h.file} · ${describe(h.counts)}`)));
+    $("live-plan-history").replaceChildren(...(data.history || []).map((h, index) => {
+      const li = item(`${when(h.at)} · ${h.file} · ${describe(h.counts)}${h.undone ? " · undone" : ""}`);
+      if (h.backup && !h.undone && index < 10) {
+        const undo = document.createElement("button");
+        undo.type = "button";
+        undo.className = "atlas-live-plan-undo";
+        undo.textContent = "Undo";
+        undo.title = "Put these desks back as they were before this update";
+        undo.onclick = () => {
+          const n = h.desks?.length;
+          if (!confirm(`Put ${n ? n + " desks" : "the desks from this update"} back as they were before ${when(h.at)}? Atlas backs up first.`)) return;
+          act(undo, () => post("/api/seating-sync/undo", { backup: h.backup }));
+        };
+        li.append(" ", undo);
+      }
+      return li;
+    }));
     if (!(data.history || []).length) $("live-plan-history").append(item("No live updates yet."));
   }
 

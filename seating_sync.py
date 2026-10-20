@@ -26,7 +26,7 @@ import atlas_store as store
 from atlas_store import ClosingConnection
 from identity_links import key
 from seating_excel import apply_sheet, layout_records, plan_sheet
-from seating_grid import read_plan
+from seating_grid import VERSION as READER, read_plan
 
 SOURCE = 'Live floor plan'
 STABLE_SECONDS = 30
@@ -149,7 +149,7 @@ class SeatingSync:
         with tempfile.TemporaryDirectory(prefix='atlas_plan_') as work:
             for path in self.candidates(folder):
                 stat = path.stat()
-                signature = [path.name, stat.st_mtime_ns, stat.st_size]
+                signature = [path.name, stat.st_mtime_ns, stat.st_size, READER]
                 if not force and self.plans.get(tuple(signature)) is False:
                     continue
                 if self.clock() - stat.st_mtime < STABLE_SECONDS:
@@ -190,7 +190,7 @@ class SeatingSync:
             plan = plan_sheet(c, rows, 'official', False, frozenset(labels))
         report = plan['report']
         info = {'file': path.name, 'modified': modified, 'signature': signature, 'desks': len(rows),
-                'reader': {k: reader[k] for k in ('fixes', 'matched_partly', 'not_in_directory', 'unknown_desks', 'conflicts', 'sheets')}}
+                'reader': {k: reader[k] for k in ('fixes', 'matched_partly', 'not_in_directory', 'unknown_desks', 'conflicts', 'sheets', 'hidden_sheets', 'blank')}}
         counts = tally(report['changes'])
         reason = ('The plan has problems Atlas cannot resolve on its own.' if report['errors'] else
                   'The same desk appears with different names in the plan.' if reader['conflicts'] else
@@ -218,7 +218,7 @@ class SeatingSync:
             self.set_status('waiting', 'Seating changed while reading the plan; comparing again.')
             return self.summary()
         self.held = None
-        entry = {'at': now(), 'file': info['file'], 'counts': counts, 'backup': backup}
+        entry = {'at': now(), 'file': info['file'], 'counts': counts, 'backup': backup, 'desks': sorted(plan['updates'])}
         self.state['history'] = [entry, *self.state.get('history', [])][:50]
         self.state['last'] = {**info, 'result': 'applied', 'counts': counts}
         self.prune()
@@ -262,6 +262,70 @@ class SeatingSync:
         self.stop_event.set()
 
 
+    def undo(self, backup):
+        """Put the desks one live update changed back as they were in its backup.
+        The plan file is not read again until it is saved again."""
+        with self.lock:
+            entry = next((h for h in self.state.get('history', []) if h.get('backup') == backup and not h.get('undone')), None)
+            if not entry:
+                raise HTTPException(404, 'This update cannot be undone any more.')
+            source = self.backups / backup
+            if not source.is_file():
+                raise HTTPException(409, 'The backup for this update was removed.')
+            if self.busy():
+                raise HTTPException(409, 'Finish active jobs and queues first.')
+            desks = entry.get('desks') or self.changed_desks(backup)
+            plan = restore_plan(self.db, source, desks)
+            if not plan['updates']:
+                entry['undone'] = now()
+                self.save()
+                raise HTTPException(409, 'These desks already match the backup.')
+            done = apply_sheet(self.db, plan, self.backups, f'{SOURCE} · undo {entry["file"]}')
+            entry['undone'] = now()
+            self.state['history'] = [{'at': now(), 'file': f'Undo of {entry["file"]}', 'counts': {'restored': len(plan['updates'])}, 'backup': done, 'desks': sorted(plan['updates'])},
+                                     *self.state['history']][:50]
+            self.held = None
+            self.prune()
+            self.set_status('synced', f'Restored {len(plan["updates"])} desks from before {entry["file"]}. The plan is read again when it is next saved.')
+            return self.summary()
+
+    def changed_desks(self, backup):
+        # Updates made before desk lists were kept: the import log holds the report.
+        with sqlite3.connect(self.db, factory=ClosingConnection) as c:
+            if not table(c, 'seating_import_history'):
+                return []
+            for path, report in c.execute('select backup, report from seating_import_history'):
+                if Path(path).name == backup:
+                    return sorted({change['desk'] for change in json.loads(report).get('changes', [])})
+        return []
+
+
+def restore_plan(db, backup, desks):
+    """A plan (as plan_sheet makes) that sets these desks to their records and links in the backup."""
+    from seating_excel import stamp
+    with sqlite3.connect(Path(backup).resolve().as_uri() + '?mode=ro', uri=True, factory=ClosingConnection) as old:
+        before, before_links = layout_records(old, 'official')
+    with sqlite3.connect(db, factory=ClosingConnection) as c:
+        c.execute('begin')
+        records, links = layout_records(c, 'official')
+        updates, changes = {}, []
+        for desk in desks:
+            if desk not in records or desk not in before:
+                continue
+            record, link = dict(before[desk], revision=records[desk].get('revision', 0)), before_links.get(desk)
+            if all(record.get(k) == records[desk].get(k) for k in ('name', 'team', 'occupancy')) and link == links.get(desk):
+                continue
+            updates[desk] = {'record': record, 'link': link}
+            changes.append({'desk': desk, 'kind': 'restored', 'before': {'name': records[desk]['name']}, 'after': {'name': record['name']}})
+        return {'fingerprint': stamp(c, 'official'), 'layout': 'official', 'updates': updates,
+                'report': {'changes': changes, 'errors': [], 'warnings': []}}
+
+
+class UndoUpdate(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    backup: str = Field(min_length=1, max_length=200)
+
+
 def tally(changes):
     counts = {}
     for change in changes:
@@ -270,7 +334,7 @@ def tally(changes):
 
 
 def describe(counts):
-    words = {'moved': 'moved', 'assigned': 'assigned', 'vacated': 'freed', 'updated': 'updated'}
+    words = {'moved': 'moved', 'assigned': 'assigned', 'vacated': 'freed', 'updated': 'updated', 'restored': 'restored'}
     return ', '.join(f'{n} {words.get(kind, kind)}' for kind, n in counts.items()) or 'no changes'
 
 
@@ -300,6 +364,11 @@ def register(app, wmi, check_token, busy, state_path):
     def apply(body: ApplyReview, request: Request):
         check_token(request)
         return sync.apply_held(body.id)
+
+    @app.post('/api/seating-sync/undo')
+    def undo(body: UndoUpdate, request: Request):
+        check_token(request)
+        return sync.undo(body.backup)
 
     @app.get('/api/official/version')
     def version():

@@ -3065,3 +3065,4 @@ body.atlas-database .atlas-live-plan-notes ul, body.atlas-database .atlas-live-p
 body.atlas-database .atlas-live-plan-held { border:1px solid var(--atlas-warning-line); background:var(--atlas-warning-bg); border-radius:var(--atlas-control-radius); padding:8px 10px; }
 body.atlas-database .atlas-live-plan-held h3 { margin:0 0 4px; font-size:13px; }
 body.atlas-database .atlas-live-plan-history summary { cursor:pointer; font-size:12px; font-weight:600; }
+body.atlas-database .atlas-live-plan-history .atlas-live-plan-undo { min-height:22px; padding:0 8px; font-size:11px; margin-left:4px; }

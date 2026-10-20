@@ -2,9 +2,13 @@
 
 The plan is drawn, not tabulated: each box holds a label and a desk code such as
 "Christophe Duriez 02R015079", "Credit Sales 02R016079" or "Open 03R016079", in one cell or in
-cells stacked above the code. Every sheet is scanned; sheets without desk codes are ignored.
-Labels become: a person (exactly one directory match), a vacant desk (Open/Vacant/blank), or
-otherwise a team or room label shown as-is. Nothing here writes to the database.
+cells stacked above the code. List tabs (a "Desk" column next to a "Name" column) are read by row.
+Every visible sheet is scanned; hidden sheets and sheets without desk codes are ignored. When a
+desk appears on several tabs, the tab for its floor ("R+4 (FINAL)" for 04R...) wins over list
+tabs, and old or draft tabs come last.
+Labels become: a person (exactly one directory match), a vacant desk (Open/Vacant written in the
+box), or otherwise a team or room label shown as-is. A bare desk code with nothing written beside
+it says nothing about the desk, so that desk is left as it is. Nothing here writes to the database.
 """
 import re
 import unicodedata
@@ -13,13 +17,20 @@ import zipfile
 from collections import defaultdict
 from pathlib import Path
 
-from directory_workbook import col_idx, iter_rows, workbook_parts, workbook_scope
+from directory_workbook import REL, col_idx, iter_rows, workbook_scope
 
 NS = '{http://schemas.openxmlformats.org/spreadsheetml/2006/main}'
 # Floor (1-2 digits), R, six digits. A missing leading zero ("2R017069") is a common typo.
 CODE = re.compile(r'(?<![0-9A-Za-z])([0-9]{1,2})\s?R\s?([0-9]{6})(?![0-9])', re.I)
 VACANT = {'', 'open', 'vacant', 'free', 'libre', 'available', 'empty', 'spare', 'hot desk', 'hotdesk', 'flex', 'flex desk'}
 MAX_ABOVE = 3
+# Bumped when reading changes, so an unchanged plan file is read again after an update.
+VERSION = 2
+DESK_HEADER = re.compile(r'(desk|desk ?(id|code|number|no|n°)|bureau|poste|seat|position|place)')
+NAME_HEADER = re.compile(r'(name|full ?name|occupant|nom|nom prenom|prenom nom|employee|user|person|collaborateur|staff)')
+TEAM_HEADER = re.compile(r'(team|department|division|equipe|service|business)')
+STALE = re.compile(r'\b(old|draft|copy|copie|archive|previous|backup|ancien|brouillon|test|wip|v[0-9]+)\b')
+FLOOR = re.compile(r'(?:^|[^0-9a-z])(?:r ?\+ ?|\+ ?|floor ?|etage ?|level ?|niveau ?|f)([0-9]{1,2})(?![0-9])')
 
 
 def plain(text):
@@ -35,6 +46,29 @@ def name_key(text):
 
 def tidy(text):
     return re.sub(r'\s+', ' ', str(text or '')).strip(' -–·,;:')
+
+
+def visible_sheets(path):
+    """[(name, part)] for visible sheets in tab order, and the names of hidden ones."""
+    with zipfile.ZipFile(path) as book:
+        workbook = ET.fromstring(book.read('xl/workbook.xml'))
+        rels = {x.attrib['Id']: x.attrib['Target'] for x in ET.fromstring(book.read('xl/_rels/workbook.xml.rels'))}
+    shown, hidden = [], []
+    for sheet in workbook.find(NS + 'sheets'):
+        name = sheet.attrib['name']
+        if sheet.attrib.get('state') in ('hidden', 'veryHidden'):
+            hidden.append(name)
+            continue
+        shown.append((name, 'xl/' + rels[sheet.attrib[REL + 'id']].lstrip('/').removeprefix('xl/')))
+    return shown, hidden
+
+
+def sheet_rank(sheet, floor):
+    """Lower wins: the tab for the desk's floor, then tabs naming no floor, then other floors; FINAL first, old/draft last."""
+    name = plain(sheet)
+    named = FLOOR.search(name)
+    place = 1 if not named else 0 if int(named[1]) == int(floor) else 2
+    return (bool(STALE.search(name)), place, 'final' not in name)
 
 
 def merged_ranges(path, part):
@@ -74,9 +108,27 @@ def sheet_boxes(path, sheet, part):
     def value(r, c):
         return grid.get(owners.get((r, c), (r, c)), '')
 
+    # List tabs: a header row with a desk column and a name (or team) column beside it.
+    columns = {}
+    for (r, c), text in sorted(grid.items()):
+        if c in columns or not DESK_HEADER.fullmatch(plain(tidy(text))):
+            continue
+        row = {cc: plain(tidy(v)) for (rr, cc), v in grid.items() if rr == r and cc != c}
+        name = next((cc for cc, v in sorted(row.items()) if NAME_HEADER.fullmatch(v)), None)
+        team = next((cc for cc, v in sorted(row.items()) if TEAM_HEADER.fullmatch(v)), None)
+        if name is not None or team is not None:
+            columns[c] = (r, name, team)
+
     found = []
     for (r, c), text in sorted(grid.items()):
         matches = list(CODE.finditer(text))
+        if c in columns and r > columns[c][0] and len(matches) == 1 and not tidy(CODE.sub('', text)):
+            _, name, team = columns[c]
+            label = tidy(grid.get((r, name), '')) if name is not None else ''
+            label = label or (tidy(grid.get((r, team), '')) if team is not None else '')
+            match = matches[0]
+            found.append((match.group(0), match.group(1), match.group(2), label, f'{sheet}!{column_name(c)}{r}'))
+            continue
         start = 0
         for match in matches:
             label = text[start:match.start()]
@@ -163,15 +215,17 @@ class Matcher:
 
 @workbook_scope
 def read_plan(path, c, known_desks=None):
-    """Seating rows plus what the reader fixed or could not place."""
+    """Seating rows plus what the reader fixed, skipped or could not place."""
     path = Path(path)
     matcher = Matcher(c)
     matched_partly = []
-    rows, by_desk, fixes, conflicts, unknown, sheets, not_found = [], {}, [], [], [], {}, []
+    rows, fixes, conflicts, unknown, sheets, not_found, blank = [], [], [], [], {}, [], []
     with zipfile.ZipFile(path) as book:
         if sum(item.file_size for item in book.infolist()) > 200 * 1024 * 1024:
             raise ValueError('The plan workbook expands beyond 200 MB.')
-    for sheet, part in workbook_parts(path):
+    shown, hidden = visible_sheets(path)
+    entries = defaultdict(list)
+    for order, (sheet, part) in enumerate(shown):
         boxes = sheet_boxes(path, sheet, part)
         if boxes:
             sheets[sheet] = len(boxes)
@@ -182,29 +236,35 @@ def read_plan(path, c, known_desks=None):
             if known_desks is not None and desk not in known_desks:
                 unknown.append({'cell': cell, 'desk': desk, 'label': label})
                 continue
-            if desk in by_desk:
-                if plain(by_desk[desk]['_label']) != plain(label):
-                    conflicts.append({'desk': desk, 'cells': [by_desk[desk]['_cell'], cell], 'labels': [by_desk[desk]['_label'], label]})
+            if not label or DESK_HEADER.fullmatch(plain(label)):
+                blank.append({'cell': cell, 'desk': desk})
                 continue
-            row = {'desk': desk, '_cell': cell, '_label': label, '_row': cell}
-            words = plain(label)
-            if words in VACANT or re.fullmatch(r'(open|vacant|free|libre)\b.*', words):
-                row.update(name='', status='vacant', kind='vacant')
+            entries[desk].append((sheet_rank(sheet, floor), order, cell, label))
+    for desk, found in entries.items():
+        found.sort()
+        rank, _, cell, label = found[0]
+        # Only tabs of the same standing can disagree; a floor tab simply wins over a list or old tab.
+        rivals = [item for item in found[1:] if item[0] == rank and plain(item[3]) != plain(label)]
+        if rivals:
+            conflicts.append({'desk': desk, 'cells': [cell] + [item[2] for item in rivals], 'labels': [label] + [item[3] for item in rivals]})
+        row = {'desk': desk, '_cell': cell, '_label': label, '_row': cell}
+        words = plain(label)
+        if words in VACANT or re.fullmatch(r'(open|vacant|free|libre)\b.*', words):
+            row.update(name='', status='vacant', kind='vacant')
+        else:
+            person = matcher.find(label)
+            if person and person[4] != 'exact':
+                matched_partly.append({'desk': desk, 'name': label, 'directory': person[2], 'account': person[1], 'how': person[4]})
+            if person:
+                canonical, account = person[0], person[1]
+                # The map keeps its own team names (Credit, Markets...), so no team is set here.
+                row.update(name=label[:160], account=account, status='assigned', kind='person', canonical=canonical)
             else:
-                person = matcher.find(label)
-                if person and person[4] != 'exact':
-                    matched_partly.append({'desk': desk, 'name': label, 'directory': person[2], 'account': person[1], 'how': person[4]})
-                if person:
-                    canonical, account = person[0], person[1]
-                    # The map keeps its own team names (Credit, Markets...), so no team is set here.
-                    row.update(name=label[:160], account=account, status='assigned', kind='person', canonical=canonical)
-                else:
-                    # A team, room or someone not in the directory: shown exactly as written.
-                    row.update(name=label[:160], status='unconfirmed', kind='label')
-                    if re.fullmatch(r"[A-Za-zÀ-ÿ'’-]+(?: [A-Za-zÀ-ÿ'’-]+){1,3}", re.sub(r'\([^)]*\)', '', label).strip()):
-                        not_found.append({'desk': desk, 'name': label, 'ambiguous': len(matcher.exact.get(name_key(label), ())) > 1})
-            by_desk[desk] = row
-            rows.append(row)
+                # A team, room or someone not in the directory: shown exactly as written.
+                row.update(name=label[:160], status='unconfirmed', kind='label')
+                if re.fullmatch(r"[A-Za-zÀ-ÿ'’-]+(?: [A-Za-zÀ-ÿ'’-]+){1,3}", re.sub(r'\([^)]*\)', '', label).strip()):
+                    not_found.append({'desk': desk, 'name': label, 'ambiguous': len(matcher.exact.get(name_key(label), ())) > 1})
+        rows.append(row)
     if not rows:
         raise ValueError('No desk codes (like 02R015079) were found in this workbook.')
     # Repeated labels ("Credit Sales") and known team names are teams, not missing people.
@@ -214,5 +274,6 @@ def read_plan(path, c, known_desks=None):
     teams = {plain(d) for (d,) in c.execute("select distinct department from users where department<>''")}
     teams |= {plain((record or {}).get('team', '')) for record in (known_desks or {}).values()} if isinstance(known_desks, dict) else set()
     not_found = [item for item in not_found if item['ambiguous'] or (repeats[plain(item['name'])] == 1 and plain(item['name']) not in teams)]
+    blank = [item for item in blank if item['desk'] not in entries]
     return {'rows': rows, 'fixes': fixes, 'conflicts': conflicts, 'unknown_desks': unknown, 'sheets': sheets,
-            'not_in_directory': not_found, 'matched_partly': matched_partly}
+            'hidden_sheets': hidden, 'blank': blank, 'not_in_directory': not_found, 'matched_partly': matched_partly}
