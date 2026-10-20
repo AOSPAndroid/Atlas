@@ -63,6 +63,7 @@
         list("names not matched to one person (shown as written)", (reader.not_in_directory || []).map((x) => `${x.name} · ${x.desk}${x.ambiguous ? " · several people share this name" : ""}`), "status-warn"),
         list("desk codes not on the map (skipped)", (reader.unknown_desks || []).map((x) => `${x.desk} ${x.label ? "· " + x.label : ""} (${x.cell})`), "status-bad"),
         list("desk codes with nothing written beside them (desk left as it is)", (reader.blank || []).map((x) => `${x.desk} (${x.cell})`), "status-warn"),
+        list("desk codes on another floor's tab (check the code)", (reader.other_floor || []).map((x) => `${x.desk}${x.label ? " · " + x.label : ""} (${x.cell})`), "status-warn"),
         list("desks with two different names in the plan", (reader.conflicts || []).map((x) => `${x.desk}: ${x.labels.join(" / ")} (${x.cells.join(", ")})`), "status-bad"),
       ].filter(Boolean);
       details.append(...notes);

@@ -25,10 +25,13 @@ CODE = re.compile(r'(?<![0-9A-Za-z])([0-9]{1,2})\s?R\s?([0-9]{6})(?![0-9])', re.
 VACANT = {'', 'open', 'vacant', 'free', 'libre', 'available', 'empty', 'spare', 'hot desk', 'hotdesk', 'flex', 'flex desk'}
 MAX_ABOVE = 3
 # Bumped when reading changes, so an unchanged plan file is read again after an update.
-VERSION = 2
-DESK_HEADER = re.compile(r'(desk|desk ?(id|code|number|no|n°)|bureau|poste|seat|position|place)')
-NAME_HEADER = re.compile(r'(name|full ?name|occupant|nom|nom prenom|prenom nom|employee|user|person|collaborateur|staff)')
-TEAM_HEADER = re.compile(r'(team|department|division|equipe|service|business)')
+VERSION = 3
+# List tabs: header words for the desk column, the person column and the team column.
+DESK_HEADER = re.compile(r'(?:(?:new|current|assigned|allocated|nouveau|numero|num|n°|no)\s*)?(?:desk|bureau|poste|seat|position|place)'
+                         r'(?:\s*(?:id|code|number|no|nr|n°|#|ref|numero))?')
+NAME_HEADER = re.compile(r'\b(names?|nom|prenom|person|people|assigned|assignee|occupant|occupied|employee|users?|collaborat\w*|staff|who|owner|allocated|attribue)\b')
+TEAM_HEADER = re.compile(r'\b(teams?|department|dept|division|equipe|service|business)\b')
+NOT_NAME = re.compile(r'\b(desk|bureau|poste|seat|teams?|department|dept|division|equipe|service|business|floor|etage|date|start|status)\b')
 STALE = re.compile(r'\b(old|draft|copy|copie|archive|previous|backup|ancien|brouillon|test|wip|v[0-9]+)\b')
 FLOOR = re.compile(r'(?:^|[^0-9a-z])(?:r ?\+ ?|\+ ?|floor ?|etage ?|level ?|niveau ?|f)([0-9]{1,2})(?![0-9])')
 
@@ -61,6 +64,11 @@ def visible_sheets(path):
             continue
         shown.append((name, 'xl/' + rels[sheet.attrib[REL + 'id']].lstrip('/').removeprefix('xl/')))
     return shown, hidden
+
+
+def floor_tabs(path):
+    """How many visible tabs name a floor ("R+2 (FINAL)", "+4", "Floor 3"): desk plans have them."""
+    return sum(1 for name, _ in visible_sheets(path)[0] if FLOOR.search(plain(name)))
 
 
 def sheet_rank(sheet, floor):
@@ -104,6 +112,7 @@ def sheet_boxes(path, sheet, part):
     if not any(CODE.search(value) for value in grid.values()):
         return []
     owners = merged_ranges(path, part)
+    floor_tab = FLOOR.search(plain(sheet))
 
     def value(r, c):
         return grid.get(owners.get((r, c), (r, c)), '')
@@ -114,8 +123,8 @@ def sheet_boxes(path, sheet, part):
         if c in columns or not DESK_HEADER.fullmatch(plain(tidy(text))):
             continue
         row = {cc: plain(tidy(v)) for (rr, cc), v in grid.items() if rr == r and cc != c}
-        name = next((cc for cc, v in sorted(row.items()) if NAME_HEADER.fullmatch(v)), None)
-        team = next((cc for cc, v in sorted(row.items()) if TEAM_HEADER.fullmatch(v)), None)
+        name = next((cc for cc, v in sorted(row.items()) if NAME_HEADER.search(v) and not NOT_NAME.search(v)), None)
+        team = next((cc for cc, v in sorted(row.items()) if TEAM_HEADER.search(v)), None)
         if name is not None or team is not None:
             columns[c] = (r, name, team)
 
@@ -146,6 +155,10 @@ def sheet_boxes(path, sheet, part):
                         parts.insert(0, above)
                     row -= 1
                 label = ' '.join(parts)
+                # Off the floor tabs, a bare code with the person in the next cell is a list row.
+                beside = value(r, c + 1)
+                if not label and not floor_tab and beside and not CODE.search(beside) and len(matches) == 1 and not tidy(CODE.sub('', text)):
+                    label = beside
             found.append((match.group(0), match.group(1), match.group(2), tidy(label), f'{sheet}!{column_name(c)}{r}'))
     return found
 
@@ -219,7 +232,7 @@ def read_plan(path, c, known_desks=None):
     path = Path(path)
     matcher = Matcher(c)
     matched_partly = []
-    rows, fixes, conflicts, unknown, sheets, not_found, blank = [], [], [], [], {}, [], []
+    rows, fixes, conflicts, unknown, sheets, not_found, blank, other_floor = [], [], [], [], {}, [], [], []
     with zipfile.ZipFile(path) as book:
         if sum(item.file_size for item in book.infolist()) > 200 * 1024 * 1024:
             raise ValueError('The plan workbook expands beyond 200 MB.')
@@ -239,6 +252,9 @@ def read_plan(path, c, known_desks=None):
             if not label or DESK_HEADER.fullmatch(plain(label)):
                 blank.append({'cell': cell, 'desk': desk})
                 continue
+            named = FLOOR.search(plain(sheet))
+            if named and int(named[1]) != int(floor):
+                other_floor.append({'cell': cell, 'desk': desk, 'label': label})
             entries[desk].append((sheet_rank(sheet, floor), order, cell, label))
     for desk, found in entries.items():
         found.sort()
@@ -276,4 +292,4 @@ def read_plan(path, c, known_desks=None):
     not_found = [item for item in not_found if item['ambiguous'] or (repeats[plain(item['name'])] == 1 and plain(item['name']) not in teams)]
     blank = [item for item in blank if item['desk'] not in entries]
     return {'rows': rows, 'fixes': fixes, 'conflicts': conflicts, 'unknown_desks': unknown, 'sheets': sheets,
-            'hidden_sheets': hidden, 'blank': blank, 'not_in_directory': not_found, 'matched_partly': matched_partly}
+            'hidden_sheets': hidden, 'blank': blank, 'other_floor': other_floor, 'not_in_directory': not_found, 'matched_partly': matched_partly}

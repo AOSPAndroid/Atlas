@@ -118,6 +118,15 @@ class LiveFloorPlan(unittest.TestCase):
         self.assertEqual(self.sync.check()['history'][0]['file'], 'plan.xlsx')
         self.assertEqual(official(self.db, '02R016079')[0]['name'], 'Christophe Duriez')
 
+    def test_a_workbook_with_floor_tabs_beats_a_newer_list(self):
+        self.write('Hoche Project_20261002.xlsx', self.layout)
+        path = self.folder / 'New Joiners 2026.xlsx'
+        workbook(path, {'Joiners': [['Name', 'Desk']] + [[f'Joiner {i}', desk] for i, desk in enumerate(self.desks[:12])]})
+        past = time.time() - 60
+        os.utime(path, (past, past))
+        self.sync.configure(Settings(folder=str(self.folder), enabled=True))
+        self.assertEqual(self.sync.check()['last']['file'], 'Hoche Project_20261002.xlsx')
+
     def test_just_saved_busy_large_and_missing(self):
         self.sync.configure(Settings(folder=str(self.folder), enabled=True))
         self.write('plan.xlsx', self.layout, age=5)

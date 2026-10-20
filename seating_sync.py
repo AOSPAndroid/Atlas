@@ -26,7 +26,7 @@ import atlas_store as store
 from atlas_store import ClosingConnection
 from identity_links import key
 from seating_excel import apply_sheet, layout_records, plan_sheet
-from seating_grid import VERSION as READER, read_plan
+from seating_grid import VERSION as READER, floor_tabs, read_plan
 
 SOURCE = 'Live floor plan'
 STABLE_SECONDS = 30
@@ -126,8 +126,15 @@ class SeatingSync:
                 'checked': self.checked, 'last': self.state.get('last'), 'history': self.state.get('history', [])[:15], 'held': held}
 
     def candidates(self, folder):
+        """Newest first, but a workbook with a tab per floor beats newer lists (New Joiners...)."""
         files = [p for p in folder.iterdir() if p.suffix.lower() == '.xlsx' and not p.name.startswith(('~$', '.'))]
-        return sorted(files, key=lambda p: p.stat().st_mtime, reverse=True)[:10]
+        files = sorted(files, key=lambda p: p.stat().st_mtime, reverse=True)[:10]
+        def plan_like(path):
+            try:
+                return floor_tabs(path) > 0
+            except (OSError, KeyError, ValueError, zipfile.BadZipFile, ET.ParseError):
+                return False
+        return sorted(files, key=lambda p: not plan_like(p))
 
     def check(self, force=False):
         """One pass: find the plan, and apply or hold its changes. Safe to call at any time."""
@@ -190,7 +197,7 @@ class SeatingSync:
             plan = plan_sheet(c, rows, 'official', False, frozenset(labels))
         report = plan['report']
         info = {'file': path.name, 'modified': modified, 'signature': signature, 'desks': len(rows),
-                'reader': {k: reader[k] for k in ('fixes', 'matched_partly', 'not_in_directory', 'unknown_desks', 'conflicts', 'sheets', 'hidden_sheets', 'blank')}}
+                'reader': {k: reader[k] for k in ('fixes', 'matched_partly', 'not_in_directory', 'unknown_desks', 'conflicts', 'sheets', 'hidden_sheets', 'blank', 'other_floor')}}
         counts = tally(report['changes'])
         reason = ('The plan has problems Atlas cannot resolve on its own.' if report['errors'] else
                   'The same desk appears with different names in the plan.' if reader['conflicts'] else

@@ -92,12 +92,14 @@ class DeskPlanReader(unittest.TestCase):
             'R+4 (FINAL)': ({'A1': 'Christophe Duriez\n04R019086', 'B1': 'Equities\n04R014086', 'C1': '04R015090',
                              'A3': 'Sandrine Kone\n04R015088'}, []),
             # A list tab: desk and name columns, read row by row; a floor tab still wins.
-            'Desk Mapping (FINAL)': ({'A1': 'Desk', 'B1': 'Name', 'C1': 'Team', 'A2': '04R019086', 'B2': 'Someone Else',
-                                      'A3': '04R009086', 'B3': 'Ons Belkicir', 'A4': '04R009088', 'C4': 'Equities',
+            'Desk Mapping (FINAL)': ({'A1': 'Desk number', 'B1': 'Team name', 'C1': 'Person assigned', 'A2': '04R019086', 'C2': 'Someone Else',
+                                      'A3': '04R009086', 'C3': 'Ons Belkicir', 'A4': '04R009088', 'B4': 'Equities',
                                       'A5': '04R009090'}, []),
-            'R+4 (FINAL) (2)': ({'A1': 'Marie Roux\n04R015088'}, []),
+            'R+4 (FINAL) (2)': ({'A1': 'Marie Roux\n04R015088', 'A3': 'Alex Smith\n02R011079'}, []),
+            # A list with no header row: the person is in the cell beside the code.
+            'Moves': ({'A1': '04R011090', 'B1': 'Christophe Duriez'}, []),
         }, hidden={'R+4 (OLD)'})
-        known = {d: {'team': 'Equities'} for d in ('04R019086', '04R014086', '04R015088', '04R015090', '04R009086', '04R009088', '04R009090')}
+        known = {d: {'team': 'Equities'} for d in ('04R019086', '04R014086', '04R015088', '04R015090', '04R009086', '04R009088', '04R009090', '04R011090', '04R011088', '02R011079')}
         result = read_plan(path, self.c, known)
         rows = {row['desk']: row for row in result['rows']}
         self.assertEqual(result['hidden_sheets'], ['R+4 (OLD)'])
@@ -107,6 +109,8 @@ class DeskPlanReader(unittest.TestCase):
         self.assertEqual(rows['04R015088']['account'], 'konesand', 'The FINAL tab beats a draft of the same floor')
         self.assertEqual((rows['04R009086']['account'], rows['04R009088']['name']), ('ons', 'Equities'), 'List rows: name column, else team')
         self.assertNotIn('04R015090', rows, 'A bare code says nothing, so the desk is left alone')
+        self.assertEqual(rows['04R011090']['account'], 'durc')
+        self.assertEqual(result['other_floor'], [{'cell': 'R+4 (FINAL) (2)!A3', 'desk': '02R011079', 'label': 'Alex Smith'}])
         self.assertNotIn('04R009090', rows)
         self.assertEqual([item['desk'] for item in result['blank']], ['04R015090', '04R009090'])
         self.assertEqual(result['conflicts'], [{'desk': '04R015088', 'cells': ['R+4 (FINAL)!A3', 'R+4 (FINAL) (2)!A1'], 'labels': ['Sandrine Kone', 'Marie Roux']}],
