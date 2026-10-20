@@ -21,7 +21,7 @@ from pydantic import BaseModel, ConfigDict, Field
 LIMIT = 300
 TEXT = 20000
 MACHINES = 500
-SOURCES = ('button', 'paste', 'return', 'screenshot', 'inbox')
+SOURCES = ('button', 'paste', 'return', 'screenshot', 'inbox', 'companion')
 HOSTNAME = re.compile(r'(?<![A-Za-z0-9_-])([A-Za-z][A-Za-z0-9-]{4,29})(?![A-Za-z0-9_-])')
 EMAIL = re.compile(r'[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+')
 ACCOUNT = re.compile(r'(?<![A-Za-z0-9])(?:[A-Za-z]{1,3}\\)?[A-Za-z]{1,2}[0-9]{6,9}(?![A-Za-z0-9])')
@@ -218,8 +218,12 @@ def register(app, wmi, check_token, path):
     history = History(path, wmi.db)
 
     @app.get('/api/clipboard')
-    def items():
-        return {'items': history.load(), 'limit': LIMIT}
+    def items(summary: bool = False):
+        loaded = history.load()
+        if summary:
+            # Cheap check for open pages: the Companion adds items in the background.
+            return {'count': len(loaded), 'latest': loaded[0]['id'] + loaded[0]['at'] if loaded else ''}
+        return {'items': loaded, 'limit': LIMIT}
 
     @app.post('/api/clipboard')
     def capture(body: Capture, request: Request):

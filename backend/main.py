@@ -1,6 +1,6 @@
 from __future__ import annotations
 from datetime import datetime
-import base64, json, logging, os, re, shutil, sqlite3, subprocess, threading, time, uuid
+import base64, json, logging, os, re, secrets, shutil, sqlite3, subprocess, sys, threading, time, uuid
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Literal
@@ -837,8 +837,16 @@ def search_message(message_id):
 search_index=SearchIndex(knowledge_path().parent/'search-index.sqlite3',
  {'article':search_articles,'diagram':search_diagrams,'deployment':search_deployments,'inbox':search_inbox})
 register_search(app,search_index,search_message)
-from inbox_control import register as register_inbox_control
-register_inbox_control(app)
+# The Atlas Companion runs in the operator's normal Windows session (clipboard, Outlook) and
+# reports here; Live Inbox's collector switches control it once it has connected.
+from inbox_control import register as register_inbox_control, InboxIntegration
+from companion_server import register as register_companion, CompanionInbox
+from runtime_paths import companion_state_path, companion_inbox_path
+def _admin_token(request):
+ from atlas_api import TOKEN
+ if not secrets.compare_digest(request.headers.get('x-atlas-token',''),TOKEN):raise HTTPException(403,'Refresh the page before saving')
+_companion=register_companion(app,sys.modules[__name__],_admin_token,companion_state_path,companion_inbox_path)
+register_inbox_control(app,CompanionInbox(_companion,InboxIntegration()))
 
 # Bundled open-source Draw.io static editor (no server-side editor endpoints).
 app.mount('/drawio', StaticFiles(directory=ROOT/'frontend/drawio', html=True), name='drawio')

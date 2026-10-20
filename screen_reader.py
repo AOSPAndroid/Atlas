@@ -27,6 +27,31 @@ IMAGE_LIMIT = 15 * 1024 * 1024
 IMAGE_TYPES = {b'\x89PNG\r\n\x1a\n': '.png', b'\xff\xd8\xff': '.jpg', b'BM': '.bmp', b'GIF8': '.gif'}
 
 
+def ocr_image(ps, data):
+    """Windows OCR of a PNG/JPEG/BMP/GIF image: {'text', 'language'}. Shared with the Atlas Companion."""
+    if not windows():
+        raise HTTPException(501, 'Reading screenshots needs Windows.')
+    if len(data) > IMAGE_LIMIT:
+        raise HTTPException(413, 'The image is larger than 15 MB.')
+    suffix = next((ext for magic, ext in IMAGE_TYPES.items() if data.startswith(magic)), None)
+    if not suffix:
+        raise HTTPException(415, 'Paste a PNG, JPEG, BMP or GIF screenshot.')
+    with tempfile.TemporaryDirectory(prefix='atlas-image-') as folder:
+        path = Path(folder) / ('clipboard' + suffix)
+        path.write_bytes(data)
+        # The path is Atlas's own temporary file, quoted as a PowerShell literal.
+        literal = "'" + str(path).replace("'", "''") + "'"
+        script = f"$Mode='image'; $Delay=0; $ImagePath={literal}\n" + SCRIPT.read_text(encoding='utf-8')
+        try:
+            captured = json.loads(ps(script, timeout=60))
+        except (RuntimeError, ValueError) as error:
+            raise HTTPException(502, f'Could not read the screenshot: {error}') from error
+    text = str(captured.get('text') or '')
+    if not text.strip():
+        raise HTTPException(422, 'No text was found in the screenshot. Copy a larger or sharper area and retry.')
+    return {'text': text, 'language': captured.get('language') or ''}
+
+
 def remember(text, source):
     # Everything read from the clipboard also lands in the clipboard history, with its enrichment.
     from clipboard_history import record
@@ -138,22 +163,8 @@ def register(app, wmi, check_token):
             data.extend(chunk)
             if len(data) > IMAGE_LIMIT:
                 raise HTTPException(413, 'The image is larger than 15 MB.')
-        suffix = next((ext for magic, ext in IMAGE_TYPES.items() if data.startswith(magic)), None)
-        if not suffix:
-            raise HTTPException(415, 'Paste a PNG, JPEG, BMP or GIF screenshot.')
-        with tempfile.TemporaryDirectory(prefix='atlas-image-') as folder:
-            path = Path(folder) / ('clipboard' + suffix)
-            path.write_bytes(data)
-            # The path is Atlas's own temporary file, quoted as a PowerShell literal.
-            literal = "'" + str(path).replace("'", "''") + "'"
-            script = f"$Mode='image'; $Delay=0; $ImagePath={literal}\n" + SCRIPT.read_text(encoding='utf-8')
-            try:
-                captured = json.loads(wmi.ps(script, timeout=60))
-            except (RuntimeError, ValueError) as error:
-                raise HTTPException(502, f'Could not read the screenshot: {error}') from error
+        captured = ocr_image(wmi.ps, bytes(data))
         text = str(captured.get('text') or '')
-        if not text.strip():
-            raise HTTPException(422, 'No text was found in the screenshot. Copy a larger or sharper area and retry.')
         title = 'Pasted screenshot'
         remember(text, 'screenshot')
         result = {'source': 'image', 'title': title, 'process': '', 'text': text[:LIMIT], 'truncated': len(text) > LIMIT,

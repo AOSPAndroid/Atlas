@@ -43,6 +43,14 @@ def scripts_path():
     return folder / SCRIPTS if folder else ROOT / 'data' / SCRIPTS
 
 
+def companion_state_path():
+    return clipboard_path().with_name('companion-state.json')
+
+
+def companion_inbox_path():
+    return clipboard_path().with_name('companion-inbox')
+
+
 def clipboard_path():
     folder = database_folder()
     return folder / CLIPBOARD if folder else ROOT / 'data' / CLIPBOARD

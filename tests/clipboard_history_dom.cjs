@@ -18,8 +18,13 @@ const enrich = (text, source, id) => ({ id, at: '2026-10-20T15:40:00', source, t
 (async () => {
   const posts = [], deletes = [];
   let stored = [enrich('older note', 'paste', 'old')];
+  let companion = { known: false, online: false, user: '', settings: { clipboard: true, mail: false }, clipboard: {}, mail: {} };
+  const settings = [];
   const f = await fixture({ fetch: async (url, options = {}) => {
-    const path = new URL(url, 'http://localhost').pathname, method = options.method || 'GET';
+    const parsed = new URL(url, 'http://localhost'), path = parsed.pathname, method = options.method || 'GET';
+    if (path === '/api/clipboard' && parsed.searchParams.get('summary')) return response({ count: stored.length, latest: stored[0] ? stored[0].id : '' });
+    if (path === '/api/companion') return response(companion);
+    if (path === '/api/companion/settings') { const body = JSON.parse(options.body); settings.push(body); companion = { ...companion, settings: { ...companion.settings, ...body } }; return response(companion); }
     if (path === '/api/session') return response({ token: 'fixture' });
     if (path === '/api/clipboard' && method === 'GET') return response({ items: stored });
     if (path === '/api/clipboard' && method === 'POST') {
@@ -96,6 +101,25 @@ const enrich = (text, source, id) => ({ id, at: '2026-10-20T15:40:00', source, t
   $('clipboardAuto').click(); clip = { text: 'something new' }; await sleep(1600); w.dispatchEvent(new w.Event('focus')); await sleep(60);
   assert.equal(posts.length, 3, 'Turning the option off stops automatic captures');
 
+  // The Companion row: not set up, then connected (browser auto-capture is not needed), then switched off.
+  const row2 = () => $('clipboardCompanion').textContent;
+  await until(() => /Companion not set up/.test(row2()));
+  companion = { ...companion, known: true, online: true, user: 'EXAMPLE\\operator', mail: { state: 'watching' } };
+  // Opening the drawer refreshes the Companion status straight away.
+  $('clipboardToggle').click(); $('clipboardToggle').click();
+  await until(() => /Companion connected/.test(row2()));
+  assert.match(row2(), /EXAMPLE\\operator · every copy is captured/);
+  assert.match(row2(), /Outlook: watching/);
+  assert($('clipboardAuto').disabled, 'Browser capture on return is covered by the Companion');
+  $('companionClipboard').click();
+  await until(() => settings.length === 1);
+  assert.deepEqual(settings[0], { clipboard: false });
+  await until(() => /clipboard capture is off/.test(row2()));
+  assert(!$('clipboardAuto').disabled);
+  companion = { ...companion, online: false, last_seen: '2026-10-20T15:00:00' };
+  $('clipboardToggle').click(); $('clipboardToggle').click();
+  await until(() => /Companion not running/.test(row2()));
+
   // Delete one, then clear all after confirming.
   $('clipboardToggle').click(); await sleep(20);
   d.querySelector('.clipboard-item [data-delete]').click();
@@ -105,6 +129,6 @@ const enrich = (text, source, id) => ({ id, at: '2026-10-20T15:40:00', source, t
   assert.equal(deletes.at(-1), '/api/clipboard');
   assert.deepEqual(f.errors, []);
   w.close();
-  console.log('PASS: clipboard history captures, colours and tabulates machines/people/desks, bulk deploy and ping, right-click tools, Ctrl+V outside Live Inbox, quiet capture on return (once), delete and clear');
+  console.log('PASS: clipboard history captures, colours and tabulates machines/people/desks, bulk deploy and ping, right-click tools, Ctrl+V outside Live Inbox, quiet capture on return (once), Companion status and switch, delete and clear');
   process.exit(0);
 })().catch(error => { console.error(error); process.exit(1); });

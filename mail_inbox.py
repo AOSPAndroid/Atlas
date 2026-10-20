@@ -12,6 +12,9 @@ from notification_inbox import notification_status, source_columns
 
 
 def mail_directory():
+    import companion_server
+    if companion_server.companion and companion_server.companion.mail_active():
+        return companion_server.companion.inbox
     from inbox_control import InboxIntegration, IntegrationError
     try:
         configured = InboxIntegration().config()
@@ -45,6 +48,9 @@ def queue_reader(directory):
 
 
 def watcher_status(directory):
+    import companion_server
+    if companion_server.companion and companion_server.companion.mail_active() and directory == companion_server.companion.inbox:
+        return companion_server.companion.mail_status()
     try:
         current = status(directory)
     except PermissionError as error:

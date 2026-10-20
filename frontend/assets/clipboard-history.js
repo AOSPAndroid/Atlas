@@ -7,7 +7,8 @@
   if (!$("clipboardDrawer")) return;
   const esc = (value) => window.AtlasUI.esc(value ?? "");
   const AUTO = "atlas-clipboard-auto", SEEN = "atlas-clipboard-seen";
-  const sources = { button: "Captured", paste: "Pasted", return: "Copied before returning", screenshot: "Screenshot", inbox: "Live Inbox" };
+  const sources = { button: "Captured", paste: "Pasted", return: "Copied before returning", screenshot: "Screenshot", inbox: "Live Inbox", companion: "Copied (Companion)" };
+  let companion = null, latest = null;
   let items = [], loaded = false, busy = false, opened = null;
   const remember = (key, value) => { try { localStorage.setItem(key, value); } catch {} };
   const recall = (key) => { try { return localStorage.getItem(key); } catch { return null; } };
@@ -168,6 +169,7 @@
   function open() {
     $("clipboardDrawer").classList.add("open");
     if (!loaded) load();
+    companionStatus();
   }
   const machinesOf = (item) => item.machines.filter((m) => window.AtlasUI.supportsWindows(m)).map((m) => m.name);
   async function copy(text, label) {
@@ -242,14 +244,46 @@
   // Coming back to Atlas after copying something elsewhere: captured without a click, when the browser allows it.
   let last = 0;
   async function returned() {
-    if (document.hidden || !$("clipboardAuto").checked || window.AtlasReadOnly || Date.now() - last < 1500) return;
+    if (document.hidden || !$("clipboardAuto").checked || window.AtlasReadOnly || Date.now() - last < 1500 || covered()) return;
     last = Date.now();
     const state = await navigator.permissions?.query({ name: "clipboard-read" }).then((p) => p.state, () => "");
     if (state === "granted") capture("return", true);
   }
   window.addEventListener("focus", returned);
   document.addEventListener("visibilitychange", returned);
+  // The Atlas Companion (normal Windows account) sends every copy in the background.
+  const covered = () => !!(companion?.online && companion.settings?.clipboard);
+  function renderCompanion() {
+    const host = $("clipboardCompanion"), c = companion;
+    if (!c) { host.replaceChildren(); return; }
+    const mail = { watching: "Outlook: watching", off: "Outlook: off · switch on Email watcher in Live Inbox", waiting_for_outlook: "Outlook: waiting for classic Outlook" }[c.mail?.state] || (c.mail?.state ? "Outlook: " + c.mail.state.replace(/_/g, " ") : "");
+    host.innerHTML = c.online
+      ? `<span class="status-ok">Companion connected</span><span>${esc(c.user)} · ${c.settings.clipboard ? "every copy is captured, even with Atlas closed" : "clipboard capture is off"}${c.clipboard?.paused ? " · paused from the tray" : ""}</span><label><input type="checkbox" id="companionClipboard" ${c.settings.clipboard ? "checked" : ""}> Capture my clipboard</label><small>${esc(mail)}</small>`
+      : c.known
+        ? `<span class="status-warn">Companion not running</span><span>Start <b>Start-Atlas-Companion.bat</b> as yourself (not as administrator). Last seen ${esc(when(c.last_seen))}.</span>`
+        : `<span class="clipboard-chip">Companion not set up</span><span>Run <b>Install-Atlas-Companion.bat</b> once as yourself to capture every copy from your normal account, even with Atlas closed.</span>`;
+    const box = $("companionClipboard");
+    if (box) box.onchange = () => json("/api/companion/settings", { clipboard: box.checked }).then((next) => { companion = next; renderCompanion(); }, (error) => status(error.message, "bad"));
+    $("clipboardAuto").disabled = covered();
+    $("clipboardAuto").closest("label").title = covered() ? "Not needed: the Atlas Companion captures every copy" : "When the browser allows the clipboard, what you copied elsewhere is captured as you come back to Atlas";
+  }
+  async function companionStatus() {
+    try { companion = await request("/api/companion"); renderCompanion(); } catch { companion = null; }
+  }
+  async function watch() {
+    if (!document.hidden) {
+      await companionStatus();
+      try {
+        const summary = await request("/api/clipboard?summary=true");
+        if (latest !== null && summary.latest !== latest) await load();
+        else if (latest === null) $("clipboardCount").textContent = summary.count;
+        latest = summary.latest;
+      } catch {}
+    }
+    setTimeout(watch, $("clipboardDrawer").classList.contains("open") ? 5000 : 15000);
+  }
   if (window.AtlasReadOnly) { $("clipboardToggle").hidden = true; return; }
   load();
+  watch();
   window.AtlasClipboard = { open, capture, load };
 })();

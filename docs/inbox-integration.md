@@ -96,6 +96,10 @@ share a name, choose the right one.
   it found. Only machines that exist in inventory are offered; check the name
   before acting. The same applies to mistyped names in emails.
 
+> **Simpler option:** the [Atlas Companion](companion.md) reads classic Outlook from your normal
+> account without the Windows task and shared folders below. Once it has connected, Live Inbox's
+> Email watcher switch controls it. Teams notifications still use the listener described here.
+
 ## One-time setup on the work PC
 
 1. Keep the Atlas checkout in a local folder readable by both Windows accounts.
