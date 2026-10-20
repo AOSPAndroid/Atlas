@@ -49,6 +49,7 @@ class ScreenReader(unittest.TestCase):
         def check_token(request):
             if request.headers.get('x-atlas-token') != 'token':
                 raise HTTPException(403, 'Refresh the page before saving')
+        self.backend = Backend
         app = FastAPI(); register(app, Backend, check_token)
         self.client = TestClient(app); self.addCleanup(self.client.close)
         windows = patch.object(screen_reader, 'windows', return_value=True); windows.start(); self.addCleanup(windows.stop)
@@ -115,6 +116,35 @@ class ScreenReader(unittest.TestCase):
         self.assertEqual(self.post('/api/screen/read', {'source': 'screen'}).status_code, 422)
         with patch.object(screen_reader, 'windows', return_value=False):
             self.assertEqual(self.post('/api/screen/read', {'source': 'window'}).status_code, 501)
+
+    def test_a_pasted_screenshot_is_read_with_ocr(self):
+        self.capture = {'title': 'ignored', 'process': '', 'text': 'Hi IT, please install Example App on SPARE-PC-0042\nalex@example.test', 'language': 'en-GB'}
+        seen = []
+        def ps(script, timeout=120):
+            path = script.split("$ImagePath='", 1)[1].split("'\n", 1)[0]
+            seen.append(Path(path).read_bytes())
+            self.scripts.append(script)
+            return json.dumps(self.capture)
+        png = b'\x89PNG\r\n\x1a\n' + b'fictional image bytes'
+        with patch.object(self.backend, 'ps', ps):
+            response = self.client.post('/api/screen/image', content=png, headers={'x-atlas-token': 'token', 'content-type': 'image/png'})
+        result = response.json()
+        self.assertEqual(response.status_code, 200, result)
+        self.assertTrue(self.scripts[0].startswith("$Mode='image'; $Delay=0; $ImagePath='"))
+        self.assertEqual(seen, [png], 'PowerShell reads exactly the uploaded image')
+        self.assertFalse(Path(self.scripts[0].split("$ImagePath='", 1)[1].split("'", 1)[0]).exists(), 'The temporary image is deleted')
+        self.assertEqual((result['source'], result['title']), ('image', 'Pasted screenshot'))
+        self.assertEqual(result['match']['user']['id'], 1)
+        self.assertEqual(result['analysis']['packages'][0]['folder'], 'Example_App')
+
+    def test_screenshot_guards(self):
+        post = lambda body, token='token': self.client.post('/api/screen/image', content=body, headers={'x-atlas-token': token})
+        self.assertEqual(post(b'\x89PNG\r\n\x1a\n', token='wrong').status_code, 403)
+        self.assertEqual(post(b'<script>not an image</script>').status_code, 415)
+        self.assertEqual(post(b'\x89PNG\r\n\x1a\n' + b'0' * (15 * 1024 * 1024)).status_code, 413)
+        self.assertEqual(self.scripts, [], 'Rejected uploads never run PowerShell')
+        self.capture = {'text': '   '}
+        self.assertEqual(post(b'\xff\xd8\xff' + b'jpeg').status_code, 422)
 
     def test_title_names(self):
         self.assertEqual(title_names('Chat | Alex Morgan | Microsoft Teams'), ['Alex Morgan'])

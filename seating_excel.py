@@ -124,11 +124,10 @@ def plan_sheet(c, rows, layout='official', complete=False, labels=frozenset(), l
         if not occupant(item['record']): continue
         person=('account',item['link']) if item['link'] else ('name',key(item['record']['name']))
         origins=current_people.get(person,[])
-        # Lenient (the plan is the authority): the same name on an unlinked desk is this person too,
-        # so a desk still holding only their name is freed as well.
-        if lenient and item['link']: origins=list(dict.fromkeys(origins+current_people.get(('name',key(item['record']['name'])),[])))
-        # The plan says where this person sits now: other desks it does not mention are freed.
-        leaving=[o for o in origins if o!=d and o not in desired] if lenient or len(origins)==1 else []
+        # The sheet says where this person sits now (the Excel wins): every other desk it does not
+        # mention is freed, including a desk still holding only their name with no account link.
+        if item['link']: origins=list(dict.fromkeys(origins+current_people.get(('name',key(item['record']['name'])),[])))
+        leaving=[o for o in origins if o!=d and o not in desired]
         for source in leaving:
             old=records[source]
             desired[source]={'record':dict(old,name='Vacant desk',team='Unassigned',occupancy='vacant'),'link':None}
@@ -143,10 +142,10 @@ def plan_sheet(c, rows, layout='official', complete=False, labels=frozenset(), l
         if occupant(item['record']): seen[('account',item['link']) if item['link'] else ('name',key(item['record']['name']))].append(d)
     for identity, desks in seen.items():
         if len(desks)>1 and any(d in desired for d in desks):
-            changed=any(d in desired and (any(desired[d]['record'][k]!=records[d][k] for k in ('name','occupancy')) or desired[d]['link']!=links.get(d)) for d in desks)
-            message='Duplicate occupant at '+', '.join(sorted(desks))+'. Provide distinct Accounts for namesakes or correct the assignments.'
-            if lenient: notes.append('Same person on '+', '.join(sorted(desks))+' in the plan: placed on each, as written.')
-            else: (errors if changed else warnings).append(message)
+            # Duplicates follow the Excel: whoever it places twice is placed twice, and it is listed.
+            note='Same person on '+', '.join(sorted(desks))+' in the Excel: placed on each, as written.'
+            notes.append(note)
+            if not lenient: warnings.append(note)
     def identity(r,link): return ('account',link) if link else ('name',key(r['name']))
     before=defaultdict(list)
     for d,r in records.items():

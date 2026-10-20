@@ -266,7 +266,7 @@ class LiveFloorPlan(unittest.TestCase):
         result = self.sync.check()
         self.assertEqual(result['status']['state'], 'synced', result['status'])
         self.assertEqual([official(self.db, d)[0]['name'] for d in ('02R015079', '02R016079')], ['Christophe Duriez'] * 2)
-        self.assertIn('Same person on 02R015079, 02R016079 in the plan: placed on each, as written.', result['last']['notes'])
+        self.assertIn('Same person on 02R015079, 02R016079 in the Excel: placed on each, as written.', result['last']['notes'])
 
     def test_an_old_desk_holding_only_the_name_is_freed(self):
         # Before the live plan, a person could sit on a second desk by name only, with no account link.

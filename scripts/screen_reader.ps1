@@ -1,7 +1,9 @@
-# Reads text from the Atlas operator's own session: the window in front, the whole screen or the
-# clipboard. Windows OCR (Windows.Media.Ocr) is built in; nothing is installed. The screenshot is a
-# temporary file deleted before this script ends; only text and the window title are returned.
-# Expects $Mode ('window', 'screen' or 'clipboard') and $Delay (seconds) to be set by the caller.
+# Reads text from the Atlas operator's own session: the window in front, the whole screen, the
+# clipboard (text, a copied screenshot or copied files) or an image the browser sends.
+# Windows OCR (Windows.Media.Ocr) is built in; nothing is installed. Images are temporary files
+# deleted before this script ends; only text and the window title are returned.
+# Expects $Mode ('window', 'screen', 'clipboard' or 'image') and $Delay (seconds) to be set by the
+# caller, and $ImagePath for 'image'.
 $ErrorActionPreference = 'Stop'
 function Done($data) { [Console]::Out.Write(($data | ConvertTo-Json -Compress -Depth 4)); exit 0 }
 
@@ -25,15 +27,28 @@ $processId = [uint32]0
 $processName = try { (Get-Process -Id $processId).ProcessName } catch { '' }
 $window = @{ title = $title.ToString(); process = $processName }
 
+Add-Type -AssemblyName System.Drawing, System.Windows.Forms
+$picture = $null
 if ($Mode -eq 'clipboard') {
-  Add-Type -AssemblyName System.Windows.Forms
+  # The whole clipboard: text first, then a copied screenshot (read with OCR), then copied files.
   $text = [System.Windows.Forms.Clipboard]::GetText()
-  Done @{ source = 'clipboard'; title = $window.title; process = $window.process; text = [string]$text; lines = 0 }
+  if ([string]::IsNullOrWhiteSpace($text) -and [System.Windows.Forms.Clipboard]::ContainsImage()) {
+    $picture = [System.Windows.Forms.Clipboard]::GetImage()
+  } elseif ([string]::IsNullOrWhiteSpace($text) -and [System.Windows.Forms.Clipboard]::ContainsFileDropList()) {
+    $text = (@([System.Windows.Forms.Clipboard]::GetFileDropList()) -join "`n")
+  }
+  if (-not $picture) { Done @{ source = 'clipboard'; title = $window.title; process = $window.process; text = [string]$text; lines = 0 } }
+}
+if ($Mode -eq 'image') {
+  $window = @{ title = 'Pasted screenshot'; process = '' }
+  $bytes = [IO.File]::ReadAllBytes($ImagePath)
+  $picture = [System.Drawing.Image]::FromStream((New-Object IO.MemoryStream (, $bytes)))
 }
 
-Add-Type -AssemblyName System.Drawing, System.Windows.Forms
 $screen = [System.Windows.Forms.SystemInformation]::VirtualScreen
-if ($Mode -eq 'window') {
+if ($picture) {
+  $bounds = New-Object System.Drawing.Rectangle 0, 0, $picture.Width, $picture.Height
+} elseif ($Mode -eq 'window') {
   $rect = New-Object AtlasScreen.Native+RECT
   if ([AtlasScreen.Native]::IsIconic($handle) -or -not [AtlasScreen.Native]::GetWindowRect($handle, [ref]$rect)) {
     throw 'The window in front could not be measured. Bring the ticket or chat to the front and retry.'
@@ -43,7 +58,7 @@ if ($Mode -eq 'window') {
 } else {
   $bounds = $screen
 }
-if ($bounds.Width -lt 20 -or $bounds.Height -lt 20) { throw 'The window in front is too small to read.' }
+if ($bounds.Width -lt 20 -or $bounds.Height -lt 20) { throw $(if ($picture) { 'The image is too small to read.' } else { 'The window in front is too small to read.' }) }
 
 Add-Type -AssemblyName System.Runtime.WindowsRuntime
 [void][Windows.Media.Ocr.OcrEngine, Windows.Foundation, ContentType = WindowsRuntime]
@@ -65,10 +80,14 @@ $limit = [Windows.Media.Ocr.OcrEngine]::MaxImageDimension
 $scale = [Math]::Min(2.0, [Math]::Min($limit / $bounds.Width, $limit / $bounds.Height))
 $path = Join-Path ([IO.Path]::GetTempPath()) ('atlas-screen-' + [guid]::NewGuid().ToString('N') + '.png')
 try {
-  $shot = New-Object System.Drawing.Bitmap $bounds.Width, $bounds.Height
-  $graphics = [System.Drawing.Graphics]::FromImage($shot)
-  $graphics.CopyFromScreen($bounds.Left, $bounds.Top, 0, 0, $bounds.Size)
-  $graphics.Dispose()
+  if ($picture) {
+    $shot = $picture
+  } else {
+    $shot = New-Object System.Drawing.Bitmap $bounds.Width, $bounds.Height
+    $graphics = [System.Drawing.Graphics]::FromImage($shot)
+    $graphics.CopyFromScreen($bounds.Left, $bounds.Top, 0, 0, $bounds.Size)
+    $graphics.Dispose()
+  }
   $width = [int]($bounds.Width * $scale); $height = [int]($bounds.Height * $scale)
   $scaled = New-Object System.Drawing.Bitmap $width, $height
   $graphics = [System.Drawing.Graphics]::FromImage($scaled)

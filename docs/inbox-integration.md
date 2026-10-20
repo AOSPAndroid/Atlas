@@ -57,8 +57,23 @@ phone call you typed up), use **Read from screen** at the top of Live Inbox:
 - **Window in 3 s**: click it, then bring the ticket or chat to the front.
   After three seconds Atlas reads the text of the window in front.
 - **Whole screen in 3 s**: the same for all monitors.
-- **Clipboard**: reads text you copied, for example a hostname or an email
-  address. No countdown.
+- **Clipboard**: reads the whole clipboard, no countdown: copied text (a
+  hostname, an email, a Teams or Outlook message, copied as rich text too) or a
+  screenshot copied with **Win+Shift+S**, which is read with text recognition.
+  The browser reads it from your own session, so it works even though Atlas
+  runs under another account. Edge asks once ("see text and images copied to
+  the clipboard"); choose **Allow**. The badge next to the button shows
+  *Clipboard allowed* (green) or *Clipboard blocked* (red). If it is blocked,
+  Atlas falls back to reading the clipboard of the account it runs under.
+- **Ctrl+V** anywhere on the Live Inbox page (outside a text box) does the
+  same with whatever you paste: text or a screenshot. It needs no permission.
+
+To stop the browser asking at all, double-click **Allow-Atlas-Clipboard.bat**
+as yourself (the account you browse with, not "Run as administrator" with
+another account) and restart Edge. It adds `http://127.0.0.1:8770` and
+`http://localhost:8770` to the per-user `ClipboardAllowedForUrls` policy of Edge
+and Chrome, keeping any entries already there; `Allow-Atlas-Clipboard.bat remove`
+undoes it. If your company sets that policy for the whole PC, its setting wins.
 
 The text is read with Windows' built-in text recognition (Windows.Media.Ocr),
 so nothing is installed. Atlas then works out the person (email addresses in
