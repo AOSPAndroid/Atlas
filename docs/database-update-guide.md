@@ -82,7 +82,7 @@ In **Manage Database > Import history**, choose **Restore directory before this 
 - **Held for review** when the plan has problems, the same desk appears with two different names, or one save changes more than the greater of 40 desks and 15% of the plan. The card lists the changes; click **Apply these changes**, or correct the Excel and Atlas reads it again. Approval applies only to the proposal you reviewed; if it has changed, Atlas asks you to review it again.
 - Desks the plan does not mention are left as they are. Desk codes not on the map are skipped and listed.
 - The card shows what was read: the tabs and how many desks each gave, hidden tabs skipped, corrected codes, names not matched to one person, unknown codes and bare codes. The ten most recent live-plan backups are kept in `backups/`.
-- **Undo** next to a recent live update puts the desks it changed back as they were (with a new backup). Atlas then leaves the map alone until the plan is saved again; click **Check now** to read the current plan straight away.
+- **Undo** next to a recent live update restores the names, teams, occupancy and account links of the desks it changed, with a new backup. Newer desk details such as notes, equipment and map positions are kept. If restoring an older update would duplicate a person after a later move, Atlas leaves the data unchanged and asks you to resolve the seating conflict. Atlas then leaves the map alone until the plan is saved again; click **Check now** to read the current plan straight away.
 - After an Atlas update that changes how plans are read, the current plan is read again on the next check.
 
 ## Seating updates
