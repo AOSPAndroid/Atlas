@@ -244,3 +244,16 @@
 .palette-result strong { color:#193449; }
 .palette-result small { color:#526b7d; }
 .atlas-palette footer { background:#f6f9fc; border-top:1px solid #e2eaf1; }
+/* Dark mode follows html[data-theme="dark"], set by shared-ui.js. */
+:host-context(html[data-theme="dark"]) #atlas-commands,:host-context(html[data-theme="dark"]) #atlas-commands:hover { border-color:#2b3440; color:#b7c2ce; background:#161b22; }
+:host-context(html[data-theme="dark"]) :is(#atlas-commands kbd,.atlas-palette kbd) { background:#1c232c; border-color:#2b3440; color:#93a1b0; }
+:host-context(html[data-theme="dark"]) .atlas-palette { border-color:#2b3440; background:#161b22; color:#dbe3ec; box-shadow:0 20px 65px #000a; }
+:host-context(html[data-theme="dark"]) .atlas-palette::backdrop { background:#000a; }
+:host-context(html[data-theme="dark"]) :is(.palette-input-row,.atlas-palette footer) { background:#1c232c; border-color:#2b3440; color:#93a1b0; }
+:host-context(html[data-theme="dark"]) .atlas-palette input { background:#0f141a; color:#f2f6fa; }
+:host-context(html[data-theme="dark"]) .palette-result { color:#dbe3ec; }
+:host-context(html[data-theme="dark"]) .palette-result:hover { background:#1c232c; }
+:host-context(html[data-theme="dark"]) .palette-result.selected { background:#12324a; box-shadow:inset 3px 0 #38b2e0; }
+:host-context(html[data-theme="dark"]) .palette-result strong { color:#f2f6fa; }
+:host-context(html[data-theme="dark"]) :is(.palette-result small,.palette-kind,#atlas-command-status) { color:#93a1b0; }
+:host-context(html[data-theme="dark"]) .palette-close { background:#1c232c; color:#dbe3ec; border-color:#2b3440; }

@@ -7,6 +7,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 DATABASE = 'office_atlas.db'
 KNOWLEDGE = 'knowledge.sqlite3'
+SCRIPTS = 'scripts.json'
 
 
 def database_folder(root=None):
@@ -34,6 +35,11 @@ def database_path():
 def knowledge_path():
     folder = database_folder()
     return folder / KNOWLEDGE if folder else ROOT / 'data' / KNOWLEDGE
+
+
+def scripts_path():
+    folder = database_folder()
+    return folder / SCRIPTS if folder else ROOT / 'data' / SCRIPTS
 
 
 def prepare_runtime_database():

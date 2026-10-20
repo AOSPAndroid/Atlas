@@ -1,5 +1,5 @@
 """Local GUI for staged directory refreshes. Never edits deployment workers."""
-import asyncio,json,sqlite3,tempfile,time,uuid,hashlib,zipfile,shutil
+import asyncio,json,re,sqlite3,tempfile,time,uuid,hashlib,zipfile,shutil
 from pathlib import Path
 from fastapi import Request,HTTPException
 from fastapi.responses import FileResponse,StreamingResponse
@@ -159,6 +159,50 @@ def register_database_manager(app,wmi,check_token):
    shutil.rmtree(folder,ignore_errors=True)
    if isinstance(e,HTTPException):raise
    raise HTTPException(400,str(e) or 'Invalid workbook')
+ # Two separate ServiceNow exports (users and devices, .xlsx or .csv, either order) in one request:
+ # the first file's bytes, then the second's; x-first-size marks the split. Atlas combines them
+ # into the usual users/devices workbook and previews it exactly like an uploaded workbook.
+ @app.post('/api/database/preview-pair')
+ async def preview_pair(request:Request):
+  check_token(request)
+  if busy():raise HTTPException(409,'Finish active jobs and queues before preparing an import.')
+  try:first_size=int(request.headers.get('x-first-size',''))
+  except ValueError:raise HTTPException(400,'Choose a users file and a devices file.')
+  names=[Path(unquote(request.headers.get(h,default))).name[:120] for h,default in (('x-first-name','first'),('x-second-name','second'))]
+  folder=Path(tempfile.mkdtemp(prefix='atlas_directory_'));paths=[folder/'first.bin',folder/'second.bin'];size=0
+  try:
+   if first_size<=0 or first_size>50*1024*1024:raise ValueError('Each export must be under 50 MB.')
+   handles=[paths[0].open('wb'),paths[1].open('wb')]
+   try:
+    async for chunk in request.stream():
+     while chunk:
+      if size<first_size:
+       take=chunk[:first_size-size];handles[0].write(take)
+      else:
+       take=chunk;handles[1].write(take)
+       if size-first_size+len(take)>50*1024*1024:raise ValueError('Each export must be under 50 MB.')
+      size+=len(take);chunk=chunk[len(take):]
+   finally:
+    for handle in handles:handle.close()
+   if size<=first_size:raise ValueError('Choose both a users file and a devices file.')
+   source=folder/'extract.xlsx'
+   from directory_pair import combine
+   # Keep the original names (one folder each) so messages say which file is wrong.
+   for index,name in enumerate(names):
+    (folder/str(index)).mkdir()
+    paths[index]=paths[index].rename(folder/str(index)/(re.sub(r'[^\w.\- ()+]+','_',name).strip(' .') or 'export'))
+   pair=await run_in_threadpool(combine,paths[0],paths[1],source)
+   candidate=folder/'candidate.db'
+   await run_in_threadpool(prepare,source,candidate)
+   filename=(pair['users_file']+' + '+pair['devices_file'])[:200]
+   with sqlite3.connect(candidate,factory=ClosingConnection) as c:
+    if directory_exports.exists(c):c.execute('update directory_export_sheets set source_file=?',(filename,))
+   staged_preview=await run_in_threadpool(stage,folder,filename,candidate)
+   return {**staged_preview,'pair':pair}
+  except Exception as e:
+   shutil.rmtree(folder,ignore_errors=True)
+   if isinstance(e,HTTPException):raise
+   raise HTTPException(400,str(e) or 'Invalid export')
  @app.post('/api/database/restore-preview/{import_id}')
  def restore_preview(import_id:str,request:Request):
   check_token(request)

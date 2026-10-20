@@ -20,9 +20,9 @@ See [Updating Atlas](updating-atlas.md) for prerequisites, backup and recovery d
 After updating Atlas, restart local Admin and Demo before importing so both load the current workbook support.
 
 1. Obtain the **complete intended directory snapshot** from your approved ServiceNow exports. Export all intended rows, not just the visible page. Keep the agreed location and machine filters consistent. A partial extract can remove other accounts from directory search.
-2. Combine the exports into one `.xlsx` file with worksheets named **users** and **devices**. The existing **Users** and **computers** format remains supported. Names are case-insensitive; use one user sheet and one device sheet. Keep the original headers, columns and rows: no duplicate cleanup is required. Users require `user_name`, `name` and `email`; devices include `ci` or `name`. If both CI and name columns are present, Atlas prefers the CI and uses a nonempty name when the CI is blank. Other aliases use the first nonempty column.
+2. Keep the two exports as they are: the **users** file and the **devices** file, `.xlsx` or `.csv`. You can select both together in step 4 (Ctrl-click, or drag them onto the Users & devices card); Atlas works out which is which from the headers and combines them itself. One `.xlsx` with worksheets named **users** and **devices** (or **Users** and **computers**) still works too. Names are case-insensitive; use one user sheet and one device sheet. Keep the original headers, columns and rows: no duplicate cleanup is required. Users require `user_name`, `name` and `email`; devices include `ci` or `name`. If both CI and name columns are present, Atlas prefers the CI and uses a nonempty name when the CI is blank. Other aliases use the first nonempty column.
 3. Finish active deployments and queue jobs. Open local **Admin**, then **Manage Database**. Demo and hosted Preview cannot import.
-4. Select the workbook and click **Validate and preview**. This creates a separate candidate without changing the live directory.
+4. Select both exports (or the workbook) and click **Validate and preview**. This creates a separate candidate without changing the live directory.
 5. Review added/removed users, machines and assignments, automatic duplicate handling, column coverage warnings, and missing desk accounts. Unexpected large removals usually indicate incomplete exports or changed filters. Discard the preview if necessary.
 6. Tick **This is the complete intended directory snapshot, and I have reviewed the removals**, type `APPLY`, then click **Back up and apply**. Atlas creates a full backup first.
 7. Search known people and machines, verify assignments, and review missing desk links. Reload or use **Refresh records** in both local layouts and Demo.
@@ -53,7 +53,7 @@ Validation covers the original directory template and the users/devices export, 
 
 ## Standalone refresh
 
-Finish active jobs, then drag the intended new `.xlsx` onto **Refresh-Directory.bat**. It stops both local services, validates the file, displays counts and asks for `APPLY`. A full backup is saved beside the active database in `backups/`, normally `data/backups/`. Start either edition again afterwards, even if you cancelled the import.
+Finish active jobs, then drag the intended new `.xlsx` workbook, or the users and devices exports together, onto **Refresh-Directory.bat**. It stops both local services, validates the file, displays counts and asks for `APPLY`. A full backup is saved beside the active database in `backups/`, normally `data/backups/`. Start either edition again afterwards, even if you cancelled the import.
 
 Always supply the new file. With no file argument, this script uses the older bundled `database040926.xlsx`.
 

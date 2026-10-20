@@ -17,15 +17,17 @@ For the integrated GUI and automatic BAT startup, use the
 [Live Inbox setup guide](inbox-integration.md). The steps below are the standalone
 workflow; the main GUI supervises the same watcher after integration is configured.
 
-1. Run **Install-Outlook-Watcher.bat** once on the Outlook PC. This installs the
-   optional pywin32 dependency into the Python selected by `Python_Settings.bat`.
+1. Run **Install-Inbox-Collectors.bat** once on the Outlook PC. This installs the
+   optional pywin32 dependency into the Python selected by `Python_Settings.bat`
+   (Teams notifications are skipped without a package; email still works).
 2. Open classic Outlook normally and allow the mailbox to synchronize.
-3. Run **Start-Outlook-Watcher.bat** under the same Windows account and elevation
-   level as Outlook. The process continues after the launcher closes.
-4. **Outlook-Watcher-Status.bat** shows whether it is watching, waiting for Outlook,
-   retrying a read, or stopped, and how many messages it saved.
-5. **Stop-Outlook-Watcher.bat** requests a cooperative stop. If Outlook is displaying
-   an access prompt, finish that prompt so the outstanding call can return.
+3. Run `py -3.12 outlook_watcher.py start` from the Atlas folder, under the same
+   Windows account and elevation level as Outlook. The process keeps running after
+   the window closes.
+4. `py -3.12 outlook_watcher.py status` shows whether it is watching, waiting for
+   Outlook, retrying a read, or stopped, and how many messages it saved.
+5. `py -3.12 outlook_watcher.py stop` requests a cooperative stop. If Outlook is
+   displaying an access prompt, finish that prompt so the outstanding call can return.
 
 Without integrated setup, this helper is independent of Atlas Admin/Demo.
 With setup saved, every local Atlas launcher starts its normal-user supervisor,
@@ -113,8 +115,8 @@ The script prints the exact `$env:ATLAS_MAIL_DIR = '...'` line. Copy that line
 into a **normal PowerShell as `x01426046`**, then run:
 
 ```powershell
-.\Install-Outlook-Watcher.bat  # once, using Python available to this account
-.\Start-Outlook-Watcher.bat
+.\Install-Inbox-Collectors.bat  # once, using Python available to this account
+py -3.12 outlook_watcher.py start
 ```
 
 Keep classic Outlook open normally. In the elevated window, restart Atlas using
@@ -123,7 +125,7 @@ processes now use the same queue, while the watcher stays in the mailbox session
 
 Run watcher status and stop commands in the normal window. Environment settings
 above apply to those PowerShell windows and their children: set the same value
-again in a new window before launching. Do not double-click a launcher from an
+again in a new window before launching. Do not start the watcher from an
 Explorer process that has not inherited that setting. `--data-dir` overrides the
 watcher's environment only; Atlas must still point to the matching directory.
 
@@ -146,9 +148,9 @@ its exact displayed name. Subfolders are relative to that store's Inbox; separat
 nested folder names with `/`.
 
 ```powershell
-.\Start-Outlook-Watcher.bat --mailbox "IT Support" --subfolder "Incidents" --data-dir "$env:LOCALAPPDATA\Atlas\SupportWatcher"
-.\Outlook-Watcher-Status.bat --data-dir "$env:LOCALAPPDATA\Atlas\SupportWatcher"
-.\Stop-Outlook-Watcher.bat --data-dir "$env:LOCALAPPDATA\Atlas\SupportWatcher"
+py -3.12 outlook_watcher.py start --mailbox "IT Support" --subfolder "Incidents" --data-dir "$env:LOCALAPPDATA\Atlas\SupportWatcher"
+py -3.12 outlook_watcher.py status --data-dir "$env:LOCALAPPDATA\Atlas\SupportWatcher"
+py -3.12 outlook_watcher.py stop --data-dir "$env:LOCALAPPDATA\Atlas\SupportWatcher"
 ```
 
 The folder identity and Outlook profile are pinned after the first connection.
@@ -158,7 +160,7 @@ Later starts with the same data folder reuse those settings. Use a different
 Optional first-time history import and a slower poll interval:
 
 ```powershell
-.\Start-Outlook-Watcher.bat --lookback-hours 24 --interval 30
+py -3.12 outlook_watcher.py start --lookback-hours 24 --interval 30
 ```
 
 `--lookback-hours` only applies to a new data folder; it does not reset an existing

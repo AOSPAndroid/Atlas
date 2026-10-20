@@ -74,9 +74,9 @@
             ><span class="nav-label">History</span>
           </button>
           <button data-page="terminal"><span class="nav-icon">&gt;_</span><span class="nav-label">Terminal</span></button>
-          <button data-page="psexec">
+          <button data-page="scripts">
             <span class="nav-icon" aria-hidden="true">&gt;_</span
-            ><span class="nav-label">PsTools</span>
+            ><span class="nav-label">Scripts</span>
           </button>
         </nav>
       </div>
@@ -674,6 +674,42 @@
  <p id="termMessage" role="status"></p><pre id="termOutput" tabindex="0" aria-label="Terminal output"></pre>
  </div>
 </section>
+<section id="scripts" class="page" aria-label="Scripts">
+ <div class="scripts-layout">
+  <aside class="scripts-library panel" aria-label="Script library">
+   <input id="scriptSearch" type="search" placeholder="Find a script" aria-label="Find a script" autocomplete="off">
+   <div id="scriptList" class="scripts-list"></div>
+   <div class="scripts-library-actions"><button type="button" id="scriptNew">New script</button><button type="button" id="scriptImport">Import .ps1</button><input id="scriptFile" type="file" accept=".ps1,.txt" hidden></div>
+   <button type="button" class="scripts-pstools" data-page="psexec" title="The 72 PsTools command templates">PsTools commands</button>
+  </aside>
+  <div class="scripts-detail panel">
+   <header class="scripts-head">
+    <div><input id="scriptName" aria-label="Script name" maxlength="120" readonly><p id="scriptDescription"></p></div>
+    <span id="scriptKind"></span>
+   </header>
+   <div class="scripts-run-grid">
+    <label class="scripts-targets">Target machines <small id="scriptTargetCount">0 machines</small>
+     <textarea id="scriptTargets" rows="4" spellcheck="false" placeholder="Paste from Excel, or separate with commas, spaces or new lines"></textarea>
+    </label>
+    <div id="scriptParams" class="scripts-params"></div>
+   </div>
+   <div class="scripts-target-actions"><button type="button" id="scriptUseSelected">Add selected machine</button><button type="button" id="scriptClearTargets">Clear</button></div>
+   <details id="scriptCodeBox" class="scripts-code">
+    <summary>Script code <small id="scriptCodeNote"></small></summary>
+    <textarea id="scriptCode" rows="14" spellcheck="false" aria-label="PowerShell script"></textarea>
+    <label class="scripts-changes"><input type="checkbox" id="scriptChanges" checked> Changes machines (ask for confirmation before running)</label>
+   </details>
+   <div class="scripts-actions" role="group" aria-label="Script actions">
+    <button type="button" id="scriptRun" class="primary">Run</button><button type="button" id="scriptStop" disabled>Stop</button>
+    <span class="scripts-actions-gap"></span>
+    <button type="button" id="scriptSave">Save</button><button type="button" id="scriptDuplicate">Duplicate</button><button type="button" id="scriptDownload">Download .ps1</button><button type="button" id="scriptDelete" class="danger">Delete</button>
+   </div>
+   <p id="scriptMessage" role="status"></p>
+   <div class="scripts-output-head"><strong>Output</strong><span id="scriptSummary" role="status"></span><span id="scriptStatus" role="status">No script running.</span><button type="button" id="scriptCopy">Copy output</button></div>
+   <pre id="scriptOutput" class="scripts-output" tabindex="0" aria-label="Script output"></pre>
+  </div>
+ </div>
+</section>
 <section id="psexec" class="page" aria-label="PsTools command workbench">
         <div class="px-intro">
           <div>
@@ -1114,6 +1150,7 @@ Ready. Choose a command and click Run.</pre>
 <script src="/assets/active-directory.js"></script>
     <script src="/assets/psexec-terminal.js"></script>
     <script src="/assets/local-terminal.js"></script>
+    <script src="/assets/script-library.js"></script>
     <script src="/assets/action-widgets.js"></script>
     <script src="/assets/reboot-monitor.js"></script>
     <script src="/assets/knowledge-converter.js"></script>

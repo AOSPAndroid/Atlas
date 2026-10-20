@@ -152,24 +152,64 @@
       "Review the removals, confirm the complete snapshot, then type APPLY to enable saving.";
     $("preview").scrollIntoView({ block: "start", behavior: "instant" });
   }
+  const megabytes = (files) => (files.reduce((sum, file) => sum + file.size, 0) / 1024 / 1024).toFixed(1);
   $("file").onchange = () => {
     interacted = true;
     resetPreview();
-    const file = $("file").files[0];
+    const files = [...($("file").files || [])];
     message(
-      file
-        ? `${file.name} selected · ${(file.size / 1024 / 1024).toFixed(1)} MB. Click Validate and preview. Large extracts can take a few minutes.`
-        : "Choose your users and devices workbook, then validate it.",
+      files.length
+        ? `${files.map((file) => file.name).join(" + ")} selected · ${megabytes(files)} MB. Click Validate and preview. Large extracts can take a few minutes.`
+        : "Choose your users and devices exports (or one workbook), then validate.",
     );
     controls();
   };
+  // Drop the two exports (or a workbook) straight onto the Users & devices card.
+  const dropZone = $("directory-import");
+  dropZone.addEventListener("dragover", (event) => {
+    if (working || !event.dataTransfer?.types?.includes("Files")) return;
+    event.preventDefault();
+    dropZone.dataset.drop = "true";
+  });
+  dropZone.addEventListener("dragleave", () => delete dropZone.dataset.drop);
+  dropZone.addEventListener("drop", (event) => {
+    delete dropZone.dataset.drop;
+    if (working || !event.dataTransfer?.files?.length) return;
+    event.preventDefault();
+    $("file").files = event.dataTransfer.files;
+    $("file").onchange();
+  });
   $("validate").onclick = () =>
     task("validate", async () => {
       resetPreview();
-      const file = $("file").files[0];
-      if (!file) throw Error("Choose an Excel workbook.");
+      const files = [...($("file").files || [])];
+      if (!files.length) throw Error("Choose an Excel workbook, or your users and devices exports.");
+      if (files.length > 2) throw Error("Choose one workbook, or exactly two exports: users and devices.");
+      if (files.length === 2) {
+        if (files.some((file) => !/\.(xlsx|csv)$/i.test(file.name)))
+          throw Error("Use the .xlsx or .csv exports from ServiceNow.");
+        if (files.some((file) => file.size > 50 * 1024 * 1024))
+          throw Error("Each export must be under the 50 MB upload limit.");
+        message(`Combining ${files[0].name} and ${files[1].name}, then comparing… Large extracts can take a few minutes. Keep this page open.`);
+        const result = await api("/api/database/preview-pair", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/octet-stream",
+            "X-First-Size": String(files[0].size),
+            "X-First-Name": encodeURIComponent(files[0].name),
+            "X-Second-Name": encodeURIComponent(files[1].name),
+          },
+          body: new Blob(files),
+        });
+        show(result);
+        const { users_file, devices_file, rows } = result.pair || {};
+        if (users_file)
+          $("source").textContent = `Users: ${users_file} (${(rows?.users ?? 0).toLocaleString()} rows) · Devices: ${devices_file} (${(rows?.devices ?? 0).toLocaleString()} rows)`;
+        return;
+      }
+      const [file] = files;
       if (!file.name.toLowerCase().endsWith(".xlsx"))
-        throw Error("Use an .xlsx workbook.");
+        throw Error("Use an .xlsx workbook with users and devices tabs, or select both exports together.");
       if (file.size > 50 * 1024 * 1024)
         throw Error("Excel file exceeds the 50 MB upload limit.");
       message(

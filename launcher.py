@@ -45,7 +45,7 @@ def stop():
 def start_server(spec):
     previous=read_record(spec['mode'])
     if running(spec,previous):return None
-    if previous:raise RuntimeError(f"An unresponsive {spec['mode']} server record exists. Run Stop-Office-Atlas.bat before restarting.")
+    if previous:raise RuntimeError(f"An unresponsive {spec['mode']} server record exists. Run Stop-All-Atlas.bat before restarting.")
     with socket.socket() as probe:
         if os.name=='nt':probe.setsockopt(socket.SOL_SOCKET,socket.SO_EXCLUSIVEADDRUSE,1)
         probe.bind((spec['host'],spec['port']))

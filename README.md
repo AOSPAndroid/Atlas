@@ -14,9 +14,9 @@ Double-click **[Start-All-Atlas.bat](Start-All-Atlas.bat)** to start the local s
 
 | Start Admin + Demo | Stop local services |
 | --- | --- |
-| [Start-Classic-Atlas.bat](Start-Classic-Atlas.bat) | [Stop-Classic-Atlas.bat](Stop-Classic-Atlas.bat) |
+| [Start-Office-Atlas.bat](Start-Office-Atlas.bat) | [Stop-All-Atlas.bat](Stop-All-Atlas.bat) |
 
-Start opens Admin and Demo. Stop stops both; finish queue jobs first. Hosted Preview stays online. To open only one mode, use the launchers in [Classic-Atlas](Classic-Atlas/README.md). (The optional Desktop layout with a dock and draggable windows was removed; old Desktop shortcuts open normal Atlas.)
+Start runs Admin and Demo. Stop stops both; finish queue jobs first. Hosted Preview stays online. (The optional Desktop layout with a dock and draggable windows was removed; old Desktop shortcuts open normal Atlas.)
 
 **[Database update guide](docs/database-update-guide.md)** covers imports, backups, recovery, seating and hosted Preview updates.
 
@@ -38,7 +38,9 @@ The **map** helps you explore floors and seating in 2D or 3D. The **IT console**
 
 **New to the performance tools?** Read the [Remote Admin performance guide](docs/REMOTE_ADMIN_PERFORMANCE.md) for what each CPU, GPU, Memory and Overview button does, how to interpret the results, and a practical slowness investigation workflow. All scans require an explicit button click.
 
-**PsTools terminal:** Open **PsTools** below **History** in the admin IT console for 72 templates covering PsExec and the adjacent Sysinternals tools, including Excel, sessions, diagnostics, networking, services, printing and repairs. Select a target and click **Run** to see live output and exit status in Atlas. Remote Command Prompt supports typed follow-up commands. Runs use the Atlas host account and your existing PsExec in `C:\Data`; repairs require target confirmation. Includes Stop, recent transcripts, favourites and optional command copying. Nothing starts automatically. [Setup, terminal controls and PsExec commands](docs/PSEXEC.md).
+**Scripts:** Open **Scripts** in the IT console sidebar to run PowerShell scripts against a list of machines. The page opens on **Online check** and runs nothing until clicked. Paste the machines (from Excel, comma or line separated), pick a script, review its values and click **Run**; each result line shows green (OK), red (failed) or amber (warning) with a count at the top. Built-ins: stop and disable services, enable and start services, check services, stop processes by name, online check, uptime, disk space, who is logged on, find installed software, Group Policy update and restart. Service and software names start blank and must be supplied explicitly. **Duplicate** a built-in, or use **New script** / **Import .ps1**, to save your own; saved scripts live in `data/scripts.json` (or the configured database folder). **Download .ps1** includes the helper functions: built-ins accept `-Computers` and their task parameters, while custom scripts retain their own parameter blocks and normal PowerShell prompts. Atlas adds the machines as `$Computers` (and `Read-Host` answers with them inside Atlas), checks every machine name first, and asks before running built-ins that change machines or custom scripts marked **Changes machines**. Scripts run on the Atlas host with the Atlas account's rights, up to 30 minutes.
+
+**PsTools terminal:** Open **Scripts → PsTools commands** in the admin IT console for 72 templates covering PsExec and the adjacent Sysinternals tools, including Excel, sessions, diagnostics, networking, services, printing and repairs. Select a target and click **Run** to see live output and exit status in Atlas. Remote Command Prompt supports typed follow-up commands. Runs use the Atlas host account and your existing PsExec in `C:\Data`; repairs require target confirmation. Includes Stop, recent transcripts, favourites and optional command copying. Nothing starts automatically. [Setup, terminal controls and PsExec commands](docs/PSEXEC.md).
 
 | Area | Capabilities |
 | --- | --- |
@@ -98,7 +100,7 @@ After updating and restarting Atlas, refresh any open browser tabs. Console scri
 
 Use the host computer's Wi-Fi/Ethernet IPv4 address in place of `YOUR-IP`. The launcher prints candidate addresses and saves them in `data/share-addresses.txt`. Share the address belonging to the network your colleagues use. The viewer requires only a browser, not Python or Windows elevation on their computers.
 
-**`Stop-Office-Atlas.bat` stops both servers.** Finish active deployments before stopping. Starting again reuses this folder's running servers. Occupied ports fail with an error rather than attaching to another installation. Closing a browser tab does not stop hosting.
+**`Stop-All-Atlas.bat` stops both servers.** Finish active deployments before stopping. Starting again reuses this folder's running servers. Occupied ports fail with an error rather than attaching to another installation. Closing a browser tab does not stop hosting.
 
 To change ports, set `ATLAS_ADMIN_PORT` and `ATLAS_VIEWER_PORT` before launching; they must be different. Logs are in `logs/admin-startup.log` and `logs/viewer-startup.log`.
 
@@ -106,7 +108,7 @@ To change ports, set `ATLAS_ADMIN_PORT` and `ATLAS_VIEWER_PORT` before launching
 
 - **Python 3.12 not found:** install Python 3.12 with the launcher, or configure `WMI_PYTHON` as described above.
 - **Dependency installation failed / Dependencies missing:** rerun `Install_Dependencies.bat` and check its error message; dependencies must be installed for the same Python that starts Atlas.
-- **Startup failed / port occupied:** check the startup log named in the error. If this folder has an unresponsive Atlas server, run `Stop-Office-Atlas.bat` before starting again. If another application uses the port, choose different Atlas ports.
+- **Startup failed / port occupied:** check the startup log named in the error. If this folder has an unresponsive Atlas server, run `Stop-All-Atlas.bat` before starting again. If another application uses the port, choose different Atlas ports.
 - **Browser tabs did not open:** try `http://127.0.0.1:8770` for admin or `http://127.0.0.1:8771` for the viewer after a successful startup.
 
 ## One command palette across Atlas, the IT console and the shared viewer
@@ -457,7 +459,7 @@ Output streams into the embedded terminal with an exit code, Copy output and Sto
 
 
 ### Atlas visual system
-The shared UI uses a blue/slate palette, Windows 11 Segoe UI Variable type, a light sidebar with a raised pill for the current page, white cards with hairline borders and soft shadows, sentence-case labels and table headers, soft focus rings and consistent table, form, dialog and terminal styling. The final rules live in frontend/assets/design-system.css; the command palette mirrors them inside its shadow root. Map, Workspace, AD, Packages, Remote Admin, Bulk Deploy, History, Terminal, PsTools, Knowledge Base and database management share these rules. Dense row/control geometry, semantic warning colours, map labels and the Draw.io canvas remain intact. The refresh adds no animation loops, remote fonts, image dependencies or JavaScript runtime work.
+The shared UI uses a blue/slate palette, Windows 11 Segoe UI Variable type, a light sidebar with a raised pill for the current page, white cards with hairline borders and soft shadows, sentence-case labels and table headers, soft focus rings and consistent table, form, dialog and terminal styling. **Dark mode** follows the Windows light/dark setting; the moon/sun button in the header switches it and the choice is remembered per browser. The floor plan, Knowledge Base articles, diagrams, menus and the search box all have dark versions. The final rules live in frontend/assets/design-system.css; the command palette mirrors them inside its shadow root. Map, Workspace, AD, Packages, Remote Admin, Bulk Deploy, History, Terminal, PsTools, Knowledge Base and database management share these rules. Dense row/control geometry, semantic warning colours, map labels and the Draw.io canvas remain intact. The refresh adds no animation loops, remote fonts, image dependencies or JavaScript runtime work.
 
 ### shadcn UI components
 

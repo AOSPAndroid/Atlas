@@ -231,7 +231,7 @@ def windows_dependencies():
         import win32api
         import win32com.client
     except ImportError as error:
-        raise ValueError('Run Install-Outlook-Watcher.bat first (pywin32 is missing).') from error
+        raise ValueError('Run Install-Inbox-Collectors.bat first (pywin32 is missing).') from error
     return pythoncom, win32api, win32com.client
 
 
@@ -411,7 +411,7 @@ def start(args):
                 raise ValueError(current['detail'])
             return current
         time.sleep(.1)
-    raise ValueError('Watcher startup has not reported its status yet. Check Outlook-Watcher-Status.bat.')
+    raise ValueError('Watcher startup has not reported its status yet. Check Live Inbox > Collectors and alerts in Atlas, or run: python outlook_watcher.py status')
 
 
 def stop(directory):

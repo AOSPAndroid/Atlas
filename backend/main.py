@@ -715,6 +715,10 @@ from psexec_runner import register as register_psexec
 register_psexec(app,validate_pc)
 from local_terminal import register as register_terminal
 register_terminal(app)
+# Scripts: built-in and saved PowerShell scripts run against a list of machines.
+from script_library import register as register_scripts
+from runtime_paths import scripts_path
+register_scripts(app, scripts_path())
 
 # Independent live health results; retains the application's local-only middleware.
 from machine_health import register_machine_health
