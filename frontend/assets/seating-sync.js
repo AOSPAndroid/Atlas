@@ -70,6 +70,9 @@
       ].filter(Boolean);
       details.append(...notes);
     }
+    const twice = list("people on more than one desk now", (data.duplicates || []).map((p) => `${p.name} · ${p.desks.join(", ")}`), "status-bad");
+    if (twice) { twice.classList.add("atlas-live-plan-duplicates"); details.prepend(twice); }
+    else if (data.duplicates) { const none = document.createElement("p"); none.className = "atlas-live-plan-no-duplicates"; none.innerHTML = '<span class="status-ok">No duplicates</span> nobody is on more than one desk.'; details.prepend(none); }
     const held = review = data.held || null;
     $("live-plan-apply").disabled = !canApply();
     $("live-plan-held").hidden = !held;

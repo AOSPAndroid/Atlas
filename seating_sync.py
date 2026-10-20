@@ -125,7 +125,29 @@ class SeatingSync:
         proposal = self.held
         held = proposal and {'id': proposal['id'], 'reason': proposal['reason'], 'file': proposal['file'], 'report': proposal['report'], 'reader': proposal['reader']}
         return {'folder': self.state.get('folder', ''), 'enabled': bool(self.state.get('enabled')), 'review_large': self.state.get('review_large', True), 'status': status,
-                'checked': self.checked, 'last': self.state.get('last'), 'history': self.state.get('history', [])[:15], 'held': held}
+                'checked': self.checked, 'last': self.state.get('last'), 'history': self.state.get('history', [])[:15], 'held': held,
+                'duplicates': self.duplicates()}
+
+    def duplicates(self):
+        """People on more than one official desk right now: the same account, or the same assigned name."""
+        try:
+            with sqlite3.connect(self.db.resolve().as_uri() + '?mode=ro', uri=True, factory=ClosingConnection) as c:
+                records, links = layout_records(c, 'official')
+        except (sqlite3.Error, OSError, ValueError):
+            return []
+        people = {}
+        for desk, record in records.items():
+            if not occupied(record):
+                continue
+            # Team and room labels ("Credit Sales") repeat by design; only accounts and assigned names count.
+            if links.get(desk):
+                identity = ('account', links[desk])
+            elif record.get('occupancy') == 'assigned':
+                identity = ('name', key(record['name']))
+            else:
+                continue
+            people.setdefault(identity, {'name': record['name'], 'desks': []})['desks'].append(desk)
+        return sorted(({'name': p['name'], 'desks': sorted(p['desks'])} for p in people.values() if len(p['desks']) > 1), key=lambda p: p['name'].casefold())
 
     def candidates(self, folder):
         """Newest first, but a workbook with a tab per floor beats newer lists (New Joiners...)."""

@@ -124,6 +124,9 @@ def plan_sheet(c, rows, layout='official', complete=False, labels=frozenset(), l
         if not occupant(item['record']): continue
         person=('account',item['link']) if item['link'] else ('name',key(item['record']['name']))
         origins=current_people.get(person,[])
+        # Lenient (the plan is the authority): the same name on an unlinked desk is this person too,
+        # so a desk still holding only their name is freed as well.
+        if lenient and item['link']: origins=list(dict.fromkeys(origins+current_people.get(('name',key(item['record']['name'])),[])))
         # The plan says where this person sits now: other desks it does not mention are freed.
         leaving=[o for o in origins if o!=d and o not in desired] if lenient or len(origins)==1 else []
         for source in leaving:
