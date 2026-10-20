@@ -8,6 +8,7 @@ ROOT = Path(__file__).resolve().parent
 DATABASE = 'office_atlas.db'
 KNOWLEDGE = 'knowledge.sqlite3'
 SCRIPTS = 'scripts.json'
+CLIPBOARD = 'clipboard-history.json'
 
 
 def database_folder(root=None):
@@ -40,6 +41,11 @@ def knowledge_path():
 def scripts_path():
     folder = database_folder()
     return folder / SCRIPTS if folder else ROOT / 'data' / SCRIPTS
+
+
+def clipboard_path():
+    folder = database_folder()
+    return folder / CLIPBOARD if folder else ROOT / 'data' / CLIPBOARD
 
 
 def prepare_runtime_database():

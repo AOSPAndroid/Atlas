@@ -3163,6 +3163,49 @@ body.atlas-console #active-directory button.ad-section-toggle { justify-content:
 body.atlas-console #adResults .ad-group-filter .ad-section-option { flex:0 0 auto; }
 body.atlas-console #adResults .ad-group-filter .ad-section-option input { flex:none; width:auto; min-width:0; height:auto; min-height:0; margin:0; }
 html[data-theme="dark"] body.atlas-console #adResults .ad-groups.ad-group-list { background:var(--atlas-surface); border-color:var(--atlas-line); }
+/* Deployment follow-ups: queue from the Deploy panel, retry or re-queue a finished deployment. */
+body.atlas-console :is(.deployment-extra,.deployment-actions,.deployment-card-actions) { display:flex; flex-wrap:wrap; gap:4px; margin:4px 0 0; }
+body.atlas-console :is(.deployment-extra,.deployment-actions,.deployment-card-actions) button { flex:1 1 auto; min-height:26px; padding:0 8px; font-size:12px; }
+body.atlas-console .deployment-card-actions { margin:4px 0; }
+body.atlas-console td.history-actions { white-space:nowrap; }
+body.atlas-console td.history-actions button { min-height:22px; height:22px; padding:0 7px; margin-right:3px; font-size:11px; }
+body.atlas-console tr[data-state="failed"] td.history-actions [data-history-retry] { color:var(--atlas-danger-text); border-color:var(--atlas-danger-line); }
+/* Clipboard history drawer: compact cards with coloured entity chips and tables per item. */
+body.atlas-console .clipboard-drawer { width:min(720px, 100vw); }
+body.atlas-console .clipboard-tools { display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin:4px 0; font-size:12px; }
+body.atlas-console .clipboard-tools input[type="search"] { flex:1 1 140px; min-width:100px; }
+body.atlas-console .clipboard-tools label { display:inline-flex; align-items:center; gap:4px; white-space:nowrap; }
+body.atlas-console #clipboardStatus { margin:2px 0 6px; font-size:12px; color:var(--atlas-muted); }
+body.atlas-console #clipboardStatus[data-tone="good"] { color:var(--atlas-success); }
+body.atlas-console #clipboardStatus[data-tone="bad"] { color:var(--atlas-danger-text); }
+body.atlas-console .clipboard-items { display:grid; gap:6px; }
+body.atlas-console .clipboard-item { border:1px solid var(--atlas-line); border-radius:7px; background:var(--atlas-surface); }
+body.atlas-console .clipboard-item > details > summary { display:grid; grid-template-columns:1fr; gap:3px; padding:6px 8px; cursor:pointer; list-style:none; }
+body.atlas-console .clipboard-item > details > summary::-webkit-details-marker { display:none; }
+body.atlas-console .clipboard-item > details[open] > summary { border-bottom:1px solid var(--atlas-line); }
+body.atlas-console .clipboard-when { font-size:11px; color:var(--atlas-muted); }
+body.atlas-console .clipboard-preview { font:12px/1.35 "Cascadia Mono", Consolas, monospace; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+body.atlas-console :is(.clipboard-chips,.clipboard-tags,.clipboard-bulk,.clipboard-item-actions) { display:flex; flex-wrap:wrap; gap:4px; }
+body.atlas-console .clipboard-chip { display:inline-flex; align-items:center; min-height:20px; padding:0 7px; border-radius:999px; border:1px solid var(--atlas-line); background:var(--atlas-surface-subtle); color:var(--atlas-text); font-size:11px; font-weight:600; }
+body.atlas-console button.clipboard-chip { cursor:copy; height:auto; }
+body.atlas-console .clipboard-chip-machine { color:var(--atlas-info, #1d4ed8); background:var(--atlas-info-bg, #dbeafe); border-color:var(--atlas-info-line, #93c5fd); }
+body.atlas-console .clipboard-chip-person { color:var(--atlas-success); background:var(--atlas-success-bg); border-color:var(--atlas-success-line); }
+body.atlas-console .clipboard-chip-desk { color:var(--atlas-indigo, #4338ca); background:var(--atlas-indigo-bg, #e0e7ff); border-color:transparent; }
+body.atlas-console .clipboard-chip-ticket, body.atlas-console .clipboard-chip-ip { color:var(--atlas-text); }
+body.atlas-console .clipboard-chip-unknown { color:var(--atlas-warning); background:var(--atlas-warning-bg); border-color:var(--atlas-warning-line); }
+body.atlas-console .clipboard-detail { padding:6px 8px; display:grid; gap:8px; }
+body.atlas-console .clipboard-detail h4 { margin:0 0 4px; font-size:12px; }
+body.atlas-console .clipboard-detail h4 small { color:var(--atlas-muted); font-weight:500; }
+body.atlas-console .clipboard-bulk { margin:0 0 4px; }
+body.atlas-console :is(.clipboard-bulk,.clipboard-item-actions,.clipboard-row-actions) button { min-height:24px; height:24px; padding:0 8px; font-size:11px; }
+body.atlas-console .clipboard-table { max-height:300px; overflow:auto; border:1px solid var(--atlas-line); border-radius:6px; }
+body.atlas-console .clipboard-table table { width:100%; border-collapse:collapse; font-size:12px; }
+body.atlas-console .clipboard-table :is(th,td) { padding:3px 6px; text-align:left; border-bottom:1px solid var(--atlas-line); white-space:nowrap; }
+body.atlas-console .clipboard-table th { position:sticky; top:0; background:var(--atlas-surface-subtle); font-weight:600; z-index:1; }
+body.atlas-console .clipboard-table td.clipboard-row-actions { text-align:right; }
+body.atlas-console .clipboard-muted { color:var(--atlas-muted); font-weight:400; }
+body.atlas-console .clipboard-person { color:var(--atlas-accent); cursor:context-menu; }
+body.atlas-console .clipboard-text pre { max-height:160px; overflow:auto; margin:4px 0 0; padding:6px; font-size:11px; white-space:pre-wrap; background:var(--atlas-surface-subtle); border-radius:5px; }
 /* dark-auto:start (generated by tools/build_dark_overrides.py; do not edit) */
 :where(html[data-theme="dark"]) .atlas-person .avatar{background:var(--atlas-selected)}
 :where(html[data-theme="dark"]) .atlas-person-detail-sections > section{background:var(--atlas-surface)}

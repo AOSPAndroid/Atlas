@@ -254,19 +254,20 @@ async function deploy(mode = "full") {
   deploySubmitting = true;
   refreshConsoleSummary();
   let d;
+  const payload = {
+    computer: target,
+    folder: pkg,
+    script: $("#script").value,
+    action: $("#action").value,
+    fresh: $("#fresh").checked,
+    threads: +$("#threads").value,
+    mode,
+  };
   try {
     d = await api("/api/deploy", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        computer: target,
-        folder: pkg,
-        script: $("#script").value,
-        action: $("#action").value,
-        fresh: $("#fresh").checked,
-        threads: +$("#threads").value,
-        mode,
-      }),
+      body: JSON.stringify(payload),
     });
   } catch (error) {
     toast(error.message);
@@ -276,15 +277,36 @@ async function deploy(mode = "full") {
     refreshConsoleSummary();
   }
   S.job = d.job;
-  poll(d.job, target);
+  poll(d.job, target, payload);
+}
+// Retry and re-queue: any past deployment can run again with the same machine, package and options.
+function queuePayload(payload) {
+  if (activeQueueId) return toast("Finish or clear the saved queue first");
+  deploymentQueue.push({ ...payload, state: "waiting" });
+  renderQueue();
+  toast(`Added to queue: ${PathName(payload.folder)} on ${payload.computer}`);
+}
+async function queueDeployment(jobId) {
+  try { queuePayload(await api("/api/deploy/" + encodeURIComponent(jobId) + "/payload")); }
+  catch (error) { toast(error.message); }
+}
+async function retryDeployment(jobId) {
+  try {
+    const d = await api("/api/deploy/" + encodeURIComponent(jobId) + "/retry", { method: "POST" });
+    toast(`Retrying ${d.package} on ${d.target}`);
+    if (d.target === S.target) poll(d.job, d.target);
+    else openDeploymentMonitor("active");
+    return d;
+  } catch (error) { toast(error.message); }
 }
 function syncDeploymentProgress() {
   const host = $("#deploymentProgress");
   if (host)
     host.hidden = !currentDeployment || currentDeployment.target !== S.target;
 }
-function poll(id, target = S.target) {
-  currentDeployment = { id, target };
+function poll(id, target = S.target, payload = null) {
+  currentDeployment = { id, target, payload };
+  $("#deploymentRetry").hidden = true;
   $("#deploymentJobTarget").textContent = target;
   $("#deploymentState").textContent = "Starting";
   $("#deploymentMessage").textContent = "Waiting for the first update…";
@@ -304,6 +326,7 @@ function poll(id, target = S.target) {
       $("#deploymentState").className = statusAccent(data.state);
       $("#deploymentMessage").textContent = data.events.at(-1)?.message || "";
       if (failure) $("#deploymentLog").open = true;
+      $("#deploymentRetry").hidden = !failure;
       $("#log").textContent = data.events
         .map(
           (e) =>
@@ -498,7 +521,7 @@ let deploymentHistorySequence = 0;
 async function loadDeploymentHistory() {
   const sequence = ++deploymentHistorySequence,
     body = $("#historyBody"), status = $("#historyStatus"), refresh = $("#refreshHistory");
-  const empty = (title, message) => `<tr class="atlas-table-empty"><td colspan="7"><b>${esc(title)}</b><span>${esc(message)}</span></td></tr>`;
+  const empty = (title, message) => `<tr class="atlas-table-empty"><td colspan="8"><b>${esc(title)}</b><span>${esc(message)}</span></td></tr>`;
   if (window.AtlasReadOnly) {
     body.innerHTML = empty("History is not included in this read-only view", "Open Atlas Admin to review recent deployment operations.");
     body.setAttribute("aria-busy", "false");
@@ -519,7 +542,7 @@ async function loadDeploymentHistory() {
     if (!Array.isArray(records)) throw Error("Invalid history response");
     // State badges and a machine link: open the target in Workspace from its history row.
     body.innerHTML = records.length ? records.map((x) =>
-      `<tr data-state="${esc(x.state)}"><td>${esc(x.started)}</td><td><button type="button" class="history-target" data-history-target="${esc(x.target)}" title="Select in Workspace">${esc(x.target)}</button></td><td>${esc(x.package)}</td><td>${esc(x.action)}</td><td>${esc(x.mode)}</td><td><span class="history-state" data-state="${esc(x.state)}">${esc(x.state)}</span></td><td><span class="${exitTone(x.exit_code)}">${esc(x.exit_code)}</span></td></tr>`
+      `<tr data-state="${esc(x.state)}"><td>${esc(x.started)}</td><td><button type="button" class="history-target" data-history-target="${esc(x.target)}" title="Select in Workspace">${esc(x.target)}</button></td><td>${esc(x.package)}</td><td>${esc(x.action)}</td><td>${esc(x.mode)}</td><td><span class="history-state" data-state="${esc(x.state)}">${esc(x.state)}</span></td><td><span class="${exitTone(x.exit_code)}">${esc(x.exit_code)}</span></td><td class="history-actions">${["failed", "interrupted", "unknown"].includes(x.state) ? `<button type="button" data-history-retry="${esc(x.id)}">Retry</button>` : ""}<button type="button" data-history-queue="${esc(x.id)}">Queue</button></td></tr>`
     ).join("") : empty("No recent operations", "Deployment operations will appear here when they are recorded. Use Refresh to check again.");
     const failures = records.filter((x) => x.state === "failed").length;
     status.textContent = records.length ? `${records.length} recorded operation${records.length === 1 ? "" : "s"}${failures ? ` · ${failures} failed` : ""}` : "No recorded deployment operations returned.";
@@ -769,7 +792,9 @@ function deploymentCard(item) {
       .join("");
     return `<article class="deployment-monitor-card"><header><b>Queue</b><span class="${statusAccent(item.state)}">${esc(item.state)}</span></header>${rows || '<p class="empty">Queue has no items</p>'}</article>`;
   }
-  return `<article class="deployment-monitor-card"><header><b>${esc(item.target || "Machine not recorded")}</b><span class="${statusAccent(item.state)}">${esc(item.state)}</span></header><p class="deployment-package"><strong>${esc(item.package || "Package not recorded")}</strong>${item.action ? " · " + esc(item.action) : ""}</p>${item.script ? `<small class="deployment-script">${esc(item.script)}</small>` : ""}<p>${esc(item.last_message || "")}</p><pre>${esc(terminalLines(item.events))}</pre></article>`;
+  const failed = ["failed", "interrupted", "unknown"].includes(item.state);
+  const actions = item.retry ? `<div class="deployment-card-actions">${failed ? `<button type="button" class="primary" data-deployment-retry="${esc(item.id)}">Retry</button>` : ""}<button type="button" data-deployment-queue="${esc(item.id)}">Add to queue</button></div>` : "";
+  return `<article class="deployment-monitor-card"><header><b>${esc(item.target || "Machine not recorded")}</b><span class="${statusAccent(item.state)}">${esc(item.state)}</span></header><p class="deployment-package"><strong>${esc(item.package || "Package not recorded")}</strong>${item.action ? " · " + esc(item.action) : ""}</p>${item.script ? `<small class="deployment-script">${esc(item.script)}</small>` : ""}<p>${esc(item.last_message || "")}</p>${actions}<pre>${esc(terminalLines(item.events))}</pre></article>`;
 }
 function renderDeploymentMonitor(data) {
   const list = document.querySelector("#deploymentsList");

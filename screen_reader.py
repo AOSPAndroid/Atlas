@@ -27,6 +27,12 @@ IMAGE_LIMIT = 15 * 1024 * 1024
 IMAGE_TYPES = {b'\x89PNG\r\n\x1a\n': '.png', b'\xff\xd8\xff': '.jpg', b'BM': '.bmp', b'GIF8': '.gif'}
 
 
+def remember(text, source):
+    # Everything read from the clipboard also lands in the clipboard history, with its enrichment.
+    from clipboard_history import record
+    record(text, source)
+
+
 def windows():
     return os.name == 'nt'
 
@@ -117,6 +123,8 @@ def register(app, wmi, check_token):
                                 if body.source != 'clipboard' else 'The clipboard has no text.')
         result = {'source': body.source, 'title': title, 'process': captured.get('process') or '',
                   'text': text[:LIMIT], 'truncated': len(text) > LIMIT, 'language': captured.get('language') or ''}
+        if body.source == 'clipboard':
+            remember(text, 'inbox')
         return {**result, **analysed(title, text)}
 
     @app.post('/api/screen/image')
@@ -147,6 +155,7 @@ def register(app, wmi, check_token):
         if not text.strip():
             raise HTTPException(422, 'No text was found in the screenshot. Copy a larger or sharper area and retry.')
         title = 'Pasted screenshot'
+        remember(text, 'screenshot')
         result = {'source': 'image', 'title': title, 'process': '', 'text': text[:LIMIT], 'truncated': len(text) > LIMIT,
                   'language': captured.get('language') or ''}
         return {**result, **analysed(title, text)}
@@ -155,4 +164,6 @@ def register(app, wmi, check_token):
     def analyse_text(body: Text, request: Request):
         # Re-run after the operator corrects recognised text or chooses one of several people.
         check_token(request)
+        if body.title == 'Clipboard' and body.user_id is None:
+            remember(body.text, 'inbox')
         return {'title': body.title, 'text': body.text, **analysed(body.title, body.text, body.user_id)}

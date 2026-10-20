@@ -118,6 +118,9 @@
           <button id="queueToggle" class="queue-toggle" data-atlas-icon="queue">
             Queue <span id="queueCount">0</span>
           </button>
+          <button id="clipboardToggle" class="queue-toggle clipboard-toggle" data-atlas-icon="clipboard" title="Clipboard history: what you copied, with what Atlas knows about it">
+            Clipboard <span id="clipboardCount">0</span>
+          </button>
           <button
             id="deploymentToggle"
             class="deployment-toggle"
@@ -318,6 +321,7 @@
             <div id="preflight"></div>
           </details>
           <button class="primary" id="deploy">Copy &amp; execute</button>
+          <div class="deployment-extra" role="group" aria-label="More deployment actions"><button type="button" id="deployQueue">Add to queue</button><button type="button" id="deployOpenQueue">Open queue</button></div>
           <div
             id="console-deploy-summary"
             class="deployment-summary"
@@ -333,6 +337,7 @@
               <b id="deploymentState"></b><span id="deploymentJobTarget"></span>
             </div>
             <p id="deploymentMessage" role="status"></p>
+            <div id="deploymentActions" class="deployment-actions" role="group" aria-label="Actions for this deployment"><button type="button" id="deploymentRetry" class="primary" hidden>Retry</button><button type="button" id="deploymentRequeue">Add to queue</button><button type="button" id="deploymentCopyLog">Copy log</button></div>
             <details id="deploymentLog">
               <summary>View log</summary>
               <pre id="log"></pre>
@@ -656,9 +661,10 @@
                   <th>Mode</th>
                   <th>State</th>
                   <th>Exit</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
-              <tbody id="historyBody"><tr class="atlas-table-empty"><td colspan="7"><b>Deployment history</b><span>Open this page or use Refresh to retrieve recent operations.</span></td></tr></tbody>
+              <tbody id="historyBody"><tr class="atlas-table-empty"><td colspan="8"><b>Deployment history</b><span>Open this page or use Refresh to retrieve recent operations.</span></td></tr></tbody>
             </table>
           </div>
         </div>
@@ -907,6 +913,19 @@ Ready. Choose a command and click Run.</pre>
         <div id="kitList"></div>
       </section>
     </aside>
+    <aside id="clipboardDrawer" class="queue-drawer clipboard-drawer">
+      <div class="queue-head">
+        <b>Clipboard history</b><button id="closeClipboard" aria-label="Close clipboard history">×</button>
+      </div>
+      <div class="clipboard-tools">
+        <button id="clipboardCapture" class="primary">Capture clipboard</button>
+        <label title="When the browser allows the clipboard, what you copied elsewhere is captured as you come back to Atlas"><input id="clipboardAuto" type="checkbox" checked /> Capture when I come back</label>
+        <input id="clipboardFilter" type="search" placeholder="Filter" aria-label="Filter clipboard history" autocomplete="off" />
+        <button id="clipboardClear">Clear</button>
+      </div>
+      <p id="clipboardStatus" role="status">Copy machines, people, desks or tickets anywhere, then press Ctrl+V in Atlas or click Capture clipboard.</p>
+      <div id="clipboardItems" class="clipboard-items"></div>
+    </aside>
     <aside id="deploymentsDrawer" class="deployments-drawer">
       <div class="deployments-head">
         <div>
@@ -1148,6 +1167,7 @@ Ready. Choose a command and click Run.</pre>
     <script src="/assets/psexec-commands.js"></script>
     <script src="/assets/console-psexec.js"></script>
 <script src="/assets/active-directory.js"></script>
+<script src="/assets/clipboard-history.js"></script>
     <script src="/assets/psexec-terminal.js"></script>
     <script src="/assets/local-terminal.js"></script>
     <script src="/assets/script-library.js"></script>
