@@ -102,14 +102,15 @@ window.AtlasADRows = (() => {
     items.push(['Nested groups',data.nested_complete===true?'Resolved in queried scope':data.nested_complete===false?'Partial':'Not checked',data.nested_complete===true?'good':'warn']);
     return items;
   }
+  const nameOf = data => data?.details?.Account || data?.details?.Name || 'AD object';
   function renderOverview() {
     const root=by('Overview');if(!root)return;root.replaceChildren();
     const actions=el('div');actions.className='ad-group-tools';const copy=el('button','Copy support summary');copy.type='button';copy.id='adCopySummary';const status=el('span');status.setAttribute('role','status');
     copy.onclick=async()=>{try{await navigator.clipboard.writeText(supportSummary());status.textContent='Summary copied.';}catch{status.textContent='Clipboard unavailable. Select the summary below.';const text=el('textarea');text.value=supportSummary();text.readOnly=true;text.setAttribute('aria-label','Support summary');root.append(text);text.select();}};
     actions.append(copy,status);root.append(actions);
     const cards=el('div');cards.className='ad-health-comparison';
-    for(const data of [primary,secondary].filter(Boolean)){
-      const card=el('section');card.className='ad-health-card';card.append(el('h3',data.details.Account||data.details.Name),el('small',`${data.kind} · ${data.server||'Server unavailable'} · ${data.queried_at||'Time unavailable'}`));
+    for(const data of [primary,...others]){
+      const card=el('section');card.className='ad-health-card';card.append(el('h3',nameOf(data)),el('small',`${data.kind} · ${data.server||'Server unavailable'} · ${data.queried_at||'Time unavailable'}`));
       const strip=el('div');strip.className='ad-health-strip';
       for(const [label,value,tone] of healthItems(data)){const badge=el('span');badge.className='ad-health-'+tone;badge.append(el('strong',label+': '),el('span',value));strip.append(badge);}
       card.append(strip,el('p','OU: '+valueText(data.details['OU / parent container'])));
@@ -118,44 +119,68 @@ window.AtlasADRows = (() => {
       for(const warning of data.warnings||[])card.append(el('small',warning));cards.append(card);
     }
     root.append(cards);
-    const detail=el('details');detail.className='ad-object-details';detail.open=!!secondary;detail.append(el('summary',secondary?'Side-by-side properties · differences highlighted':'All AD properties'));
-    const table=el('table');table.className='ad-details';const head=el('tr');head.append(el('th','Property'),el('th',primary.details.Account||primary.details.Name));if(secondary)head.append(el('th',secondary.details.Account||secondary.details.Name));table.append(head);
-    for(const name of new Set([...Object.keys(primary.details),...Object.keys(secondary?.details||{})])){
-      const row=el('tr'),a=valueText(primary.details[name]),b=valueText(secondary?.details[name]);
-      if(secondary&&a!==b)row.className='ad-property-different';row.append(el('th',name),el('td',a));if(secondary)row.append(el('td',b));table.append(row);
+    const detail=el('details');detail.className='ad-object-details';detail.open=!!others.length;detail.append(el('summary',others.length?'Side-by-side properties · differences highlighted':'All AD properties'));
+    const table=el('table');table.className='ad-details';const head=el('tr');head.append(el('th','Property'));
+    for(const data of [primary,...others])head.append(el('th',nameOf(data)));table.append(head);
+    for(const name of new Set([primary,...others].flatMap(data=>Object.keys(data.details)))){
+      const row=el('tr'),values=[primary,...others].map(data=>valueText(data.details[name]));
+      if(others.length&&new Set(values).size>1)row.className='ad-property-different';row.append(el('th',name));values.forEach(v=>row.append(el('td',v)));table.append(row);
     }
     detail.append(table);root.append(detail);
   }
+  const groupKey = g => String(g.dn || g.name).toLowerCase();
   function supportSummary() {
     const lines=['Atlas · AD support summary'];
-    for(const data of [primary,secondary].filter(Boolean)){
-      lines.push('',`${data.kind}: ${data.details.Account||data.details.Name}`,`Queried: ${data.queried_at||'Unavailable'} | Server: ${data.server||'Unavailable'}`);
+    for(const data of [primary,...others]){
+      lines.push('',`${data.kind}: ${nameOf(data)}`,`Queried: ${data.queried_at||'Unavailable'} | Server: ${data.server||'Unavailable'}`);
       for(const [key,value] of Object.entries(data.details))lines.push(key+': '+valueText(value));
       lines.push('Membership scope: '+(data.membership_note||'Not supplied'));
       for(const warning of data.warnings||[])lines.push('Warning: '+warning);
       for(const group of data.groups)lines.push(`[${group.membership||'Unknown'}] ${group.name} | ${group.description??'Description unavailable'} | ${group.dn||''}`);
     }
-    if(secondary){const key=g=>String(g.dn||g.name).toLowerCase(),a=new Set(primary.groups.map(key)),b=new Set(secondary.groups.map(key));lines.push('','Only first object: '+primary.groups.filter(g=>!b.has(key(g))).map(g=>g.name).join(', '),'Only second object: '+secondary.groups.filter(g=>!a.has(key(g))).map(g=>g.name).join(', '));}
+    if(others.length){
+      const a=new Set(primary.groups.map(groupKey)),names=g=>g.map(x=>x.name).join(', ')||'none';
+      lines.push('');
+      for(const other of others){
+        const b=new Set(other.groups.map(groupKey));
+        lines.push(`Missing from ${nameOf(primary)} (${nameOf(other)} has): `+names(other.groups.filter(g=>!a.has(groupKey(g)))),
+                   `Only ${nameOf(primary)} (not ${nameOf(other)}): `+names(primary.groups.filter(g=>!b.has(groupKey(g)))));
+      }
+    }
     const access=document.querySelector('.ad-access-check');if(access)lines.push('','Access reference: '+(document.querySelector('[aria-label="DaaS or VDI access profile"]')?.selectedOptions[0]?.textContent||''),access.querySelector('.ad-access-results')?.textContent||'Not checked');
     lines.push('','Read-only evidence. Replicated logon is approximate; group membership is not proof of effective access.');return lines.join('\n');
   }
   let primary = null,
-    secondary = null;
+    others = [];
+  const MAX_COMPARE = 5;
   function csvCell(value) {
     let s = String(value ?? "");
     if (/^[\s]*[=+@-]/.test(s) || /^[\t\r\n]/.test(s)) s = "'" + s;
     return '"' + s.replace(/"/g, '""') + '"';
   }
+  // Who has what: one row per group, one coloured cell per compared object.
+  function presenceOf(inFirst, count, total) {
+    if (!total) return 'first';
+    if (!inFirst) return 'second';
+    return count === total ? 'both' : count ? 'partial' : 'first';
+  }
+  function comparisonText(g) {
+    const a = nameOf(primary), total = others.length;
+    if (g.presence === 'both') return total > 1 ? 'Everyone has it' : 'In both';
+    if (g.presence === 'first') return 'Only ' + a;
+    if (g.presence === 'partial') return `${a} + ${g.count} of ${total}`;
+    return `Missing from ${a} · ` + (total > 1 ? `${g.count} of ${total} have it` : nameOf(others[0]) + ' has it');
+  }
   function renderGroups(data, result) {
     primary = data;
-    secondary = null;
+    others = [];
     renderOverview();
     const accessDetails = el('details');accessDetails.className='workspace-ad-access';accessDetails.append(el('summary','Access reference'));
     const access = el('div');accessDetails.append(access);
     result.append(accessDetails);
     let refreshAccess = () => {};
     import('/site-info.js?v=3').then(({mountAccessCheck})=>{
-      if(access.isConnected) refreshAccess=mountAccessCheck(access,()=>[primary,secondary]);
+      if(access.isConnected) refreshAccess=mountAccessCheck(access,()=>[primary,...(others.length?others:[null])]);
     }).catch(()=>{access.textContent='Access reference unavailable.';});
     const bar = el("div");
     bar.className = "ad-group-tools ad-group-filter";
@@ -178,20 +203,20 @@ window.AtlasADRows = (() => {
     }
     const view = el("select");
     view.setAttribute("aria-label", "Membership comparison");
-    for (const [v, t] of [
-      ["all", "All groups"],
-      ["both", "In both"],
-      ["first", "Only first object"],
-      ["second", "Only second object"],
-    ]) {
-      const o = el("option", t);
+    const views = {};
+    for (const v of ["all", "second", "first", "both", "partial"]) {
+      const o = el("option");
       o.value = v;
+      views[v] = o;
       view.append(o);
     }
     view.disabled = true;
     const download = el("button", "Export CSV");
     download.type = "button";
-    bar.append(search, mode, view);
+    const copyMissing = el("button", "Copy missing groups");
+    copyMissing.type = "button";copyMissing.className = "ad-copy-missing";copyMissing.hidden = true;
+    const copyStatus = el("span");copyStatus.setAttribute("role", "status");copyStatus.className = "ad-copy-status";
+    bar.append(search, mode, view, copyMissing, copyStatus);
     result.prepend(bar);
     // Always-visible object summary, like the title area of an AD properties sheet.
     const header=el('div');header.className='ad-object-header';
@@ -215,8 +240,8 @@ window.AtlasADRows = (() => {
     kind.value = data.kind || by("Kind").value;
     const identity = el("input");
     identity.required = true;
-    identity.maxLength = 128;
-    identity.placeholder = "Compare with account / machine";
+    identity.maxLength = 700;
+    identity.placeholder = "Compare with colleagues or machines · up to 5, comma separated";
     identity.setAttribute("aria-label", "Compare AD object");
     const server = el("input");
     server.maxLength = 128;
@@ -228,34 +253,78 @@ window.AtlasADRows = (() => {
     const status = el("p");
     status.setAttribute("role", "status");
     compare.append(kind, identity, server, go);
-    result.append(compare, status);
+    status.className = "ad-compare-status";
+    // Coloured counts double as filters: click one to list just those groups.
+    const chips = el("div");chips.className = "ad-compare-summary";chips.setAttribute("role", "group");chips.setAttribute("aria-label", "Membership summary");
     const count = el("p");count.className='ad-group-count';count.setAttribute('role','status');
     const list = el("div");
     list.className = "ad-groups ad-group-list";
     list.tabIndex=0;list.setAttribute('aria-label','Scrollable AD group list');
-    bar.after(count,list);
-    compare.before(el('h3','Compare with another user or machine'));
+    // Compare sits above the list: pick colleagues first, then read the gaps.
+    const heading=el('h3','Compare with other users or machines');heading.className='ad-compare-heading';
+    bar.before(heading,compare,status);
+    bar.after(chips,count,list);
     result.append(by('Overview').parentElement, result.querySelector('.workspace-ad-evidence'), accessDetails);
-    let rows = [];
-    const key = (g) => String(g.dn || g.name).toLowerCase();
+    let rows = [], all = [];
+    const labels = () => {
+      const a = nameOf(primary), many = others.length > 1;
+      views.all.textContent = "All groups";
+      views.second.textContent = "Missing from " + a;
+      views.first.textContent = "Only " + a;
+      views.both.textContent = many ? "Everyone has it" : "In both";
+      views.partial.textContent = "Partly shared";
+      views.partial.hidden = views.partial.disabled = !many;
+    };
+    const chip = (text, n, tone, value) => {
+      const b = el("button");b.type = "button";b.className = "ad-chip ad-chip-" + tone;b.dataset.view = value;
+      b.append(el("strong", n), el("span", text));b.setAttribute("aria-pressed", String(view.value === value));
+      b.disabled = !n && value !== "all";
+      b.onclick = () => {view.value = view.value === value ? "all" : value;filter();};
+      return b;
+    };
+    const summary = () => {
+      chips.replaceChildren();
+      if (!others.length) {
+        const kinds = {Direct: "has", Nested: "nested", Primary: "primary"};
+        for (const [kindName, tone] of Object.entries(kinds)) {
+          const n = primary.groups.filter(g => g.membership === kindName).length;
+          if (n) {const s = el("span");s.className = "ad-chip ad-chip-" + tone;s.append(el("strong", n), el("span", kindName.toLowerCase()));chips.append(s);}
+        }
+        return;
+      }
+      const tally = v => all.filter(g => g.presence === v).length, a = nameOf(primary);
+      chips.append(chip("missing from " + a, tally("second"), "missing", "second"), chip("only " + a, tally("first"), "only", "first"));
+      if (others.length > 1) chips.append(chip("partly shared", tally("partial"), "partial", "partial"));
+      chips.append(chip(others.length > 1 ? "everyone has" : "in both", tally("both"), "shared", "both"), chip("all groups", all.length, "all", "all"));
+    };
+    const cell = (group, name, owner) => {
+      const td = el("td");td.className = "ad-matrix";
+      const badge = el("span");
+      if (group) {badge.className = "ad-cell ad-cell-" + ({Nested: "nested", Primary: "primary"}[group.membership] || "has");badge.textContent = "✓ " + (group.membership || "Member");}
+      else {badge.className = "ad-cell ad-cell-missing" + (owner ? " ad-cell-target" : "");badge.textContent = "✗ Missing";}
+      badge.title = name + (group ? " is a member" + (group.via ? " via " + group.via : "") : " is not a member");
+      td.append(badge);return td;
+    };
     const filter = () => {
-      const a = new Map(primary.groups.map((g) => [key(g), g]));
-      const b = new Map((secondary?.groups || []).map((g) => [key(g), g]));
-      rows = [...new Set([...a.keys(), ...b.keys()])].map((k) => ({
-        ...(a.get(k) || b.get(k)),
-        sourceServer: a.has(k) ? primary.queryServer : secondary.queryServer,
-        firstMembership: a.get(k)?.membership || "",
-        secondMembership: b.get(k)?.membership || "",
-        presence: secondary
-          ? a.has(k) && b.has(k)
-            ? "both"
-            : a.has(k)
-              ? "first"
-              : "second"
-          : "first",
-      }));
+      const maps = [primary, ...others].map(o => new Map(o.groups.map(g => [groupKey(g), g])));
+      const [a, ...rest] = maps;
+      all = [...new Set(maps.flatMap(m => [...m.keys()]))].map(k => {
+        const owner = maps.findIndex(m => m.has(k)), count = rest.filter(m => m.has(k)).length;
+        return {
+          ...maps[owner].get(k),
+          members: maps.map(m => m.get(k) || null),
+          sourceServer: [primary, ...others][owner].queryServer,
+          firstMembership: a.get(k)?.membership || "",
+          secondMembership: rest[0]?.get(k)?.membership || "",
+          count,
+          presence: presenceOf(a.has(k), count, rest.length),
+        };
+      });
+      labels();summary();
       const term = search.value.trim().toLowerCase();
-      rows = rows
+      // Missing groups first, so gaps are seen before anything else.
+      const order = {second: 0, partial: 1, first: 2, both: 3};
+      rows = all
         .filter((g) => {
           const n = String(g.name || "").toLowerCase();
           return (
@@ -270,21 +339,24 @@ window.AtlasADRows = (() => {
             (view.value === "all" || g.presence === view.value)
           );
         })
-        .sort((a, b) => String(a.name).localeCompare(String(b.name)));
+        .sort((x, y) => (others.length ? order[x.presence] - order[y.presence] || y.count - x.count : 0) || String(x.name).localeCompare(String(y.name)));
       list.replaceChildren();
+      const missing = all.filter(g => g.presence === "second");
+      copyMissing.hidden = !others.length;copyMissing.disabled = !missing.length;
+      copyMissing.textContent = missing.length ? `Copy ${missing.length} missing group${missing.length === 1 ? "" : "s"}` : "Nothing missing";
       count.textContent =
         rows.length +
         " matching groups" +
-        (secondary
-          ? " · Comparing " +
-            (primary.details.Account || primary.details.Name) +
-            " with " +
-            (secondary.details.Account || secondary.details.Name)
+        (others.length
+          ? " · Comparing " + nameOf(primary) + " with " + others.map(nameOf).join(", ")
           : "");
       const table = el('table');
       table.setAttribute('aria-label','AD group memberships');
+      if (others.length) table.className = 'ad-matrix-table';
       const head=el('thead'), header=el('tr');
-      for(const text of ['Name','Type','Membership', ...(secondary?['Comparison']:[]),'Description','Actions']){const th=el('th',text);th.scope='col';header.append(th);}
+      // Comparing: the group type moves into the ⓘ details to leave room for one column per person.
+      const columns = others.length ? ['Name',...[primary, ...others].map(nameOf),'Comparison','Description','Actions'] : ['Name','Type','Membership','Description','Actions'];
+      for(const [i, text] of columns.entries()){const th=el('th',text);th.scope='col';if(others.length&&i>=1&&i<=others.length+1){th.className='ad-matrix-head'+(i===1?' ad-matrix-target':'');th.title=text;}header.append(th);}
       head.append(header);table.append(head);const body=el('tbody');table.append(body);
       for (const g of rows) {
         const row=el('tr'),name=el('td'),description=el('td');
@@ -292,7 +364,7 @@ window.AtlasADRows = (() => {
         AtlasADRows.attach(row,name,actions,{...g,kind:'group'},g.sourceServer,()=>AtlasAD.browseMembers(g.dn,g.sourceServer));
         const detail=el('details');detail.className='ad-group-record';
         // A small inline toggle keeps each group on one line, like the Windows console.
-        const summary=el('summary');summary.title='Group details';summary.setAttribute('aria-label','Group details for '+g.name);summary.append(el('span','i'));detail.append(summary);
+        const summaryToggle=el('summary');summaryToggle.title='Group details';summaryToggle.setAttribute('aria-label','Group details for '+g.name);summaryToggle.append(el('span','i'));detail.append(summaryToggle);
         const properties=el('dl');
         for(const [label,value] of [['Description',g.description==null?'Description unavailable':g.description||'No description recorded'],['Directory path',g.dn],['Scope',g.scope],['Category',g.category]])properties.append(el('dt',label),el('dd',value||'Unavailable'));
         detail.append(properties);name.append(detail);
@@ -301,8 +373,15 @@ window.AtlasADRows = (() => {
         const known=value=>value&&value!=='Unavailable';
         const type=el('td',known(g.category)?`${g.category} Group${known(g.scope)?' - '+g.scope:''}`:'Group');type.className='ad-type';
         row.title=g.dn||'';
-        row.append(name,type,el('td',secondary?`${g.firstMembership||'—'} / ${g.secondMembership||'—'}`:g.membership));
-        if(secondary)row.append(el('td',{both:'In both',first:'Only first object',second:'Only second object'}[g.presence]));
+        row.append(name);
+        if(!others.length)row.append(type);
+        if(others.length){
+          row.className='ad-row-'+g.presence+(g.presence==='second'&&g.count===others.length?' ad-row-all-others':'');
+          [primary,...others].forEach((o,i)=>row.append(cell(g.members[i],nameOf(o),i===0)));
+          const verdict=el('td');verdict.className='ad-verdict';const tag=el('span',comparisonText(g));tag.className='ad-verdict-'+g.presence;verdict.append(tag);row.append(verdict);
+        } else {
+          const m=el('td');const tag=el('span',g.membership||'—');tag.className='ad-cell ad-cell-'+({Nested:'nested',Primary:'primary'}[g.membership]||'has');m.append(tag);row.append(m);
+        }
         row.append(description,actions);body.append(row);
       }
       if(rows.length)list.append(table);else list.append(el('p','No matching groups.'));
@@ -311,33 +390,34 @@ window.AtlasADRows = (() => {
     search.oninput = filter;
     mode.onchange = filter;
     view.onchange = filter;
+    copyMissing.onclick = async () => {
+      const text = all.filter(g => g.presence === "second").map(g => g.name).join("\n");
+      try {await navigator.clipboard.writeText(text);copyStatus.textContent = "Copied.";}
+      catch {copyStatus.textContent = "Clipboard unavailable.";const box = el("textarea");box.value = text;box.readOnly = true;box.setAttribute("aria-label", "Missing groups");copyStatus.replaceChildren(box);box.select();}
+      setTimeout(() => {if (copyStatus.textContent === "Copied.") copyStatus.textContent = "";}, 2000);
+    };
     download.onclick = () => {
+      const names = [primary, ...others].map(nameOf);
       const columns = [
-        "First object",
-        "Second object",
-        "Comparison",
         "Group name",
+        "Comparison",
+        ...names,
         "Description",
         "Distinguished name",
         "Scope",
         "Category",
-        "First membership",
-        "Second membership",
       ];
       const records = rows.map((g) => [
-        primary.details.Account || primary.details.Name,
-        secondary?.details.Account || secondary?.details.Name || "",
-        secondary ? g.presence : "Not compared",
         g.name,
+        others.length ? comparisonText(g) : "Not compared",
+        ...g.members.map((m) => m ? m.membership || "Member" : "Missing"),
         g.description,
         g.dn,
         g.scope,
         g.category,
-        g.firstMembership,
-        g.secondMembership,
       ]);
       const csv =
-        "\uFEFF" +
+        "﻿" +
         [columns, ...records]
           .map((row) => row.map(csvCell).join(","))
           .join("\r\n");
@@ -353,11 +433,14 @@ window.AtlasADRows = (() => {
     compare.onsubmit = async (e) => {
       e.preventDefault();
       if (busy || window.AtlasReadOnly) return;
+      const wanted = [...new Set(identity.value.split(/[\s,;]+/).map(s => s.trim()).filter(Boolean))];
+      if (!wanted.length) return;
+      if (wanted.length > MAX_COMPARE) {status.textContent = `Compare up to ${MAX_COMPARE} at once.`;return;}
       const current = ++revision;
       pending?.abort();pending = new AbortController();
       busy = true;
       controls();
-      secondary = null;
+      others = [];
       view.value = "all";
       view.disabled = true;
       filter();renderOverview();refreshAccess();
@@ -372,23 +455,31 @@ window.AtlasADRows = (() => {
         by("Selected"),
       ];
       inputs.forEach((n) => (n.disabled = true));
-      status.textContent = "Comparing memberships…";
-      const payload={kind:kind.value,identity:identity.value.trim(),server:server.value.trim()};
+      const failed = [], found = [];
       try {
-        const compared = await AtlasClient.request("/api/active-directory/lookup", {
-          method: "POST",
-          signal: pending.signal,
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        if (current !== revision || !compare.isConnected) return;
-        secondary = {...compared,kind:payload.kind,queryServer:AtlasADRows.server(compared.server,payload.server)};
-        view.disabled = false;
-        status.textContent =
-          "Comparison complete. " + (secondary.warnings || []).join(" ");
+        for (const [index, name] of wanted.entries()) {
+          status.textContent = wanted.length > 1 ? `Comparing memberships… ${index + 1} of ${wanted.length} (${name})` : "Comparing memberships…";
+          const payload={kind:kind.value,identity:name,server:server.value.trim()};
+          try {
+            const compared = await AtlasClient.request("/api/active-directory/lookup", {
+              method: "POST",
+              signal: pending.signal,
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            });
+            if (current !== revision || !compare.isConnected) return;
+            found.push({...compared,kind:payload.kind,queryServer:AtlasADRows.server(compared.server,payload.server)});
+          } catch (error) {
+            if (current !== revision || error.name === "AbortError") return;
+            failed.push(name + ": " + error.message);
+          }
+        }
+        others = found;
+        view.disabled = !others.length;
+        status.textContent = others.length
+          ? "Comparison complete. " + [...others.flatMap(o => o.warnings || []), ...failed].join(" ")
+          : failed.join(" ");
         filter();renderOverview();refreshAccess();
-      } catch (error) {
-        if (current === revision) status.textContent = error.message;
       } finally {
         if (current !== revision) return;
         pending = null;busy = false;
@@ -398,7 +489,7 @@ window.AtlasADRows = (() => {
     };
     for (const n of [kind, identity, server])
       n.oninput = () => {
-        secondary = null;
+        others = [];
         view.value = "all";
         view.disabled = true;
         status.textContent =
@@ -423,7 +514,7 @@ window.AtlasADRows = (() => {
   const fields = ['Kind','Identity','Server','Selected'];
   function reset() {
     revision++;pending?.abort();pending=null;busy=false;
-    primary=secondary=null;selectionKey='';selectionPromise=null;
+    primary=null;others=[];selectionKey='';selectionPromise=null;
     by('Results').replaceChildren();
     by('Results').setAttribute('aria-busy','false');
     if(window.AtlasAD) window.AtlasAD.groupActions=null;

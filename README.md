@@ -410,7 +410,7 @@ Atlas uses tight shared spacing: small controls, 12px console panels, narrower s
 
 
 ### AD group inspection and comparison
-Right-click a user or machine and choose **See groups** to query its exact account in local Admin. The Workspace group list supports user/computer comparisons, groups in both objects or only one, and case-insensitive name filters: contains, starts with, ends with, equals and excludes. **Export CSV** downloads the filtered rows, object identities and each object's membership type; spreadsheet formula-like values are escaped. Command palette: See user groups, See machine groups, Compare AD groups, Filter AD group names, Export AD groups to CSV.
+Right-click a user or machine and choose **See groups** to query its exact account in local Admin. **Compare groups** takes up to five colleagues or machines at once (comma separated) and shows one colour-coded column per person: green ✓ member (teal nested, indigo primary), red ✗ missing. Groups the first person is missing come first, with a count of who has them; coloured counters (missing, only them, partly shared, everyone has) filter the list, and **Copy missing groups** copies the missing names for an access request. The list also supports case-insensitive name filters: contains, starts with, ends with, equals and excludes. **Export CSV** downloads the filtered rows, object identities and each object's membership type; spreadsheet formula-like values are escaped. Command palette: See user groups, See machine groups, Compare AD groups, Filter AD group names, Export AD groups to CSV.
 
 Queries use the Windows account running Atlas and require RSAT/domain connectivity. Results cover direct, primary and discovered nested membership in the queried directory scope, not effective permissions. Any lookup warnings or membership limits still apply to comparisons. Demo and Preview expose navigation but never run live AD queries.
 
@@ -426,7 +426,7 @@ AD lookup shows compact read-only user/machine health, OU, machine password chan
 
 Group lookup traverses parents of direct and primary groups, detects cycles, and labels discovered memberships Nested. Traversal is bounded to 1,000 visited groups and a 20-second work budget (the existing 35-second process timeout still applies). Failed resolution or limits produce partial-result warnings. This is scoped directory evidence, not a complete cross-domain authorization calculation or proof of effective access.
 
-Compare users or computers beside the group list; expand **Account health & properties** for both health cards and a property matrix with differences highlighted. Existing group filters and CSV export include nested memberships. Copy support summary (also in the palette) includes both objects, query times, returned properties, group memberships, differences and warnings. No AD changes or additional remote health scans are performed.
+Compare users or computers above the group list; expand **Account health & properties** for both health cards and a property matrix with differences highlighted. Existing group filters and CSV export include nested memberships. Copy support summary (also in the palette) includes every compared object, query times, returned properties, group memberships, differences and warnings. No AD changes or additional remote health scans are performed.
 
 References: https://learn.microsoft.com/en-us/powershell/module/activedirectory/get-adgroup and https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-adts/f9e9b7e2-c7ac-4db6-ba38-71d9696981e9
 
