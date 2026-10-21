@@ -6,6 +6,13 @@
     "Requires Atlas Admin running from an elevated Windows account. Disabled in Demo and Preview.";
   const blocked = [
     "#deploy",
+    "#deployQueue",
+    "#deploymentRetry",
+    "#deploymentRequeue",
+    "[data-deployment-retry]",
+    "[data-deployment-queue]",
+    "[data-history-retry]",
+    "[data-history-queue]",
     "#copyOnly",
     "#execOnly",
     "#bulkStart",

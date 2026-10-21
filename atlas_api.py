@@ -313,6 +313,9 @@ def register_atlas(app):
  # Reads only the operator's own session; never registered on the LAN viewer.
  from screen_reader import register as register_screen_reader
  register_screen_reader(app,wmi,check_token)
+ from clipboard_history import register as register_clipboard
+ from runtime_paths import clipboard_path
+ register_clipboard(app,wmi,check_token,clipboard_path)
 
  @app.get('/legacy-atlas')
  def previous_atlas():

@@ -25,7 +25,7 @@ CODE = re.compile(r'(?<![0-9A-Za-z])([0-9]{1,2})\s?R\s?([0-9]{6})(?![0-9])', re.
 VACANT = {'', 'open', 'vacant', 'free', 'libre', 'available', 'empty', 'spare', 'hot desk', 'hotdesk', 'flex', 'flex desk'}
 MAX_ABOVE = 3
 # Bumped when reading changes, so an unchanged plan file is read again after an update.
-VERSION = 3
+VERSION = 5
 # List tabs: header words for the desk column, the person column and the team column.
 DESK_HEADER = re.compile(r'(?:(?:new|current|assigned|allocated|nouveau|numero|num|n°|no)\s*)?(?:desk|bureau|poste|seat|position|place)'
                          r'(?:\s*(?:id|code|number|no|nr|n°|#|ref|numero))?')

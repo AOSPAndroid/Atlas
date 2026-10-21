@@ -7,6 +7,7 @@ import json
 import os
 import re
 import sqlite3
+import tempfile
 from pathlib import Path
 
 from fastapi import HTTPException, Request
@@ -21,6 +22,40 @@ APP_WORDS = re.compile(r'\b(microsoft|teams|outlook|chat|message|inbox|mail|cale
                        r'atlas|notepad|excel|word|powerpoint|onenote|meeting|call|activity|ticket|incident)\b', re.I)
 BROWSERS = {'msedge', 'chrome', 'firefox', 'openfin', 'iexplore'}
 LIMIT = 20000
+IMAGE_LIMIT = 15 * 1024 * 1024
+# A screenshot pasted or read from the clipboard in the browser: only these formats are accepted.
+IMAGE_TYPES = {b'\x89PNG\r\n\x1a\n': '.png', b'\xff\xd8\xff': '.jpg', b'BM': '.bmp', b'GIF8': '.gif'}
+
+
+def ocr_image(ps, data):
+    """Windows OCR of a PNG/JPEG/BMP/GIF image: {'text', 'language'}. Shared with the Atlas Companion."""
+    if not windows():
+        raise HTTPException(501, 'Reading screenshots needs Windows.')
+    if len(data) > IMAGE_LIMIT:
+        raise HTTPException(413, 'The image is larger than 15 MB.')
+    suffix = next((ext for magic, ext in IMAGE_TYPES.items() if data.startswith(magic)), None)
+    if not suffix:
+        raise HTTPException(415, 'Paste a PNG, JPEG, BMP or GIF screenshot.')
+    with tempfile.TemporaryDirectory(prefix='atlas-image-') as folder:
+        path = Path(folder) / ('clipboard' + suffix)
+        path.write_bytes(data)
+        # The path is Atlas's own temporary file, quoted as a PowerShell literal.
+        literal = "'" + str(path).replace("'", "''") + "'"
+        script = f"$Mode='image'; $Delay=0; $ImagePath={literal}\n" + SCRIPT.read_text(encoding='utf-8')
+        try:
+            captured = json.loads(ps(script, timeout=60))
+        except (RuntimeError, ValueError) as error:
+            raise HTTPException(502, f'Could not read the screenshot: {error}') from error
+    text = str(captured.get('text') or '')
+    if not text.strip():
+        raise HTTPException(422, 'No text was found in the screenshot. Copy a larger or sharper area and retry.')
+    return {'text': text, 'language': captured.get('language') or ''}
+
+
+def remember(text, source):
+    # Everything read from the clipboard also lands in the clipboard history, with its enrichment.
+    from clipboard_history import record
+    record(text, source)
 
 
 def windows():
@@ -113,10 +148,33 @@ def register(app, wmi, check_token):
                                 if body.source != 'clipboard' else 'The clipboard has no text.')
         result = {'source': body.source, 'title': title, 'process': captured.get('process') or '',
                   'text': text[:LIMIT], 'truncated': len(text) > LIMIT, 'language': captured.get('language') or ''}
+        if body.source == 'clipboard':
+            remember(text, 'inbox')
+        return {**result, **analysed(title, text)}
+
+    @app.post('/api/screen/image')
+    async def read_image(request: Request):
+        """Text from a screenshot the browser read from the clipboard or got from Ctrl+V, via Windows OCR."""
+        check_token(request)
+        if not windows():
+            raise HTTPException(501, 'Reading screenshots needs Windows.')
+        data = bytearray()
+        async for chunk in request.stream():
+            data.extend(chunk)
+            if len(data) > IMAGE_LIMIT:
+                raise HTTPException(413, 'The image is larger than 15 MB.')
+        captured = ocr_image(wmi.ps, bytes(data))
+        text = str(captured.get('text') or '')
+        title = 'Pasted screenshot'
+        remember(text, 'screenshot')
+        result = {'source': 'image', 'title': title, 'process': '', 'text': text[:LIMIT], 'truncated': len(text) > LIMIT,
+                  'language': captured.get('language') or ''}
         return {**result, **analysed(title, text)}
 
     @app.post('/api/screen/analyse')
     def analyse_text(body: Text, request: Request):
         # Re-run after the operator corrects recognised text or chooses one of several people.
         check_token(request)
+        if body.title == 'Clipboard' and body.user_id is None:
+            remember(body.text, 'inbox')
         return {'title': body.title, 'text': body.text, **analysed(body.title, body.text, body.user_id)}

@@ -93,6 +93,25 @@ function bind() {
   };
   $("#action").onchange = scripts;
   $("#deploy").onclick = () => deploy("full");
+  $("#deployQueue").onclick = () => addQueue();
+  $("#deployOpenQueue").onclick = () => $("#queueDrawer").classList.add("open");
+  $("#deploymentRetry").onclick = () => currentDeployment && retryDeployment(currentDeployment.id);
+  $("#deploymentRequeue").onclick = () => currentDeployment && (currentDeployment.payload ? queuePayload(currentDeployment.payload) : queueDeployment(currentDeployment.id));
+  $("#deploymentCopyLog").onclick = async () => {
+    try { await navigator.clipboard.writeText($("#log").textContent); toast("Log copied"); }
+    catch { toast("Clipboard unavailable"); }
+  };
+  // Retry / queue buttons on Deployments drawer cards and History rows.
+  $("#deploymentsList").addEventListener("click", (event) => {
+    const retry = event.target.closest("[data-deployment-retry]"), queue = event.target.closest("[data-deployment-queue]");
+    if (retry) retryDeployment(retry.dataset.deploymentRetry).then(() => refreshDeploymentMonitor());
+    if (queue) queueDeployment(queue.dataset.deploymentQueue);
+  });
+  $("#historyBody").addEventListener("click", (event) => {
+    const retry = event.target.closest("[data-history-retry]"), queue = event.target.closest("[data-history-queue]");
+    if (retry) retryDeployment(retry.dataset.historyRetry).then((d) => d && setTimeout(loadDeploymentHistory, 800));
+    if (queue) queueDeployment(queue.dataset.historyQueue);
+  });
   $("#copyOnly").onclick = () => deploy("copy");
   $("#execOnly").onclick = () => deploy("execute");
   $("#favBtn").onclick = toggleFav;
@@ -520,7 +539,7 @@ function bindConsolePolish() {
   window.addEventListener("resize", closeMenus);
   const panels = [
     ...document.querySelectorAll(
-      "#queueDrawer,#deploymentsDrawer,#softwareDrawer",
+      "#queueDrawer,#deploymentsDrawer,#softwareDrawer,#clipboardDrawer",
     ),
   ];
   let active = null,
@@ -528,6 +547,7 @@ function bindConsolePolish() {
   const toggles = {
     queueDrawer: "queueToggle",
     deploymentsDrawer: "deploymentsToggle",
+    clipboardDrawer: "clipboardToggle",
   };
   panels.forEach((p) => {
     p.setAttribute("role", "dialog");

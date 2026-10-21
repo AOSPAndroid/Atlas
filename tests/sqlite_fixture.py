@@ -10,6 +10,8 @@ _runtime_fixture = None
 def isolate_backend_database():
     """Keep standalone backend-test imports away from shipped/runtime databases."""
     global _runtime_fixture
+    # The Companion connection file never goes to the shared ProgramData or the checkout in tests.
+    os.environ.setdefault('ATLAS_COMPANION_DIR', tempfile.mkdtemp(prefix='atlas-companion-test-'))
     if os.environ.get('ATLAS_DB_PATH'):
         return Path(os.environ['ATLAS_DB_PATH'])
     _runtime_fixture = tempfile.TemporaryDirectory(prefix='atlas-backend-test-', ignore_cleanup_errors=True)

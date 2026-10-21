@@ -258,6 +258,48 @@ class LiveFloorPlan(unittest.TestCase):
             self.assertEqual(response.status_code, 409)
             apply.assert_not_called()
 
+    def test_the_plan_wins_a_person_on_two_desks_is_placed_on_both(self):
+        twice = [row[:] for row in self.layout]
+        twice[2] = ['Christophe Duriez\n02R015079', 'Christophe Duriez\n02R016079', 'Credit Sales\n02R016081']
+        self.write('plan.xlsx', twice)
+        self.sync.configure(Settings(folder=str(self.folder), enabled=True))
+        result = self.sync.check()
+        self.assertEqual(result['status']['state'], 'synced', result['status'])
+        self.assertEqual([official(self.db, d)[0]['name'] for d in ('02R015079', '02R016079')], ['Christophe Duriez'] * 2)
+        self.assertIn('Same person on 02R015079, 02R016079 in the Excel: placed on each, as written.', result['last']['notes'])
+
+    def test_an_old_desk_holding_only_the_name_is_freed(self):
+        # Before the live plan, a person could sit on a second desk by name only, with no account link.
+        spare = next(d for d in self.desks if d not in ('02R015079', '02R016079', '02R010070', '02R011079', '02R011081', '02R015081', '02R016081', '02R017069', '02R017071', '02R017073', '02R019069', '02R019071', '02R019073', '02R010086'))
+        with sqlite3.connect(self.db, factory=ClosingConnection) as c:
+            body = json.loads(c.execute('select body from official_records where id=?', (spare,)).fetchone()[0])
+            c.execute('update official_records set body=? where id=?', (json.dumps(dict(body, name='Christophe Duriez', occupancy='assigned')), spare))
+            c.execute('delete from desk_user_links where desk_id=?', (spare,))
+        self.write('plan.xlsx', self.layout)
+        self.sync.configure(Settings(folder=str(self.folder), enabled=True))
+        result = self.sync.check()
+        self.assertEqual(result['status']['state'], 'synced', result['status'])
+        self.assertEqual(official(self.db, spare)[0]['occupancy'], 'vacant', 'The plan places him at 02R015079 only')
+        self.assertEqual(official(self.db, '02R015079')[0]['name'], 'Christophe Duriez')
+
+    def test_the_card_lists_people_on_more_than_one_desk(self):
+        twice = [row[:] for row in self.layout]
+        twice[2] = ['Christophe Duriez\n02R015079', 'Christophe Duriez\n02R016079', 'Credit Sales\n02R016081']
+        self.write('plan.xlsx', twice)
+        self.sync.configure(Settings(folder=str(self.folder), enabled=True))
+        found = {p['name']: p['desks'] for p in self.sync.check()['duplicates']}
+        self.assertIn(['02R015079', '02R016079'], found.values())
+        self.assertNotIn('Credit Sales', found, 'Repeated team labels are not people')
+
+    def test_large_changes_apply_straight_away_when_review_is_off(self):
+        self.sync.configure(Settings(folder=str(self.folder), enabled=True, review_large=False))
+        free = [[f'Open\n{desk}' for desk in self.desks[i:i + 6]] for i in range(0, 60, 6)]
+        self.write('plan.xlsx', free)
+        result = self.sync.check()
+        self.assertEqual(result['status']['state'], 'synced', result['status'])
+        self.assertFalse(result['review_large'])
+        self.assertEqual(official(self.db, self.desks[0])[0]['occupancy'], 'vacant')
+
     def test_review_threshold(self):
         self.assertFalse(large(40, 100))
         self.assertTrue(large(41, 100))

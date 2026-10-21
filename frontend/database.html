@@ -91,10 +91,11 @@
       </div>
       <section class="panel atlas-live-plan" id="live-plan" aria-labelledby="live-plan-title">
         <header class="atlas-live-plan-head"><h2 id="live-plan-title">Live floor plan</h2><span id="live-plan-state" role="status">Off</span></header>
-        <p>Atlas reads the assistants' desk plan (Excel boxes such as <b>Christophe Duriez 02R015079</b>, <b>Credit Sales 02R016079</b> or <b>Open 03R016079</b>) from a synced folder, and the map updates within a minute of each save, in Admin and Demo. Normal changes apply on their own with a backup; large or unclear ones wait here for you. Desks the plan does not mention are left as they are.</p>
+        <p>Atlas reads the assistants' desk plan (Excel boxes such as <b>Christophe Duriez 02R015079</b>, <b>Credit Sales 02R016079</b> or <b>Open 03R016079</b>) from a synced folder, and the map updates within a minute of each save, in Admin and Demo. The Excel is the authority: what it says is applied as written, with a backup, and anything Atlas could not link is listed as a note. With <b>Ask before large changes</b> on, a save that changes many desks waits here for you first. Desks the plan does not mention are left as they are.</p>
         <div class="atlas-live-plan-controls">
           <label class="atlas-live-plan-folder">Plan folder<input id="live-plan-folder" autocomplete="off" spellcheck="false" placeholder="C:\Users\you\OneDrive - Company\Shortcuts\PA-IT_shared\02_Current_plan"></label>
           <label class="atlas-live-plan-toggle"><input type="checkbox" id="live-plan-enabled"> Live link on</label>
+          <label class="atlas-live-plan-toggle" title="Off: every save of the plan reaches the map straight away"><input type="checkbox" id="live-plan-review" checked> Ask before large changes</label>
           <button type="button" id="live-plan-save" class="primary">Save</button>
           <button type="button" id="live-plan-check">Check now</button>
         </div>

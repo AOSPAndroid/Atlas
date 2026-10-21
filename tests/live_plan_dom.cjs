@@ -15,6 +15,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
       { desk: '02R016079', kind: 'moved', from_desk: '02R015079', before: { name: 'Credit Sales' }, after: { name: 'Christophe Duriez' } },
       { desk: '02R015079', kind: 'vacated', from_desk: null, before: { name: 'Christophe Duriez' }, after: { name: 'Vacant desk' } }] } },
     history: [{ at: '2026-10-19T17:00:00+00:00', file: 'Hoche Project_20261002.xlsx', counts: { moved: 2, assigned: 1 }, backup: 'b1.db', desks: ['04R019086', '04R014086'] }],
+    duplicates: [{ name: 'Example Person', desks: ['03R012074', '04R030088'] }],
   };
   const synced = { ...held, status: { state: 'synced', message: 'Updated from Hoche Project_20261020.xlsx: 1 moved, 1 freed.' }, held: null,
     history: [{ at: '2026-10-20T09:02:00+00:00', file: 'Hoche Project_20261020.xlsx', counts: { moved: 1, vacated: 1 } }, ...held.history] };
@@ -50,6 +51,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   assert.match(get('live-plan-details').textContent, /02R999999 · Ghost/);
   assert.match(get('live-plan-details').textContent, /Tabs read: R\+2 \(FINAL\) \(120\) · R\+4 \(FINAL\) \(118\) · hidden tabs skipped: R\+4 \(OLD\)/);
   assert.match(get('live-plan-details').textContent, /1 desk codes with nothing written beside them/);
+  assert.match(get('live-plan-details').textContent, /1 people on more than one desk now/);
+  assert.match(get('live-plan-details').textContent, /Example Person · 03R012074, 04R030088/);
   assert(!get('live-plan-held').hidden);
   assert.deepEqual([...get('live-plan-changes').children].map((li) => li.textContent),
     ['02R016079 · moved from 02R015079: Credit Sales → Christophe Duriez', '02R015079 · freed: Christophe Duriez → Vacant desk']);
@@ -58,7 +61,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await sleep(20);
   assert.equal(get('live-plan-folder').value, '"C:\\Users\\me\\OneDrive\\02_Current_plan"', 'Typing is not overwritten by refreshes');
   get('live-plan-save').onclick(); await sleep(20);
-  assert.deepEqual(posts[0], ['/api/seating-sync/settings', { folder: '"C:\\Users\\me\\OneDrive\\02_Current_plan"', enabled: true }]);
+  assert.deepEqual(posts[0], ['/api/seating-sync/settings', { folder: '"C:\\Users\\me\\OneDrive\\02_Current_plan"', enabled: true, review_large: true }]);
   w.confirm = () => false; get('live-plan-apply').onclick(); await sleep(20);
   assert.equal(posts.length, 1, 'Cancelling the confirmation applies nothing');
   replaceOnApply = true;

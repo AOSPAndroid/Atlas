@@ -7,6 +7,6 @@ const html=fs.readFileSync('frontend/index.html','utf8'),code=fs.readFileSync('f
  w.document.getElementById('adSelected').click();assert.equal(requests.length,0);assert.equal(w.document.getElementById('adIdentity').value,'PC01');
  await w.document.getElementById('adForm').onsubmit({preventDefault(){}});assert.equal(requests.length,1);assert.equal(requests[0].kind,'computer');
  const result=w.document.getElementById('adResults');assert(result.textContent.includes('false'));assert(result.textContent.includes('Test Group'));assert.equal(result.querySelectorAll('img').length,0);
- const search=result.querySelector('input');search.value='missing';search.oninput();assert(result.textContent.includes('No matching groups'));
+ const search=result.querySelector('[aria-label="Filter AD groups"]');search.value='missing';search.oninput();assert(result.textContent.includes('No matching groups'));
  w.AtlasReadOnly={};w.AtlasAD.open();assert(w.document.getElementById('adLookup').disabled);await w.document.getElementById('adForm').onsubmit({preventDefault(){}});assert.equal(requests.length,1);w.close();console.log('PASS: manual AD lookup, selected target, literal display, group filter and read-only blocking');
 })().catch(e=>{console.error(e);process.exit(1)});

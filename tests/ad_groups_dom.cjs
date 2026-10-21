@@ -24,7 +24,7 @@ const fs=require('fs'),assert=require('assert/strict'),{JSDOM}=require('jsdom');
  view.value='first';view.onchange();assert.equal(root.querySelectorAll('.ad-groups tbody tr').length,2);
  view.value='second';view.onchange();assert(root.querySelector('.ad-groups').textContent.includes('VPN_Paris'));
  view.value='all';view.onchange();w.AtlasAD.command('ad-export-groups');
- const reader=new w.FileReader();const csv=await new Promise(resolve=>{reader.onload=()=>resolve(reader.result);reader.readAsText(blob)});assert(csv.includes("'=SUM(1,2)"));assert(csv.includes('Description'));assert(csv.includes('Trading access <important>'));assert(csv.includes('"both"'));assert(csv.includes('"alice","bob"'));
+ const reader=new w.FileReader();const csv=await new Promise(resolve=>{reader.onload=()=>resolve(reader.result);reader.readAsText(blob)});assert(csv.includes("'=SUM(1,2)"));assert(csv.includes('Description'));assert(csv.includes('Trading access <important>'));assert(csv.includes('"In both"'));assert(csv.includes('"alice","bob"'));
  w.document.querySelector('#adSelected').click();assert.equal(w.AtlasAD.groupActions,null);
  w.AtlasReadOnly={};w.AtlasAD.show('computer','PC02');assert.equal(calls,2);assert(w.document.querySelector('#adLookup').disabled);
  w.close();console.log('PASS: five filters, DN comparison, CSV escaping/formula protection, stale export cleared and viewer blocked');

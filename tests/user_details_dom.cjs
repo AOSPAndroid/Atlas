@@ -60,7 +60,9 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
   assert.equal(doc.querySelector('#kyc [role="status"]').textContent,'Email copied');
   f.run('S.target="PC-NEW"');
   copyButton('Copy summary').click();await sleep(0);
-  assert.equal(copied.at(-1),f.run('supportSummary()'),'Summary resolves the current machine at copy time');
+  // The timestamp line can tick over a second between the copy and this comparison.
+  const untimed=text=>text.replace(/^Timestamp: .*\n/m,'');
+  assert.equal(untimed(copied.at(-1)),untimed(f.run('supportSummary()')),'Summary resolves the current machine at copy time');
   f.run('S.target=""');
   assert(f.run('supportSummary()').includes('Domain account: INTRANET\\x00123456'));
   assert(f.run('completeMachineReport()').includes('Domain account: INTRANET\\x00123456'));

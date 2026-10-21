@@ -1,6 +1,6 @@
 from __future__ import annotations
 from datetime import datetime
-import base64, json, logging, os, re, shutil, sqlite3, subprocess, threading, time, uuid
+import base64, json, logging, os, re, secrets, shutil, sqlite3, subprocess, sys, threading, time, uuid
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Literal
@@ -72,10 +72,21 @@ def ps(script,timeout=120):
  return run(['powershell.exe','-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-EncodedCommand',encoded],timeout=timeout).stdout.strip()
 def hist_db():
  c=sqlite3.connect(HISTORY_DB,timeout=20,factory=ClosingConnection);c.row_factory=sqlite3.Row
- c.execute('''create table if not exists deployments(id text primary key,started text,finished text,operator text,target text,package text,action text,script text,mode text,state text,robocopy_code text,pid text,exit_code text,details text)''');c.commit();return c
-def history_create(j,target,package,action,script,mode):
- if j in jobs:jobs[j].update(target=target,package=package,action=action,script=script,action_title=action+' · '+package,started_at=time.time());job_service.save(j)
- with hist_db() as c:c.execute('insert into deployments(id,started,operator,target,package,action,script,mode,state) values(?,datetime("now","localtime"),?,?,?,?,?,?,?)',(j,identity(),target,package,action,script,mode,'queued'));c.commit()
+ c.execute('''create table if not exists deployments(id text primary key,started text,finished text,operator text,target text,package text,action text,script text,mode text,state text,robocopy_code text,pid text,exit_code text,details text)''')
+ # The full request (folder, fresh copy, threads) so a failed deployment can be retried or queued as it was.
+ if 'payload' not in {row[1] for row in c.execute('pragma table_info(deployments)')}:c.execute('alter table deployments add column payload text')
+ c.commit();return c
+def history_create(j,target,package,action,script,mode,payload=None):
+ if j in jobs:jobs[j].update(target=target,package=package,action=action,script=script,action_title=action+' · '+package,started_at=time.time(),payload=payload);job_service.save(j)
+ with hist_db() as c:c.execute('insert into deployments(id,started,operator,target,package,action,script,mode,state,payload) values(?,datetime("now","localtime"),?,?,?,?,?,?,?,?)',(j,identity(),target,package,action,script,mode,'queued',json.dumps(payload) if payload else None));c.commit()
+def saved_payload(j):
+ """The deployment request behind a job or history row, rebuilt from its columns for older rows."""
+ job=jobs.get(j) or {}
+ if job.get('payload'):return dict(job['payload'])
+ with hist_db() as c:row=c.execute('select target,package,action,script,mode,payload from deployments where id=?',(j,)).fetchone()
+ if not row:raise HTTPException(404,'Deployment not found in history')
+ if row['payload']:return json.loads(row['payload'])
+ return {'computer':row['target'],'folder':row['package'],'script':row['script'],'action':row['action'] or 'Install','mode':row['mode'] or 'full'}
 def history_update(j,**fields):
  if not fields:return
  with hist_db() as c:c.execute('update deployments set '+','.join(f'{k}=?' for k in fields)+' where id=?',(*fields.values(),j));c.commit()
@@ -208,7 +219,7 @@ def bulk_worker(j,p):
   item=Deploy(computer=row['machine'],folder=p.folder,script=p.script,action=p.action,fresh=p.fresh,threads=p.threads)
   row.update(copy='Running',completion='Running',job=child)
   try:
-   history_create(child,item.computer,Path(item.folder).name,item.action,item.script,item.mode)
+   history_create(child,item.computer,Path(item.folder).name,item.action,item.script,item.mode,item.model_dump())
    deploy_worker(child,item)
    events=jobs[child]['events'];end=events[-1] if events else {}
    row.update(copy='Complete' if any('Copy complete' in e['message'] for e in events) else 'Failed',launch='Started' if any('pid' in e for e in events) else 'Not started',pid=next((e['pid'] for e in events if 'pid' in e),''),completion='Launched' if jobs[child]['state']=='launched' else ('Complete' if jobs[child]['state']=='complete' else 'Failed'),exit_code=end.get('exit_code',''),details=end.get('message',''))
@@ -320,7 +331,16 @@ def preflight(pc:str):
 @app.post('/api/deploy')
 def deploy(p:Deploy):
  validate_deployment(p);job_service.target_ready(p.computer)
- j=uuid.uuid4().hex;jobs[j]={'state':'queued','events':[]};history_create(j,p.computer,Path(p.folder).name,p.action,p.script,p.mode);start_job(deploy_worker,j,p);return {'job':j}
+ j=uuid.uuid4().hex;jobs[j]={'state':'queued','events':[]};history_create(j,p.computer,Path(p.folder).name,p.action,p.script,p.mode,p.model_dump());start_job(deploy_worker,j,p);return {'job':j}
+@app.get('/api/deploy/{j}/payload')
+def deployment_payload(j:str):
+ """What a past deployment asked for, to add it to the queue again."""
+ return Deploy(**saved_payload(j)).model_dump()
+@app.post('/api/deploy/{j}/retry')
+def retry_deployment(j:str):
+ """Run a past deployment again with the same machine, package, script and options."""
+ payload=Deploy(**saved_payload(j))
+ return {**deploy(payload),'target':payload.computer,'package':Path(payload.folder).name,'action':payload.action}
 @app.get('/api/job/{j}')
 def job(j:str):
  if j not in jobs:raise HTTPException(404,'Job not found')
@@ -340,7 +360,9 @@ def bulk_job(j:str):
 def history(limit:int=100,today:bool=False):
  with hist_db() as c:
   where = ' where date(started)=date("now","localtime")' if today else ''
-  return [dict(x) for x in c.execute('select * from deployments'+where+' order by started desc limit ?', (max(1,min(limit,500)),))]
+  rows=[dict(x) for x in c.execute('select * from deployments'+where+' order by started desc limit ?', (max(1,min(limit,500)),))]
+ for row in rows:row.pop('payload',None)
+ return rows
 @app.get('/api/ping/{pc}')
 def ping(pc:str):return {'online':has_echo_reply(run(['ping.exe','-4','-n','1','-w','1200',validate_pc(pc)],False,timeout=5))}
 @app.get('/api/access/{pc}')
@@ -504,7 +526,7 @@ def _queue_worker(queue_id,items):
     row['state']='running';child=uuid.uuid4().hex
     jobs[child]={'state':'queued','target':item.computer,'events':[],'started_at':time.time()};row['job']=child;job_service.save(queue_id,queue=True)
    try:
-    history_create(child,item.computer,Path(item.folder).name,item.action,item.script,item.mode)
+    history_create(child,item.computer,Path(item.folder).name,item.action,item.script,item.mode,item.model_dump())
     deploy_worker(child,item)
     row.update(state=jobs[child]['state'],events=jobs[child].get('events',[]))
    except Exception as exc:
@@ -597,7 +619,7 @@ def database_freshness():
 
 def deployment_details(job_id,job):
     targets=job.get('targets') or [r.get('machine','') for r in job.get('results',[]) if r.get('machine')]
-    details={'target':job.get('target',''),'package':job.get('package',''),'action':job.get('action',''),'script':job.get('script','')}
+    details={'target':job.get('target',''),'package':job.get('package',''),'action':job.get('action',''),'script':job.get('script',''),'retry':not targets}
     if targets:details['target']=', '.join(targets)
     # Older persisted jobs retain their original selection in deployment history.
     if not details['package']:
@@ -815,8 +837,16 @@ def search_message(message_id):
 search_index=SearchIndex(knowledge_path().parent/'search-index.sqlite3',
  {'article':search_articles,'diagram':search_diagrams,'deployment':search_deployments,'inbox':search_inbox})
 register_search(app,search_index,search_message)
-from inbox_control import register as register_inbox_control
-register_inbox_control(app)
+# The Atlas Companion runs in the operator's normal Windows session (clipboard, Outlook) and
+# reports here; Live Inbox's collector switches control it once it has connected.
+from inbox_control import register as register_inbox_control, InboxIntegration
+from companion_server import register as register_companion, CompanionInbox
+from runtime_paths import companion_state_path, companion_inbox_path
+def _admin_token(request):
+ from atlas_api import TOKEN
+ if not secrets.compare_digest(request.headers.get('x-atlas-token',''),TOKEN):raise HTTPException(403,'Refresh the page before saving')
+_companion=register_companion(app,sys.modules[__name__],_admin_token,companion_state_path,companion_inbox_path)
+register_inbox_control(app,CompanionInbox(_companion,InboxIntegration()))
 
 # Bundled open-source Draw.io static editor (no server-side editor endpoints).
 app.mount('/drawio', StaticFiles(directory=ROOT/'frontend/drawio', html=True), name='drawio')

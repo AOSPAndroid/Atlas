@@ -45,8 +45,13 @@ class SeatingExcel(unittest.TestCase):
   p=self.plan(values,True);self.assertEqual(p['updates'][a]['record']['occupancy'],'vacant');self.assertEqual(p['updates'][b]['record']['occupancy'],'vacant')
  def test_conflicts(self):
   a,b,d=self.ids
-  for values in ([[a,'A','','u1','assigned'],[a,'B','','u2','assigned']],[[a,'Alice','','u1','assigned'],[d,'Alice','','u1','assigned']],[['BAD','A','','','assigned']],[[a,'Unknown','','missing','assigned']],[[a,'Alice','','u1','vacant']]):
+  for values in ([[a,'A','','u1','assigned'],[a,'B','','u2','assigned']],[['BAD','A','','','assigned']],[[a,'Unknown','','missing','assigned']],[[a,'Alice','','u1','vacant']]):
    self.assertTrue(self.plan(values)['report']['errors'],values)
+ def test_duplicates_follow_the_excel(self):
+  # The same person on two desks in the sheet is placed on both, with a warning, not a blocking error.
+  a,b,d=self.ids;p=self.plan([[a,'Alice','','u1','assigned'],[d,'Alice','','u1','assigned']])
+  self.assertFalse(p['report']['errors']);self.assertEqual(p['updates'][d]['link'],'key1');self.assertEqual((p['updates'][a]['record']['name'],p['updates'][a]['record']['occupancy']),('Alice','assigned'),'Alice keeps her first desk too')
+  self.assertTrue(any('Same person on' in w and 'placed on each' in w for w in p['report']['warnings']))
  def test_stale_preview_and_atomic_rollback(self):
   a,b,d=self.ids;p=self.plan([[d,'Alice','Rates','u1','assigned']]);before=self.state()
   original=sx.store.save_record;calls=[]
