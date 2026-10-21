@@ -8,7 +8,8 @@ function syncDeploymentPanel({ selection = false } = {}) {
     panel = $("#deploymentPanel"),
     toggle = $("#deploymentToggle");
   if (!workspace || !panel || !toggle) return;
-  const available = !!S.target && workspace.classList.contains("active"),
+  // The panel lives in Workspace, or beside a Live Inbox message while its Deploy tool is open.
+  const available = !!S.target && !!panel.closest(".page")?.classList.contains("active"),
     compact = window.matchMedia("(max-width: 760px)").matches;
   if (!available) deploymentExpanded = false;
   else if (selection) deploymentExpanded = true;

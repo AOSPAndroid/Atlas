@@ -6,6 +6,35 @@ sender lookup, candidate selection and linked-machine panel. Open in Workspace
 selects the matched person in the existing Atlas tools. Messages never launch
 diagnostics, deployments or fixes automatically.
 
+## Request tools: everything beside the message
+
+**Select**, **Health** and **Groups** on a machine, the **Suggested checks** and the
+package buttons open a third column next to the message, so the email, the sender
+and the results stay on screen. It works on that machine and sender, and the
+machine becomes Atlas's current target (Workspace and Remote Admin follow it):
+
+- **Health**: ping, C$, WMI, CPU, RAM, GPU, C: space and uptime. **Select** runs the
+  quick checks; **Health** scans everything.
+- **Performance**: one sample of CPU, memory, C: free space, disk latency and
+  uptime, what stands out, and the 12 busiest processes by CPU or memory.
+  **End…** stops a process after you confirm. **Remote Admin ↗** opens the full
+  view (threads, services, GPU).
+- **PC groups** and **User groups**: the AD account first (disabled, locked out,
+  password or account expired), then the groups, direct before primary before
+  nested, with a filter and **Copy names**. **Compare in Active Directory ↗**
+  opens the full page to compare with colleagues.
+- **Deploy**: the Workspace deployment panel itself (package, Install, Repair or
+  Uninstall, script, Advanced, Add to queue, progress and log). It goes back to
+  Workspace when you close the tools or leave Live Inbox, with your choices kept.
+- **MSRA**, **C$**, **Remote Desktop**, **Computer Management** and **Reboot…**
+  (with its confirmation) at the top; **Workspace ↗** opens the person and machine
+  there.
+
+When a Live Inbox button opens another page (Knowledge Base, Workspace, Active
+Directory, Remote Admin), a **Back to Live Inbox** button appears at the bottom.
+On screens narrower than 1280 pixels the message list hides while the tools are
+open; close them (×) to see it again.
+
 ## Acting on a message
 
 Each selected message shows a **Request** card and buttons on every machine:
@@ -21,8 +50,9 @@ Each selected message shows a **Request** card and buttons on every machine:
   to the sender. Otherwise the sender's linked Windows machines are offered.
   Phones and other inventory-only devices get no Windows actions.
 - **Packages.** Product names in the message are matched against the package
-  catalogue. **Install… / Uninstall… / Repair…** opens Workspace with the person,
-  machine, package, action and script selected; click the deploy button there.
+  catalogue. **Install… / Uninstall… / Repair…** opens **Deploy** in the request
+  tools beside the message with the machine, package, action and script selected;
+  click the deploy button there.
   **Add to queue** adds it to the deployment queue, which still needs
   **Start queue**. If nothing matches, **Search catalogue** opens the package
   picker with the words after "install". Saved deployment kits can be added too.
@@ -35,6 +65,7 @@ Each selected message shows a **Request** card and buttons on every machine:
   `python tools/build_winget_aliases.py` (downloads about 20 MB).
 - **Suggested checks** depend on the issue: performance scan, health check,
   reboot (with the usual confirmation), and the user's or machine's AD groups.
+  They run in the request tools, without leaving Live Inbox (below).
 - **Knowledge Base** shows articles and diagrams whose title or text mention the
   matched words. Articles tagged for the request's issue type (see **Suggest in
   Live Inbox for** in the article editor) come first.

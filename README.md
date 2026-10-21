@@ -34,7 +34,7 @@ The **map** helps you explore floors and seating in 2D or 3D. The **IT console**
 
 ## What Atlas can do
 
-**Live Inbox:** emails and Teams/Outlook notification previews, matched sender records and linked machines inside the main Atlas GUI. Start/Stop collectors, choose sources and open listener settings from the same screen. See [integrated setup](docs/inbox-integration.md). Suggested fixes are not yet included.
+**Live Inbox:** emails and Teams/Outlook notification previews, matched sender records and linked machines inside the main Atlas GUI. Start/Stop collectors, choose sources and open listener settings from the same screen. Health, performance (with End process), the user's and PC's AD groups, deployment, MSRA/C$ and reboot run in a tools column beside the message, without leaving Live Inbox. See [integrated setup](docs/inbox-integration.md#request-tools-everything-beside-the-message). Suggested fixes are not yet included.
 
 **New to the performance tools?** Read the [Remote Admin performance guide](docs/REMOTE_ADMIN_PERFORMANCE.md) for what each CPU, GPU, Memory and Overview button does, how to interpret the results, and a practical slowness investigation workflow. All scans require an explicit button click.
 
