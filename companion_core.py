@@ -1,16 +1,28 @@
 """Atlas Companion logic that does not touch Windows: the connection to Atlas, what to send for a
-clipboard change, and forwarding Outlook mail from the Companion's own queue. atlas_companion.py
-adds the Windows parts (clipboard listener, tray icon, Outlook) around these classes."""
+clipboard change, forwarding Outlook mail and Teams previews from the Companion's own queue, running
+the commands Atlas asks for, and driving the notification listener through its command and status
+files. atlas_companion.py adds the Windows parts (clipboard listener, tray icon, Outlook, the listener
+app) around these classes."""
 import hashlib
+import html
 import json
 import os
+import re
+import sqlite3
 import struct
 import time
 import urllib.error
 import urllib.request
+import uuid
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from urllib.parse import urlsplit
 
-VERSION = '1.0'
+VERSION = '1.1'
+# What this Companion can do when Atlas asks (sent at check-in; Atlas hides what an older one cannot).
+CAPABILITIES = ('outlook.reply', 'outlook.open', 'outlook.done', 'open.url', 'notify', 'notifications.show')
+URL_SCHEMES = ('https', 'http', 'msteams', 'mailto', 'sip', 'tel', 'callto')
+DONE_CATEGORY = 'Atlas: done'
 TEXT_LIMIT = 20000
 # Formats password managers and Windows set to keep a copy out of clipboard history and monitors.
 PRIVATE_FORMATS = {'ExcludeClipboardContentFromMonitorProcessing', 'Clipboard Viewer Ignore'}
@@ -49,11 +61,11 @@ class Client:
         self.url, self.token, self.timeout = url, token, timeout
         self.opener = opener or urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
-    def send(self, path, data, content_type):
+    def send(self, path, data, content_type, timeout=None):
         request = urllib.request.Request(self.url + path, data=data, method='POST',
                                          headers={'Content-Type': content_type, 'X-Atlas-Companion': self.token})
         try:
-            with self.opener.open(request, timeout=self.timeout) as response:
+            with self.opener.open(request, timeout=timeout or self.timeout) as response:
                 return json.loads(response.read() or b'{}')
         except urllib.error.HTTPError as error:
             try:
@@ -64,8 +76,8 @@ class Client:
         except (urllib.error.URLError, OSError, ValueError) as error:
             raise Offline(f'Atlas is not reachable at {self.url}: {error}') from error
 
-    def post(self, path, body):
-        return self.send(path, json.dumps(body).encode('utf-8'), 'application/json')
+    def post(self, path, body, timeout=None):
+        return self.send(path, json.dumps(body).encode('utf-8'), 'application/json', timeout)
 
     def image(self, data):
         return self.send('/api/companion/image', data, 'image/bmp')
@@ -132,18 +144,21 @@ class ClipboardForwarder:
 
 
 class MailForwarder:
-    """Forwards messages from the Companion's own Outlook queue (outlook_watcher.MailQueue, with its
-    checkpoints) to Atlas, in order, remembering the last one Atlas accepted."""
+    """Forwards messages from the Companion's own queue (outlook_watcher.MailQueue, with its
+    checkpoints) to Atlas, in order, remembering the last one Atlas accepted. The notification
+    listener writes Teams/Outlook previews into the same queue; `kinds` says which are wanted
+    (a kind that is switched off is skipped, not kept for later)."""
 
-    FIELDS = ('entry_id', 'received_at', 'conversation_id', 'sender_name', 'sender_address', 'subject', 'body', 'body_truncated')
+    FIELDS = ('entry_id', 'received_at', 'conversation_id', 'sender_name', 'sender_address', 'subject', 'body', 'body_truncated',
+              'channel', 'content_kind', 'app_name')
 
-    def __init__(self, queue, client, batch=50):
-        self.queue, self.client, self.batch = queue, client, batch
+    def __init__(self, queue, client, batch=50, kinds=('mail',)):
+        self.queue, self.client, self.batch, self.kinds = queue, client, batch, tuple(kinds)
 
     def pending(self):
         after = self.queue.get('forwarded') or 0
         return self.queue.db.execute(
-            f"SELECT id, source, {', '.join(self.FIELDS)} FROM messages WHERE id > ? AND content_kind='mail' ORDER BY id LIMIT ?",
+            f"SELECT id, source, {', '.join(self.FIELDS)} FROM messages WHERE id > ? ORDER BY id LIMIT ?",
             (after, self.batch)).fetchall()
 
     def forward(self):
@@ -152,21 +167,155 @@ class MailForwarder:
             rows = self.pending()
             if not rows:
                 return sent
-            for source in dict.fromkeys(row['source'] for row in rows):
-                group = [row for row in rows if row['source'] == source]
+            wanted = [row for row in rows if row['content_kind'] in self.kinds]
+            for source in dict.fromkeys(row['source'] for row in wanted):
+                group = [row for row in wanted if row['source'] == source]
                 self.client.post('/api/companion/mail', {'source': source, 'messages': [{k: row[k] for k in self.FIELDS} for row in group]})
             with self.queue.db:
                 self.queue.set('forwarded', rows[-1]['id'])
-            sent += len(rows)
+            sent += len(wanted)
             if len(rows) < self.batch:
                 return sent
 
 
-def hello(client, user, computer, clipboard, mail):
-    """Check in with Atlas; returns its settings ({'clipboard': bool, 'mail': bool})."""
+def hello(client, user, computer, clipboard, mail, notifications=None, capabilities=CAPABILITIES):
+    """Check in with Atlas; returns its settings (clipboard, mail, notifications, outlook_previews, alerts)."""
     response = client.post('/api/companion/hello', {'version': VERSION, 'user': user, 'computer': computer,
-                                                    'clipboard': clipboard, 'mail': mail})
+                                                    'clipboard': clipboard, 'mail': mail, 'notifications': notifications or {},
+                                                    'capabilities': list(capabilities)})
     return response.get('settings') or {}
+
+
+class CommandRunner:
+    """Fetches what Atlas asks for (waiting up to `wait` seconds for a request) and reports each
+    result. `handlers` maps a command kind to a function of its arguments returning a dict."""
+
+    def __init__(self, client, handlers):
+        self.client, self.handlers = client, handlers
+
+    def run_once(self, wait=20):
+        response = self.client.post('/api/companion/poll', {'wait': wait}, timeout=wait + 15)
+        for command in response.get('commands') or []:
+            handler = self.handlers.get(command.get('kind'))
+            try:
+                if handler is None:
+                    raise ValueError('This Companion cannot do ' + str(command.get('kind')))
+                body = {'ok': True, 'result': handler(command.get('args') or {}) or {}, 'error': ''}
+            except Exception as error:  # Reported to Atlas; the Companion keeps running.
+                body = {'ok': False, 'result': {}, 'error': (str(error) or type(error).__name__)[:1000]}
+            self.client.post(f"/api/companion/commands/{command['id']}/result", body)
+        return response.get('settings')
+
+
+def safe_url(url):
+    """Only web, Teams, mail and phone links are opened, never files or programs."""
+    url = str(url or '').strip()
+    if urlsplit(url).scheme.lower() not in URL_SCHEMES:
+        raise ValueError('Only web, Teams, mail and phone links can be opened.')
+    return url
+
+
+def reply_html(existing, text):
+    """The reply text above Outlook's quoted message, in the reply's own HTML."""
+    paragraphs = ''.join(f'<p>{html.escape(line) or "&nbsp;"}</p>' for line in str(text).splitlines())
+    block = f'<div style="font-family:Calibri,Arial,sans-serif;font-size:11pt">{paragraphs}</div>'
+    match = re.search(r'<body[^>]*>', existing or '', re.I)
+    return existing[:match.end()] + block + existing[match.end():] if match else block + (existing or '')
+
+
+def categories(current, separator, done, name=DONE_CATEGORY):
+    """Outlook's category list with the done category added or removed. Outlook separates categories
+    with the Windows list separator (";" in French settings, "," in English)."""
+    names = [part.strip() for part in re.split(r'[,;]', current or '') if part.strip()]
+    names = [n for n in names if n != name] + ([name] if done else [])
+    return (separator.strip() + ' ').join(names)
+
+
+def queue_identity(directory):
+    """The Outlook profile, store and folder the Companion's queue watches (pinned at the first scan)."""
+    path = Path(directory) / 'inbox.sqlite3'
+    if not path.is_file():
+        return None
+    connection = sqlite3.connect(path.as_uri() + '?mode=ro', uri=True, timeout=2)
+    try:
+        row = connection.execute("SELECT value FROM watcher_state WHERE key='identity'").fetchone()
+        return json.loads(row[0]) if row else None
+    except sqlite3.Error:
+        return None
+    finally:
+        connection.close()
+
+
+def store_for(directory, source):
+    """The Outlook store holding a forwarded email, when its source is this queue's inbox."""
+    identity = queue_identity(directory)
+    if identity and hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest() == source:
+        return identity.get('store_id')
+    return None
+
+
+class ListenerMissing(Exception):
+    """The notification listener app is not installed (or could not start) for this account."""
+
+
+class ListenerControl:
+    """Drives the Atlas Notification Listener (a Windows app; Windows only lets installed apps read
+    notifications) through the files it watches in the Companion's queue folder:
+    notifications-command.json (start, pause, show its window) and notifications-status.json.
+    `launch` starts the app; `running` says whether it holds its queue lock."""
+
+    RELAUNCH_SECONDS = 60
+
+    def __init__(self, directory, launch, running, clock=time.time):
+        self.directory, self.launch, self.running, self.clock = Path(directory), launch, running, clock
+        self.sent, self.launched = None, 0
+
+    def command(self, operation, previews):
+        path = self.directory / 'notifications-command.json'
+        expires = datetime.now(timezone.utc) + timedelta(seconds=30)
+        body = {'id': uuid.uuid4().hex, 'operation': operation, 'outlook_previews': bool(previews), 'expires_at': expires.isoformat()}
+        temporary = path.with_suffix('.tmp')
+        temporary.write_text(json.dumps(body), encoding='utf-8')
+        os.replace(temporary, path)
+        self.sent = (operation.replace('_show', ''), bool(previews))
+
+    def step(self, want, previews, show=False):
+        """One check: start, pause or show the listener as Atlas's settings ask. Returns the action taken."""
+        running = self.running()
+        if want or show:
+            if not running:
+                if not show and self.clock() - self.launched < self.RELAUNCH_SECONDS:
+                    return 'waiting'
+                # Written first: the listener reads the command file as it starts.
+                self.command('start_show' if show else 'start', previews)
+                self.launched = self.clock()
+                self.launch()
+                return 'launched'
+            if show:
+                self.command('start_show', previews)
+                return 'shown'
+            if self.sent != ('start', bool(previews)):
+                self.command('start', previews)
+                return 'started'
+            return 'running'
+        if running and self.sent != ('pause', bool(previews)):
+            self.command('pause', previews)
+            return 'paused'
+        return 'idle'
+
+    def status(self, want):
+        """What to report at check-in, from the listener's status file."""
+        if not want:
+            return {'state': 'off', 'detail': ''}
+        try:
+            data = json.loads((self.directory / 'notifications-status.json').read_text(encoding='utf-8-sig'))
+        except (OSError, ValueError):
+            data = {}
+        if not self.running():
+            return {'state': 'starting', 'detail': data.get('detail') or 'Starting the notification listener…',
+                    'captured': data.get('captured', 0), 'last_success_at': data.get('last_success_at')}
+        keep = ('state', 'detail', 'last_success_at', 'captured', 'teams_seen', 'outlook_seen', 'outlook_enabled')
+        return {key: data[key] for key in keep if data.get(key) is not None} or {'state': 'starting', 'detail': ''}
 
 
 def backoff(failures, low=5, high=60):

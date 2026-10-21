@@ -51,6 +51,10 @@ def companion_inbox_path():
     return clipboard_path().with_name('companion-inbox')
 
 
+def inbox_state_path():
+    return clipboard_path().with_name('inbox-state.json')
+
+
 def clipboard_path():
     folder = database_folder()
     return folder / CLIPBOARD if folder else ROOT / 'data' / CLIPBOARD

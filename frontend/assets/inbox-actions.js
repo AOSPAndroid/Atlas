@@ -91,6 +91,18 @@
         // Articles open beside the message; diagrams need the diagram viewer.
         if (String(detail.document).startsWith("article:") && work({ document: detail.document }, "knowledge", "scan")) return;
         return window.AtlasKnowledge.show(detail.document);
+      case "reply":
+        // The reply composer beside the message; it opens the reply in Outlook through the Companion.
+        if (work(user === undefined ? {} : { user }, "reply")) return;
+        throw Error("Open Live Inbox to reply.");
+      case "outlook-open": {
+        const result = await window.AtlasClient.request("/api/companion/commands", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ kind: "outlook.open", args: { message_id: detail.message }, wait: 10 }),
+        });
+        if (result.state === "failed" || result.state === "expired") throw Error(result.error || "Outlook did not open the email.");
+        return toast(result.state === "done" ? "Opened in Outlook" : "Sent to the Atlas Companion; Outlook will open the email.");
+      }
       default:
         throw Error("Unknown Live Inbox action.");
     }

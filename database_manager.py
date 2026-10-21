@@ -87,7 +87,8 @@ def register_database_manager(app,wmi,check_token):
  @app.middleware('http')
  async def directory_mutation_gate(request,call_next):
   # Inventory runs against immutable scan data; directory reads do not mutate.
-  independent=request.url.path in ('/api/software-tools/inventory','/api/software-tools/preview','/api/kill','/api/reboot') or request.url.path.startswith(('/api/open-tool/','/api/cleanup-packages/'))
+  # The Atlas Companion's poll waits up to 20 s for a command: it must never hold this gate.
+  independent=request.url.path in ('/api/software-tools/inventory','/api/software-tools/preview','/api/kill','/api/reboot') or request.url.path.startswith(('/api/open-tool/','/api/cleanup-packages/','/api/companion/'))
   if request.method in ('POST','PUT','PATCH','DELETE') and not independent:
    async with gate:return await call_next(request)
   return await call_next(request)

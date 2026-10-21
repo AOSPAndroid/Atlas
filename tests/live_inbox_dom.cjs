@@ -15,6 +15,7 @@ two.preview = two.subject;
 const response = data => ({ ok: true, status: 200, json: async () => data });
 (async () => {
   let rows = [one], offline = false, requests = [], deferred, holdDetail = false, opened;
+  const doneRequests = [];
   const notifications = { running: true, stale: false, state: 'watching', last_success_at: one.received_at };
   const control = { configured: true, state: 'running', mail_user: 'TEST\\MailUser', atlas_user: 'TEST\\AtlasAdmin', agent_running: true, desired: { running: true, outlook: true, notifications: true, outlook_previews: false } };
   const actions = [];
@@ -41,6 +42,7 @@ const response = data => ({ ok: true, status: 200, json: async () => data });
           requests: [{ kind: 'inbox', ref: '2', title: '<img src=x onerror="window.mailExecuted=true"> \u0002VPN\u0003 down', snippet: 'Cannot \u0002connect\u0003', at: '2026-10-01', extra: { sender: 'Sam' } }] }
       : { terms: [], articles: [], requests: [] });
     assert(parsed.pathname.startsWith('/api/inbox/messages'), 'Inbox requests stay in its local API');
+    if (parsed.pathname.endsWith('/done')) { const body = JSON.parse(options.body); doneRequests.push([parsed.pathname, body]); return response({ done: body.done }); }
     if (offline) throw Error('Connection lost');
     if (parsed.pathname === '/api/inbox/messages') {
       const after = Number(parsed.searchParams.get('after_id'));
@@ -53,7 +55,7 @@ const response = data => ({ ok: true, status: 200, json: async () => data });
     const analysis = row.id === 1 ? { machines: [{ name: 'LAPTOP-04', linked: false, model_id: 'Latitude 5440' }], people: [
       { id: 9, full_name: 'Marie Dupont', written: 'DUPONT Marie', basis: 'name', user_name: 'X09', department: 'Equities', desks: [{ id: '04R019086', floor: 4 }], machines: [{ name: 'LAPTOP-09' }] },
       { ambiguous: true, written: 'Lee Wong', basis: 'name', candidates: [{ id: 10, email: 'lee1@example.test' }, { id: 11, email: 'lee2@example.test' }] }] } : {};
-    const detail = { message: { ...row, body: '<script>window.mailExecuted=true</script>\nMy laptop cannot connect.' + named }, match: { ...row.match, user: chosen ? person : row.match.user, chosen: !!chosen }, machines: row.match.user || chosen ? [{ name: 'LAPTOP-01', model_id: 'Latitude 7450', match_type: 'Assigned', operational_status: 'Operational' }] : [], analysis };
+    const detail = { message: { ...row, outlook: row.id === 1, state: { done: false }, body: '<script>window.mailExecuted=true</script>\nMy laptop cannot connect.' + named }, match: { ...row.match, user: chosen ? person : row.match.user, chosen: !!chosen }, machines: row.match.user || chosen ? [{ name: 'LAPTOP-01', model_id: 'Latitude 7450', match_type: 'Assigned', operational_status: 'Operational' }] : [], analysis };
     if (holdDetail) return new Promise(resolve => deferred = () => resolve(response(detail)));
     return response(detail);
   }});
@@ -91,6 +93,22 @@ const response = data => ({ ok: true, status: 200, json: async () => data });
   const footer = [...d.querySelectorAll('.inbox-person-card [data-slot=card-footer] button')];
   footer.find(b => b.textContent === 'Details').click(); assert.deepEqual([sent.at(-1).action, sent.at(-1).user.id], ['person', 7]);
   footer.find(b => b.textContent.startsWith('Workspace')).click(); assert.equal(opened, 7);
+  // Message actions: reply beside the message, the original in Outlook, done in Live Inbox (and Outlook).
+  const actionButton = label => [...d.querySelectorAll('.inbox-message-actions button')].find(b => b.textContent === label);
+  actionButton('Reply…').click(); assert.deepEqual([sent.at(-1).action, sent.at(-1).user.id], ['reply', 7]);
+  actionButton('Open in Outlook').click(); assert.deepEqual([sent.at(-1).action, sent.at(-1).message], ['outlook-open', 1]);
+  assert(!d.querySelector('.inbox-list-heading [aria-pressed]'), 'Hide done appears once something is done');
+  actionButton('Mark done').click();
+  await until(() => d.querySelector('[data-mail-id="1"][data-done]') && actionButton('Done · reopen'));
+  assert.deepEqual(doneRequests, [['/api/inbox/messages/1/done', { done: true }]]);
+  assert.match(d.querySelector('[data-mail-id="1"]').textContent, /Done$/);
+  const hide = d.querySelector('.inbox-list-heading [aria-pressed]');
+  hide.click(); await until(() => hide.textContent === 'Show done');
+  assert(d.querySelector('[data-mail-id="1"]'), 'The open message stays in the list');
+  hide.click();
+  actionButton('Done · reopen').click();
+  await until(() => !d.querySelector('[data-mail-id="1"][data-done]'));
+  assert.deepEqual(doneRequests.at(-1)[1], { done: false });
   rows.push(two);
   await until(() => d.querySelectorAll('[data-mail-id]').length === 2);
   assert.equal(d.querySelector('[data-mail-id][aria-current]').getAttribute('data-mail-id'), '1', 'Arrival never changes a selected message');

@@ -14,20 +14,39 @@
     ["user-groups", "User groups", "account"],
     ["deploy", "Deploy", "machine"],
     ["knowledge", "Knowledge", "document"],
+    ["reply", "Reply", "message"],
   ];
   const MISSING = {
     user: "No Atlas person is selected. Choose someone in this request or look them up above.",
     machine: "No Windows PC is selected. Choose one in this request, in Person, or look it up above.",
     account: "This person has no AD account or email in Atlas.",
     document: "Choose an article under Knowledge Base or Seen before in the message.",
+    message: "Select a message in Live Inbox to reply to it.",
   };
+  // Reply templates; {first} {pc} {on} {package} {ticket} are filled from the message and the tools.
+  const REPLIES = {
+    en: [["done", "Done", "Hi {first},\n\nThis is done{on}. Let me know if anything still isn't working.\n\nKind regards,"],
+      ["installed", "Installed", "Hi {first},\n\n{package} is now installed{on}. If it doesn't appear yet, restart the application or sign out and back in.\n\nKind regards,"],
+      ["restart", "Please restart", "Hi {first},\n\nCould you please restart {pc} and let me know if the problem comes back?\n\nKind regards,"],
+      ["details", "More details", "Hi {first},\n\nCould you send me your PC name (on the sticker on the machine) and a screenshot of the error, so I can look into it?\n\nKind regards,"],
+      ["remote", "Remote session", "Hi {first},\n\nI'm going to connect to {pc} with Remote Assistance. Please accept the prompt when it appears on your screen.\n\nKind regards,"],
+      ["ticket", "Ticket raised", "Hi {first},\n\nI've raised {ticket} for this; you'll get the updates from it.\n\nKind regards,"]],
+    fr: [["done", "C'est fait", "Bonjour {first},\n\nC'est fait{on}. N'hésitez pas à me dire si quelque chose ne fonctionne toujours pas.\n\nCordialement,"],
+      ["installed", "Installé", "Bonjour {first},\n\n{package} est maintenant installé{on}. S'il n'apparaît pas encore, redémarrez l'application ou fermez puis rouvrez votre session.\n\nCordialement,"],
+      ["restart", "Redémarrer", "Bonjour {first},\n\nPourriez-vous redémarrer {pc} et me dire si le problème revient ?\n\nCordialement,"],
+      ["details", "Plus d'infos", "Bonjour {first},\n\nPourriez-vous m'envoyer le nom de votre PC (sur l'étiquette de la machine) et une capture d'écran de l'erreur ?\n\nCordialement,"],
+      ["remote", "Prise en main", "Bonjour {first},\n\nJe vais me connecter à {pc} en assistance à distance. Merci d'accepter la demande qui va s'afficher à l'écran.\n\nCordialement,"],
+      ["ticket", "Ticket ouvert", "Bonjour {first},\n\nJ'ai ouvert {ticket} pour cette demande ; vous recevrez les mises à jour par ce biais.\n\nCordialement,"]],
+  };
+  const FRENCH = /\b(bonjour|merci|cordialement|svp|s'il vous pla[iî]t|pourriez|pouvez|ordinateur|mon poste|bonne journ[ée]e)\b/i;
   const TOOLS = [["msra", "MSRA"], ["cshare", "C$"], ["rdp", "Remote Desktop"], ["compmgmt", "Computer Management"]];
   const RECORD = [["Account", "user_name"], ["Email", "email"], ["Department", "department"], ["Job role", "job_role"], ["Location", "location"],
     ["Manager", "manager"], ["Business unit", "business_unit"], ["Employee number", "employee_number"], ["Start date", "start_date"], ["Last login", "last_login"]];
   const MEMBERSHIP = { Direct: 0, Primary: 1, Nested: 2 };
   const state = { machine: "", user: null, tab: "health", done: {}, performance: null, groups: {}, docked: false,
     request: null, person: null, document: "", article: null, results: null };
-  let dock = null, home = null, back = null, inboxClick = false, lookupGeneration = 0;
+  let dock = null, home = null, back = null, inboxClick = false, lookupGeneration = 0, companionInfo = null;
+  const drafts = new Map();
 
   const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   const account = (user) => user?.user_name || user?.email || "";
@@ -59,7 +78,13 @@
 ${TABS.map(([id]) => `<section class="inbox-work-pane" role="tabpanel" id="inboxWorkPane-${id}" data-work-pane="${id}" aria-labelledby="inboxWorkTab-${id}" hidden></section>`).join("")}`;
     pane("health").innerHTML = "<div data-work-health></div>";
     dock.addEventListener("click", (event) => click(event).catch((error) => toast(error.message)));
-    dock.addEventListener("input", (event) => { if (event.target.matches("[data-work-filter]")) filterGroups(event.target); });
+    dock.addEventListener("input", (event) => {
+      if (event.target.matches("[data-work-filter]")) filterGroups(event.target);
+      if (event.target.matches("[data-work-reply]")) drafts.get(state.request.message.id).text = event.target.value;
+    });
+    dock.addEventListener("change", (event) => {
+      if (event.target.matches("[data-work-reply-all]")) drafts.get(state.request.message.id).all = event.target.checked;
+    });
     dock.addEventListener("submit", (event) => {
       event.preventDefault();
       const form = event.target;
@@ -111,7 +136,7 @@ ${TABS.map(([id]) => `<section class="inbox-work-pane" role="tabpanel" id="inbox
     }
     state.user = user;
     dock.querySelector("[data-work-title]").textContent = [machine || "No Windows PC", fullName(user)].filter(Boolean).join(" · ");
-    const have = { machine: !!machine, user: !!user?.id, account: !!account(user), document: !!state.document };
+    const have = { machine: !!machine, user: !!user?.id, account: !!account(user), document: !!state.document, message: !!state.request?.message };
     for (const [tab, , needs] of TABS) {
       const button = dock.querySelector(`[data-work-tab="${tab}"]`);
       button.disabled = !have[needs];
@@ -131,7 +156,7 @@ ${TABS.map(([id]) => `<section class="inbox-work-pane" role="tabpanel" id="inbox
       button.classList.toggle("active", selected);
     });
     dock.querySelectorAll("[data-work-pane]").forEach((section) => { section.hidden = section.dataset.workPane !== tab; });
-    const have = { machine: state.machine, user: state.user?.id, account: account(state.user), document: state.document }[needs];
+    const have = { machine: state.machine, user: state.user?.id, account: account(state.user), document: state.document, message: state.request?.message }[needs];
     if (!have) return note(tab, MISSING[needs]);
     if (tab === "person") return mode === "scan" || state.done.person !== state.user.id ? loadPerson() : undefined;
     if (tab === "health") return health(mode);
@@ -142,6 +167,82 @@ ${TABS.map(([id]) => `<section class="inbox-work-pane" role="tabpanel" id="inbox
     }
     if (tab === "knowledge") return mode === "scan" || state.done.knowledge !== state.document ? knowledge() : undefined;
     if (tab === "deploy") { target(); return dockDeployment(); }
+    if (tab === "reply") return renderReply();
+  }
+
+  // The Atlas Companion, for what only the operator's own session can do (Outlook, Teams, links).
+  async function companion(kind) {
+    if (!companionInfo || Date.now() - companionInfo.at > 10000) {
+      try { companionInfo = { at: Date.now(), data: await window.AtlasClient.request("/api/companion", { atlasSilent: true }) }; }
+      catch { companionInfo = { at: Date.now(), data: {} }; }
+    }
+    return !!(companionInfo.data.online && (companionInfo.data.capabilities || []).includes(kind));
+  }
+  const ask = (kind, args, wait = 10) => post("/api/companion/commands", { kind, args, wait });
+
+  // Teams and mail links open in the operator's own Teams and Outlook when the Companion runs.
+  async function openLink(url) {
+    if (await companion("open.url")) {
+      const result = await ask("open.url", { url }, 8);
+      if (result.state === "failed" || result.state === "expired") throw Error(result.error || "The link did not open.");
+      return toast("Opened in your session");
+    }
+    window.open(url, "_blank", "noopener");
+  }
+  const teamsLink = (kind, email, message) => `https://teams.microsoft.com/l/${kind}/0/0?users=${encodeURIComponent(email)}${message ? "&message=" + encodeURIComponent(message) : ""}`;
+
+  function firstName(detail) {
+    const user = detail.match?.user, name = String(user?.full_name || user?.name || detail.message.sender_name || "").trim();
+    // "Lair de Gourmont, Amaury Pierre Marie" and "DUPONT Marie": the given name, not the surname.
+    if (name.includes(",")) return name.split(",")[1].trim().split(/\s+/)[0] || "";
+    const words = name.split(/\s+/).filter(Boolean);
+    return words.find((word) => word !== word.toUpperCase()) || words[0] || "";
+  }
+
+  function fill(template, detail, lang) {
+    const pc = state.machine || requestEntries().machines[0]?.name || "";
+    const text = `${detail.message.subject || ""}\n${detail.message.body || ""}`;
+    const ticket = (text.match(/\b(?:INC|RITM|REQ|SCTASK|CHG)\d{6,10}\b/i) || [""])[0].toUpperCase();
+    const fr = lang === "fr";
+    const values = { first: firstName(detail), pc: pc || (fr ? "votre PC" : "your PC"), on: pc ? (fr ? " sur " : " on ") + pc : "",
+      package: detail.analysis?.packages?.[0]?.display_name || (fr ? "L'application" : "The application"), ticket: ticket || (fr ? "un ticket" : "a ticket") };
+    return template.replace(/\{(\w+)\}/g, (_, name) => values[name] ?? "").replace(/^(Hi|Bonjour) ,/m, "$1,");
+  }
+
+  function renderReply() {
+    const detail = state.request, host = pane("reply"), message = detail.message, id = message.id;
+    const draft = drafts.get(id) || { lang: FRENCH.test(`${message.subject} ${message.body}`) ? "fr" : "en", text: "", all: false };
+    drafts.set(id, draft);
+    const teams = message.channel === "teams" && message.content_kind === "notification";
+    const email = detail.match?.user?.email || message.sender_address;
+    const heading = teams ? `Teams chat with ${esc(fullName(detail.match?.user) || message.sender_name)}`
+      : `To ${esc(message.sender_name || message.sender_address)}${message.sender_address ? " &lt;" + esc(message.sender_address) + "&gt;" : ""} · ${esc(/^re:/i.test(message.subject || "") ? message.subject : "RE: " + (message.subject || ""))}`;
+    host.innerHTML = `<div class="inbox-work-toolbar"><small>${heading}</small><span role="group" aria-label="Language">${["en", "fr"].map((lang) => `<button type="button" data-work-lang="${lang}" aria-pressed="${draft.lang === lang}">${lang.toUpperCase()}</button>`).join("")}</span></div>
+<div class="inbox-work-templates" role="group" aria-label="Reply templates">${REPLIES[draft.lang].map(([key, label]) => `<button type="button" data-work-template="${key}">${esc(label)}</button>`).join("")}</div>
+<textarea data-work-reply rows="9" aria-label="Reply text" placeholder="Choose a template above or write your reply.">${esc(draft.text)}</textarea>
+<div class="inbox-work-toolbar"><span>${message.outlook ? `<button type="button" class="primary" data-work-reply-outlook>Open reply in Outlook</button><label><input type="checkbox" data-work-reply-all${draft.all ? " checked" : ""}> Reply all</label>` : ""}${teams && email ? '<button type="button" class="primary" data-work-reply-teams>Reply in Teams chat</button>' : ""}${!message.outlook && !teams && email ? '<button type="button" data-work-reply-mail>New email in Outlook</button>' : ""}<button type="button" data-work-reply-copy>Copy</button></span></div>
+<p class="inbox-work-muted" data-work-reply-status>${message.outlook ? "Outlook opens the reply with this text above the original email; you check it and press Send." : teams ? "Teams opens a chat with this text ready to send." : "This email did not come through the Atlas Companion: copy the text, or open a new email."}</p>`;
+  }
+
+  async function sendReply(how) {
+    const detail = state.request, message = detail.message, draft = drafts.get(message.id), note = pane("reply").querySelector("[data-work-reply-status]");
+    const text = draft.text.trim();
+    if (!text && how !== "outlook") return toast("Write the reply first.");
+    note.textContent = "Opening…";
+    try {
+      if (how === "outlook") {
+        const result = await ask("outlook.reply", { message_id: message.id, text, reply_all: draft.all });
+        if (result.state === "failed" || result.state === "expired") throw Error(result.error || "Outlook did not open the reply.");
+        note.textContent = result.state === "done" ? "Reply opened in Outlook: check it and press Send." : "Sent to the Atlas Companion; Outlook will open the reply.";
+        return;
+      }
+      const email = detail.match?.user?.email || message.sender_address;
+      const subject = /^re:/i.test(message.subject || "") ? message.subject : "RE: " + (message.subject || "");
+      await openLink(how === "teams" ? teamsLink("chat", email, text) : `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(text)}`);
+      note.textContent = how === "teams" ? "Teams chat opened with your reply ready to send." : "New email opened.";
+    } catch (error) {
+      note.textContent = error.message;
+    }
   }
 
   function note(tab, text) {
@@ -211,7 +312,8 @@ ${TABS.map(([id]) => `<section class="inbox-work-pane" role="tabpanel" id="inbox
     const { user, machines = [], desks = [] } = state.person, host = pane("person");
     const rows = RECORD.filter(([, key]) => user[key]).map(([label, key]) => [label, user[key]]);
     if (desks.length) rows.splice(Math.min(rows.length, 5), 0, ["Desk", desks.map((desk) => `${desk.id} (floor ${desk.floor})${/name/.test(desk.match || "") ? " · name match" : ""}`).join(", ")]);
-    host.innerHTML = `<div class="inbox-work-toolbar"><b>${esc(fullName(user))}</b><span><button type="button" data-work-copy-person>Copy summary</button><button type="button" data-work-tab-link="user-groups"${account(user) ? "" : " disabled"}>User groups</button></span></div>
+    const links = user.email ? [["chat", "Teams chat"], ["call", "Teams call"], ["mail", "Email"]].map(([kind, label]) => `<button type="button" data-work-link="${kind}">${label}</button>`).join("") : "";
+    host.innerHTML = `<div class="inbox-work-toolbar"><b>${esc(fullName(user))}</b><span>${links}<button type="button" data-work-copy-person>Copy summary</button><button type="button" data-work-tab-link="user-groups"${account(user) ? "" : " disabled"}>User groups</button></span></div>
 <dl class="inbox-work-record">${rows.map(([label, value]) => `<dt>${esc(label)}</dt><dd>${esc(value)}</dd>`).join("")}</dl>
 <div class="inbox-work-toolbar"><b>PCs and devices (${machines.length})</b></div>
 ${machines.length ? `<ul class="inbox-work-machines">${machines.map((m) => {
@@ -502,6 +604,22 @@ ${missing.length ? groupList(missing).replace('class="inbox-work-groups"', 'clas
         desks.length ? "Desk: " + desks.map((desk) => desk.id).join(", ") : "", machines.length ? "PCs: " + machines.map(machineName).join(", ") : ""].filter(Boolean).join("\n"), "Person summary");
     }
     if ("workKbCopy" in data) return copy(state.article?.markdown || "", "Article");
+    if (data.workLink) {
+      const email = state.person?.user?.email || state.user?.email;
+      return openLink(data.workLink === "mail" ? "mailto:" + email : teamsLink(data.workLink, email));
+    }
+    if (data.workLang || data.workTemplate) {
+      const draft = drafts.get(state.request.message.id);
+      if (data.workLang) { draft.lang = data.workLang; return renderReply(); }
+      draft.text = fill(REPLIES[draft.lang].find(([key]) => key === data.workTemplate)[2], state.request, draft.lang);
+      const box = pane("reply").querySelector("[data-work-reply]");
+      box.value = draft.text;
+      return box.focus();
+    }
+    if ("workReplyOutlook" in data) return sendReply("outlook");
+    if ("workReplyTeams" in data) return sendReply("teams");
+    if ("workReplyMail" in data) return sendReply("mail");
+    if ("workReplyCopy" in data) return copy(drafts.get(state.request.message.id).text, "Reply");
     if ("workKbOpen" in data) return window.AtlasKnowledge.show(state.document);
     if ("workAd" in data) {
       const { kind, id } = state.groups[state.tab];
@@ -517,9 +635,13 @@ ${missing.length ? groupList(missing).replace('class="inbox-work-groups"', 'clas
 
   // The message on screen in Live Inbox (sent by live-inbox.jsx), for "In this request".
   window.addEventListener("atlas:inbox-detail", (event) => {
-    if (event.detail?.message?.id !== state.request?.message?.id) invalidateLookup();
+    const changed = event.detail?.message?.id !== state.request?.message?.id;
+    if (changed) invalidateLookup();
     state.request = event.detail;
     renderRequest();
+    const tab = dock?.querySelector('[data-work-tab="reply"]');
+    if (tab) { tab.disabled = !state.request?.message; tab.title = tab.disabled ? MISSING.message : ""; }
+    if (changed && dock && !dock.hidden && state.tab === "reply" && state.request?.message) renderReply();
   });
 
   // "Back to Live Inbox" after a Live Inbox button opened another page (Knowledge Base, Workspace,

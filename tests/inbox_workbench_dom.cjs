@@ -41,6 +41,8 @@ const people = { 7: { user: { ...person, department: 'Client Services', location
       : url.endsWith('=laptop-09') ? { users: [], machines: [{ name: 'LAPTOP-09', windows_remote_supported: 1 }] } : { users: [], machines: [] });
     if (url === '/api/knowledge/articles/visio') return response({ id: 'visio', title: 'Visio requests', tags: ['software'], markdown: '## Steps\n1. Check the licence group.' });
     if (url === '/api/kill') return response({ count: 1, results: [{ Process: 'Renderer.exe', PID: 42, state: 'terminated' }] });
+    if (url === '/api/companion') return response({ online: true, capabilities: ['outlook.reply', 'outlook.open', 'open.url'] });
+    if (url === '/api/companion/commands') return response({ id: 'c' + calls.length, kind: body.kind, state: 'done', result: {}, error: '' });
     return response({ deployments: [], items: [] });
   } });
   const { w, run } = f, d = w.document, $ = id => d.getElementById(id);
@@ -264,9 +266,49 @@ const people = { 7: { user: { ...person, department: 'Client Services', location
   await actions.run({ action: 'knowledge', document: 'kb-network' });
   assert.deepEqual(diagrams, ['kb-network']);
 
-  // A sender without a Windows PC: Person and User groups only.
+  // Reply: templates in the email's language, filled from the message; Outlook opens the reply (never sends it).
+  const commands = () => calls.filter(c => c.url === '/api/companion/commands').map(c => c.body);
+  const french = { message: { id: 31, subject: 'Commande Téléphone pro', body: "Bonjour, pourriez-vous installer Example App ? Ticket INC0012345. Merci", sender_name: 'Lair de Gourmont, Amaury Pierre Marie : GTB Europe', sender_address: 'amaury@example.test', outlook: true, content_kind: 'mail', channel: 'outlook' },
+    match: { user: { id: 7, full_name: 'Lair de Gourmont, Amaury Pierre Marie', email: 'amaury@example.test' } }, machines: [], analysis: { machines: [], people: [], packages: [{ display_name: 'Example App' }] } };
+  w.dispatchEvent(new w.CustomEvent('atlas:inbox-detail', { detail: french }));
+  await actions.run({ action: 'reply', user: french.match.user });
+  assert.equal(d.querySelector('[data-work-tab="reply"]').getAttribute('aria-selected'), 'true');
+  assert.equal(pane('reply').querySelector('[data-work-lang="fr"]').getAttribute('aria-pressed'), 'true', 'A French email gets French templates');
+  await until(() => w.AtlasInboxWork.state().machine === 'LAPTOP-01', "the sender's own PC");
+  pane('reply').querySelector('[data-work-template="installed"]').click();
+  const box = pane('reply').querySelector('[data-work-reply]');
+  assert.match(box.value, /^Bonjour Amaury,\n\nExample App est maintenant installé sur LAPTOP-01\./, 'Given name, package and PC');
+  pane('reply').querySelector('[data-work-template="ticket"]').click();
+  assert.match(box.value, /J'ai ouvert INC0012345/);
+  box.value += '\nRedouane'; box.dispatchEvent(new w.Event('input', { bubbles: true }));
+  d.querySelector('[data-work-tab="health"]').click(); d.querySelector('[data-work-tab="reply"]').click();
+  assert.match(pane('reply').querySelector('[data-work-reply]').value, /Redouane$/, 'The draft survives switching tools');
+  pane('reply').querySelector('[data-work-reply-all]').click();
+  pane('reply').querySelector('[data-work-reply-outlook]').click();
+  await until(() => /press Send/.test(pane('reply').querySelector('[data-work-reply-status]').textContent), 'reply opened');
+  assert.deepEqual([commands().at(-1).kind, commands().at(-1).args.message_id, commands().at(-1).args.reply_all], ['outlook.reply', 31, true]);
+  assert.match(commands().at(-1).args.text, /INC0012345[\s\S]*Redouane$/);
+  pane('reply').querySelector('[data-work-lang="en"]').click();
+  pane('reply').querySelector('[data-work-template="restart"]').click();
+  assert.match(pane('reply').querySelector('[data-work-reply]').value, /^Hi Amaury,\n\nCould you please restart LAPTOP-01/);
+  // A Teams preview is answered in a Teams chat, prefilled, opened in the operator's own Teams.
+  const teams = { ...french, message: { ...french.message, id: 32, subject: 'Alex Morgan', body: 'Is my laptop ready?', content_kind: 'notification', channel: 'teams', outlook: false, sender_address: '' }, match: { user: person } };
+  w.dispatchEvent(new w.CustomEvent('atlas:inbox-detail', { detail: teams }));
+  assert.equal(pane('reply').querySelector('[data-work-lang="en"]').getAttribute('aria-pressed'), 'true');
+  assert(!pane('reply').querySelector('[data-work-reply-outlook]'), 'No Outlook reply for a Teams preview');
+  pane('reply').querySelector('[data-work-template="done"]').click();
+  pane('reply').querySelector('[data-work-reply-teams]').click();
+  await until(() => commands().at(-1).kind === 'open.url', 'teams chat');
+  assert.match(commands().at(-1).args.url, /^https:\/\/teams\.microsoft\.com\/l\/chat\/0\/0\?users=alex%40example\.test&message=Hi%20Alex/);
+  // Teams chat and call with anyone from their record.
+  await actions.run({ action: 'person', user: person });
+  await until(() => pane('person').querySelector('[data-work-link="call"]'), 'person links');
+  pane('person').querySelector('[data-work-link="call"]').click();
+  await until(() => /l\/call\/0\/0\?users=alex%40example\.test$/.test(commands().at(-1).args.url || ''), 'teams call');
+
+  // A sender without a Windows PC: Person, User groups, Knowledge and Reply only.
   await actions.run({ action: 'user-groups', user: { ...person, id: 8, user_name: 'INBOX1', full_name: 'Sam Lee' }, machine: '' });
-  assert.deepEqual([...d.querySelectorAll('[data-work-tab]')].filter(b => !b.disabled).map(b => b.dataset.workTab), ['person', 'user-groups', 'knowledge']);
+  assert.deepEqual([...d.querySelectorAll('[data-work-tab]')].filter(b => !b.disabled).map(b => b.dataset.workTab), ['person', 'user-groups', 'knowledge', 'reply']);
   assert(d.querySelector('[data-work-tool="msra"]').disabled);
   assert.match(d.querySelector('[data-work-title]').textContent, /No Windows PC · Sam Lee/);
 
@@ -274,10 +316,10 @@ const people = { 7: { user: { ...person, department: 'Client Services', location
   d.querySelector('[data-work-close]').click();
   assert(work().hidden);
   assert.equal($('deploymentPanel').parentNode, $('workspace'));
-  assert(calls.every(c => c.method === 'GET' || ['/api/active-directory/lookup', '/api/kill'].includes(c.url)), 'Nothing deploys or reboots by itself');
+  assert(calls.every(c => c.method === 'GET' || ['/api/active-directory/lookup', '/api/kill', '/api/companion/commands'].includes(c.url)), 'Nothing deploys or reboots by itself');
   await sleep(100);
   assert.deepEqual(f.errors, []);
   w.close();
-  console.log('PASS: Live Inbox request tools run person (record, desk, devices), health, performance (End… confirmed), user and PC AD groups (filter, copy, compare with a colleague), deployment, software/services/specs and articles beside the message; request people and PCs one click each; lookup of anyone; the deployment panel moves in and back intact; Back to Live Inbox after a Live Inbox button; reboot confirmed; Workspace fallback outside Live Inbox');
+  console.log('PASS: Live Inbox request tools run person (record, desk, devices), health, performance (End… confirmed), user and PC AD groups (filter, copy, compare with a colleague), deployment, software/services/specs and articles beside the message; replies (FR/EN templates, Outlook reply window, Teams chat) and Teams chat/call; request people and PCs one click each; lookup of anyone; the deployment panel moves in and back intact; Back to Live Inbox after a Live Inbox button; reboot confirmed; Workspace fallback outside Live Inbox');
   process.exit(0);
 })().catch(error => { console.error(error); process.exit(1); });

@@ -63,6 +63,20 @@ becomes Atlas's current target (Workspace and Remote Admin follow it).
   restart), **Specs** and **Reboot…** (with its confirmation) at the top;
   **Workspace ↗** opens the person and PC there.
 
+- **Reply**: the answer, in the email's language (French emails get French
+  templates): **Done**, **Installed**, **Please restart**, **More details**, **Remote session**,
+  **Ticket raised**, filled with the sender's given name ("Lair de Gourmont, Amaury Pierre
+  Marie" is greeted as Amaury), the PC, the package asked for and any INC/RITM/REQ number in
+  the email. Edit it, then **Open reply in Outlook** (reply or reply all, through the Atlas
+  Companion: you press Send) or **Copy**. A Teams preview is answered with **Reply in Teams
+  chat**. The draft is kept while you use the other tools.
+
+On the message itself: **Reply…**, **Open in Outlook** (emails that came through the Atlas
+Companion) and **Mark done**. Done messages are dimmed with a **Done** badge; **Hide done** in the
+list hides them. Done is kept by Atlas and, for Companion mail, also marks the email read with the
+Outlook category **Atlas: done**. In **Person**, **Teams chat**, **Teams call** and **Email** open in
+your own Teams and Outlook through the Companion. See [companion.md](companion.md).
+
 When a Live Inbox button opens another page (a diagram, Workspace, Active
 Directory, Remote Admin), a **Back to Live Inbox** button appears at the bottom.
 On screens narrower than 1280 pixels the message list hides while the tools are

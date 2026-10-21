@@ -6,7 +6,7 @@ from pathlib import Path
 import re
 import sqlite3
 
-from fastapi import HTTPException, Query
+from fastapi import Body, HTTPException, Query, Request
 from directory_lookup import exact_users, linked_machines
 from outlook_watcher import default_directory, status, utcnow
 from notification_inbox import notification_status, source_columns
@@ -14,7 +14,7 @@ from notification_inbox import notification_status, source_columns
 
 def mail_directory():
     import companion_server
-    if companion_server.companion and companion_server.companion.mail_active():
+    if companion_server.companion and companion_server.companion.inbox_active():
         return companion_server.companion.inbox
     from inbox_control import InboxIntegration, IntegrationError
     try:
@@ -50,7 +50,7 @@ def queue_reader(directory):
 
 def watcher_status(directory):
     import companion_server
-    if companion_server.companion and companion_server.companion.mail_active() and directory == companion_server.companion.inbox:
+    if companion_server.companion and companion_server.companion.inbox_active() and directory == companion_server.companion.inbox:
         return companion_server.companion.mail_status()
     try:
         current = status(directory)
@@ -65,6 +65,21 @@ def watcher_status(directory):
     return {**{key: current.get(key) for key in
                ('state', 'running', 'last_success_at', 'updated_at', 'detail', 'config')},
             'stale': stale, 'interval': current.get('interval', 5)}
+
+
+def notifications_status(directory):
+    """Teams/Outlook notification listener status: the Companion's when it supplies the queue."""
+    import companion_server
+    if companion_server.companion and companion_server.companion.inbox_active() and directory == companion_server.companion.inbox:
+        return companion_server.companion.notification_status()
+    return notification_status(directory)
+
+
+def outlook_actions(directory):
+    """Whether Outlook can act on this queue's mail: only mail the Companion supplied, while it runs."""
+    import companion_server
+    current = companion_server.companion
+    return bool(current and directory == current.inbox and current.can('outlook.open'))
 
 
 def person(row):
@@ -212,6 +227,9 @@ def mentioned_people(connection, text, exclude=()):
     return people
 
 
+inbox_states = None
+
+
 def safely(load, label, warnings):
     # The request can still be read when the package share or knowledge store is unavailable.
     try:
@@ -221,7 +239,23 @@ def safely(load, label, warnings):
         return []
 
 
-def register(app, directory_connection, get_directory=mail_directory, packages=lambda: [], documents=lambda: []):
+def register(app, directory_connection, get_directory=mail_directory, packages=lambda: [], documents=lambda: [],
+             state=None, check_token=None):
+    from inbox_state import InboxState
+    global inbox_states
+    if state is None:
+        from runtime_paths import inbox_state_path
+        state = InboxState(inbox_state_path)
+    inbox_states = state  # Test servers point it at their temporary folder.
+
+    def require_token(request):
+        if check_token:
+            return check_token(request)
+        import secrets
+        from atlas_api import TOKEN
+        if not secrets.compare_digest(request.headers.get('x-atlas-token', ''), TOKEN):
+            raise HTTPException(403, 'Refresh Atlas before changing Live Inbox messages.')
+
     @app.get('/api/inbox/arrivals')
     def arrivals(after_id: int = Query(0, ge=0)):
         # Atlas desktop alerts need counts only, never sender names or bodies.
@@ -245,12 +279,18 @@ def register(app, directory_connection, get_directory=mail_directory, packages=l
                 where = 'WHERE id>?' if after_id else 'WHERE id<?' if before_id else ''
                 parameters = [after_id or before_id] if where else []
                 order = 'ASC' if after_id else 'DESC'
-                rows = queue.execute('SELECT id,received_at,imported_at,sender_name,sender_address,subject,'
+                rows = queue.execute('SELECT id,source,entry_id,received_at,imported_at,sender_name,sender_address,subject,'
                                      + source_columns(queue) + ' '
                                      f'FROM messages {where} ORDER BY id {order} LIMIT ?',
                                      (*parameters, limit + 1)).fetchall()
         more = len(rows) > limit
-        items = [dict(row) for row in rows[:limit]]
+        done = state.done_keys()
+        from inbox_state import key as state_key
+        items = []
+        for row in rows[:limit]:
+            item = dict(row)
+            item['done'] = state_key(item.pop('source'), item.pop('entry_id')) in done
+            items.append(item)
         if items:
             try:
                 with directory_connection() as connection:
@@ -261,7 +301,7 @@ def register(app, directory_connection, get_directory=mail_directory, packages=l
         return {'items': items, 'total': total, 'newest_id': newest, 'has_more': more,
                 'next_before': items[-1]['id'] if items and not after_id else None,
                 'next_after': items[-1]['id'] if items and after_id else newest,
-                'watcher': watcher_status(directory), 'notifications': notification_status(directory)}
+                'watcher': watcher_status(directory), 'notifications': notifications_status(directory)}
 
     @app.get('/api/inbox/messages/{message_id}')
     def message(message_id: int, user_id: int | None = Query(None, ge=1)):
@@ -272,6 +312,8 @@ def register(app, directory_connection, get_directory=mail_directory, packages=l
         item = dict(row)
         for key, default in (('channel', 'outlook'), ('content_kind', 'mail'), ('app_name', '')):
             item.setdefault(key, default)
+        item['state'] = state.get(item.get('source', ''), item.get('entry_id', '')) or {'done': False}
+        item['outlook'] = item['content_kind'] == 'mail' and outlook_actions(get_directory())
         # Outlook entry/store IDs are private implementation details, not browser links.
         for key in ('source', 'entry_id', 'conversation_id'):
             item.pop(key, None)
@@ -296,6 +338,30 @@ def register(app, directory_connection, get_directory=mail_directory, packages=l
         except sqlite3.Error as error:
             raise HTTPException(503, 'Atlas directory lookup is unavailable. Retry after the database is ready.') from error
         return {'message': item, 'match': match, 'machines': machines, 'analysis': {**analysis, 'warnings': warnings}}
+
+    @app.post('/api/inbox/messages/{message_id}/done')
+    def mark_done(message_id: int, request: Request, body: dict = Body(...)):
+        """Done (or open again) in Live Inbox; Outlook is told too when the Companion supplied the email."""
+        require_token(request)
+        done = body.get('done')
+        if type(done) is not bool:
+            raise HTTPException(422, 'Send {"done": true} or {"done": false}.')
+        directory = get_directory()
+        with queue_reader(directory) as queue:
+            row = queue.execute('SELECT * FROM messages WHERE id=?', (message_id,)).fetchone() if queue else None
+        if row is None:
+            raise HTTPException(404, 'Message not found in the local inbox.')
+        row = {'content_kind': 'mail', **dict(row)}  # Queues from before notification previews have no content_kind.
+        saved = state.set(row['source'], row['entry_id'], done, by=request.headers.get('x-atlas-operator', ''))
+        outlook = False
+        if row['content_kind'] == 'mail' and outlook_actions(directory):
+            import companion_server
+            try:
+                companion_server.companion.send('outlook.done', {'message_id': message_id, 'done': done})
+                outlook = True
+            except HTTPException:
+                pass  # Live Inbox keeps the state; Outlook is updated next time it can be.
+        return {'id': message_id, 'done': done, 'state': saved or {'done': False}, 'outlook': outlook}
 
     @app.get('/api/inbox/person/{user_id}')
     def person_detail(user_id: int):

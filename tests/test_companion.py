@@ -101,7 +101,7 @@ class Companion(unittest.TestCase):
     def test_check_in_clipboard_and_screenshots_reach_the_history(self):
         self.assertFalse(self.http.get('/api/companion').json()['known'])
         settings = core.hello(self.client, 'EXAMPLE\\operator', 'PC-OPS-01', {'state': 'watching', 'captured': 0}, {'state': 'off'})
-        self.assertEqual(settings, {'clipboard': True, 'mail': False})
+        self.assertEqual(settings, {'clipboard': True, 'mail': False, 'notifications': False, 'outlook_previews': False, 'alerts': True})
         status = self.http.get('/api/companion').json()
         self.assertEqual((status['online'], status['user'], status['computer']), (True, 'EXAMPLE\\operator', 'PC-OPS-01'))
         forwarder = core.ClipboardForwarder(self.client)
@@ -154,16 +154,175 @@ class Companion(unittest.TestCase):
         core.hello(self.client, 'EXAMPLE\\operator', 'PC-OPS-01', {}, {'state': 'watching'})
         self.assertEqual(inbox.command('start')['desired']['outlook'], True)
         status = inbox.status()
-        self.assertEqual((status['configured'], status['companion'], status['mail_user'], status['state']), (True, True, 'EXAMPLE\\operator', 'watching'))
+        # "running" is what Live Inbox labels "Collector task connected".
+        self.assertEqual((status['configured'], status['companion'], status['mail_user'], status['state']), (True, True, 'EXAMPLE\\operator', 'running'))
         self.assertFalse(inbox.command('source', outlook=False)['desired']['running'])
         self.assertFalse(self.server.settings()['mail'])
-        with self.assertRaisesRegex(IntegrationError, 'Teams notifications'):
-            inbox.command('source', notifications=True)
+        # Teams previews now come through the Companion too.
+        desired = inbox.command('source', notifications=True)['desired']
+        self.assertEqual((desired['running'], desired['outlook'], desired['notifications']), (True, False, True))
+        self.assertEqual(inbox.command('preferences', outlook_previews=True)['desired']['outlook_previews'], True)
+        self.assertEqual(inbox.command('stop')['desired'], {'running': False, 'outlook': False, 'notifications': False, 'outlook_previews': True})
         self.server.state['companion']['seen_epoch'] = 0
         self.assertEqual(inbox.status()['state'], 'stopped')
 
 
+    def online(self, capabilities=core.CAPABILITIES):
+        core.hello(self.client, 'EXAMPLE\\operator', 'PC-OPS-01', {}, {'state': 'watching'}, {'state': 'watching'}, capabilities)
+
+    def command(self, kind, **args):
+        return self.http.post('/api/companion/commands', json={'kind': kind, 'args': args}, headers={'x-atlas-token': 'admin'})
+
+    def test_commands_reach_the_companion_and_report_back(self):
+        self.assertEqual(self.command('open.url', url='https://teams.microsoft.com/l/chat/0/0?users=alex@example.test').status_code, 409, 'Not running')
+        self.online(capabilities=())
+        self.assertIn('Update the Atlas Companion', self.command('open.url', url='https://example.test').json()['detail'], 'A 1.0 Companion cannot')
+        self.online()
+        self.assertEqual(self.http.post('/api/companion/commands', json={'kind': 'open.url', 'args': {'url': 'https://x.test'}}).status_code, 403)
+        for bad in ('file:///C:/Windows/System32/calc.exe', 'javascript:alert(1)', 'C:\\tools\\run.bat'):
+            self.assertEqual(self.command('open.url', url=bad).status_code, 422, bad)
+        queued = self.command('open.url', url='msteams:/l/chat/0/0?users=alex@example.test').json()
+        self.assertEqual(queued['state'], 'pending')
+        seen = []
+        runner = core.CommandRunner(self.client, {'open.url': lambda args: seen.append(args) or {'opened': True},
+                                                  'notify': lambda args: (_ for _ in ()).throw(RuntimeError('Windows refused the alert'))})
+        self.assertEqual(runner.run_once(0)['mail'], False, 'Polling also returns the settings')
+        self.assertEqual(seen, [{'url': 'msteams:/l/chat/0/0?users=alex@example.test'}])
+        done = self.http.get(f"/api/companion/commands/{queued['id']}").json()
+        self.assertEqual((done['state'], done['result']), ('done', {'opened': True}))
+        failing = self.command('notify', title='Deployment finished', text='Example App on LAPTOP-0001').json()
+        runner.run_once(0)
+        self.assertEqual(self.http.get(f"/api/companion/commands/{failing['id']}").json()['error'], 'Windows refused the alert')
+        self.assertEqual(runner.run_once(0), self.server.settings(), 'Nothing left to do')
+        # Outlook commands name an Atlas message; only mail the Companion supplied can be found in Outlook.
+        self.assertEqual(self.command('outlook.open', message_id=1).status_code, 409)
+        self.settings(mail=True)
+        queue = MailQueue(self.root / 'local', utcnow())
+        queue.insert('a' * 64, mail(1)); queue.db.commit()
+        core.MailForwarder(queue, self.client).forward(); queue.close()
+        reply = self.command('outlook.reply', message_id=1, text='Hi Alex,\nIt is installed.', reply_all=True).json()
+        self.assertEqual(self.server.commands[reply['id']]['args'], {'source': 'a' * 64, 'entry_id': 'E1', 'text': 'Hi Alex,\nIt is installed.', 'reply_all': True})
+        # Waiting for the result: answered by the Companion while Atlas waits.
+        import threading
+        worker = threading.Thread(target=lambda: (__import__('time').sleep(0.2), core.CommandRunner(self.client, {'outlook.open': lambda a: {'opened': 'message'}, 'outlook.reply': lambda a: {}}).run_once(0)))
+        worker.start()
+        answer = self.http.post('/api/companion/commands', json={'kind': 'outlook.open', 'args': {'message_id': 1}, 'wait': 5}, headers={'x-atlas-token': 'admin'}).json()
+        worker.join()
+        self.assertEqual((answer['state'], answer['result']), ('done', {'opened': 'message'}))
+        # Not picked up in time: expired, with the reason.
+        late = self.command('open.url', url='https://example.test').json()
+        self.server.commands[late['id']]['created'] -= companion_server.COMMAND_SECONDS + 1
+        self.assertEqual(runner.run_once(0), self.server.settings())
+        self.assertIn('did not pick this up', self.http.get(f"/api/companion/commands/{late['id']}").json()['error'])
+
+    def test_teams_previews_reach_live_inbox_through_the_companion(self):
+        self.online()
+        self.settings(notifications=True)
+        self.assertEqual(mail_inbox.mail_directory(), self.root / 'companion-inbox', 'Teams alone is enough for Live Inbox to read the Companion queue')
+        queue = MailQueue(self.root / 'local', utcnow())
+        with queue.db:  # Written as the notification listener writes it.
+            queue.db.execute("INSERT INTO messages(source,entry_id,received_at,imported_at,conversation_id,sender_name,sender_address,subject,body,body_truncated,channel,content_kind,app_name) "
+                             "VALUES('notification:MSTeams_8wekyb3d8bbwe!MSTeams','H1','2026-10-21T09:00:00+00:00','2026-10-21T09:00:01+00:00','','Alex Morgan','','Alex Morgan','LAPTOP-0001 froze again',0,'teams','notification','Microsoft Teams')")
+        queue.insert('a' * 64, mail(2)); queue.db.commit()
+        sent = core.MailForwarder(queue, self.client, kinds=('notification',)).forward()
+        self.assertEqual(sent, 1, 'Mail is skipped while Email watcher is off')
+        queue.close()
+        with sqlite3.connect(self.root / 'companion-inbox' / 'inbox.sqlite3') as c:
+            self.assertEqual(c.execute('select source,channel,content_kind,app_name,body from messages').fetchall(),
+                             [('notification:MSTeams_8wekyb3d8bbwe!MSTeams', 'teams', 'notification', 'Microsoft Teams', 'LAPTOP-0001 froze again')])
+        self.assertEqual(mail_inbox.notifications_status(self.root / 'companion-inbox')['state'], 'watching')
+        self.assertEqual(mail_inbox.watcher_status(self.root / 'companion-inbox')['state'], 'stopped')
+        self.settings(notifications=False)
+        with self.assertRaisesRegex(core.Offline, 'notification watcher is off'):
+            self.client.post('/api/companion/mail', {'source': 'notification:MSTeams_8wekyb3d8bbwe!MSTeams', 'messages': [{**mail(3), 'channel': 'teams', 'content_kind': 'notification'}]})
+
+    def test_alerts_are_merged_and_can_be_switched_off(self):
+        self.assertIsNone(self.server.alert('Deployment finished', 'Example App on LAPTOP-0001'), 'No Companion, no alert')
+        self.online()
+        first = self.server.alert('Deployment finished', 'Example App on LAPTOP-0001')
+        self.assertEqual(self.server.alert('Deployment failed', 'Viewer on LAPTOP-0002'), first, 'Raised together: one alert')
+        args = self.server.commands[first]['args']
+        self.assertEqual((args['title'], args['text']), ('2 Atlas updates', 'Example App on LAPTOP-0001 · Viewer on LAPTOP-0002'))
+        self.settings(alerts=False)
+        self.assertIsNone(self.server.alert('Queue finished', '3 of 3 done'))
+
+    def test_done_in_live_inbox_and_outlook(self):
+        from inbox_state import InboxState
+        self.online(); self.settings(mail=True)
+        queue = MailQueue(self.root / 'local', utcnow())
+        queue.insert('a' * 64, mail(1)); queue.insert('a' * 64, mail(2)); queue.db.commit()
+        core.MailForwarder(queue, self.client).forward(); queue.close()
+        def directory_connection():
+            c = connect(self.root / 'atlas.db'); c.row_factory = sqlite3.Row; prepare_views(c); return c
+        app = FastAPI()
+        def check_token(request):
+            if request.headers.get('x-atlas-token') != 'admin':
+                raise HTTPException(403, 'Refresh the page before saving')
+        mail_inbox.register(app, directory_connection, lambda: self.root / 'companion-inbox', state=InboxState(self.root / 'inbox-state.json'), check_token=check_token)
+        http = TestClient(app); self.addCleanup(http.close)
+        self.assertTrue(http.get('/api/inbox/messages/1').json()['message']['outlook'], 'Outlook can act on Companion mail')
+        self.assertEqual(http.post('/api/inbox/messages/1/done', json={'done': True}).status_code, 403)
+        marked = http.post('/api/inbox/messages/1/done', json={'done': True}, headers={'x-atlas-token': 'admin'}).json()
+        self.assertEqual((marked['done'], marked['outlook']), (True, True))
+        outlook = [c for c in self.server.commands.values() if c['kind'] == 'outlook.done']
+        self.assertEqual(outlook[0]['args'], {'source': 'a' * 64, 'entry_id': 'E1', 'done': True})
+        listing = {item['id']: item['done'] for item in http.get('/api/inbox/messages').json()['items']}
+        self.assertEqual(listing, {1: True, 2: False})
+        self.assertTrue(http.get('/api/inbox/messages/1').json()['message']['state']['done'])
+        http.post('/api/inbox/messages/1/done', json={'done': False}, headers={'x-atlas-token': 'admin'})
+        self.assertFalse(http.get('/api/inbox/messages').json()['items'][-1]['done'])
+        self.assertEqual(http.post('/api/inbox/messages/9/done', json={'done': True}, headers={'x-atlas-token': 'admin'}).status_code, 404)
+
+
 class CoreHelpers(unittest.TestCase):
+    def test_listener_is_started_paused_and_shown_through_its_files(self):
+        tmp = tempfile.TemporaryDirectory(); self.addCleanup(tmp.cleanup)
+        folder, state = Path(tmp.name), {'running': False, 'now': 1000.0, 'launches': 0}
+        def launch():
+            state['launches'] += 1; state['running'] = True
+        control = core.ListenerControl(folder, launch, lambda: state['running'], clock=lambda: state['now'])
+        read = lambda: json.loads((folder / 'notifications-command.json').read_text())
+        self.assertEqual(control.step(False, False), 'idle')
+        self.assertEqual(control.step(True, False), 'launched')
+        self.assertEqual((read()['operation'], state['launches']), ('start', 1), 'The command is waiting when the app starts')
+        self.assertEqual(control.step(True, False), 'running')
+        self.assertEqual(control.step(True, True), 'started')
+        self.assertTrue(read()['outlook_previews'])
+        self.assertEqual(control.step(False, True), 'paused')
+        self.assertEqual(read()['operation'], 'pause')
+        self.assertEqual(control.step(False, True, show=True), 'shown')
+        self.assertEqual(read()['operation'], 'start_show')
+        state['running'] = False
+        self.assertEqual(control.step(True, True), 'waiting', 'Not relaunched within a minute')
+        state['now'] += 61
+        self.assertEqual(control.step(True, True), 'launched')
+        self.assertLess(len(read()['id']), 65)
+        (folder / 'notifications-status.json').write_text('\ufeff' + json.dumps({'state': 'permission_required', 'detail': 'Allow access in the listener window.', 'captured': 3}), encoding='utf-8')
+        self.assertEqual(control.status(True), {'state': 'permission_required', 'detail': 'Allow access in the listener window.', 'captured': 3})
+        self.assertEqual(control.status(False)['state'], 'off')
+
+    def test_reply_text_categories_links_and_stores(self):
+        html = core.reply_html('<html><body lang="FR"><p>quoted</p></body></html>', 'Bonjour Marie,\n\nC\'est fait <3')
+        self.assertTrue(html.startswith('<html><body lang="FR"><div'))
+        self.assertIn('<p>Bonjour Marie,</p><p>&nbsp;</p><p>C&#x27;est fait &lt;3</p>', html)
+        self.assertTrue(html.endswith('<p>quoted</p></body></html>'))
+        self.assertEqual(core.categories('Rouge; Client', ';', True), 'Rouge; Client; Atlas: done')
+        self.assertEqual(core.categories('Red, Atlas: done', ',', False), 'Red')
+        self.assertEqual(core.categories('', ',', True), 'Atlas: done')
+        self.assertEqual(core.safe_url(' msteams:/l/call/0/0?users=a@b.test '), 'msteams:/l/call/0/0?users=a@b.test')
+        for bad in ('file:///C:/x.exe', 'javascript:alert(1)', 'shell:startup', ''):
+            with self.assertRaises(ValueError):
+                core.safe_url(bad)
+        tmp = tempfile.TemporaryDirectory(); self.addCleanup(tmp.cleanup)
+        queue = MailQueue(Path(tmp.name), utcnow())
+        identity = {'profile': 'Outlook', 'store_id': 'STORE-1', 'folder_id': 'FOLDER-1'}
+        queue.pin(identity); queue.db.commit(); queue.close()
+        import hashlib
+        source = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
+        self.assertEqual(core.store_for(Path(tmp.name), source), 'STORE-1')
+        self.assertIsNone(core.store_for(Path(tmp.name), 'b' * 64))
+
+
     def test_dib_to_bmp_offsets(self):
         for bits, compression, colours, extra in ((24, 0, 0, 0), (8, 0, 0, 1024), (32, 3, 0, 12), (8, 0, 16, 64)):
             dib = struct.pack('<IiiHHIIiiII', 40, 2, 2, 1, bits, compression, 0, 0, 0, colours, 0) + b'\0' * 64

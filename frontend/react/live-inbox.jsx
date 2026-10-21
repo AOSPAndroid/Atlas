@@ -69,7 +69,7 @@ export function LiveInbox() {
   const [notifications, setNotifications] = useState(null);
   const [selected, setSelected] = useState(null), [chosen, setChosen] = useState(null), [detail, setDetail] = useState(null);
   const [error, setError] = useState(""), [detailError, setDetailError] = useState(""), [pending, setPending] = useState(0);
-  const [loaded, setLoaded] = useState(false), [older, setOlder] = useState(false), [refresh, setRefresh] = useState(0);
+  const [loaded, setLoaded] = useState(false), [older, setOlder] = useState(false), [refresh, setRefresh] = useState(0), [hideDone, setHideDone] = useState(false);
   const cursor = useRef(0), initialized = useRef(false), session = useRef(0), selection = useRef(selected);
   selection.current = selected;
   useEffect(() => {
@@ -126,6 +126,13 @@ export function LiveInbox() {
     return () => { current = false; controller.abort(); };
   }, [selected, chosen, visible, readonly, refresh]);
   function choose(id) { setSelected(id); setChosen(null); }
+  // Done is kept by Atlas (and in Outlook for Companion mail); shown at once, undone if Atlas refuses.
+  async function markDone(id, done) {
+    const apply = (value) => { setItems(previous => previous.map(row => row.id === id ? { ...row, done: value } : row)); setDetail(previous => previous?.message.id === id ? { ...previous, message: { ...previous.message, state: { done: value } } } : previous); };
+    apply(done);
+    try { await window.AtlasClient.request("/api/inbox/messages/" + id + "/done", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ done }) }); }
+    catch (failure) { apply(!done); window.toast?.(failure.message); }
+  }
   // Search results and "Seen before" open a specific message, even one not loaded in the list.
   useEffect(() => {
     const open = (event) => { const id = Number(event.detail?.id); if (Number.isSafeInteger(id) && id > 0) choose(id); };
@@ -168,19 +175,19 @@ export function LiveInbox() {
     <ScreenReader />
     <div className="inbox-grid">
       <div className="inbox-mail-list">
-        <div className="inbox-list-heading"><h2>Incoming messages</h2>{pending > 0 && <Button variant="secondary" size="sm" onClick={() => { choose(items[0].id); setPending(0); }}>Show newest ({pending})</Button>}</div>
-        {!loaded ? <Skeleton className="inbox-loading" /> : !items.length ? <EmptyInbox title="Waiting for incoming messages">Emails and notification previews appear when their collectors are connected. Collection begins when each collector first starts.</EmptyInbox> : <ul aria-label="Collected messages">{items.map(item => <li key={item.id}>
-          <Button variant="ghost" className="inbox-mail-row" aria-current={selected === item.id ? "true" : undefined} onClick={() => choose(item.id)} data-mail-id={item.id}>
+        <div className="inbox-list-heading"><h2>Incoming messages</h2>{items.some(item => item.done) && <Button variant="ghost" size="sm" aria-pressed={hideDone} onClick={() => setHideDone(!hideDone)}>{hideDone ? "Show done" : "Hide done"}</Button>}{pending > 0 && <Button variant="secondary" size="sm" onClick={() => { choose(items[0].id); setPending(0); }}>Show newest ({pending})</Button>}</div>
+        {!loaded ? <Skeleton className="inbox-loading" /> : !items.length ? <EmptyInbox title="Waiting for incoming messages">Emails and notification previews appear when their collectors are connected. Collection begins when each collector first starts.</EmptyInbox> : <ul aria-label="Collected messages">{items.filter(item => !hideDone || !item.done || item.id === selected).map(item => <li key={item.id}>
+          <Button variant="ghost" className="inbox-mail-row" aria-current={selected === item.id ? "true" : undefined} onClick={() => choose(item.id)} data-mail-id={item.id} data-done={item.done ? "" : undefined}>
             <span className="inbox-mail-top"><strong>{item.sender_name || item.sender_address || "Sender not supplied"}</strong><time dateTime={item.received_at}>{date(item.received_at)}</time></span>
             <span className="inbox-subject">{item.content_kind === "notification" ? item.preview || "(No message preview)" : item.subject || "(No subject)"}</span>
-            <span className="inbox-mail-bottom"><Badge variant="secondary">{sourceLabel(item)}</Badge><span className="inbox-address">{item.sender_address}</span><Badge variant="outline" data-tone={matchTones[item.match.kind]}>{matchLabels[item.match.kind]}</Badge></span>
+            <span className="inbox-mail-bottom"><Badge variant="secondary">{sourceLabel(item)}</Badge><span className="inbox-address">{item.sender_address}</span><Badge variant="outline" data-tone={matchTones[item.match.kind]}>{matchLabels[item.match.kind]}</Badge>{item.done && <Badge variant="outline" data-tone="good">Done</Badge>}</span>
           </Button>
         </li>)}</ul>}
         {items.length > 0 && items.length < total && <Button variant="outline" size="sm" disabled={older} onClick={loadOlder}>Load older messages ({items.length} of {total})</Button>}
       </div>
       <div className="inbox-context" aria-label="Message and sender details">
         {selected === null ? <EmptyInbox title="Select a message">Its sender and linked machines will appear here.</EmptyInbox> : detailError ? <p role="alert" className="inbox-error">{detailError}</p> : !detail || message.id !== selected ? <Skeleton className="inbox-loading" /> : <>
-          <Card className="inbox-message-card"><CardHeader><CardTitle role="heading" aria-level={2}>{message.subject || "(No subject)"}</CardTitle><CardDescription>{sourceLabel(message)} · {message.sender_name}{message.sender_address ? " <" + message.sender_address + ">" : ""} · {date(message.received_at)}</CardDescription></CardHeader><CardContent>{message.content_kind === "notification" && <p className="inbox-match-note">Notification preview from {message.app_name || (message.channel === "teams" ? "Teams" : "Outlook")}. Text may be incomplete or hidden by notification settings. Open the source app for the full conversation.</p>}<MessageBody message={message} analysis={detail.analysis} user={user} />{!!message.body_truncated && <p className="inbox-muted">Showing the first 100,000 characters. Open Outlook for the full message.</p>}</CardContent></Card>
+          <Card className="inbox-message-card"><CardHeader><CardTitle role="heading" aria-level={2}>{message.subject || "(No subject)"}</CardTitle><CardDescription>{sourceLabel(message)} · {message.sender_name}{message.sender_address ? " <" + message.sender_address + ">" : ""} · {date(message.received_at)}</CardDescription></CardHeader><CardContent><div className="inbox-message-actions" role="group" aria-label="Message actions"><Button size="sm" variant="outline" onClick={() => sendInboxAction("reply", { user })}>Reply…</Button>{message.outlook && <Button size="sm" variant="outline" onClick={() => sendInboxAction("outlook-open", { message: message.id })}>Open in Outlook</Button>}<Button size="sm" variant={message.state?.done ? "secondary" : "outline"} data-done-toggle onClick={() => markDone(message.id, !message.state?.done)}>{message.state?.done ? "Done · reopen" : "Mark done"}</Button></div>{message.content_kind === "notification" && <p className="inbox-match-note">Notification preview from {message.app_name || (message.channel === "teams" ? "Teams" : "Outlook")}. Text may be incomplete or hidden by notification settings. Open the source app for the full conversation.</p>}<MessageBody message={message} analysis={detail.analysis} user={user} />{!!message.body_truncated && <p className="inbox-muted">Showing the first 100,000 characters. Open Outlook for the full message.</p>}</CardContent></Card>
           <Card className="inbox-person-card"><CardHeader><CardTitle role="heading" aria-level={2}><UserRound aria-hidden="true" />People</CardTitle><CardDescription>Sender · {matchLabels[match.kind]}{match.chosen ? " · selected for this view" : ""}</CardDescription></CardHeader><CardContent>
             {match.kind === "ambiguous" && <div className="inbox-candidates"><p>More than one person matches this {match.basis}. Choose the correct record to view machines.</p>{match.candidates.map(candidate => <Button key={candidate.id} size="sm" variant={chosen === candidate.id ? "secondary" : "outline"} onClick={() => setChosen(candidate.id)}>{candidate.name} · {candidate.email || candidate.user_name || candidate.id}</Button>)}</div>}
             {user ? <><h3>{user.full_name || user.name}</h3><p>{[user.user_name, user.email].filter(Boolean).join(" · ")}</p><p className="inbox-muted">{[user.department, user.location, user.job_role, deskText(user)].filter(Boolean).join(" · ") || "No additional directory details"}</p>{match.basis === "name" && <p className="inbox-match-note">{message.content_kind === "notification" ? "Matched the notification title. It may be a chat or group name; verify the sender in Teams or Outlook before taking action." : "Display names can be shared. Verify this person against the sender address before taking action."}</p>}</> : match.kind === "unmatched" && <p>No exact email or full-name match was found in the Atlas database.</p>}

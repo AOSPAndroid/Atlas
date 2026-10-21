@@ -90,6 +90,23 @@ def saved_payload(j):
 def history_update(j,**fields):
  if not fields:return
  with hist_db() as c:c.execute('update deployments set '+','.join(f'{k}=?' for k in fields)+' where id=?',(*fields.values(),j));c.commit()
+ if fields.get('state') in ('complete','launched','failed'):deployment_alert(j,fields['state'])
+def deployment_alert(j,state):
+ """A Windows alert in the operator's session (Atlas Companion) when a deployment ends.
+ Bulk and queue items report once for the whole group instead."""
+ try:
+  import companion_server
+  if not companion_server.companion or (jobs.get(j) or {}).get('group'):return
+  with hist_db() as c:row=c.execute('select target,package,action from deployments where id=?',(j,)).fetchone()
+  if row:companion_server.companion.alert({'complete':'Deployment finished','launched':'Deployment launched','failed':'Deployment failed'}[state],f"{row['action'] or 'Install'} {row['package']} on {row['target']}",'/installer#history')
+ except Exception:pass
+def group_alert(title,rows,field):
+ try:
+  import companion_server
+  if not companion_server.companion:return
+  failed=sum(1 for row in rows if str(row.get(field,'')).lower()=='failed')
+  companion_server.companion.alert(title,f'{len(rows)-failed} of {len(rows)} done'+(f', {failed} failed' if failed else ''),'/installer#history')
+ except Exception:pass
 def identity():return run(['whoami.exe']).stdout.strip()
 def emit(j,message,state=None,**extra):
  with lock:
@@ -215,7 +232,7 @@ def bulk_worker(j,p):
  rows=[{'machine':pc,'copy':'Waiting','launch':'Waiting','pid':'','completion':'','exit_code':'','details':''} for pc in p.computers]
  jobs[j].update(state='running',phase='deploy',results=rows)
  def work(row):
-  child=uuid.uuid4().hex;jobs[child]={'state':'queued','events':[],'started_at':time.time()}
+  child=uuid.uuid4().hex;jobs[child]={'state':'queued','events':[],'started_at':time.time(),'group':j}
   item=Deploy(computer=row['machine'],folder=p.folder,script=p.script,action=p.action,fresh=p.fresh,threads=p.threads)
   row.update(copy='Running',completion='Running',job=child)
   try:
@@ -228,6 +245,7 @@ def bulk_worker(j,p):
   with ThreadPoolExecutor(max_workers=p.concurrency) as pool:list(pool.map(work,rows))
  finally:
   jobs[j].update(state='complete',phase='complete');job_service.save(j)
+  group_alert('Bulk deployment finished',rows,'completion')
 
 class ClosingConnection(sqlite3.Connection):
  def __exit__(self,*args):
@@ -524,7 +542,7 @@ def _queue_worker(queue_id,items):
     if q.get('pause_requested'):
      q['state']='paused';return
     row['state']='running';child=uuid.uuid4().hex
-    jobs[child]={'state':'queued','target':item.computer,'events':[],'started_at':time.time()};row['job']=child;job_service.save(queue_id,queue=True)
+    jobs[child]={'state':'queued','target':item.computer,'events':[],'started_at':time.time(),'group':queue_id};row['job']=child;job_service.save(queue_id,queue=True)
    try:
     history_create(child,item.computer,Path(item.folder).name,item.action,item.script,item.mode,item.model_dump())
     deploy_worker(child,item)
@@ -533,6 +551,7 @@ def _queue_worker(queue_id,items):
     jobs[child]['state']='failed';row.update(state='failed',events=[{'message':str(exc)}])
    job_service.save(child);job_service.save(queue_id,queue=True)
   q['state']='cancelled' if q.get('cancel_requested') else 'complete'
+  group_alert('Queue finished' if q['state']=='complete' else 'Queue cancelled',[row for row in q['items'] if row['state']!='cancelled'],'state')
  except Exception as exc:q.update(state='failed',error=str(exc))
  finally:
   if q['state']=='cancelled':

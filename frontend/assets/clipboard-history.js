@@ -257,13 +257,20 @@
     const host = $("clipboardCompanion"), c = companion;
     if (!c) { host.replaceChildren(); return; }
     const mail = { watching: "Outlook: watching", off: "Outlook: off · switch on Email watcher in Live Inbox", waiting_for_outlook: "Outlook: waiting for classic Outlook" }[c.mail?.state] || (c.mail?.state ? "Outlook: " + c.mail.state.replace(/_/g, " ") : "");
+    const teams = { watching: "Teams: watching", off: "Teams: off · switch on Notification watcher in Live Inbox", not_installed: "Teams: the notification listener app is not installed for your account (Install-Inbox-Collectors.bat)", permission_required: "Teams: allow notification access (Live Inbox > Listener settings)" }[c.notifications?.state] || (c.notifications?.state ? "Teams: " + c.notifications.state.replace(/_/g, " ") : "");
+    // 1.1 and later: Outlook replies, Teams previews and Windows alerts.
+    const alerts = (c.capabilities || []).includes("notify")
+      ? `<label title="Deployment and queue results as Windows alerts in your session"><input type="checkbox" id="companionAlerts" ${c.settings.alerts ? "checked" : ""}> Windows alerts</label>`
+      : `<small>Restart the Companion (Start-Atlas-Companion.bat) to add Outlook replies, Teams and Windows alerts.</small>`;
     host.innerHTML = c.online
-      ? `<span class="status-ok">Companion connected</span><span>${esc(c.user)} · ${c.settings.clipboard ? "every copy is captured, even with Atlas closed" : "clipboard capture is off"}${c.clipboard?.paused ? " · paused from the tray" : ""}</span><label><input type="checkbox" id="companionClipboard" ${c.settings.clipboard ? "checked" : ""}> Capture my clipboard</label><small>${esc(mail)}</small>`
+      ? `<span class="status-ok">Companion connected</span><span>${esc(c.user)} · ${c.settings.clipboard ? "every copy is captured, even with Atlas closed" : "clipboard capture is off"}${c.clipboard?.paused ? " · paused from the tray" : ""}</span><label><input type="checkbox" id="companionClipboard" ${c.settings.clipboard ? "checked" : ""}> Capture my clipboard</label>${alerts}<small>${esc([mail, teams].filter(Boolean).join(" · "))}</small>`
       : c.known
         ? `<span class="status-warn">Companion not running</span><span>Start <b>Start-Atlas-Companion.bat</b> as yourself (not as administrator). Last seen ${esc(when(c.last_seen))}.</span>`
         : `<span class="clipboard-chip">Companion not set up</span><span>Run <b>Install-Atlas-Companion.bat</b> once as yourself to capture every copy from your normal account, even with Atlas closed.</span>`;
-    const box = $("companionClipboard");
-    if (box) box.onchange = () => json("/api/companion/settings", { clipboard: box.checked }).then((next) => { companion = next; renderCompanion(); }, (error) => status(error.message, "bad"));
+    for (const [id, key] of [["companionClipboard", "clipboard"], ["companionAlerts", "alerts"]]) {
+      const box = $(id);
+      if (box) box.onchange = () => json("/api/companion/settings", { [key]: box.checked }).then((next) => { companion = next; renderCompanion(); }, (error) => status(error.message, "bad"));
+    }
     $("clipboardAuto").disabled = covered();
     $("clipboardAuto").closest("label").title = covered() ? "Not needed: the Atlas Companion captures every copy" : "When the browser allows the clipboard, what you copied elsewhere is captured as you come back to Atlas";
   }

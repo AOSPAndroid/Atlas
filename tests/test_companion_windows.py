@@ -93,5 +93,57 @@ class WindowsShell(unittest.TestCase):
         self.assertIn('PostQuitMessage', calls)
 
 
+    def test_outlook_reply_open_and_done(self):
+        module, companion, calls = self.companion({})
+        class Item:
+            Categories, UnRead, saved = 'Rouge', True, 0
+            def __init__(self): self.replies = []
+            def Reply(self): return self.reply('reply')
+            def ReplyAll(self): return self.reply('all')
+            def reply(self, kind):
+                reply = types.SimpleNamespace(kind=kind, BodyFormat=2, HTMLBody='<html><body><p>quoted</p></body></html>', shown=None)
+                reply.Display = lambda modal: setattr(reply, 'shown', modal)
+                self.replies.append(reply); return reply
+            def Display(self, modal): calls.append(('display', modal))
+            def Save(self): self.saved += 1
+        item, asked = Item(), []
+        namespace = types.SimpleNamespace(GetItemFromID=lambda entry, *store: asked.append((entry, *store)) or item)
+        client = types.ModuleType('win32com.client'); client.Dispatch = lambda name: types.SimpleNamespace(GetNamespace=lambda kind: namespace)
+        package = types.ModuleType('win32com'); package.client = client
+        with patch.dict(sys.modules, {'win32com': package, 'win32com.client': client}), patch.object(module.core, 'store_for', return_value='STORE-1'):
+            self.assertEqual(companion.outlook_reply({'entry_id': 'E1', 'source': 's', 'text': 'Bonjour,\nC\'est fait.', 'reply_all': True}), {'opened': 'reply_all'})
+            reply = item.replies[0]
+            self.assertEqual((reply.kind, reply.shown), ('all', False), 'Opened for the operator to send, never sent')
+            self.assertIn('<p>Bonjour,</p><p>C&#x27;est fait.</p>', reply.HTMLBody)
+            self.assertTrue(reply.HTMLBody.endswith('<p>quoted</p></body></html>'))
+            self.assertEqual(asked[0], ('E1', 'STORE-1'))
+            companion.outlook_open({'entry_id': 'E1', 'source': 's'})
+            self.assertIn(('display', False), calls)
+            with patch.object(module, 'list_separator', return_value=';'):
+                companion.outlook_done({'entry_id': 'E1', 'source': 's', 'done': True})
+            self.assertEqual((item.Categories, item.UnRead, item.saved), ('Rouge; Atlas: done', False, 1))
+
+    def test_links_alerts_and_the_listener_window(self):
+        module, companion, calls = self.companion({})
+        opened = []
+        with patch.object(module.os, 'startfile', create=True, new=lambda url: opened.append(url)):
+            companion.open_url({'url': 'msteams:/l/chat/0/0?users=alex@example.test'})
+            with self.assertRaises(ValueError):
+                companion.open_url({'url': 'file:///C:/Windows/System32/cmd.exe'})
+        self.assertEqual(opened, ['msteams:/l/chat/0/0?users=alex@example.test'])
+        companion.notify({'title': 'Queue finished', 'text': '3 of 3 done', 'path': '/installer#history'})
+        self.assertEqual(calls[-1], 'PostMessage', 'Shown on the window thread')
+        shown = []
+        module.win32gui = sys.modules['win32gui']
+        sys.modules['win32gui'].Shell_NotifyIcon = lambda message, data: shown.append(data)
+        companion.wndproc(1, module.ALERT, 0, 0)
+        self.assertEqual((shown[0][6], shown[0][8]), ('3 of 3 done', 'Queue finished'))
+        self.assertTrue(shown[0][2] & module.NIF_INFO)
+        with patch.object(module.webbrowser, 'open', new=lambda url: opened.append(url)):
+            companion.wndproc(1, module.TRAY, 0, module.NIN_BALLOONUSERCLICK)
+        self.assertEqual(opened[-1], 'http://127.0.0.1:8770/installer#history', 'Clicking the alert opens Atlas there')
+        self.assertEqual(companion.show_notifications({}), {'requested': True})
+        self.assertTrue(companion.show_listener.is_set())
+
 if __name__ == '__main__':
     unittest.main()
