@@ -15,12 +15,12 @@
     ["health", "Health", "machine"],
     ["checkup", "Check-up", "machine"],
     ["performance", "Performance", "machine"],
+    ["deploy", "Deploy", "machine"],
     ["machine-groups", "PC groups", "machine"],
     ["user-groups", "User groups", "account"],
-    ["deploy", "Deploy", "machine"],
-    ["knowledge", "Knowledge", "document"],
     ["reply", "Reply", "message"],
     ["notes", "Notes", "any"],
+    ["knowledge", "Knowledge", "document"],
   ];
   const MISSING = {
     user: "No Atlas person is selected. Choose someone in this request or look them up above.",
@@ -46,7 +46,8 @@
       ["ticket", "Ticket ouvert", "Bonjour {first},\n\nJ'ai ouvert {ticket} pour cette demande ; vous recevrez les mises à jour par ce biais.\n\nCordialement,"]],
   };
   const FRENCH = /\b(bonjour|merci|cordialement|svp|s'il vous pla[iî]t|pourriez|pouvez|ordinateur|mon poste|bonne journ[ée]e)\b/i;
-  const TOOLS = [["msra", "MSRA"], ["cshare", "C$"], ["rdp", "Remote Desktop"], ["compmgmt", "Computer Management"]];
+  // [id, label, full name]
+  const TOOLS = [["msra", "MSRA", "Remote Assistance (MSRA)"], ["cshare", "C$", "Open the C$ share"], ["rdp", "RDP", "Remote Desktop"], ["compmgmt", "Computer Mgmt", "Computer Management"]];
   const RECORD = [["Account", "user_name"], ["Email", "email"], ["Department", "department"], ["Job role", "job_role"], ["Location", "location"],
     ["Manager", "manager"], ["Business unit", "business_unit"], ["Employee number", "employee_number"], ["Start date", "start_date"], ["Last login", "last_login"]];
   const MEMBERSHIP = { Direct: 0, Primary: 1, Nested: 2 };
@@ -96,13 +97,21 @@
 <div class="inbox-work-request" data-work-request hidden></div>
 <form class="inbox-work-lookup" data-work-lookup role="search"><input type="search" name="term" placeholder="Look up anyone: name, account, email or PC" aria-label="Look up a person or PC" autocomplete="off" spellcheck="false" /><button type="submit">Find</button></form>
 <div class="inbox-work-results" data-work-results hidden></div>
-<div class="inbox-work-quick" role="group" aria-label="PC tools">${TOOLS.map(([id, label]) => `<button type="button" data-work-tool="${id}" data-needs="machine">${label}</button>`).join("")}<button type="button" data-work-software data-needs="machine">Software…</button><button type="button" data-work-services data-needs="machine">Services…</button><button type="button" data-work-specs data-needs="machine">Specs</button><button type="button" data-work-reboot data-needs="machine">Reboot…</button><button type="button" data-work-act="message" data-needs="machine">Message…</button><button type="button" data-work-act="restart" data-needs="machine">Restart later…</button><button type="button" data-work-gpupdate data-needs="machine" title="gpupdate /target:computer /force on the PC">GPUpdate</button><button type="button" data-work-workspace>Workspace ↗</button></div>
+<div class="inbox-work-quick" role="toolbar" aria-label="PC tools"><span role="group" aria-label="Connect">${TOOLS.map(([id, label, title]) => `<button type="button" data-work-tool="${id}" data-needs="machine" title="${title}">${label}</button>`).join("")}</span><span role="group" aria-label="Look at"><button type="button" data-work-software data-needs="machine" title="Installed applications: uninstall, repair">Software…</button><button type="button" data-work-services data-needs="machine" title="Start, stop and restart services">Services…</button><button type="button" data-work-specs data-needs="machine">Specs</button></span><span role="group" aria-label="Act on the PC"><button type="button" data-work-act="message" data-needs="machine" title="A message box on the PC's screen">Message…</button><button type="button" data-work-act="restart" data-needs="machine" title="Restart in a few minutes or at a time, with a warning">Restart later…</button><button type="button" data-work-reboot data-needs="machine" title="Restart now, after you confirm">Reboot…</button><button type="button" data-work-gpupdate data-needs="machine" title="gpupdate /target:computer /force on the PC">GPUpdate</button></span><span><button type="button" data-work-workspace title="Open the person and PC in Workspace">Workspace ↗</button></span></div>
 <div class="inbox-work-form" data-work-form hidden></div>
 <div class="inbox-work-tabs" role="tablist" aria-label="Request tools">${TABS.map(([id, label]) => `<button type="button" role="tab" id="inboxWorkTab-${id}" data-work-tab="${id}" aria-controls="inboxWorkPane-${id}" aria-selected="false">${label}</button>`).join("")}</div>
 ${TABS.map(([id]) => `<section class="inbox-work-pane" role="tabpanel" id="inboxWorkPane-${id}" data-work-pane="${id}" aria-labelledby="inboxWorkTab-${id}" hidden></section>`).join("")}`;
     pane("health").innerHTML = "<div data-work-health></div>";
     dock.addEventListener("click", (event) => click(event).catch((error) => toast(error.message)));
     dock.addEventListener("keydown", (event) => { if (event.key === "Escape" && state.floating && !event.target.closest("input,textarea,select")) close(); });
+    const bar = dock.querySelector(".inbox-work-tabs");
+    bar.addEventListener("scroll", tabOverflow, { passive: true });
+    bar.addEventListener("wheel", (event) => {
+      if (bar.scrollWidth <= bar.clientWidth || Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+      bar.scrollLeft += event.deltaY;
+      event.preventDefault();
+    }, { passive: false });
+    if (window.ResizeObserver) new ResizeObserver(tabOverflow).observe(bar);
     // Floating tools sit left of an open drawer (clipboard, queue, deployments) so both stay usable.
     const drawers = new MutationObserver(avoidDrawers);
     document.querySelectorAll(".queue-drawer, .deployments-drawer").forEach((node) => drawers.observe(node, { attributes: true, attributeFilter: ["class"] }));
@@ -200,6 +209,11 @@ ${TABS.map(([id]) => `<section class="inbox-work-pane" role="tabpanel" id="inbox
     dock.style.right = width && innerWidth - width >= 500 ? `${Math.round(width) + 8}px` : "";
   }
 
+  function tabOverflow() {
+    const bar = dock?.querySelector(".inbox-work-tabs");
+    if (bar) bar.toggleAttribute("data-overflow", bar.scrollLeft + bar.clientWidth < bar.scrollWidth - 2);
+  }
+
   function refreshTabs() {
     const have = available();
     for (const [tab, , needs] of TABS) {
@@ -224,7 +238,13 @@ ${TABS.map(([id]) => `<section class="inbox-work-pane" role="tabpanel" id="inbox
       const selected = button.dataset.workTab === tab;
       button.setAttribute("aria-selected", String(selected));
       button.classList.toggle("active", selected);
+      if (selected) {
+        // The chosen tab is scrolled into the tab row, never the page.
+        const bar = button.parentNode, inner = button.getBoundingClientRect(), outer = bar.getBoundingClientRect();
+        if (inner.left < outer.left || inner.right > outer.right) bar.scrollLeft += inner.left - outer.left - 24;
+      }
     });
+    tabOverflow();
     dock.querySelectorAll("[data-work-pane]").forEach((section) => { section.hidden = section.dataset.workPane !== tab; });
     if (!available()[needs]) return note(tab, MISSING[needs]);
     if (tab === "person") return mode === "scan" || state.done.person !== state.user.id ? loadPerson() : undefined;

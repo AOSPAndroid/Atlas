@@ -102,6 +102,8 @@ const keys = [{ id: '1A2B3C4D-0000-0000-0000-000000000001', created: '2025-01-05
   run("page('inbox')");
   const grid = d.querySelector('.inbox-grid'), work = () => $('inboxWork'), pane = tab => d.querySelector(`[data-work-pane="${tab}"]`);
   assert.equal(work().parentNode, grid, 'Open floating tools join the message as its third column');
+  // The header marks Workspace only on Workspace; Live Inbox has its own sidebar entry.
+  assert(!d.querySelector('[data-section="workspace"][aria-current]'), 'The header does not claim Workspace on Live Inbox');
   assert(!work().classList.contains('inbox-work-floating'));
   d.querySelector('[data-work-tab="health"]').click();
   const fetched = prefix => calls.filter(c => c.url.startsWith(prefix));
@@ -443,7 +445,7 @@ const keys = [{ id: '1A2B3C4D-0000-0000-0000-000000000001', created: '2025-01-05
 
   // A sender without a Windows PC: Person, User groups, Knowledge, Reply and Notes only.
   await actions.run({ action: 'user-groups', user: { ...person, id: 8, user_name: 'INBOX1', full_name: 'Sam Lee' }, machine: '' });
-  assert.deepEqual([...d.querySelectorAll('[data-work-tab]')].filter(b => !b.disabled).map(b => b.dataset.workTab), ['person', 'user-groups', 'knowledge', 'reply', 'notes']);
+  assert.deepEqual([...d.querySelectorAll('[data-work-tab]')].filter(b => !b.disabled).map(b => b.dataset.workTab), ['person', 'user-groups', 'reply', 'notes', 'knowledge']);
   assert(d.querySelector('[data-work-tool="msra"]').disabled);
   assert.match(d.querySelector('[data-work-title]').textContent, /No Windows PC · Sam Lee/);
 

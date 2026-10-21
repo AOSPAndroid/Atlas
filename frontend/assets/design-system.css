@@ -3225,15 +3225,33 @@ body.atlas-console .inbox-work-head { display:flex; justify-content:space-betwee
 body.atlas-console .inbox-work-head small { color:var(--atlas-muted); font-size:11px; }
 body.atlas-console .inbox-work-head h2 { margin-top:2px; font-size:14px; line-height:1.3; overflow-wrap:anywhere; }
 body.atlas-console .inbox-work .inbox-work-close { min-width:28px; padding:0; font-size:16px; line-height:1; }
-body.atlas-console :is(.inbox-work-quick,.inbox-work-tabs) { display:flex; flex-wrap:wrap; gap:4px; }
-body.atlas-console .inbox-work-tabs { padding-bottom:6px; border-bottom:1px solid var(--atlas-line); }
-body.atlas-console .inbox-work-tabs [role="tab"] { border:1px solid var(--atlas-line); background:var(--atlas-surface); color:var(--atlas-text); font-weight:600; }
-body.atlas-console .inbox-work-tabs [role="tab"].active { background:var(--atlas-accent); border-color:var(--atlas-accent); color:#fff; }
-body.atlas-console .inbox-work-tabs [role="tab"]:disabled { opacity:.45; cursor:not-allowed; }
+/* PC tools: one toolbar in groups (connect · look at · act · Workspace), lighter than the buttons inside the tools. */
+body.atlas-console .inbox-work-quick { display:flex; flex-wrap:wrap; align-items:center; gap:2px 0; padding:2px; border:1px solid var(--atlas-line); border-radius:var(--atlas-control-radius); background:var(--atlas-surface-subtle); }
+body.atlas-console .inbox-work-quick > span { display:inline-flex; flex-wrap:wrap; padding:0 2px; }
+body.atlas-console .inbox-work-quick > span + span { border-left:1px solid var(--atlas-line); }
+body.atlas-console .inbox-work-quick > span:last-child { margin-left:auto; }
+body.atlas-console .inbox-work .inbox-work-quick button { min-height:24px; padding:2px 6px; border:0; background:none; color:var(--atlas-text); font-weight:500; }
+body.atlas-console .inbox-work .inbox-work-quick button:hover:not(:disabled) { background:var(--atlas-selected); color:var(--atlas-accent); }
+body.atlas-console .inbox-work .inbox-work-quick button:disabled { opacity:.4; cursor:not-allowed; }
+/* Tabs: one underlined row; it scrolls sideways when narrow, faded where it is cut. */
+body.atlas-console .inbox-work-tabs { display:flex; flex-wrap:nowrap; overflow-x:auto; overflow-y:hidden; scrollbar-width:none; border-bottom:1px solid var(--atlas-line); }
+body.atlas-console .inbox-work-tabs::-webkit-scrollbar { display:none; }
+body.atlas-console .inbox-work-tabs[data-overflow] { -webkit-mask-image:linear-gradient(to right,#000 calc(100% - 32px),transparent); mask-image:linear-gradient(to right,#000 calc(100% - 32px),transparent); }
+body.atlas-console .inbox-work .inbox-work-tabs [role="tab"] { flex:none; min-height:28px; padding:4px 8px; border:0; border-bottom:2px solid transparent; border-radius:0; background:none; color:var(--atlas-muted); font-weight:600; }
+body.atlas-console .inbox-work .inbox-work-tabs [role="tab"]:hover:not(:disabled) { color:var(--atlas-text); background:var(--atlas-selected); }
+body.atlas-console .inbox-work .inbox-work-tabs [role="tab"].active { color:var(--atlas-accent); border-bottom-color:var(--atlas-accent); background:none; }
+body.atlas-console .inbox-work-tabs [role="tab"]:disabled { opacity:.4; cursor:not-allowed; }
 body.atlas-console .inbox-work-pane { display:grid; grid-template-columns:minmax(0,1fr); gap:8px; min-width:0; }
 body.atlas-console .inbox-work-pane[hidden] { display:none; }
-body.atlas-console .inbox-work-pane .atlas-health { margin:0; }
-body.atlas-console .inbox-work-pane .atlas-health-grid { grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:6px; margin-top:8px; }
+/* Health in the tools: compact rows (check · reading · when), not cards. */
+body.atlas-console .inbox-work-pane .atlas-health { margin:0; padding:6px; }
+body.atlas-console .inbox-work-pane .atlas-health > p { margin:2px 0 0; font-size:11px; line-height:1.4; color:var(--atlas-muted); }
+body.atlas-console .inbox-work-pane .atlas-health-grid { grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:3px; margin-top:6px; }
+body.atlas-console .inbox-work-pane .atlas-health-item { display:grid; grid-template-columns:58px minmax(0,1fr); align-items:baseline; gap:0 6px; min-height:0; padding:3px 6px; }
+body.atlas-console .inbox-work-pane .atlas-health-item > b { grid-row:1 / span 2; }
+body.atlas-console .inbox-work-pane .atlas-health-item > div { margin:0; font-size:12px; line-height:1.35; overflow-wrap:anywhere; }
+body.atlas-console .inbox-work-pane .atlas-health-item > small { grid-column:2; font-size:10px; color:var(--atlas-muted); }
+body.atlas-console .inbox-work-pane .atlas-health-item > small:empty { display:none; }
 body.atlas-console .inbox-work-pane .deployment-panel { border:0; padding:0; }
 body.atlas-console #inboxWork #closeDeploymentPanel { display:none; }
 body.atlas-console :is(.inbox-work-muted,.inbox-work-toolbar small) { color:var(--atlas-muted); font-size:12px; }
@@ -3402,6 +3420,8 @@ body.atlas-console .clipboard-table td:is(:nth-child(2),:nth-child(3)):not(.clip
 body.atlas-console .clipboard-table td:nth-child(3):not(.clipboard-row-actions) { min-width:120px; }
 body.atlas-console .clipboard-table td.clipboard-row-actions { position:sticky; right:0; background:var(--atlas-surface); box-shadow:-8px 0 8px -8px rgba(15,35,50,.35); }
 body.atlas-console .clipboard-table tr[data-clipboard-unknown] b { font-family:ui-monospace, Consolas, monospace; }
+/* Live Inbox with its tools open: they show the PC, so Workspace's target bar steps aside. */
+body.atlas-console:has(#inbox.active .inbox-work:not([hidden]):not(.inbox-work-floating)) #targetBar { display:none !important; }
 /* dark-auto:start (generated by tools/build_dark_overrides.py; do not edit) */
 :where(html[data-theme="dark"]) .atlas-person .avatar{background:var(--atlas-selected)}
 :where(html[data-theme="dark"]) .atlas-person-detail-sections > section{background:var(--atlas-surface)}

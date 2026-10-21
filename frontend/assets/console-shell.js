@@ -58,7 +58,7 @@ function page(id) {
     else b.removeAttribute("aria-current");
   });
   document.querySelectorAll('[data-section]').forEach(link => {
-    if(link.dataset.section === (id === 'knowledge' ? 'knowledge' : 'workspace'))link.setAttribute('aria-current','page');else link.removeAttribute('aria-current');
+    if(link.dataset.section === id)link.setAttribute('aria-current','page');else link.removeAttribute('aria-current');
   });
   if (id === "knowledge") window.AtlasKnowledge?.open();
   if (id === "history") loadDeploymentHistory();

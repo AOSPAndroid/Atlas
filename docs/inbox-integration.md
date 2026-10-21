@@ -78,7 +78,7 @@ becomes Atlas's current target (Workspace and Remote Admin follow it).
 - **Knowledge**: Knowledge Base articles suggested for the request (or under Seen
   before) open here, formatted, with **Copy text**. Diagrams open in the diagram
   viewer.
-- **MSRA**, **C$**, **Remote Desktop**, **Computer Management**, **Software…**
+- **MSRA**, **C$**, **RDP** (Remote Desktop), **Computer Mgmt**, **Software…**
   (installed applications, uninstall and repair), **Services…** (start, stop,
   restart), **Specs** and **Reboot…** (with its confirmation) at the top;
   **Workspace ↗** opens the person and PC there.
