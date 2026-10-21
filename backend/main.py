@@ -812,7 +812,13 @@ def inbox_documents():
  articles=[{'id':'article:'+a['id'],'title':a['title'],'notes':a['markdown'][:20000]+'\n'+' '.join(a['tags']),'categories':a['categories']}
            for a in all_articles(knowledge_path())]
  return knowledge_diagrams()+articles
-register_inbox(app, db, packages=inbox_packages, documents=inbox_documents)
+def person_deployments(names):
+ """The latest deployments to these PCs, for a person's record in Live Inbox."""
+ names=[str(n).upper() for n in names if n][:20]
+ if not names:return []
+ with hist_db() as c:
+  return [dict(r) for r in c.execute('select id,started,finished,target,package,action,state from deployments where upper(target) in (%s) order by started desc limit 8'%','.join('?'*len(names)),names)]
+register_inbox(app, db, packages=inbox_packages, documents=inbox_documents, deployments=person_deployments)
 from package_matching import prewarm as prewarm_package_aliases
 prewarm_package_aliases()
 
@@ -866,6 +872,8 @@ def _admin_token(request):
  if not secrets.compare_digest(request.headers.get('x-atlas-token',''),TOKEN):raise HTTPException(403,'Refresh the page before saving')
 _companion=register_companion(app,sys.modules[__name__],_admin_token,companion_state_path,companion_inbox_path)
 register_inbox_control(app,CompanionInbox(_companion,InboxIntegration()))
+from support_tools import register as register_support_tools
+register_support_tools(app,sys.modules[__name__],_admin_token)
 
 # Bundled open-source Draw.io static editor (no server-side editor endpoints).
 app.mount('/drawio', StaticFiles(directory=ROOT/'frontend/drawio', html=True), name='drawio')

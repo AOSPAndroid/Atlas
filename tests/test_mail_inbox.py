@@ -294,6 +294,27 @@ class InboxTests(unittest.TestCase):
         self.assertEqual((person['user']['full_name'], [m['name'] for m in person['machines']], person['desks']), ('Marie Dupont', ['LAPTOP-04'], []))
         self.assertEqual(self.client.get('/api/inbox/person/999').status_code, 404)
 
+    def test_person_record_lists_earlier_requests_and_deployments(self):
+        first, second = self.add(subject='VPN drops'), self.add(subject='Outlook slow')
+        self.add(name='Sam Green', address='sam@example.test', subject='Not Alex')
+        asked = []
+        def deployments(names):
+            asked.append(names)
+            return [{'id': 'job-1', 'target': 'LAPTOP-01', 'package': 'Teams', 'state': 'success'}]
+        app = FastAPI()
+        def directory_connection():
+            c = connect(self.directory)
+            c.row_factory = sqlite3.Row
+            prepare_views(c)
+            return c
+        register(app, directory_connection, lambda: self.base / 'mail', deployments=deployments)
+        with TestClient(app) as client:
+            person = client.get('/api/inbox/person/1').json()
+        self.assertEqual([(r['id'], r['subject']) for r in person['requests']], [(second, 'Outlook slow'), (first, 'VPN drops')])
+        self.assertEqual(asked, [['LAPTOP-01']])
+        self.assertEqual(person['deployments'][0]['package'], 'Teams')
+        self.assertEqual(self.client.get('/api/inbox/person/3').json()['deployments'], [], 'No hook: no deployments')
+
     def test_name_windows_cover_word_orders_and_possessives(self):
         from mail_inbox import name_candidates
         names = name_candidates("Hi Marie DUPONT, can Dupont, Marie use O'Brien's PC?")

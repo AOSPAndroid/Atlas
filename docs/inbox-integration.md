@@ -40,9 +40,21 @@ becomes Atlas's current target (Workspace and Remote Admin follow it).
 - **Person**: the directory record (account, email, department, job role, location,
   manager, start date, last login), the desk from the floor plan, and every device
   with **Health**, **Performance** and **Deploy** for each PC. **Copy summary** copies
-  it all.
+  it all. Below: their **other requests in Live Inbox** (click one to open it) and the
+  latest **deployments to their PCs** with how they ended. Their shared note, if any,
+  is pinned at the top.
 - **Health**: ping, C$, WMI, CPU, RAM, GPU, C: space and uptime. **Select** runs the
   quick checks; **Health** scans everything.
+- **Check-up** (also on each PC of the request card): one read-only pass over the PC
+  in about 10 to 60 seconds. Who is signed in (and whether several people are), uptime
+  and last boot, a pending restart and why (Windows Update, component servicing,
+  files waiting to be replaced, Software Center), blue screens, unexpected shutdowns
+  and disk errors, the applications that crashed or hung, the latest updates, and each
+  network adapter (IP, gateway, DNS, DHCP, link speed). What stands out comes first
+  ("Restart pending: Windows Update", "OUTLOOK.EXE: 4 crashes, 1 hang", "Ethernet at
+  100 Mbps: check the cable or the dock"). Choose 1 to 30 days of events; **Copy** gives
+  a summary for the ticket. A part the PC refuses (for example no Software Center) is
+  listed under **Not checked**; the rest still shows.
 - **Performance**: one sample of CPU, memory, C: free space, disk latency and
   uptime, what stands out, and the 12 busiest processes by CPU or memory.
   **End…** stops a process after you confirm. **Remote Admin ↗** opens the full
@@ -52,6 +64,14 @@ becomes Atlas's current target (Workspace and Remote Admin follow it).
   nested, with a filter and **Copy names**. **Compare with** a colleague (the other
   people in the request are offered, or type an account) lists the groups they have
   and this person lacks, ready to copy: "same access as…" requests in one step.
+  A locked-out account gets **Unlock account** (Unlock-ADAccount, then looked up
+  again), and the password expiry shows as "Password expires in 3 days" (amber within
+  a week).
+- **BitLocker recovery** (in **PC groups**): **Show recovery keys** reads the PC's
+  recovery passwords from Active Directory, so it works while the PC is stuck at the
+  BitLocker screen. Type the Key ID the user reads out (the first characters are
+  enough) to pick the right key, then **Copy**. Keys kept only in Intune or MBAM are not
+  in AD.
 - **Deploy**: the Workspace deployment panel itself (package, Install, Repair or
   Uninstall, script, Advanced, Add to queue, progress and log). It goes back to
   Workspace when you close the tools or leave Live Inbox, with your choices kept.
@@ -62,6 +82,11 @@ becomes Atlas's current target (Workspace and Remote Admin follow it).
   (installed applications, uninstall and repair), **Services…** (start, stop,
   restart), **Specs** and **Reboot…** (with its confirmation) at the top;
   **Workspace ↗** opens the person and PC there.
+- **Message…** shows a Windows message box on the PC (msg.exe) to everyone signed in,
+  for 1 minute to 1 hour, with ready texts ("IT support is connecting to your PC
+  now…"). **Restart later…** plans a restart in 5 minutes to 2 hours or at a time
+  (Windows warns the user and counts down; refused while a deployment to the PC runs);
+  **Cancel a planned restart** stops it. **GPUpdate** refreshes the computer Group Policy.
 
 - **Reply**: the answer, in the email's language (French emails get French
   templates): **Done**, **Installed**, **Please restart**, **More details**, **Remote session**,
@@ -70,6 +95,13 @@ becomes Atlas's current target (Workspace and Remote Admin follow it).
   the email. Edit it, then **Open reply in Outlook** (reply or reply all, through the Atlas
   Companion: you press Send) or **Copy**. A Teams preview is answered with **Reply in Teams
   chat**. The draft is kept while you use the other tools.
+- **Notes**: a shared note on the person and one on the PC ("Prefers Teams calls",
+  "Dock replaced 03/10"), kept by Atlas in `data/support-notes.json` (next to the
+  database) with who saved it. Below, the **work log** of the request on screen: every
+  check-up, message, restart, unlock, BitLocker key, process ended and reply done from
+  these tools, with the time, plus lines you add ("Called the user, fixed"). **Copy for
+  ticket** gives the request, user, PC and work done, ready to paste. The log is kept in
+  this browser for the latest 100 requests.
 
 On the message itself: **Reply…**, **Open in Outlook** (emails that came through the Atlas
 Companion) and **Mark done**. Done messages are dimmed with a **Done** badge; **Hide done** in the

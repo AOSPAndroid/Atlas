@@ -49,6 +49,7 @@ export function MachineActions({ machine, user }) {
   return <div className="inbox-machine-actions" role="group" aria-label={"Actions for " + machine.name}>
     <Button size="sm" variant="outline" onClick={() => send("target")}>Select</Button>
     <Button size="sm" variant="outline" onClick={() => send("health")}>Health</Button>
+    <Button size="sm" variant="outline" onClick={() => send("checkup")}>Check-up</Button>
     <Button size="sm" variant="outline" onClick={() => send("machine-groups")}>Groups</Button>
     <Button size="sm" variant="outline" onClick={() => send("reboot")}>Reboot…</Button>
   </div>;

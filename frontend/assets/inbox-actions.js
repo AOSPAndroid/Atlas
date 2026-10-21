@@ -42,6 +42,10 @@
         if (work(detail, "health", "scan")) return;
         page("workspace");
         return refreshTargetHealth(true);
+      case "checkup":
+        await focus(detail);
+        if (!work(detail, "checkup", "scan")) throw Error("The PC check-up runs from Live Inbox's request tools.");
+        return;
       case "performance":
         await focus(detail);
         if (!work(detail, "performance", "scan")) page("admin");

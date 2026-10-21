@@ -240,7 +240,7 @@ def safely(load, label, warnings):
 
 
 def register(app, directory_connection, get_directory=mail_directory, packages=lambda: [], documents=lambda: [],
-             state=None, check_token=None):
+             state=None, check_token=None, deployments=lambda names: []):
     from inbox_state import InboxState
     global inbox_states
     if state is None:
@@ -372,7 +372,23 @@ def register(app, directory_connection, get_directory=mail_directory, packages=l
                 if row is None:
                     raise HTTPException(404, 'This person is no longer in the Atlas directory.')
                 user = dict(row)
-                return {'user': user, 'machines': linked_machines(connection, user_id),
-                        'desks': people_desks(connection, [person(row)]).get(user['canonical_key'], [])}
+                machines = linked_machines(connection, user_id)
+                result = {'user': user, 'machines': machines, 'desks': people_desks(connection, [person(row)]).get(user['canonical_key'], [])}
         except sqlite3.Error as error:
             raise HTTPException(503, 'Atlas directory lookup is unavailable. Retry after the database is ready.') from error
+        # What came before: their earlier requests in Live Inbox and the latest deployments to their PCs.
+        result['requests'] = []
+        address = str(user.get('email') or '').strip().lower()
+        if address:
+            try:
+                with queue_reader(get_directory()) as queue:
+                    if queue is not None:
+                        result['requests'] = [dict(r) for r in queue.execute(
+                            'SELECT id,received_at,subject FROM messages WHERE lower(sender_address)=? ORDER BY id DESC LIMIT 6', (address,))]
+            except HTTPException:
+                pass
+        try:
+            result['deployments'] = list(deployments([m.get('name') or m.get('machine_name') for m in machines]))
+        except Exception:
+            result['deployments'] = []
+        return result

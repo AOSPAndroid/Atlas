@@ -34,6 +34,8 @@ with tempfile.TemporaryDirectory() as tmp:
  if clipboard_history.history: clipboard_history.history._path=base/'clipboard-history.json'
  import mail_inbox
  if mail_inbox.inbox_states: mail_inbox.inbox_states._path=base/'inbox-state.json'
+ import support_tools
+ if support_tools.notes: support_tools.notes._path=base/'support-notes.json'
  import companion_server
  if companion_server.companion:
   companion_server.companion._state_path=base/'companion-state.json';companion_server.companion._inbox=base/'companion-inbox';companion_server.companion.state={}

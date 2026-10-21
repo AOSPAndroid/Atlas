@@ -3341,6 +3341,57 @@ body.atlas-console .inbox-work-templates { display:flex; flex-wrap:wrap; gap:4px
 body.atlas-console .inbox-work textarea[data-work-reply] { width:100%; min-height:150px; box-sizing:border-box; padding:6px 8px; border:1px solid var(--atlas-line); border-radius:var(--atlas-control-radius); background:var(--atlas-surface); color:var(--atlas-text); font:12px/1.5 var(--atlas-font); resize:vertical; }
 body.atlas-console .inbox-work-toolbar label { display:inline-flex; align-items:center; gap:4px; font-size:12px; }
 body.atlas-console .inbox-work-toolbar [data-work-lang][aria-pressed="true"] { background:var(--atlas-selected); border-color:var(--atlas-accent); font-weight:600; }
+/* Request tools: check-up, PC actions, unlock, BitLocker keys, notes, work log, person history. */
+body.atlas-console .inbox-work-chips { align-items:center; }
+body.atlas-console .inbox-work-chips [data-tone="warn"] { background:var(--atlas-warning-bg); color:var(--atlas-warning); border-color:var(--atlas-warning-line); }
+body.atlas-console .inbox-work-form { display:grid; padding:6px; border:1px solid var(--atlas-accent); border-radius:var(--atlas-control-radius); background:var(--atlas-selected); }
+body.atlas-console .inbox-work-form[hidden] { display:none; }
+body.atlas-console .inbox-work-form form, body.atlas-console form.inbox-work-note { display:grid; gap:4px; }
+body.atlas-console :is(.inbox-work-form,.inbox-work-note) :is(textarea,input:not([type="time"])) { width:100%; min-width:0; box-sizing:border-box; padding:4px 6px; border:1px solid var(--atlas-line); border-radius:var(--atlas-control-radius); background:var(--atlas-surface); color:var(--atlas-text); font:12px/1.45 var(--atlas-font); }
+body.atlas-console :is(.inbox-work-form,.inbox-work-note) textarea { resize:vertical; }
+body.atlas-console #inboxWork :is(select,input[type="time"]) { width:auto; min-height:26px; height:26px; padding:2px 6px; font-size:12px; border-radius:var(--atlas-control-radius); }
+body.atlas-console #inboxWork .inbox-work-toolbar label { flex-direction:row; align-items:center; gap:4px; font-size:12px; font-weight:400; color:var(--atlas-text); }
+body.atlas-console .inbox-work-form .inbox-work-toolbar > button[aria-label="Close"] { min-width:26px; padding:0; }
+body.atlas-console .inbox-work-findings { display:grid; gap:2px; margin:0; padding:0; list-style:none; font-size:12px; }
+body.atlas-console .inbox-work-findings li { padding:3px 8px; border-left:3px solid var(--atlas-line); border-radius:var(--atlas-control-radius); }
+body.atlas-console .inbox-work-findings [data-tone="warn"] { border-left-color:var(--atlas-warning); background:var(--atlas-warning-bg); }
+body.atlas-console .inbox-work-findings [data-tone="bad"] { border-left-color:var(--atlas-danger); background:var(--atlas-danger-bg); color:var(--atlas-danger-text); font-weight:600; }
+body.atlas-console .inbox-work-apps :is(th,td):is(:nth-child(2),:nth-child(3)) { width:58px; text-align:right; }
+body.atlas-console .inbox-work-apps :is(th,td):last-child { width:86px; text-align:right; }
+body.atlas-console .inbox-work-network li > span:first-child small { overflow-wrap:anywhere; }
+body.atlas-console .inbox-work-network li > span:last-child { display:grid; justify-items:end; gap:0; font-family:ui-monospace, Consolas, monospace; }
+body.atlas-console .inbox-work-pinned { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:start; gap:2px 8px; padding:4px 8px; border-left:3px solid var(--atlas-warning); border-radius:var(--atlas-control-radius); background:var(--atlas-warning-bg); font-size:12px; }
+body.atlas-console .inbox-work-pinned small { grid-column:1 / -1; color:var(--atlas-muted); font-size:11px; font-weight:600; }
+body.atlas-console .inbox-work-pinned p { white-space:pre-wrap; overflow-wrap:anywhere; }
+body.atlas-console .inbox-work-history { display:grid; margin:0; padding:0; list-style:none; border:1px solid var(--atlas-line); border-radius:var(--atlas-control-radius); font-size:12px; }
+body.atlas-console .inbox-work-history li + li { border-top:1px solid var(--atlas-line); }
+body.atlas-console .inbox-work-history li > span, body.atlas-console #inboxWork .inbox-work-history button { display:flex; justify-content:space-between; align-items:baseline; gap:8px; width:100%; min-height:24px; padding:3px 6px; border:0; border-radius:0; background:none; color:inherit; text-align:left; box-sizing:border-box; }
+body.atlas-console #inboxWork .inbox-work-history button:hover { background:var(--atlas-selected); }
+body.atlas-console .inbox-work-history li > span { flex-wrap:wrap; }
+body.atlas-console .inbox-work-history li { display:flex; align-items:center; }
+body.atlas-console .inbox-work-history li > small { padding-right:6px; }
+body.atlas-console .inbox-work-history :is(button,li > span) > span { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+body.atlas-console .inbox-work-history small { flex:none; color:var(--atlas-muted); font-size:11px; }
+body.atlas-console .inbox-work-history [data-state="failed"] { color:var(--atlas-danger-text); font-weight:600; }
+body.atlas-console .inbox-work-history :is([data-state="success"],[data-state="completed"]) { color:var(--atlas-success); }
+body.atlas-console .inbox-work-keys { display:grid; margin:0; padding:0; list-style:none; border:1px solid var(--atlas-line); border-radius:var(--atlas-control-radius); }
+body.atlas-console .inbox-work-keys li { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:4px 8px; padding:4px 6px; font-size:12px; }
+body.atlas-console .inbox-work-keys li + li { border-top:1px solid var(--atlas-line); }
+body.atlas-console .inbox-work-keys li[hidden] { display:none; }
+body.atlas-console .inbox-work-keys li[data-match] { background:var(--atlas-success-bg); box-shadow:inset 3px 0 var(--atlas-success); }
+body.atlas-console .inbox-work-keys li > span { display:grid; }
+body.atlas-console .inbox-work-keys b { font-family:ui-monospace, Consolas, monospace; }
+body.atlas-console .inbox-work-keys small { color:var(--atlas-muted); font-size:11px; }
+body.atlas-console .inbox-work-keys code { font:12px/1.4 ui-monospace, Consolas, monospace; letter-spacing:.02em; user-select:all; }
+body.atlas-console .inbox-work-keys code span { display:inline-block; white-space:nowrap; }
+body.atlas-console .inbox-work-bitlocker { display:grid; gap:4px; padding:6px; border:1px dashed var(--atlas-line); border-radius:var(--atlas-control-radius); }
+body.atlas-console .inbox-work-bitlocker [data-work-key-filter] { flex:1 1 150px; min-width:0; }
+body.atlas-console .inbox-work-log { display:grid; gap:2px; margin:0; padding:0; list-style:none; font-size:12px; }
+body.atlas-console .inbox-work-log li { display:grid; grid-template-columns:auto minmax(0,1fr); gap:8px; padding:2px 0; }
+body.atlas-console .inbox-work-log li + li { border-top:1px solid var(--atlas-line); }
+body.atlas-console .inbox-work-log time { color:var(--atlas-muted); font-variant-numeric:tabular-nums; white-space:nowrap; }
+body.atlas-console .inbox-work-log span { overflow-wrap:anywhere; }
+body.atlas-console [data-work-log] { padding-top:6px; border-top:1px solid var(--atlas-line); }
 /* dark-auto:start (generated by tools/build_dark_overrides.py; do not edit) */
 :where(html[data-theme="dark"]) .atlas-person .avatar{background:var(--atlas-selected)}
 :where(html[data-theme="dark"]) .atlas-person-detail-sections > section{background:var(--atlas-surface)}

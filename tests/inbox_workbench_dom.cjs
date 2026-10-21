@@ -1,6 +1,8 @@
 // Live Inbox request tools: health, performance, AD groups and deployment run beside the message
 // without switching to Workspace; the deployment panel moves in and back; "Back to Live Inbox"
 // after a Live Inbox button opens another page; Workspace is still used outside Live Inbox.
+// Support tools: check-up, message on screen, restart later, GPUpdate, unlock, BitLocker keys,
+// notes and the work log copied for the ticket.
 const assert = require('node:assert/strict');
 const { fixture } = require('./ui_fixture.cjs');
 const { profileSnapshot } = require('./performance_sample.cjs');
@@ -16,14 +18,27 @@ const sample = { ...profileSnapshot('overview'), computer: 'LAPTOP-01' };
 const marie = { id: 9, full_name: 'Marie Dupont', user_name: 'X09', email: 'marie@example.test', written: 'DUPONT Marie', machines: [{ name: 'LAPTOP-09', windows_remote_supported: 1 }] };
 const group = (name, membership = 'Direct') => ({ name, membership, category: 'Security', scope: 'Global', dn: 'CN=' + name });
 const ad = (kind, identity) => ({ kind, queried_at: '2026-10-21T09:00:00Z', server: 'dc.example.test', operator: 'EXAMPLE\\operator', warnings: [], nested_complete: true,
-  details: kind === 'user' ? { Account: identity, Name: identity === 'X09' ? 'Marie Dupont' : 'Alex Morgan', Enabled: true, 'Locked out': identity === 'INBOX0', 'Password expired': false } : { Name: identity, Enabled: true },
+  details: kind === 'user' ? { Account: identity, Name: identity === 'X09' ? 'Marie Dupont' : 'Alex Morgan', Enabled: true, 'Locked out': identity === 'INBOX0', 'Password expired': false,
+    'Password expires': new Date(Date.now() + 3.5 * 86400000).toISOString() } : { Name: identity, Enabled: true },
   groups: identity === 'X09' ? [{ ...group('App-Outlook'), description: 'Outlook users' }, group('APP-Visio'), group('VPN-Users', 'Nested'), group('Domain Users', 'Primary')]
     : [group('Paris-Printers', 'Nested'), { ...group('App-Outlook'), description: 'Outlook users' }, group('Domain Users', 'Primary')] });
-const people = { 7: { user: { ...person, department: 'Client Services', location: 'Paris', manager: 'Jo Lead' }, machines: [laptop, { name: 'PHONE-01', device_kind: 'phone', windows_remote_supported: 0 }], desks: [{ id: '04R019086', floor: 4, match: 'confirmed account link' }] },
+const people = { 7: { user: { ...person, department: 'Client Services', location: 'Paris', manager: 'Jo Lead' }, machines: [laptop, { name: 'PHONE-01', device_kind: 'phone', windows_remote_supported: 0 }], desks: [{ id: '04R019086', floor: 4, match: 'confirmed account link' }],
+    requests: [{ id: 32, subject: 'Alex Morgan', received_at: '2026-10-21T08:00:00Z' }, { id: 25, subject: 'VPN drops at home', received_at: '2026-10-01T08:00:00Z' }],
+    deployments: [{ id: 'job-1', target: 'LAPTOP-01', package: 'Example App', action: 'Install', state: 'failed', started: '2026-10-15 10:00:00' }] },
   9: { user: marie, machines: marie.machines, desks: [] }, 8: { user: { id: 8, full_name: 'Sam Lee', user_name: 'INBOX1' }, machines: [], desks: [] } };
 
+// The check-up of LAPTOP-01: a restart is pending, up 9 days, Outlook keeps crashing, a dock at 100 Mbps.
+const checkup = days => ({ ok: true, computer: 'LAPTOP-01', checked_at: '2026-10-21T09:00:00Z', days, errors: ['updates: Access denied'], duration_ms: 4200,
+  session: { console_user: 'EXAMPLE\\INBOX0', users: ['EXAMPLE\\INBOX0'], last_boot: '2026-10-12T08:00:00Z', uptime_hours: 217, model: 'Latitude 7440' },
+  events: { unexpected_shutdowns: { count: 1, last: '2026-10-18T07:00:00Z' }, bluescreens: { count: 0, last: null }, disk_errors: { count: 0, last: null },
+    app_problems: [{ app: 'OUTLOOK.EXE', crashes: 4, hangs: 1, last: '2026-10-21T08:30:00Z' }, { app: 'Teams.exe', crashes: 0, hangs: 1, last: '2026-10-19T08:30:00Z' }] },
+  pending_reboot: { pending: true, reasons: ['Windows Update'] }, updates: null,
+  network: [{ name: 'Ethernet 2', description: 'Dock Ethernet', ip: ['10.1.2.3', 'fe80::1'], gateway: ['10.1.2.1'], dns: ['10.0.0.10'], mac: '00-11-22-33-44-55', dhcp: true, suffix: 'corp.example', speed_mbps: 100 }] });
+const keys = [{ id: '1A2B3C4D-0000-0000-0000-000000000001', created: '2025-01-05T10:00:00Z', password: '111111-222222-333333-444444-555555-666666-777777-888888' },
+  { id: '9F8E7D6C-0000-0000-0000-000000000002', created: '2026-06-01T10:00:00Z', password: '999999-888888-777777-666666-555555-444444-333333-222222' }];
+
 (async () => {
-  const calls = [], pendingLookups = new Map();
+  const calls = [], pendingLookups = new Map(), notes = {};
   const f = await fixture({ fetch: async (url, options = {}) => {
     url = String(url); const method = options.method || 'GET', body = options.body ? JSON.parse(options.body) : null;
     calls.push({ url, method, body });
@@ -43,6 +58,18 @@ const people = { 7: { user: { ...person, department: 'Client Services', location
     if (url === '/api/kill') return response({ count: 1, results: [{ Process: 'Renderer.exe', PID: 42, state: 'terminated' }] });
     if (url === '/api/companion') return response({ online: true, capabilities: ['outlook.reply', 'outlook.open', 'open.url'] });
     if (url === '/api/companion/commands') return response({ id: 'c' + calls.length, kind: body.kind, state: 'done', result: {}, error: '' });
+    if (url.startsWith('/api/diagnose/LAPTOP-01?days=')) return response(checkup(Number(url.split('=')[1])));
+    if (url === '/api/support/message') return response({ computer: body.computer, pid: 11, seconds: body.seconds });
+    if (url === '/api/support/restart') return response({ computer: body.computer, pid: 12, seconds: body.minutes * 60 });
+    if (url === '/api/support/restart/cancel') return response({ computer: body.computer, pid: 13, cancelled: true });
+    if (url === '/api/support/gpupdate') return response({ computer: body.computer, pid: 14 });
+    if (url === '/api/support/unlock') return response({ account: body.identity, was_locked: true, locked: false });
+    if (url === '/api/support/bitlocker') return response({ computer: body.computer, keys });
+    if (url.startsWith('/api/support/notes') && method === 'PUT') {
+      notes[body.kind + ':' + body.key] = body.text ? { text: body.text, updated: '2026-10-21T10:00:00', by: 'EXAMPLE\\operator' } : null;
+      return response({ kind: body.kind, key: body.key, note: notes[body.kind + ':' + body.key] });
+    }
+    if (url.startsWith('/api/support/notes?')) { const query = new URLSearchParams(url.split('?')[1]); return response({ user: notes['user:' + query.get('user')] || null, machine: notes['machine:' + query.get('machine')] || null }); }
     return response({ deployments: [], items: [] });
   } });
   const { w, run } = f, d = w.document, $ = id => d.getElementById(id);
@@ -100,7 +127,12 @@ const people = { 7: { user: { ...person, department: 'Client Services', location
   await actions.run({ action: 'user-groups', user: person, machine: 'LAPTOP-01' });
   await until(() => pane('user-groups').querySelector('.inbox-work-groups'), 'user groups');
   assert.deepEqual(fetched('/api/active-directory/lookup').at(-1).body, { kind: 'user', identity: 'INBOX0', server: '' });
-  assert.equal(pane('user-groups').querySelector('.inbox-work-chips').textContent, 'Locked out');
+  assert.deepEqual([...pane('user-groups').querySelectorAll('.inbox-work-chips span')].map(n => [n.textContent, n.dataset.tone]), [['Locked out', 'bad'], ['Password expires in 3 days', 'warn']]);
+  // Locked out: unlocked from here, then looked up again.
+  pane('user-groups').querySelector('[data-work-unlock]').click();
+  await until(() => fetched('/api/support/unlock').length === 1 && fetched('/api/active-directory/lookup').length === 2, 'unlock and look up again');
+  assert.deepEqual(fetched('/api/support/unlock')[0].body, { identity: 'INBOX0', server: '' });
+  await until(() => pane('user-groups').querySelector('[data-work-filter]'), 'groups after unlock');
   assert.deepEqual([...pane('user-groups').querySelectorAll('[data-group] > span')].map(n => n.textContent), ['App-Outlook', 'Domain Users', 'Paris-Printers']);
   const filter = pane('user-groups').querySelector('[data-work-filter]');
   filter.value = 'paris'; filter.dispatchEvent(new w.Event('input', { bubbles: true }));
@@ -114,6 +146,16 @@ const people = { 7: { user: { ...person, department: 'Client Services', location
   await until(() => pane('machine-groups').querySelector('.inbox-work-groups'), 'machine groups');
   assert.deepEqual(fetched('/api/active-directory/lookup').at(-1).body, { kind: 'computer', identity: 'LAPTOP-01', server: '' });
   assert.equal(pane('machine-groups').querySelector('.inbox-work-chips').textContent, 'enabled');
+  // BitLocker recovery keys from AD: newest first, found by the Key ID on the screen, copied.
+  pane('machine-groups').querySelector('[data-work-bitlocker-show]').click();
+  await until(() => pane('machine-groups').querySelectorAll('.inbox-work-keys li').length === 2, 'BitLocker keys');
+  assert.deepEqual(fetched('/api/support/bitlocker')[0].body, { computer: 'LAPTOP-01', server: '' });
+  assert.deepEqual([...pane('machine-groups').querySelectorAll('.inbox-work-keys b')].map(n => n.textContent), ['9F8E7D6C', '1A2B3C4D']);
+  const keyFilter = pane('machine-groups').querySelector('[data-work-key-filter]');
+  keyFilter.value = '1a2b-3c'; keyFilter.dispatchEvent(new w.Event('input', { bubbles: true }));
+  assert.deepEqual([...pane('machine-groups').querySelectorAll('.inbox-work-keys li')].map(li => [li.hidden, li.hasAttribute('data-match')]), [[true, false], [false, true]]);
+  pane('machine-groups').querySelector('[data-work-key-copy="1"]').click();
+  await until(() => clipboard === keys[0].password, 'recovery key copied');
 
   // Deploy: the Workspace deployment panel moves beside the message with the package and script chosen.
   await actions.run({ action: 'deploy', user: person, machine: 'LAPTOP-01', pkg: { folder: 'Example App', display_name: 'Example App' }, deployAction: 'Repair' });
@@ -306,9 +348,88 @@ const people = { 7: { user: { ...person, department: 'Client Services', location
   pane('person').querySelector('[data-work-link="call"]').click();
   await until(() => /l\/call\/0\/0\?users=alex%40example\.test$/.test(commands().at(-1).args.url || ''), 'teams call');
 
-  // A sender without a Windows PC: Person, User groups, Knowledge and Reply only.
+  // Check-up: what stands out first, from the Check-up button of a request PC.
+  await actions.run({ action: 'checkup', user: person, machine: 'LAPTOP-01' });
+  assert.equal(d.querySelector('[data-work-tab="checkup"]').getAttribute('aria-selected'), 'true');
+  await until(() => pane('checkup').querySelector('.inbox-work-findings'), 'check-up');
+  assert.equal(fetched('/api/diagnose/LAPTOP-01?days=7').length, 1);
+  const checked = [...pane('checkup').querySelectorAll('.inbox-work-tile')].map(t => [t.querySelector('small').textContent, t.querySelector('b').textContent, t.dataset.tone]);
+  assert.deepEqual(checked, [['Signed in', 'INBOX0', ''], ['Uptime', '9 days', 'warn'], ['Restart', 'Pending', 'bad'], ['Crashes', '1', 'warn'], ['Updates', '–', '']]);
+  assert.deepEqual([...pane('checkup').querySelectorAll('.inbox-work-findings li')].map(li => [li.dataset.tone, li.textContent]), [
+    ['bad', 'Restart pending: Windows Update'], ['warn', 'Not restarted for 9 days'], ['warn', '1 unexpected shutdown in 7 days (power loss or freeze)'],
+    ['warn', 'OUTLOOK.EXE: 4 crashes, 1 hang'], ['warn', 'Ethernet 2 at 100 Mbps: check the cable or the dock']]);
+  assert.match(pane('checkup').querySelector('.inbox-work-network').textContent, /10\.1\.2\.3 · DHCP · corp\.example[\s\S]*Gateway 10\.1\.2\.1/);
+  assert.match(pane('checkup').textContent, /Not checked \(1\)/);
+  const days = pane('checkup').querySelector('[data-work-checkup-days]');
+  days.value = '14'; days.dispatchEvent(new w.Event('change', { bubbles: true }));
+  await until(() => fetched('/api/diagnose/LAPTOP-01?days=14').length === 1 && /in 14 days/.test(pane('checkup').textContent), 'check-up over 14 days');
+  pane('checkup').querySelector('[data-work-checkup-copy]').click();
+  await until(() => /^Check-up of LAPTOP-01[\s\S]*- Restart pending: Windows Update/.test(clipboard), 'check-up copied');
+
+  // Message on screen and restart later: small forms under the PC tools; a restart can be cancelled.
+  const form = () => d.querySelector('[data-work-form]');
+  pane('checkup').querySelector('[data-work-act="restart"]').click();
+  assert(!form().hidden && form().querySelector('[data-work-schedule-restart]'), 'Restart later from the check-up');
+  form().querySelector('[name="minutes"]').value = '30';
+  form().querySelector('[data-work-schedule-restart]').dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }));
+  await until(() => fetched('/api/support/restart').length === 1 && form().hidden, 'restart planned');
+  assert.deepEqual(fetched('/api/support/restart')[0].body, { computer: 'LAPTOP-01', message: 'IT support will restart your PC. Please save your work.', minutes: 30 });
+  d.querySelector('[data-work-act="restart"]').click();
+  form().querySelector('[data-work-restart-cancel]').click();
+  await until(() => fetched('/api/support/restart/cancel').length === 1 && form().hidden, 'restart cancelled');
+  d.querySelector('[data-work-act="message"]').click();
+  form().querySelector('[data-work-screen="0"]').click();
+  form().querySelector('[name="seconds"]').value = '900';
+  form().querySelector('[data-work-send-message]').dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }));
+  await until(() => fetched('/api/support/message').length === 1, 'message sent');
+  assert.deepEqual(fetched('/api/support/message')[0].body, { computer: 'LAPTOP-01', text: 'IT support is connecting to your PC now to look at your request.', seconds: 900 });
+  d.querySelector('[data-work-act="message"]').click(); d.querySelector('[data-work-act="message"]').click();
+  assert(form().hidden, 'The same button closes its form');
+  d.querySelector('[data-work-gpupdate]').click();
+  await until(() => fetched('/api/support/gpupdate').length === 1, 'Group Policy refresh');
+
+  // Person: their other requests open in Live Inbox; the latest deployments to their PCs.
+  await actions.run({ action: 'person', user: person });
+  await until(() => pane('person').querySelector('[data-work-open-message]'), 'request history');
+  assert.deepEqual([...pane('person').querySelectorAll('[data-work-open-message]')].map(b => b.dataset.workOpenMessage), ['25'], 'The message on screen is not listed');
+  assert.match(pane('person').querySelector('[data-state="failed"]').closest('li').textContent, /Example App · Install[\s\S]*LAPTOP-01/);
+  const opens = []; w.addEventListener('atlas:inbox-open', event => opens.push(event.detail.id));
+  pane('person').querySelector('[data-work-open-message="25"]').click();
+  assert.deepEqual(opens, [25]);
+
+  // Notes: shared notes on the person and the PC; the work log lists what was done, ready for the ticket.
+  d.querySelector('[data-work-tab="notes"]').click();
+  await until(() => pane('notes').querySelector('[data-work-note="user"]'), 'notes');
+  assert(fetched('/api/support/notes?').some(c => c.url === '/api/support/notes?user=account%3Ainbox0&machine=LAPTOP-01'));
+  const userNote = pane('notes').querySelector('[data-work-note="user"]');
+  userNote.elements.text.value = 'Prefers Teams calls before 10:00';
+  userNote.dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }));
+  await until(() => /Saved/.test(userNote.querySelector('[data-work-note-status]').textContent), 'note saved');
+  assert.deepEqual(calls.find(c => c.method === 'PUT').body, { kind: 'user', key: 'account:inbox0', text: 'Prefers Teams calls before 10:00' });
+  const logged = () => [...pane('notes').querySelectorAll('.inbox-work-log li span')].map(n => n.textContent);
+  assert.deepEqual(logged(), ['Reply prepared in Teams chat', 'Check-up of LAPTOP-01 (7 days): Restart pending: Windows Update; Not restarted for 9 days; 1 unexpected shutdown in 7 days (power loss or freeze); OUTLOOK.EXE: 4 crashes, 1 hang; Ethernet 2 at 100 Mbps: check the cable or the dock',
+    'Check-up of LAPTOP-01 (14 days): Restart pending: Windows Update; Not restarted for 9 days; 1 unexpected shutdown in 14 days (power loss or freeze); OUTLOOK.EXE: 4 crashes, 1 hang; Ethernet 2 at 100 Mbps: check the cable or the dock',
+    'Restart of LAPTOP-01 planned for ' + new Date(Date.now() + 1800e3).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), 'Planned restart of LAPTOP-01 cancelled',
+    'Message shown on LAPTOP-01: "IT support is connecting to your PC now to look at your request."', 'Group Policy refresh started on LAPTOP-01']);
+  const line = pane('notes').querySelector('[data-work-log-add]');
+  line.elements.text.value = 'Called Alex, Outlook works after the restart';
+  line.dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }));
+  await until(() => logged().length === 8, 'manual log line');
+  pane('notes').querySelector('[data-work-log-copy]').click();
+  await until(() => /^Request: Alex Morgan\nFrom: Lair de Gourmont[\s\S]*User: Alex Morgan · INBOX0\nPC: LAPTOP-01\n\nWork done:\n[\s\S]*Called Alex, Outlook works after the restart$/.test(clipboard), 'ticket text');
+  // The person note shows on their record.
+  await actions.run({ action: 'person', user: person });
+  await until(() => pane('person').querySelector('.inbox-work-pinned'), 'pinned note');
+  assert.match(pane('person').querySelector('.inbox-work-pinned').textContent, /Prefers Teams calls before 10:00/);
+  // Another message has its own work log.
+  w.dispatchEvent(new w.CustomEvent('atlas:inbox-detail', { detail: { ...teams, message: { ...teams.message, id: 33 } } }));
+  d.querySelector('[data-work-tab="notes"]').click();
+  await until(() => pane('notes').querySelector('[data-work-log]') && !pane('notes').querySelector('.inbox-work-log'), 'empty log for another message');
+  assert.match(pane('notes').querySelector('[data-work-log]').textContent, /Work log for this request \(0\)/);
+
+  // A sender without a Windows PC: Person, User groups, Knowledge, Reply and Notes only.
   await actions.run({ action: 'user-groups', user: { ...person, id: 8, user_name: 'INBOX1', full_name: 'Sam Lee' }, machine: '' });
-  assert.deepEqual([...d.querySelectorAll('[data-work-tab]')].filter(b => !b.disabled).map(b => b.dataset.workTab), ['person', 'user-groups', 'knowledge', 'reply']);
+  assert.deepEqual([...d.querySelectorAll('[data-work-tab]')].filter(b => !b.disabled).map(b => b.dataset.workTab), ['person', 'user-groups', 'knowledge', 'reply', 'notes']);
   assert(d.querySelector('[data-work-tool="msra"]').disabled);
   assert.match(d.querySelector('[data-work-title]').textContent, /No Windows PC · Sam Lee/);
 
@@ -316,10 +437,10 @@ const people = { 7: { user: { ...person, department: 'Client Services', location
   d.querySelector('[data-work-close]').click();
   assert(work().hidden);
   assert.equal($('deploymentPanel').parentNode, $('workspace'));
-  assert(calls.every(c => c.method === 'GET' || ['/api/active-directory/lookup', '/api/kill', '/api/companion/commands'].includes(c.url)), 'Nothing deploys or reboots by itself');
+  assert(calls.every(c => c.method === 'GET' || ['/api/active-directory/lookup', '/api/kill', '/api/companion/commands'].includes(c.url) || c.url.startsWith('/api/support/')), 'Nothing deploys or reboots by itself');
   await sleep(100);
   assert.deepEqual(f.errors, []);
   w.close();
-  console.log('PASS: Live Inbox request tools run person (record, desk, devices), health, performance (End… confirmed), user and PC AD groups (filter, copy, compare with a colleague), deployment, software/services/specs and articles beside the message; replies (FR/EN templates, Outlook reply window, Teams chat) and Teams chat/call; request people and PCs one click each; lookup of anyone; the deployment panel moves in and back intact; Back to Live Inbox after a Live Inbox button; reboot confirmed; Workspace fallback outside Live Inbox');
+  console.log('PASS: Live Inbox request tools run person (record, desk, devices), health, performance (End… confirmed), user and PC AD groups (filter, copy, compare with a colleague), deployment, software/services/specs and articles beside the message; replies (FR/EN templates, Outlook reply window, Teams chat) and Teams chat/call; request people and PCs one click each; check-up, message on screen, restart later (and cancel), GPUpdate, unlock, password expiry, BitLocker keys found by Key ID, other requests and deployments, notes and the work log copied for the ticket; lookup of anyone; the deployment panel moves in and back intact; Back to Live Inbox after a Live Inbox button; reboot confirmed; Workspace fallback outside Live Inbox');
   process.exit(0);
 })().catch(error => { console.error(error); process.exit(1); });

@@ -17,7 +17,7 @@ def register(app, backend):
              'overview':'System overview', 'processes':'Process scan', 'performance':'Performance scan',
              'preflight':'Deployment preflight', 'machine-health':'Health check',
              'cleanup-packages':'Package cleanup', 'open-tool':'Open remote tool',
-             'package-folder':'Locate package folder'}
+             'package-folder':'Locate package folder', 'diagnose':'PC check-up'}
     writes = {'/api/kill':'Terminate process', '/api/remote-registry/enable':'Enable Remote Registry',
               '/api/software-tools/inventory':'Software inventory'}
 
