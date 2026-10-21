@@ -18,6 +18,7 @@ const analysis = {
   categories: [{ id: 'slow', label: 'Slow or freezing PC', matched: ['slow'], tools: ['performance', 'health', 'reboot'] }],
   tools: ['performance', 'health', 'reboot', 'user-groups'],
   machines: [{ name: 'NAMED-PC-02', device_kind: 'desktop', windows_remote_supported: 1, linked: false }],
+  people: [{ id: 9, full_name: 'Marie Dupont', written: 'Marie Dupont', machines: [{ name: 'LAPTOP-09', device_kind: 'laptop', windows_remote_supported: 1 }, { name: 'LAPTOP-01', windows_remote_supported: 1 }] }],
   knowledge: [{ id: 'kb-slow', title: 'Slow PC runbook' }], warnings: ['Knowledge Base unavailable: test'],
 };
 
@@ -43,7 +44,8 @@ const analysis = {
   assert.match(card.textContent, /Slow or freezing PC/);
   assert.equal(card.querySelector('img'), null, 'Package names are escaped');
   const target = card.querySelector('select');
-  assert.deepEqual([...target.options].map(o => o.value), ['NAMED-PC-02', 'LAPTOP-01'], 'Named machine first; inventory-only phone excluded');
+  assert.deepEqual([...target.options].map(o => o.value), ['NAMED-PC-02', 'LAPTOP-01', 'LAPTOP-09'], "Named machine first; inventory-only phone excluded; then PCs of people named, once each");
+  assert.match(target.options[2].textContent, /LAPTOP-09 · Marie Dupont/);
   card.querySelector('[data-package="Example App"] button').click();
   assert.deepEqual(sent.at(-1), { action: 'deploy', machine: 'NAMED-PC-02', user: person, pkg: analysis.packages[0], deployAction: 'Install' });
   Object.getOwnPropertyDescriptor(w.HTMLSelectElement.prototype, 'value').set.call(target, 'LAPTOP-01');

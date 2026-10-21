@@ -27,7 +27,8 @@ const supportsWindows = (machine) => window.AtlasUI?.supportsWindows ? window.At
 // "read as GBRPWMK2O88I521" when the name was found despite 0/O or 1/I confusion.
 export const readAs = (machine) => machine?.written_as && machine.written_as !== String(machine.name).toUpperCase() ? " · read as " + machine.written_as : "";
 
-/** Windows machines for this request: machines named in the message first, then linked ones. */
+/** Windows machines for this request: machines named in the message first, then the sender's,
+ *  then those of people named in the message (labelled with their owner). */
 export function requestMachines(detail) {
   const mentioned = (detail.analysis?.machines || []).map((m) => ({ ...m, mentioned: true }));
   const linked = (detail.machines || []).map((m) => {
@@ -35,6 +36,10 @@ export function requestMachines(detail) {
     return { ...m, name: m.name || m.machine_name, mentioned: !!mention, written_as: mention?.written_as };
   });
   const rows = [...mentioned.filter((m) => !m.linked), ...linked];
+  for (const p of detail.analysis?.people || []) for (const m of p.machines || []) {
+    const name = m.name || m.machine_name;
+    if (!rows.some((r) => r.name.toUpperCase() === String(name).toUpperCase())) rows.push({ ...m, name, mentioned: false, owner: p.full_name || p.name });
+  }
   return rows.filter((m) => m.name && supportsWindows(m)).sort((a, b) => b.mentioned - a.mentioned);
 }
 
@@ -74,8 +79,8 @@ export function RequestCard({ detail, user }) {
     <CardContent>
       {categories.length > 0 && <p className="inbox-request-tags">{categories.map((c) => <Badge key={c.id} variant="outline" title={"Matched: " + c.matched.join(", ")}>{c.label}</Badge>)}</p>}
       {machines.length > 1 ? <label className="inbox-request-target">Machine
-        <select value={target} onChange={(event) => setTarget(event.target.value)}>{machines.map((m) => <option key={m.name} value={m.name}>{m.name}{m.mentioned ? " · named in message" : ""}{readAs(m)}</option>)}</select>
-      </label> : <p className="inbox-muted">{target ? "Machine: " + target + (machines[0]?.mentioned ? " (named in message" + readAs(machines[0]) + ")" : "") : "No Windows machine is linked to or named in this message."}</p>}
+        <select value={target} onChange={(event) => setTarget(event.target.value)}>{machines.map((m) => <option key={m.name} value={m.name}>{m.name}{m.mentioned ? " · named in message" : m.owner ? " · " + m.owner : ""}{readAs(m)}</option>)}</select>
+      </label> : <p className="inbox-muted">{target ? "Machine: " + target + (machines[0]?.mentioned ? " (named in message" + readAs(machines[0]) + ")" : machines[0]?.owner ? " (" + machines[0].owner + ")" : "") : "No Windows machine is linked to or named in this message."}</p>}
 
       {(analysis.packages || []).length > 0 && <section aria-label="Suggested packages" className="inbox-request-section">
         <h3><PackagePlus aria-hidden="true" />Packages · {action}</h3>

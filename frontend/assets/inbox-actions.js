@@ -1,11 +1,13 @@
-/* Live Inbox actions: open the normal Workspace tools for a request's person and machine.
-   Every action needs a click. Reboots keep their confirmation, and nothing deploys until
-   Install or Start queue is clicked in Workspace. */
+/* Live Inbox actions: a request's tools open beside the message (inbox-workbench.js), so the
+   person, health, performance, AD groups, deployment and articles never leave Live Inbox.
+   Outside Live Inbox the normal Workspace tools are used. Every action needs a click. Reboots keep their
+   confirmation, and nothing deploys until Install or Start queue is clicked. */
 (() => {
   const openQueue = () => document.querySelector("#queueDrawer")?.classList.add("open");
+  const work = (detail, tab, mode) => !!window.AtlasInboxWork?.open(detail, tab, mode);
 
+  // Makes the request's person and machine Atlas's current selection, without changing page.
   async function focus({ user, machine }) {
-    page("workspace");
     if (user?.id && S.user?.id !== user.id) await loadUser("id:" + user.id);
     if (machine) {
       setTarget(machine, "Live inbox request", false);
@@ -33,18 +35,29 @@
     switch (action) {
       case "target":
         await focus(detail);
+        if (!work(detail, "health", "quick")) page("workspace");
         return toast(`${S.target} selected for ${user?.full_name || user?.name || "this request"}`);
       case "health":
         await focus(detail);
+        if (work(detail, "health", "scan")) return;
+        page("workspace");
         return refreshTargetHealth(true);
       case "performance":
         await focus(detail);
-        return page("admin");
+        if (!work(detail, "performance", "scan")) page("admin");
+        return;
+      case "person":
+        if (!user?.id) throw Error("This person is not in the Atlas directory.");
+        if (work({ user, ...(machine === undefined ? {} : { machine }) }, "person")) return;
+        page("workspace");
+        return loadUser("id:" + user.id);
       case "user-groups":
         if (!user?.user_name && !user?.email) throw Error("No AD account is known for this sender.");
+        if (work({ user, ...(machine === undefined ? {} : { machine }) }, "user-groups", "scan")) return;
         return window.AtlasAD.show("user", user.user_name || user.email);
       case "machine-groups":
         await focus(detail);
+        if (work(detail, "machine-groups", "scan")) return;
         return window.AtlasAD.show("computer", S.target);
       case "reboot":
         await focus(detail);
@@ -53,6 +66,7 @@
         return openQueue();
       case "deploy":
         await focus(detail);
+        if (!work(detail, "deploy")) page("workspace");
         await choosePackage(pkg, deployAction);
         openDeploymentPanel();
         return toast(`${pkg.display_name || pkg.folder} ready for ${S.target}. Check the script, then click ${deployAction}.`);
@@ -63,6 +77,7 @@
         return openQueue();
       case "search": {
         await focus(detail);
+        if (!work(detail, "deploy")) page("workspace");
         openDeploymentPanel();
         document.querySelector("#pkgSearch").value = detail.term || "";
         document.querySelector("#packagePicker").open = true;
@@ -73,6 +88,8 @@
         window.AtlasKits.addToQueue(detail.kit);
         return openQueue();
       case "knowledge":
+        // Articles open beside the message; diagrams need the diagram viewer.
+        if (String(detail.document).startsWith("article:") && work({ document: detail.document }, "knowledge", "scan")) return;
         return window.AtlasKnowledge.show(detail.document);
       default:
         throw Error("Unknown Live Inbox action.");

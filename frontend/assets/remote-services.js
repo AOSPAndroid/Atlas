@@ -427,6 +427,8 @@
     window.addEventListener("atlas:admin-target-change", changedTarget);
     changedTarget();
   }
+  // Live Inbox's request tools list services for the selected machine without opening Remote Admin.
+  window.AtlasServices = { load };
   if (document.readyState === "loading")
     document.addEventListener("DOMContentLoaded", bind, { once: true });
   else bind();
