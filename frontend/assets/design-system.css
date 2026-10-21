@@ -2581,7 +2581,12 @@ body.atlas-console .inbox-request-row { display:flex; flex-wrap:wrap; gap:4px; a
 body.atlas-console .inbox-request-row :is(input, select), body.atlas-console .inbox-request-target select { flex:1; min-width:140px; min-height:var(--atlas-control-height); padding:2px 6px; border:1px solid var(--atlas-line); border-radius:var(--atlas-control-radius); font:12px var(--atlas-font); background:var(--atlas-surface); }
 body.atlas-console .inbox-request-target { display:flex; flex-direction:row; align-items:center; justify-content:flex-start; gap:6px; font-size:12px; }
 /* The description is long; keep it under the title instead of squeezing the title. */
-body.atlas-console #liveInbox :is(.inbox-request-card, .screen-reader-text, .inbox-message-card) [data-slot="card-header"] { grid-template-columns:minmax(0,1fr); }
+/* Card headers: a long description (a sender like "Lair de Gourmont, Amaury Pierre Marie : GTB Europe
+   <address>") flows beside the title or wraps under it; the title is never squeezed to one letter per line. */
+body.atlas-console #liveInbox [data-slot="card-header"] { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:2px 8px; }
+body.atlas-console #liveInbox [data-slot="card-header"] > [data-slot="card-title"] { flex:1 1 auto; min-width:min(12em,100%); }
+body.atlas-console #liveInbox [data-slot="card-header"] > [data-slot="card-description"] { flex:0 1 auto; min-width:0; }
+body.atlas-console #liveInbox :is(.inbox-request-card, .screen-reader-text, .inbox-message-card) [data-slot="card-header"] > [data-slot="card-description"] { flex-basis:100%; }
 
 /* Read from screen (Live Inbox). */
 body.atlas-console .screen-reader { display:grid; gap:6px; border:1px solid var(--atlas-line); border-radius:var(--atlas-control-radius); padding:6px 8px; background:var(--atlas-surface); }

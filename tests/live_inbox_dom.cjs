@@ -71,6 +71,11 @@ const response = data => ({ ok: true, status: 200, json: async () => data });
   // The message comes first; named machines and people are highlighted and open the request tools.
   const sent = []; w.addEventListener('atlas:inbox-action', event => sent.push(event.detail));
   assert(d.querySelector('.inbox-context').firstElementChild.classList.contains('inbox-message-card'), 'The message is the first card');
+  // A long sender ("Lair de Gourmont, Amaury Pierre Marie : GTB Europe <address>") once squeezed the subject to one
+  // letter per line: card headers wrap, and titles keep a minimum width.
+  const css = fs.readFileSync('frontend/assets/design-system.css', 'utf8');
+  assert.match(css, /#liveInbox \[data-slot="card-header"\] \{ display:flex; flex-wrap:wrap;/);
+  assert.match(css, /#liveInbox \[data-slot="card-header"\] > \[data-slot="card-title"\] \{ flex:1 1 auto; min-width:min\(12em,100%\); \}/);
   assert.deepEqual([...d.querySelectorAll('.inbox-body .inbox-entity')].map(e => [e.tagName, e.textContent]), [['BUTTON', 'DUPONT Marie'], ['BUTTON', 'LAPTOP-04'], ['MARK', 'Lee Wong']]);
   d.querySelector('.inbox-body [data-entity="person"]').click(); d.querySelector('.inbox-body [data-entity="machine"]').click();
   assert.deepEqual(sent.map(x => [x.action, x.user?.id, x.machine]), [['person', 9, undefined], ['target', 7, 'LAPTOP-04']]);
