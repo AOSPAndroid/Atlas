@@ -264,4 +264,42 @@ class InboxTests(unittest.TestCase):
                 self.assertEqual(client.post('/api/inbox/control', json={'action': 'start'}, headers={'Origin': 'https://example.test'}).status_code, 403)
 
 
+    def test_people_named_in_the_message_with_their_machines(self):
+        with connect(self.directory) as c:
+            for uid, name, email, account in [(4, 'Marie Dupont', 'marie@example.test', 'X01000004'), (5, 'John Smith', 'john@example.test', 'X01000005'),
+                                              (6, 'Chloé Martin', 'chloe@example.test', 'X01000006'), (7, 'Riley Operator', 'riley@example.test', 'X01426046'),
+                                              (8, 'Lee Wong', 'lee1@example.test', 'X01000008'), (9, 'Lee Wong', 'lee2@example.test', 'X01000009')]:
+                c.execute('INSERT INTO users(id,canonical_key,user_id,user_id_norm,full_name,full_name_norm,email,email_norm) VALUES(?,?,?,?,?,?,?,?)',
+                          (uid, 'person:' + str(uid), account, account.lower(), name, name.lower(), email, email))
+            c.execute("INSERT INTO machines(id,machine_name,machine_name_norm,assigned_to) VALUES(2,'LAPTOP-04','laptop-04','X01000004')")
+            rebuild_links(c)
+        body = ("Bonjour Riley Operator,\nPlease install Visio for DUPONT Marie and give her the same access as John Smith's team.\n"
+                "Sam Green needs it too, and one of the Lee Wong. Contact chloe@example.test or X01000005.\nThanks\nAlex Morgan\n"
+                "From: Old Thread\nSent: Monday\nHi Old Person")
+        mid = self.add(subject='Visio for the team', body=body)
+        with patch.dict(os.environ, {'USERNAME': 'x01426046_dsk'}):
+            detail = self.client.get(f'/api/inbox/messages/{mid}').json()
+        people = detail['analysis']['people']
+        named = [(p.get('full_name'), p['written'], p['basis']) for p in people if not p.get('ambiguous')]
+        # In order of first mention; the operator (Riley, "Hi Riley") and the signature (the sender) are left out.
+        self.assertEqual(named, [('Marie Dupont', 'DUPONT Marie', 'name'), ('John Smith', 'John Smith', 'name'),
+                                 ('Sam Green', 'Sam Green', 'name'), ('Chloé Martin', 'chloe@example.test', 'email')])
+        self.assertEqual([m['name'] for m in people[0]['machines']], ['LAPTOP-04'])
+        self.assertEqual(people[0]['desks'], [])
+        shared = [p for p in people if p.get('ambiguous')]
+        self.assertEqual([(p['written'], sorted(c['email'] for c in p['candidates'])) for p in shared],
+                         [('Lee Wong', ['lee1@example.test', 'lee2@example.test'])])
+        self.assertEqual(detail['match']['user']['desks'], [])
+        person = self.client.get('/api/inbox/person/4').json()
+        self.assertEqual((person['user']['full_name'], [m['name'] for m in person['machines']], person['desks']), ('Marie Dupont', ['LAPTOP-04'], []))
+        self.assertEqual(self.client.get('/api/inbox/person/999').status_code, 404)
+
+    def test_name_windows_cover_word_orders_and_possessives(self):
+        from mail_inbox import name_candidates
+        names = name_candidates("Hi Marie DUPONT, can Dupont, Marie use O'Brien's PC?")
+        self.assertEqual(names['marie dupont'], 'Marie DUPONT')
+        self.assertEqual(names['dupont marie'], 'Marie DUPONT')
+        self.assertIn('hi marie dupont', names)
+        self.assertNotIn("o'brien's pc", names)
+
 if __name__ == '__main__': unittest.main()

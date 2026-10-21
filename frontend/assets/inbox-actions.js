@@ -1,6 +1,6 @@
-/* Live Inbox actions: a request's tools open beside the message (inbox-workbench.js), so
-   health, performance, AD groups and deployment never leave Live Inbox. Outside Live Inbox
-   the normal Workspace tools are used. Every action needs a click. Reboots keep their
+/* Live Inbox actions: a request's tools open beside the message (inbox-workbench.js), so the
+   person, health, performance, AD groups, deployment and articles never leave Live Inbox.
+   Outside Live Inbox the normal Workspace tools are used. Every action needs a click. Reboots keep their
    confirmation, and nothing deploys until Install or Start queue is clicked. */
 (() => {
   const openQueue = () => document.querySelector("#queueDrawer")?.classList.add("open");
@@ -46,9 +46,14 @@
         await focus(detail);
         if (!work(detail, "performance", "scan")) page("admin");
         return;
+      case "person":
+        if (!user?.id) throw Error("This person is not in the Atlas directory.");
+        if (work({ user, ...(machine === undefined ? {} : { machine }) }, "person")) return;
+        page("workspace");
+        return loadUser("id:" + user.id);
       case "user-groups":
         if (!user?.user_name && !user?.email) throw Error("No AD account is known for this sender.");
-        if (work(detail, "user-groups", "scan")) return;
+        if (work({ user, ...(machine === undefined ? {} : { machine }) }, "user-groups", "scan")) return;
         return window.AtlasAD.show("user", user.user_name || user.email);
       case "machine-groups":
         await focus(detail);
@@ -83,6 +88,8 @@
         window.AtlasKits.addToQueue(detail.kit);
         return openQueue();
       case "knowledge":
+        // Articles open beside the message; diagrams need the diagram viewer.
+        if (String(detail.document).startsWith("article:") && work({ document: detail.document }, "knowledge", "scan")) return;
         return window.AtlasKnowledge.show(detail.document);
       default:
         throw Error("Unknown Live Inbox action.");

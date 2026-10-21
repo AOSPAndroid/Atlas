@@ -49,7 +49,11 @@ const response = data => ({ ok: true, status: 200, json: async () => data });
     }
     const row = rows.find(row => row.id === Number(parsed.pathname.split('/').at(-1)));
     const chosen = parsed.searchParams.get('user_id');
-    const detail = { message: { ...row, body: '<script>window.mailExecuted=true</script>\nMy laptop cannot connect.' }, match: { ...row.match, user: chosen ? person : row.match.user, chosen: !!chosen }, machines: row.match.user || chosen ? [{ name: 'LAPTOP-01', model_id: 'Latitude 7450', match_type: 'Assigned', operational_status: 'Operational' }] : [] };
+    const named = row.id === 1 ? '\nPlease also help DUPONT Marie on LAPTOP-04, and one of the Lee Wong.\n' + Array.from({ length: 24 }, (_, i) => 'Line ' + i).join('\n') : '';
+    const analysis = row.id === 1 ? { machines: [{ name: 'LAPTOP-04', linked: false, model_id: 'Latitude 5440' }], people: [
+      { id: 9, full_name: 'Marie Dupont', written: 'DUPONT Marie', basis: 'name', user_name: 'X09', department: 'Equities', desks: [{ id: '04R019086', floor: 4 }], machines: [{ name: 'LAPTOP-09' }] },
+      { ambiguous: true, written: 'Lee Wong', basis: 'name', candidates: [{ id: 10, email: 'lee1@example.test' }, { id: 11, email: 'lee2@example.test' }] }] } : {};
+    const detail = { message: { ...row, body: '<script>window.mailExecuted=true</script>\nMy laptop cannot connect.' + named }, match: { ...row.match, user: chosen ? person : row.match.user, chosen: !!chosen }, machines: row.match.user || chosen ? [{ name: 'LAPTOP-01', model_id: 'Latitude 7450', match_type: 'Assigned', operational_status: 'Operational' }] : [], analysis };
     if (holdDetail) return new Promise(resolve => deferred = () => resolve(response(detail)));
     return response(detail);
   }});
@@ -61,10 +65,27 @@ const response = data => ({ ok: true, status: 200, json: async () => data });
   await sleep(150); assert.equal(requests.length, 0, 'Hidden inbox does not read mail');
   d.getElementById('workspace').classList.remove('active'); d.getElementById('inbox').classList.add('active');
   await until(() => d.querySelector('.inbox-devices strong'));
-  assert.equal(d.querySelector('.inbox-devices strong').textContent, 'LAPTOP-01');
+  assert.deepEqual([...d.querySelectorAll('.inbox-devices strong')].map(n => n.textContent), ['LAPTOP-04', 'LAPTOP-01'], 'Machines named in the message, then linked ones');
   assert.match(d.querySelector('[data-inbox-status]').textContent, /Watching Outlook/);
   assert(!d.querySelector('.inbox-body script')); assert(!w.mailExecuted);
-  d.querySelector('.inbox-person-card [data-slot=card-footer] button').click(); assert.equal(opened, 7);
+  // The message comes first; named machines and people are highlighted and open the request tools.
+  const sent = []; w.addEventListener('atlas:inbox-action', event => sent.push(event.detail));
+  assert(d.querySelector('.inbox-context').firstElementChild.classList.contains('inbox-message-card'), 'The message is the first card');
+  assert.deepEqual([...d.querySelectorAll('.inbox-body .inbox-entity')].map(e => [e.tagName, e.textContent]), [['BUTTON', 'DUPONT Marie'], ['BUTTON', 'LAPTOP-04'], ['MARK', 'Lee Wong']]);
+  d.querySelector('.inbox-body [data-entity="person"]').click(); d.querySelector('.inbox-body [data-entity="machine"]').click();
+  assert.deepEqual(sent.map(x => [x.action, x.user?.id, x.machine]), [['person', 9, undefined], ['target', 7, 'LAPTOP-04']]);
+  assert(d.querySelector('.inbox-body[data-collapsed]'), 'A long message starts collapsed');
+  [...d.querySelectorAll('.inbox-message-card button')].find(b => b.textContent === 'Show the whole message').click();
+  await until(() => !d.querySelector('.inbox-body[data-collapsed]'));
+  // Named people: details, desk, machines; a shared name lists its candidates.
+  const marie = d.querySelector('[data-named-person="Marie Dupont"]');
+  assert.match(marie.textContent, /written "DUPONT Marie"/); assert.match(marie.textContent, /X09 · Equities · Desk 04R019086/); assert.match(marie.textContent, /LAPTOP-09/);
+  assert.match(d.querySelector('[data-named-person="Lee Wong"]').textContent, /2 people share this name/);
+  [...d.querySelector('[data-named-person="Lee Wong"]').querySelectorAll('button')].find(b => b.textContent === 'lee2@example.test').click();
+  assert.deepEqual(sent.at(-1).user, { id: 11, email: 'lee2@example.test' });
+  const footer = [...d.querySelectorAll('.inbox-person-card [data-slot=card-footer] button')];
+  footer.find(b => b.textContent === 'Details').click(); assert.deepEqual([sent.at(-1).action, sent.at(-1).user.id], ['person', 7]);
+  footer.find(b => b.textContent.startsWith('Workspace')).click(); assert.equal(opened, 7);
   rows.push(two);
   await until(() => d.querySelectorAll('[data-mail-id]').length === 2);
   assert.equal(d.querySelector('[data-mail-id][aria-current]').getAttribute('data-mail-id'), '1', 'Arrival never changes a selected message');

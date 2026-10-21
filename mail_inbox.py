@@ -3,6 +3,7 @@ from contextlib import contextmanager
 from datetime import datetime
 import os
 from pathlib import Path
+import re
 import sqlite3
 
 from fastapi import HTTPException, Query
@@ -121,6 +122,96 @@ def mentioned_machines(connection, names):
     return [{key: value for key, value in row.items() if key != 'name_norm'} for row in rows]
 
 
+# People named in a message, as people write them: "Marie Dupont", "DUPONT Marie", "Dupont, Marie",
+# "Marie Dupont's laptop", "Bonjour Marie Dupont". Every two- and three-word window of capitalised
+# words is tried in both orders, so only names that exist in the directory come back.
+NAME_WORD = r"[A-ZÀ-Þ][A-Za-zÀ-ÿ'’-]*[A-Za-zÀ-ÿ]"
+NAME_RUN = re.compile(rf"{NAME_WORD}(?:(?:[ \t]+|,[ \t]*){NAME_WORD})+")
+PEOPLE = 8
+
+
+def name_candidates(text, limit=400):
+    """{directory name_norm: name as written}."""
+    found = {}
+    for run in NAME_RUN.finditer(text):
+        words = [re.sub(r"['’]s$", '', word) for word in re.split(r'[ \t]+|,[ \t]*', run.group(0)) if word]
+        for size in (3, 2):
+            for start in range(len(words) - size + 1):
+                window = words[start:start + size]
+                written = ' '.join(window)
+                variants = [window] if size == 3 else [window, window[::-1]]
+                for variant in variants:
+                    found.setdefault(' '.join(variant).lower(), written)
+                if size == 2:
+                    found.setdefault(f'{window[1]}, {window[0]}'.lower(), written)
+        if len(found) >= limit:
+            break
+    return found
+
+
+def operator_accounts():
+    """The Windows accounts running Atlas (x01426046_dsk is x01426046's admin account)."""
+    accounts = set()
+    for value in (os.environ.get('USERNAME'), os.environ.get('USER')):
+        value = str(value or '').rsplit('\\', 1)[-1].casefold()
+        if value:
+            accounts |= {value, re.sub(r'[_-](dsk|adm|admin|a)$', '', value)}
+    return accounts
+
+
+def people_desks(connection, people):
+    try:
+        from desk_directory import people_desks as desks
+        return desks(connection, people)
+    except (sqlite3.Error, KeyError, ValueError):
+        return {}
+
+
+def mentioned_people(connection, text, exclude=()):
+    """People the message names (full name, email address or account ID), in the order they are
+    written, with their linked machines. The sender and the Atlas operator are left out. A name
+    shared by several people is returned once with its candidates."""
+    from clipboard_history import ACCOUNT, EMAIL
+    exclude, operators = set(exclude), operator_accounts()
+    keep = lambda row: row['id'] not in exclude and str(row['user_name'] or '').casefold() not in operators
+    entries = {}
+
+    def add(rows, basis, written):
+        # A name that is also the sender's or the operator's (a signature, "Hi <operator>") means them.
+        if not rows or not all(keep(row) for row in rows):
+            return
+        position = text.find(written)
+        if len(rows) == 1:
+            key, entry = ('user', rows[0]['id']), {**person(rows[0]), 'written': written, 'basis': basis}
+        else:
+            key, entry = ('name', written.casefold()), {'ambiguous': True, 'written': written, 'basis': basis,
+                                                      'candidates': [person(row) for row in rows[:5]]}
+        # Listed in the order of their first mention, however they were written.
+        if key not in entries or 0 <= position < entries[key][0] or entries[key][0] < 0:
+            entries[key] = (position, entry)
+
+    for address in dict.fromkeys(EMAIL.findall(text)):
+        add(exact_users(connection, address, field='email'), 'email', address)
+    for account in dict.fromkeys(ACCOUNT.findall(text)):
+        add(exact_users(connection, account), 'account', account)
+    names = name_candidates(text)
+    rows = []
+    keys = list(names)
+    for start in range(0, len(keys), 400):
+        chunk = keys[start:start + 400]
+        rows += connection.execute(f"SELECT * FROM legacy_users WHERE name_norm IN ({','.join('?' * len(chunk))})", chunk).fetchall()
+    by_name = {}
+    for row in rows:
+        by_name.setdefault(row['name_norm'], []).append(row)
+    for key, matches in by_name.items():
+        add(matches, 'name', names[key])
+    people = [entry for _, entry in sorted(entries.values(), key=lambda item: (item[0] < 0, item[0]))][:PEOPLE]
+    for entry in people:
+        if not entry.get('ambiguous'):
+            entry['machines'] = linked_machines(connection, entry['id'])[:6]
+    return people
+
+
 def safely(load, label, warnings):
     # The request can still be read when the package share or knowledge store is unavailable.
     try:
@@ -194,6 +285,28 @@ def register(app, directory_connection, get_directory=mail_directory, packages=l
                 analysis = analyse(item.get('subject'), item.get('body'), packages=catalogue, documents=knowledge,
                                    find_machines=lambda names: mentioned_machines(connection, names),
                                    linked=[m.get('name') for m in machines])
+                from inbox_analysis import latest_text
+                sender = [match['user']['id']] if match['user'] else []
+                analysis['people'] = mentioned_people(connection, latest_text(item.get('subject'), item.get('body')), sender)
+                # Where the sender and the people named sit, from the floor plan.
+                known = [user for user in [match['user'], *analysis['people']] if user and not user.get('ambiguous')]
+                desks = people_desks(connection, known)
+                for user in known:
+                    user['desks'] = desks.get(user['canonical_key'], [])
         except sqlite3.Error as error:
             raise HTTPException(503, 'Atlas directory lookup is unavailable. Retry after the database is ready.') from error
         return {'message': item, 'match': match, 'machines': machines, 'analysis': {**analysis, 'warnings': warnings}}
+
+    @app.get('/api/inbox/person/{user_id}')
+    def person_detail(user_id: int):
+        """A person's directory record, linked machines and desk for the Live Inbox request tools."""
+        try:
+            with directory_connection() as connection:
+                row = connection.execute('SELECT * FROM legacy_users WHERE id=?', (user_id,)).fetchone()
+                if row is None:
+                    raise HTTPException(404, 'This person is no longer in the Atlas directory.')
+                user = dict(row)
+                return {'user': user, 'machines': linked_machines(connection, user_id),
+                        'desks': people_desks(connection, [person(row)]).get(user['canonical_key'], [])}
+        except sqlite3.Error as error:
+            raise HTTPException(503, 'Atlas directory lookup is unavailable. Retry after the database is ready.') from error

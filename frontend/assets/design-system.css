@@ -2581,7 +2581,7 @@ body.atlas-console .inbox-request-row { display:flex; flex-wrap:wrap; gap:4px; a
 body.atlas-console .inbox-request-row :is(input, select), body.atlas-console .inbox-request-target select { flex:1; min-width:140px; min-height:var(--atlas-control-height); padding:2px 6px; border:1px solid var(--atlas-line); border-radius:var(--atlas-control-radius); font:12px var(--atlas-font); background:var(--atlas-surface); }
 body.atlas-console .inbox-request-target { display:flex; flex-direction:row; align-items:center; justify-content:flex-start; gap:6px; font-size:12px; }
 /* The description is long; keep it under the title instead of squeezing the title. */
-body.atlas-console #liveInbox :is(.inbox-request-card, .screen-reader-text) [data-slot="card-header"] { grid-template-columns:minmax(0,1fr); }
+body.atlas-console #liveInbox :is(.inbox-request-card, .screen-reader-text, .inbox-message-card) [data-slot="card-header"] { grid-template-columns:minmax(0,1fr); }
 
 /* Read from screen (Live Inbox). */
 body.atlas-console .screen-reader { display:grid; gap:6px; border:1px solid var(--atlas-line); border-radius:var(--atlas-control-radius); padding:6px 8px; background:var(--atlas-surface); }
@@ -3236,11 +3236,11 @@ body.atlas-console .inbox-work-error { color:var(--atlas-danger-text); font-weig
 body.atlas-console .inbox-work-toolbar { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:4px 8px; }
 body.atlas-console .inbox-work-toolbar > span { display:flex; flex-wrap:wrap; gap:4px; }
 body.atlas-console .inbox-work-toolbar [aria-pressed="true"] { background:var(--atlas-selected); border-color:var(--atlas-accent); }
-body.atlas-console .inbox-work-tiles { display:grid; grid-template-columns:repeat(auto-fit,minmax(110px,1fr)); gap:6px; }
-body.atlas-console .inbox-work-tile { display:grid; gap:2px; padding:6px 8px; border:1px solid var(--atlas-line); border-left-width:3px; border-radius:var(--atlas-control-radius); min-width:0; }
+body.atlas-console .inbox-work-tiles { display:grid; grid-template-columns:repeat(auto-fit,minmax(96px,1fr)); gap:4px; }
+body.atlas-console .inbox-work-tile { display:grid; gap:1px; padding:3px 6px; border:1px solid var(--atlas-line); border-left-width:3px; border-radius:var(--atlas-control-radius); min-width:0; }
 body.atlas-console .inbox-work-tile small { color:var(--atlas-muted); font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.03em; }
-body.atlas-console .inbox-work-tile b { font-size:18px; line-height:1.2; }
-body.atlas-console .inbox-work-tile span { font-size:11px; color:var(--atlas-muted); overflow-wrap:anywhere; }
+body.atlas-console .inbox-work-tile b { font-size:14px; line-height:1.25; }
+body.atlas-console .inbox-work-tile span { font-size:11px; color:var(--atlas-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 body.atlas-console .inbox-work-tile[data-tone="good"] { border-left-color:var(--atlas-success); }
 body.atlas-console .inbox-work-tile[data-tone="warn"] { border-left-color:var(--atlas-warning); background:var(--atlas-warning-bg); }
 body.atlas-console .inbox-work-tile[data-tone="bad"] { border-left-color:var(--atlas-danger); background:var(--atlas-danger-bg); }
@@ -3262,7 +3262,6 @@ body.atlas-console .inbox-work-details summary { cursor:pointer; font-size:12px;
 body.atlas-console .inbox-work-details dl { display:grid; grid-template-columns:minmax(110px,auto) 1fr; gap:2px 8px; margin-top:4px; font-size:12px; }
 body.atlas-console .inbox-work-details dt { color:var(--atlas-muted); }
 body.atlas-console .inbox-work-details dd { margin:0; overflow-wrap:anywhere; }
-body.atlas-console .inbox-work-filter { display:flex; gap:4px; }
 body.atlas-console .inbox-work-filter input { flex:1; min-width:0; }
 body.atlas-console .inbox-work-groups { list-style:none; padding:0; max-height:46vh; overflow:auto; border:1px solid var(--atlas-line); border-radius:var(--atlas-control-radius); }
 body.atlas-console .inbox-work-groups li { display:grid; grid-template-columns:minmax(0,1fr) auto auto; align-items:center; gap:6px; padding:3px 6px; font-size:12px; }
@@ -3277,6 +3276,57 @@ body.atlas-console .inbox-return { position:fixed; left:50%; bottom:16px; z-inde
 body.atlas-console .inbox-return[hidden] { display:none; }
 @media(max-width:1280px) { body.atlas-console .inbox-grid:has(> .inbox-work:not([hidden])) { grid-template-columns:minmax(300px,.9fr) minmax(380px,1.1fr); } body.atlas-console .inbox-grid:has(> .inbox-work:not([hidden])) > .inbox-mail-list { display:none; } }
 @media(max-width:950px) { body.atlas-console .inbox-grid:has(> .inbox-work:not([hidden])) { grid-template-columns:minmax(0,1fr); } body.atlas-console .inbox-work { position:static; max-height:none; overflow:visible; } }
+/* Live Inbox header: status and Read from screen share a row; the collectors take the next. */
+body.atlas-console .live-inbox { display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px; }
+body.atlas-console .live-inbox > * { flex:1 1 100%; min-width:0; margin:0; }
+body.atlas-console .live-inbox > .inbox-error { order:0; }
+body.atlas-console .live-inbox > .inbox-toolbar { order:1; flex:1 1 440px; }
+body.atlas-console .live-inbox > .screen-reader { order:2; flex:0 1 auto; padding:3px 6px; }
+body.atlas-console .live-inbox > .screen-reader:has(.screen-reader-text) { flex-basis:100%; }
+body.atlas-console .live-inbox > .inbox-controls { order:3; }
+body.atlas-console .live-inbox > .inbox-grid { order:4; }
+@media(max-width:1700px) { body.atlas-console .screen-reader-bar > .inbox-muted { display:none; } }
+/* The message: long emails start folded; machines and people found in it are highlighted. */
+body.atlas-console #liveInbox .inbox-body[data-collapsed] { max-height:16em; overflow:hidden; -webkit-mask-image:linear-gradient(#000 70%,transparent); mask-image:linear-gradient(#000 70%,transparent); }
+body.atlas-console #liveInbox .inbox-entity { display:inline; height:auto; min-height:0; margin:0; padding:0 2px; border:0 !important; border-radius:3px; font:inherit; line-height:inherit; color:inherit !important; background:var(--atlas-selected) !important; box-shadow:inset 0 -2px var(--atlas-accent); cursor:pointer; }
+body.atlas-console #liveInbox .inbox-entity[data-entity] { font-weight:600; }
+body.atlas-console #liveInbox .inbox-entity[data-entity="person"] { background:var(--atlas-success-bg) !important; box-shadow:inset 0 -2px var(--atlas-success); }
+body.atlas-console #liveInbox mark.inbox-entity { background:var(--atlas-warning-bg) !important; box-shadow:inset 0 -2px var(--atlas-warning); cursor:help; }
+body.atlas-console #liveInbox .inbox-named-people { margin-top:6px; padding-top:6px; border-top:1px solid var(--atlas-line); }
+body.atlas-console #liveInbox .inbox-named-people h3 { margin:0 0 4px; font-size:12px; color:var(--atlas-muted); }
+body.atlas-console #liveInbox .inbox-named-people ul { display:grid; gap:6px; margin:0; padding:0; list-style:none; }
+body.atlas-console #liveInbox .inbox-named-people li > div:first-child { display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
+body.atlas-console #liveInbox .inbox-named-people p { margin:2px 0; }
+body.atlas-console #liveInbox .inbox-person-card [data-slot="card-footer"] { display:flex; flex-wrap:wrap; gap:4px; }
+/* Request tools: people and PCs of the request, lookup, person record, comparison, articles. */
+body.atlas-console .inbox-work-request { display:flex; flex-wrap:wrap; align-items:center; gap:4px; }
+body.atlas-console .inbox-work-request[hidden] { display:none; }
+body.atlas-console .inbox-work-request small { margin-right:2px; color:var(--atlas-muted); font-size:11px; }
+body.atlas-console .inbox-work .inbox-work-request button { min-height:22px; padding:1px 8px; border-radius:999px; font-size:11px; }
+body.atlas-console .inbox-work-request button[data-kind="machine"] { font-family:ui-monospace, Consolas, monospace; }
+body.atlas-console .inbox-work-request button[aria-pressed="true"] { background:var(--atlas-selected); border-color:var(--atlas-accent); font-weight:600; }
+body.atlas-console :is(.inbox-work-lookup,.inbox-work-filter) { display:flex; gap:4px; }
+body.atlas-console .inbox-work-lookup input { flex:1; min-width:0; }
+body.atlas-console .inbox-work-results { display:grid; gap:2px; max-height:220px; overflow:auto; padding:4px; border:1px solid var(--atlas-line); border-radius:var(--atlas-control-radius); }
+body.atlas-console .inbox-work-results[hidden] { display:none; }
+body.atlas-console #inboxWork .inbox-work-results button { display:flex; justify-content:space-between; align-items:baseline; gap:8px; width:100%; text-align:left; }
+body.atlas-console .inbox-work-results small { color:var(--atlas-muted); overflow-wrap:anywhere; }
+body.atlas-console .inbox-work-record { display:grid; grid-template-columns:minmax(90px,auto) minmax(0,1fr); gap:2px 8px; font-size:12px; }
+body.atlas-console .inbox-work-record dt { color:var(--atlas-muted); }
+body.atlas-console .inbox-work-record dd { margin:0; overflow-wrap:anywhere; }
+body.atlas-console .inbox-work-machines { margin:0; padding:0; list-style:none; border:1px solid var(--atlas-line); border-radius:var(--atlas-control-radius); }
+body.atlas-console .inbox-work-machines li { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:4px 8px; padding:4px 6px; font-size:12px; }
+body.atlas-console .inbox-work-machines li + li { border-top:1px solid var(--atlas-line); }
+body.atlas-console .inbox-work-machines li[aria-current="true"] { background:var(--atlas-selected); box-shadow:inset 2px 0 var(--atlas-accent); }
+body.atlas-console .inbox-work-machines li > span:first-child { display:grid; min-width:0; }
+body.atlas-console .inbox-work-machines li > span:last-child { display:flex; flex-wrap:wrap; gap:4px; }
+body.atlas-console .inbox-work-machines small { color:var(--atlas-muted); font-size:11px; }
+body.atlas-console .inbox-work-compare { display:flex; flex-wrap:wrap; align-items:center; gap:4px; padding:6px; border:1px dashed var(--atlas-line); border-radius:var(--atlas-control-radius); }
+body.atlas-console .inbox-work-compare input { flex:1 1 140px; min-width:0; }
+body.atlas-console .inbox-work-groups[data-compare="missing"] li > span:first-child { color:var(--atlas-danger-text); font-weight:600; }
+body.atlas-console .inbox-work-article { font-size:12px; line-height:1.5; overflow-wrap:anywhere; }
+body.atlas-console .inbox-work-article :is(h1,h2,h3,h4) { margin:8px 0 4px; font-size:13px; }
+body.atlas-console .inbox-work-article :is(ul,ol) { padding-left:18px; }
 /* dark-auto:start (generated by tools/build_dark_overrides.py; do not edit) */
 :where(html[data-theme="dark"]) .atlas-person .avatar{background:var(--atlas-selected)}
 :where(html[data-theme="dark"]) .atlas-person-detail-sections > section{background:var(--atlas-surface)}

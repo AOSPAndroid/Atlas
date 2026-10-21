@@ -6,31 +6,64 @@ sender lookup, candidate selection and linked-machine panel. Open in Workspace
 selects the matched person in the existing Atlas tools. Messages never launch
 diagnostics, deployments or fixes automatically.
 
+## The message, and the people in it
+
+The selected message comes first: subject, sender and the email itself (long emails
+are folded; **Show the whole message** opens them). Machines and people Atlas finds in
+it are highlighted: click a PC to check it, or a person to open their record.
+
+**People** shows the sender and everyone **named in the message**, found in the
+newest part of the email (quoted earlier replies are ignored):
+
+- full names as people write them: "Marie Dupont", "DUPONT Marie", "Dupont, Marie",
+  "Marie Dupont's laptop", "Bonjour Marie Dupont";
+- email addresses and account IDs (X01426046).
+
+Only names that exist in the Atlas directory are listed, with their account,
+department, desk and PCs. A name shared by several people shows each of them to
+choose from. The sender (their signature) and you (the Windows account running
+Atlas, with or without its `_dsk` suffix) are left out. The PCs of the people named
+are offered in the Request card's **Machine** list after the sender's, labelled with
+their owner, so "install Visio for Marie" can go to Marie's laptop.
+
 ## Request tools: everything beside the message
 
-**Select**, **Health** and **Groups** on a machine, the **Suggested checks** and the
-package buttons open a third column next to the message, so the email, the sender
-and the results stay on screen. It works on that machine and sender, and the
-machine becomes Atlas's current target (Workspace and Remote Admin follow it):
+**Details**, **Select**, **Health**, **Groups**, the **Suggested checks**, the package
+buttons, Knowledge Base articles and the highlights open a third column next to the
+message, so the email, the people and the results stay on screen. The PC there
+becomes Atlas's current target (Workspace and Remote Admin follow it).
 
+- **In this request**: the sender, the people named and every PC mentioned or linked,
+  one click each. A PC brings its owner; a person brings their own PC.
+- **Look up anyone**: name, account, email or PC name, for requests about someone
+  who is not in the email.
+- **Person**: the directory record (account, email, department, job role, location,
+  manager, start date, last login), the desk from the floor plan, and every device
+  with **Health**, **Performance** and **Deploy** for each PC. **Copy summary** copies
+  it all.
 - **Health**: ping, C$, WMI, CPU, RAM, GPU, C: space and uptime. **Select** runs the
   quick checks; **Health** scans everything.
 - **Performance**: one sample of CPU, memory, C: free space, disk latency and
   uptime, what stands out, and the 12 busiest processes by CPU or memory.
   **End…** stops a process after you confirm. **Remote Admin ↗** opens the full
-  view (threads, services, GPU).
+  view (threads, GPU).
 - **PC groups** and **User groups**: the AD account first (disabled, locked out,
   password or account expired), then the groups, direct before primary before
-  nested, with a filter and **Copy names**. **Compare in Active Directory ↗**
-  opens the full page to compare with colleagues.
+  nested, with a filter and **Copy names**. **Compare with** a colleague (the other
+  people in the request are offered, or type an account) lists the groups they have
+  and this person lacks, ready to copy: "same access as…" requests in one step.
 - **Deploy**: the Workspace deployment panel itself (package, Install, Repair or
   Uninstall, script, Advanced, Add to queue, progress and log). It goes back to
   Workspace when you close the tools or leave Live Inbox, with your choices kept.
-- **MSRA**, **C$**, **Remote Desktop**, **Computer Management** and **Reboot…**
-  (with its confirmation) at the top; **Workspace ↗** opens the person and machine
-  there.
+- **Knowledge**: Knowledge Base articles suggested for the request (or under Seen
+  before) open here, formatted, with **Copy text**. Diagrams open in the diagram
+  viewer.
+- **MSRA**, **C$**, **Remote Desktop**, **Computer Management**, **Software…**
+  (installed applications, uninstall and repair), **Services…** (start, stop,
+  restart), **Specs** and **Reboot…** (with its confirmation) at the top;
+  **Workspace ↗** opens the person and PC there.
 
-When a Live Inbox button opens another page (Knowledge Base, Workspace, Active
+When a Live Inbox button opens another page (a diagram, Workspace, Active
 Directory, Remote Admin), a **Back to Live Inbox** button appears at the bottom.
 On screens narrower than 1280 pixels the message list hides while the tools are
 open; close them (×) to see it again.
