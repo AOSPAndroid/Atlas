@@ -23,7 +23,7 @@ const people = { 7: { user: { ...person, department: 'Client Services', location
   9: { user: marie, machines: marie.machines, desks: [] }, 8: { user: { id: 8, full_name: 'Sam Lee', user_name: 'INBOX1' }, machines: [], desks: [] } };
 
 (async () => {
-  const calls = [];
+  const calls = [], pendingLookups = new Map();
   const f = await fixture({ fetch: async (url, options = {}) => {
     url = String(url); const method = options.method || 'GET', body = options.body ? JSON.parse(options.body) : null;
     calls.push({ url, method, body });
@@ -36,6 +36,7 @@ const people = { 7: { user: { ...person, department: 'Client Services', location
     if (url.startsWith('/api/performance/LAPTOP-01?kind=overview')) return response(sample);
     if (url === '/api/active-directory/lookup') return response(ad(body.kind, body.identity));
     if (url.startsWith('/api/inbox/person/')) return response(people[url.split('/').at(-1)]);
+    if (url.startsWith('/api/search?term=') && pendingLookups.has(decodeURIComponent(url.split('term=')[1]))) return pendingLookups.get(decodeURIComponent(url.split('term=')[1]));
     if (url.startsWith('/api/search?term=')) return response(url.endsWith('=sam') ? { users: [{ id: 8, full_name: 'Sam Lee', user_name: 'INBOX1' }, { id: 12, full_name: 'Sam Green', user_name: 'X12' }], machines: [] }
       : url.endsWith('=laptop-09') ? { users: [], machines: [{ name: 'LAPTOP-09', windows_remote_supported: 1 }] } : { users: [], machines: [] });
     if (url === '/api/knowledge/articles/visio') return response({ id: 'visio', title: 'Visio requests', tags: ['software'], markdown: '## Steps\n1. Check the licence group.' });
@@ -186,6 +187,66 @@ const people = { 7: { user: { ...person, department: 'Client Services', location
   await until(() => /Sam Lee/.test(d.querySelector('[data-work-title]').textContent), 'picked person');
   find('laptop-09');
   await until(() => w.AtlasInboxWork.state().machine === 'LAPTOP-09' && w.AtlasInboxWork.state().tab === 'health', 'single PC opens');
+
+  // Late lookup responses cannot replace a newer result or an explicit context change.
+  const deferredLookup = term => {
+    let finish;
+    pendingLookups.set(term, new Promise(resolve => { finish = (data, status = 200) => resolve(response(data, status)); }));
+    find(term);
+    return finish;
+  };
+  const obsoletePc = { users: [], machines: [{ name: 'OBSOLETE-PC', windows_remote_supported: 1 }] };
+  const results = d.querySelector('[data-work-results]');
+  const oldSuccess = deferredLookup('old-success');
+  const oldFailure = deferredLookup('old-failure');
+  const latest = deferredLookup('latest');
+  oldSuccess(obsoletePc); oldFailure({ detail: 'OBSOLETE LOOKUP FAILURE' }, 503);
+  await sleep(30);
+  assert.equal(results.getAttribute('aria-busy'), 'true', 'Obsolete completions cannot finish the latest loading state');
+  assert(!results.textContent.includes('OBSOLETE'));
+  latest({ users: [], machines: [{ name: 'LAPTOP-09', windows_remote_supported: 1 }] });
+  await until(() => results.hidden, 'latest lookup opens its PC');
+  assert.equal(w.AtlasInboxWork.state().machine, 'LAPTOP-09');
+
+  const afterLatest = deferredLookup('after-latest');
+  find('laptop-09');
+  await until(() => results.hidden, 'newer PC result selected');
+  afterLatest(obsoletePc); await sleep(30);
+  assert.equal(w.AtlasInboxWork.state().machine, 'LAPTOP-09', 'An older response completing after the latest result cannot replace its PC');
+
+  const beforeManualChoice = deferredLookup('before-manual-choice');
+  d.querySelector('[data-work-person="1"]').click();
+  await until(() => w.AtlasInboxWork.state().user === 9, 'manual request person');
+  beforeManualChoice(obsoletePc); await sleep(30);
+  assert.deepEqual([w.AtlasInboxWork.state().user, w.AtlasInboxWork.state().machine], [9, 'LAPTOP-09'], 'An earlier search cannot replace a manually chosen person and their PC');
+
+  for (const selector of ['[data-work-person="1"]', '[data-work-machine="1"]']) {
+    const beforeSameChoice = deferredLookup('before-same-' + selector);
+    d.querySelector(selector).click();
+    beforeSameChoice(obsoletePc); await sleep(30);
+    assert.deepEqual([w.AtlasInboxWork.state().user, w.AtlasInboxWork.state().machine], [9, 'LAPTOP-09'], 'Explicitly choosing the current person or PC also cancels pending lookup');
+  }
+
+  const beforeClear = deferredLookup('before-clear');
+  find(''); beforeClear(obsoletePc); await sleep(30);
+  assert(results.hidden && !results.hasAttribute('aria-busy'), 'Clearing lookup invalidates pending results');
+  assert.equal(w.AtlasInboxWork.state().machine, 'LAPTOP-09');
+
+  const beforeMessage = deferredLookup('before-message');
+  w.dispatchEvent(new w.CustomEvent('atlas:inbox-detail', { detail: { message: { id: 200 }, match: { user: marie }, analysis: {} } }));
+  beforeMessage(obsoletePc); await sleep(30);
+  assert(results.hidden);
+  assert.equal(w.AtlasInboxWork.state().machine, 'LAPTOP-09', 'An earlier message lookup cannot replace the current selection');
+
+  const beforeClose = deferredLookup('before-close');
+  d.querySelector('[data-work-close]').click();
+  beforeClose(obsoletePc); await sleep(30);
+  assert(work().hidden, 'An obsolete lookup cannot reopen closed tools');
+  w.AtlasInboxWork.open({ user: marie, machine: 'LAPTOP-09' }, 'person');
+  const beforeLeaving = deferredLookup('before-leaving');
+  run("page('workspace');page('inbox')");
+  beforeLeaving(obsoletePc); await sleep(30);
+  assert.equal(w.AtlasInboxWork.state().machine, 'LAPTOP-09', 'Leaving and returning cannot revive an obsolete lookup');
 
   // PC tools that open over Live Inbox.
   const opened = []; w.AtlasSoftware.load = pc => opened.push(['software', pc]); w.AtlasServices = { load: () => opened.push(['services', run('S.target')]) }; w.AtlasHealth.specs = pc => opened.push(['specs', pc]);

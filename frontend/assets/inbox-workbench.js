@@ -27,7 +27,7 @@
   const MEMBERSHIP = { Direct: 0, Primary: 1, Nested: 2 };
   const state = { machine: "", user: null, tab: "health", done: {}, performance: null, groups: {}, docked: false,
     request: null, person: null, document: "", article: null, results: null };
-  let dock = null, home = null, back = null, inboxClick = false;
+  let dock = null, home = null, back = null, inboxClick = false, lookupGeneration = 0;
 
   const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   const account = (user) => user?.user_name || user?.email || "";
@@ -91,6 +91,7 @@ ${TABS.map(([id]) => `<section class="inbox-work-pane" role="tabpanel" id="inbox
   }
 
   function use(machine, user) {
+    invalidateLookup();
     if (machine !== state.machine) {
       const host = dock.querySelector("[data-work-health]");
       if (host) window.AtlasHealth?.cancel(host);
@@ -392,8 +393,18 @@ ${missing.length ? groupList(missing).replace('class="inbox-work-groups"', 'clas
     }
   }
 
-  // Anyone in Atlas: one match opens directly, several are listed.
+  function invalidateLookup() {
+    lookupGeneration++;
+    state.results = null;
+    const host = dock?.querySelector("[data-work-results]");
+    if (host) { host.hidden = true; host.removeAttribute("aria-busy"); }
+  }
+
+  // Anyone in Atlas: only the latest lookup in the current request can select a result.
   async function lookup(term) {
+    invalidateLookup();
+    const generation = lookupGeneration;
+    const current = () => generation === lookupGeneration && !dock.hidden && inbox()?.classList.contains("active");
     term = String(term || "").trim();
     const host = dock.querySelector("[data-work-results]");
     if (!term) { host.hidden = true; return; }
@@ -401,6 +412,7 @@ ${missing.length ? groupList(missing).replace('class="inbox-work-groups"', 'clas
     busy(host, `Looking up ${term}…`);
     try {
       const result = await window.AtlasClient.request("/api/search?term=" + encodeURIComponent(term));
+      if (!current()) return;
       const users = (result.users || []).slice(0, 8), machines = (result.machines || []).slice(0, 8);
       state.results = { users, machines };
       if (users.length + machines.length === 1) {
@@ -411,9 +423,10 @@ ${missing.length ? groupList(missing).replace('class="inbox-work-groups"', 'clas
         ? `${users.map((u, i) => `<button type="button" data-work-pick-user="${i}"><b>${esc(fullName(u))}</b><small>${esc([u.user_name, u.email, u.department].filter(Boolean).join(" · "))}</small></button>`).join("")}${machines.map((m, i) => `<button type="button" data-work-pick-machine="${i}"><b>${esc(machineName(m))}</b><small>${esc([m.device_kind, m.model_id].filter(Boolean).join(" · "))}</small></button>`).join("")}${(result.users || []).length + (result.machines || []).length > users.length + machines.length ? '<p class="inbox-work-muted">More matches: refine the search.</p>' : ""}`
         : `<p class="inbox-work-muted">Nobody and no PC in Atlas matches "${esc(term)}".</p>`;
     } catch (error) {
+      if (!current()) return;
       host.innerHTML = `<p class="inbox-work-error" role="alert">${esc(error.message)}</p>`;
     } finally {
-      host.removeAttribute("aria-busy");
+      if (current()) host.removeAttribute("aria-busy");
     }
   }
 
@@ -438,6 +451,7 @@ ${missing.length ? groupList(missing).replace('class="inbox-work-groups"', 'clas
   }
 
   function close() {
+    invalidateLookup();
     undock();
     state.docked = false;
     const host = dock.querySelector("[data-work-health]");
@@ -503,6 +517,7 @@ ${missing.length ? groupList(missing).replace('class="inbox-work-groups"', 'clas
 
   // The message on screen in Live Inbox (sent by live-inbox.jsx), for "In this request".
   window.addEventListener("atlas:inbox-detail", (event) => {
+    if (event.detail?.message?.id !== state.request?.message?.id) invalidateLookup();
     state.request = event.detail;
     renderRequest();
   });
@@ -533,7 +548,7 @@ ${missing.length ? groupList(missing).replace('class="inbox-work-groups"', 'clas
   window.page = function (id) {
     const leaving = id !== "inbox" && !!inbox()?.classList.contains("active");
     // Back in Workspace before the switch, so the panel is never hidden with a package half chosen.
-    if (leaving) undock(false);
+    if (leaving) { invalidateLookup(); undock(false); }
     const result = original.apply(this, arguments);
     if (id === "inbox") {
       returnButton(false);
