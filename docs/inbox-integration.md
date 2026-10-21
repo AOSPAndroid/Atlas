@@ -55,6 +55,15 @@ becomes Atlas's current target (Workspace and Remote Admin follow it).
   100 Mbps: check the cable or the dock"). Choose 1 to 30 days of events; **Copy** gives
   a summary for the ticket. A part the PC refuses (for example no Software Center) is
   listed under **Not checked**; the rest still shows.
+
+  It is light on the PC: event logs and installed updates are read through the PC's Event
+  Log service, filtered there by event, date and a maximum count, rather than record by
+  record through WMI (which can keep "WMI Provider Host" busy for many seconds). If the PC
+  does not allow remote event log reading, its events are read through WMI for the last 7
+  days only, and installed updates wait for **Read installed updates** (the slower hotfix
+  list). Atlas keeps each check-up for 10 minutes ("4 min ago, saved"): coming back to the
+  PC, switching tabs or opening it from the clipboard never asks the PC again; **Check
+  again** does.
 - **Performance**: one sample of CPU, memory, C: free space, disk latency and
   uptime, what stands out, and the 12 busiest processes by CPU or memory.
   **End…** stops a process after you confirm. **Remote Admin ↗** opens the full

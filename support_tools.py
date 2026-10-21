@@ -24,6 +24,9 @@ from pydantic import BaseModel, ConfigDict, Field
 
 SCRIPT = Path(__file__).parent / 'scripts' / 'support_diagnose.ps1'
 ACTIVE, LOCK = set(), threading.Lock()
+# A check-up is kept for this long: reopening the tools or switching tabs never asks the PC again.
+CACHE_SECONDS = 600
+CACHE = {}
 TEXT = r'^[^\x00-\x09\x0b-\x1f]*$'  # Printable text and line breaks.
 SERVER = r'^(?:[A-Za-z0-9_]+(?:[.-][A-Za-z0-9_]+)*)?$'  # A domain or controller name, or empty.
 
@@ -172,16 +175,23 @@ def run_ad(wmi, body, script, what):
     return result
 
 
-def diagnose(wmi, pc, days=7):
+def diagnose(wmi, pc, days=7, updates=False, fresh=False):
+    """The PC check-up, from the cache when one is less than CACHE_SECONDS old (unless fresh). A
+    cached check-up that read the hotfix list also answers a request without it."""
     pc = wmi.validate_pc(pc)
     with LOCK:
+        if not fresh:
+            for key in ((pc, days, True), (pc, days, bool(updates))):
+                saved = CACHE.get(key)
+                if saved and time.monotonic() - saved[0] < CACHE_SECONDS:
+                    return {**saved[1], 'cached': True, 'age_seconds': round(time.monotonic() - saved[0])}
         if pc in ACTIVE:
             raise HTTPException(429, f'A check-up of {pc} is already running.')
         ACTIVE.add(pc)
     started = time.monotonic()
     try:
         args = ['powershell.exe', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', str(SCRIPT),
-                '-Computer', pc, '-Days', str(int(days))]
+                '-Computer', pc, '-Days', str(int(days)), *(['-Updates'] if updates else [])]
         result = json.loads(wmi.run(args, timeout=90).stdout)
         if not isinstance(result, dict):
             raise ValueError('Invalid check-up result')
@@ -191,7 +201,11 @@ def diagnose(wmi, pc, days=7):
         network = result.get('network')
         result['network'] = [network] if isinstance(network, dict) else network or []
         result['duration_ms'] = round((time.monotonic() - started) * 1000)
-        return result
+        with LOCK:
+            CACHE[(pc, days, bool(updates))] = (time.monotonic(), result)
+            for key in [key for key, (at, _) in CACHE.items() if time.monotonic() - at >= CACHE_SECONDS]:
+                del CACHE[key]
+        return {**result, 'cached': False, 'age_seconds': 0}
     except subprocess.TimeoutExpired as error:
         raise HTTPException(504, f'{pc} did not answer within 90 seconds.') from error
     except HTTPException:
@@ -220,8 +234,8 @@ def register(app, wmi, check_token, notes_path=None):
             return ''
 
     @app.get('/api/diagnose/{pc}')
-    def check_up(pc: str, days: int = Query(7, ge=1, le=30)):
-        return diagnose(wmi, pc, days)
+    def check_up(pc: str, days: int = Query(7, ge=1, le=30), updates: bool = False, fresh: bool = False):
+        return diagnose(wmi, pc, days, updates, fresh)
 
     @app.post('/api/support/message')
     def message(body: Message, request: Request):

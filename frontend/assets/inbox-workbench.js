@@ -439,14 +439,16 @@ ${deployments.length ? `<div class="inbox-work-toolbar"><b>Recent deployments to
 
   // One-click check-up (scripts/support_diagnose.ps1): who is signed in, uptime, crashes and blue
   // screens, a pending restart, the last updates and the network, with what stands out first.
-  async function checkup() {
-    const host = pane("checkup"), pc = state.machine, days = state.checkupDays || 7, key = pc + ":" + days;
+  // Atlas keeps a check-up for 10 minutes, so coming back to a PC shows it without asking the PC
+  // again; Check again (fresh) and Read installed updates (updates) do ask it.
+  async function checkup({ fresh = false, updates = false } = {}) {
+    const host = pane("checkup"), pc = state.machine, days = state.checkupDays || 7, key = [pc, days, fresh, updates].join(":");
     state.done.checkup = pc;
-    busy(host, `Checking ${pc}: sign-ins, crashes, pending restart, updates and network… up to a minute.`);
+    busy(host, `Checking ${pc}: sign-ins, crashes, pending restart, updates and network… usually 5 to 20 seconds.`);
     // Switching PC and back while it runs waits for the same check-up instead of starting a second.
     let run = checkups.get(key);
     if (!run) {
-      run = window.AtlasClient.request(`/api/diagnose/${encodeURIComponent(pc)}?days=${days}`);
+      run = window.AtlasClient.request(`/api/diagnose/${encodeURIComponent(pc)}?` + new URLSearchParams({ days, ...(fresh ? { fresh: 1 } : {}), ...(updates ? { updates: 1 } : {}) }));
       checkups.set(key, run);
       run.finally(() => checkups.delete(key)).catch(() => {});
     }
@@ -456,7 +458,7 @@ ${deployments.length ? `<div class="inbox-work-toolbar"><b>Recent deployments to
       state.checkup = { pc, data };
       renderCheckup();
       const found = findings(data);
-      logWork(`Check-up of ${pc} (${plural(data.days, "day")}): ${found.length ? found.map(([, text]) => text).join("; ") : "nothing stands out"}`);
+      if (!data.cached && !updates) logWork(`Check-up of ${pc} (${plural(data.events?.days || data.days, "day")}): ${found.length ? found.map(([, text]) => text).join("; ") : "nothing stands out"}`);
     } catch (error) {
       if (state.machine !== pc || state.done.checkup !== pc) return;
       delete state.done.checkup;
@@ -472,7 +474,7 @@ ${deployments.length ? `<div class="inbox-work-toolbar"><b>Recent deployments to
 
   function findings(data) {
     const out = [], session = data.session || {}, events = data.events || {}, restart = data.pending_reboot || {}, updates = data.updates || {};
-    const network = list(data.network), period = `in ${plural(data.days, "day")}`;
+    const network = list(data.network), period = `in ${plural(events.days || data.days, "day")}`;
     if (restart.pending) out.push(["bad", `Restart pending: ${list(restart.reasons).join(", ")}`]);
     if (number(session.uptime_hours) >= 7 * 24) out.push(["warn", `Not restarted for ${Math.floor(session.uptime_hours / 24)} days`]);
     if (events.bluescreens?.count) out.push(["bad", `${plural(events.bluescreens.count, "blue screen")} ${period}`]);
@@ -498,13 +500,17 @@ ${deployments.length ? `<div class="inbox-work-toolbar"><b>Recent deployments to
       ["Uptime", uptime === null ? "–" : uptime < 48 ? Math.round(uptime) + " h" : Math.floor(uptime / 24) + " days", session.last_boot ? "Since " + new Date(session.last_boot).toLocaleString([], { dateStyle: "short", timeStyle: "short" }) : "", uptime === null ? "" : uptime >= 7 * 24 ? "warn" : "good"],
       ["Restart", data.pending_reboot ? (restart.pending ? "Pending" : "Not needed") : "–", list(restart.reasons).join(", "), data.pending_reboot ? (restart.pending ? "bad" : "good") : ""],
       ["Crashes", data.events ? String(crashes) : "–", data.events ? `${plural(events.bluescreens?.count || 0, "blue screen")} · ${events.unexpected_shutdowns?.count || 0} unexpected off` : "", data.events ? (events.bluescreens?.count ? "bad" : crashes ? "warn" : "good") : ""],
-      ["Updates", updates.last_installed ? day(updates.last_installed) : "–", data.updates ? `${updates.last_30_days || 0} in the last 30 days` : "", updates.last_installed ? (Date.now() - Date.parse(updates.last_installed) > 45 * 86400000 ? "warn" : "good") : ""],
+      updates.skipped ? ["Updates", "Not read", "Read installed updates below", ""]
+        : ["Updates", updates.last_installed ? day(updates.last_installed) : "–", data.updates ? `${updates.last_30_days || 0} in the last 30 days` : "", updates.last_installed ? (Date.now() - Date.parse(updates.last_installed) > 45 * 86400000 ? "warn" : "good") : ""],
     ];
-    host.innerHTML = `<div class="inbox-work-toolbar"><small>${esc(pc)} · checked ${esc(clock(data.checked_at || Date.now()))}${data.duration_ms ? " in " + Math.round(data.duration_ms / 1000) + " s" : ""}</small><span><label>Last <select data-work-checkup-days aria-label="Events from the last">${[1, 3, 7, 14, 30].map((n) => `<option value="${n}"${n === data.days ? " selected" : ""}>${plural(n, "day")}</option>`).join("")}</select></label><button type="button" data-work-rescan>Check again</button><button type="button" data-work-checkup-copy>Copy</button></span></div>
+    const age = data.cached ? Math.max(1, Math.round((data.age_seconds || 0) / 60)) : 0;
+    host.innerHTML = `<div class="inbox-work-toolbar"><small title="${data.cached ? "Saved by Atlas for 10 minutes; Check again asks the PC" : ""}">${esc(pc)} · checked ${esc(clock(data.checked_at || Date.now()))}${data.cached ? ` · ${age} min ago, saved` : data.duration_ms ? " in " + Math.round(data.duration_ms / 1000) + " s" : ""}</small><span><label>Last <select data-work-checkup-days aria-label="Events from the last">${[1, 3, 7, 14, 30].map((n) => `<option value="${n}"${n === data.days ? " selected" : ""}>${plural(n, "day")}</option>`).join("")}</select></label><button type="button" data-work-checkup-again title="Ask the PC again">Check again</button><button type="button" data-work-checkup-copy>Copy</button></span></div>
 <div class="inbox-work-tiles">${tiles.map(([label, value, detail, level]) => `<div class="inbox-work-tile" data-tone="${level}" title="${esc(detail)}"><small>${esc(label)}</small><b>${esc(value)}</b><span>${esc(detail)}</span></div>`).join("")}</div>
 ${found.length ? `<ul class="inbox-work-findings" aria-label="What stands out">${found.map(([level, text]) => `<li data-tone="${level}">${esc(text)}</li>`).join("")}</ul>` : '<p class="inbox-work-chips"><span data-tone="good">Nothing stands out</span></p>'}
 ${restart.pending ? '<div class="inbox-work-toolbar"><small>A restart finishes installing what is waiting.</small><span><button type="button" data-work-act="restart">Restart later…</button><button type="button" data-work-act="message">Message…</button></span></div>' : ""}
-${apps.length ? `<table class="inbox-work-processes inbox-work-apps"><thead><tr><th scope="col">Application</th><th scope="col">Crashes</th><th scope="col">Hangs</th><th scope="col">Last</th></tr></thead><tbody>${apps.map((app) => `<tr><td title="${esc(app.app)}">${esc(app.app || "Unknown")}</td><td data-tone="${app.crashes >= 3 ? "bad" : app.crashes ? "warn" : ""}">${esc(app.crashes)}</td><td data-tone="${app.hangs >= 3 ? "warn" : ""}">${esc(app.hangs)}</td><td>${esc(day(app.last))}</td></tr>`).join("")}</tbody></table>` : data.events ? `<p class="inbox-work-muted">No application crash or hang in the last ${plural(data.days, "day")}.</p>` : ""}
+${events.source === "wmi" ? `<p class="inbox-work-muted">This PC does not allow remote event log reading, so its events were read through WMI: last ${plural(events.days, "day")} only.</p>` : ""}
+${updates.skipped ? '<div class="inbox-work-toolbar"><small>Installed updates were not read: on this PC that means the slower hotfix list.</small><button type="button" data-work-checkup-updates>Read installed updates</button></div>' : ""}
+${apps.length ? `<table class="inbox-work-processes inbox-work-apps"><thead><tr><th scope="col">Application</th><th scope="col">Crashes</th><th scope="col">Hangs</th><th scope="col">Last</th></tr></thead><tbody>${apps.map((app) => `<tr><td title="${esc(app.app)}">${esc(app.app || "Unknown")}</td><td data-tone="${app.crashes >= 3 ? "bad" : app.crashes ? "warn" : ""}">${esc(app.crashes)}</td><td data-tone="${app.hangs >= 3 ? "warn" : ""}">${esc(app.hangs)}</td><td>${esc(day(app.last))}</td></tr>`).join("")}</tbody></table>` : data.events ? `<p class="inbox-work-muted">No application crash or hang in the last ${plural(events.days || data.days, "day")}.</p>` : ""}
 ${network.length ? `<div class="inbox-work-toolbar"><b>Network (${network.length})</b></div><ul class="inbox-work-machines inbox-work-network">${network.map((adapter) => `<li><span><b>${esc(adapter.name)}</b><small>${esc(list(adapter.ip).filter((ip) => !ip.includes(":")).join(", ") || list(adapter.ip).join(", "))} · ${adapter.dhcp ? "DHCP" : "Static"}${adapter.suffix ? " · " + esc(adapter.suffix) : ""}</small><small>Gateway ${esc(list(adapter.gateway).join(", ") || "none")} · DNS ${esc(list(adapter.dns).join(", ") || "none")}</small></span><span><small>${number(adapter.speed_mbps) === null ? "" : esc(adapter.speed_mbps >= 1000 ? adapter.speed_mbps / 1000 + " Gbps" : adapter.speed_mbps + " Mbps")}</small><small>${esc(adapter.mac)}</small></span></li>`).join("")}</ul>` : ""}
 ${list(updates.recent).length ? `<details class="inbox-work-details"><summary>Latest updates (${list(updates.recent).length})</summary><dl>${list(updates.recent).map((update) => `<dt>${esc(update.kb)}</dt><dd>${esc(day(update.installed))} · ${esc(update.description)}</dd>`).join("")}</dl></details>` : ""}
 ${list(data.errors).length ? `<details class="inbox-work-details"><summary>Not checked (${list(data.errors).length})</summary><ul class="inbox-work-notes">${list(data.errors).map((text) => `<li>${esc(text)}</li>`).join("")}</ul></details>` : ""}`;
@@ -512,7 +518,7 @@ ${list(data.errors).length ? `<details class="inbox-work-details"><summary>Not c
 
   function checkupText() {
     const { pc, data } = state.checkup, session = data.session || {}, found = findings(data);
-    return [`Check-up of ${pc}, ${new Date(data.checked_at || Date.now()).toLocaleString()} (last ${plural(data.days, "day")})`,
+    return [`Check-up of ${pc}, ${new Date(data.checked_at || Date.now()).toLocaleString()} (last ${plural(data.events?.days || data.days, "day")})`,
       session.console_user ? "Signed in: " + session.console_user : "", number(session.uptime_hours) === null ? "" : `Uptime: ${Math.floor(session.uptime_hours / 24)} days ${Math.round(session.uptime_hours % 24)} h`,
       ...(found.length ? found.map(([, text]) => "- " + text) : ["Nothing stands out."])].filter(Boolean).join("\n");
   }
@@ -987,6 +993,8 @@ ${keys.length ? `<ul class="inbox-work-keys">${keys.map((key, i) => `<li data-ke
       return copy(key.password, "Recovery key");
     }
     if ("workCheckupCopy" in data) return copy(checkupText(), "Check-up");
+    if ("workCheckupAgain" in data) return checkup({ fresh: true });
+    if ("workCheckupUpdates" in data) return checkup({ updates: true });
     if (data.workOpenMessage) return window.dispatchEvent(new CustomEvent("atlas:inbox-open", { detail: { id: Number(data.workOpenMessage) } }));
     if ("workLogCopy" in data) return copy(ticketText(), "Ticket text");
     if ("workLogClear" in data) {

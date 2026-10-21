@@ -1,25 +1,46 @@
 [CmdletBinding()]
-param([Parameter(Mandatory)][string]$Computer, [ValidateRange(1, 30)][int]$Days = 7)
-# One-click PC check-up for Live Inbox (support_tools.py). Read-only WMI queries; each section is
-# independent, so a blocked part (for example the ConfigMgr client) never hides the others.
+param([Parameter(Mandatory)][string]$Computer, [ValidateRange(1, 30)][int]$Days = 7, [switch]$Updates)
+# One-click PC check-up for Live Inbox (support_tools.py). Read-only; each section is independent, so
+# a blocked part (for example the ConfigMgr client) never hides the others.
+# Light on the PC: event logs are read through its Event Log service with the filter (log, event IDs,
+# date, a maximum count) applied there, not record by record through WMI. Only when remote event log
+# access is blocked does it fall back to WMI, limited to 7 days. Installed updates come from the same
+# event log; the slow hotfix list (Win32_QuickFixEngineering) is read only with -Updates.
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 $result = [ordered]@{ ok = $true; computer = $Computer.ToUpperInvariant(); checked_at = [datetime]::UtcNow.ToString('o'); days = $Days; errors = @() }
 $wmi = @{ ComputerName = $Computer; ErrorAction = 'Stop' }
-$since = [Management.ManagementDateTimeConverter]::ToDmtfDateTime((Get-Date).AddDays(-$Days))
 
 function Section([string]$name, [scriptblock]$block) {
     try { $result[$name] = & $block }
     catch { $result[$name] = $null; $result.errors += "${name}: $($_.Exception.Message)" }
 }
-function When($value) {
-    if (!$value) { return $null }
-    try { return ([Management.ManagementDateTimeConverter]::ToDateTime($value)).ToUniversalTime().ToString('o') } catch { return $null }
-}
 function Latest($rows) {
-    $row = @($rows) | Sort-Object TimeWritten -Descending | Select-Object -First 1
-    if ($row) { return When $row.TimeWritten }
+    $row = @($rows) | Sort-Object Time -Descending | Select-Object -First 1
+    if ($row) { return $row.Time.ToUniversalTime().ToString('o') }
     return $null
+}
+$script:eventlog = $null  # $true once the Event Log service answered, $false after it refused.
+# Events as {Id, Provider, Time, App}, newest first, filtered on the PC.
+function Events([string]$log, [int[]]$ids, [datetime]$from, [int]$max, [string]$provider = '') {
+    if ($script:eventlog -ne $false) {
+        $filter = @{ LogName = $log; Id = $ids }
+        if ($from -gt [datetime]::MinValue) { $filter.StartTime = $from }
+        if ($provider) { $filter.ProviderName = $provider }
+        try {
+            $found = @(Get-WinEvent -ComputerName $Computer -FilterHashtable $filter -MaxEvents $max -ErrorAction Stop)
+            $script:eventlog = $true
+            return @($found | ForEach-Object { [pscustomobject]@{ Id = $_.Id; Provider = $_.ProviderName; Time = $_.TimeCreated; App = [string](@($_.Properties)[0].Value) } })
+        } catch {
+            if ($_.FullyQualifiedErrorId -like 'NoMatchingEventsFound*') { $script:eventlog = $true; return @() }
+            if ($script:eventlog) { throw }
+            $script:eventlog = $false  # The Event Log service is not reachable: WMI, over a shorter period.
+        }
+    }
+    $start = [Management.ManagementDateTimeConverter]::ToDmtfDateTime([datetime]::Now.AddDays(-[Math]::Min($Days, 7)))
+    $where = "Logfile='$log' AND TimeWritten >= '$start' AND (" + (($ids | ForEach-Object { "EventCode=$_" }) -join ' OR ') + ')'
+    @(Get-WmiObject Win32_NTLogEvent @wmi -Filter $where | Select-Object -First $max | ForEach-Object {
+        [pscustomobject]@{ Id = [int]$_.EventCode; Provider = [string]$_.SourceName; Time = [Management.ManagementDateTimeConverter]::ToDateTime($_.TimeWritten); App = [string](@($_.InsertionStrings) | Select-Object -First 1) } })
 }
 
 Section 'session' {
@@ -33,15 +54,16 @@ Section 'session' {
 }
 
 Section 'events' {
-    $system = @(Get-WmiObject Win32_NTLogEvent @wmi -Filter ("Logfile='System' AND TimeWritten >= '$since' AND " +
-        "(EventCode=6008 OR EventCode=41 OR EventCode=1001 OR EventCode=7 OR EventCode=51 OR EventCode=153 OR EventCode=129)"))
-    $application = @(Get-WmiObject Win32_NTLogEvent @wmi -Filter "Logfile='Application' AND TimeWritten >= '$since' AND (EventCode=1000 OR EventCode=1002)")
-    $shutdowns = @($system | Where-Object { $_.EventCode -in 6008, 41 })
-    $bluescreens = @($system | Where-Object { $_.EventCode -eq 1001 -and $_.SourceName -match 'BugCheck|WER-SystemErrorReporting' })
-    $disk = @($system | Where-Object { $_.EventCode -in 7, 51, 153, 129 })
-    $apps = @($application | Group-Object { [string](@($_.InsertionStrings) | Select-Object -First 1) } | Sort-Object Count -Descending | Select-Object -First 8 | ForEach-Object {
-        [ordered]@{ app = $_.Name; crashes = @($_.Group | Where-Object EventCode -eq 1000).Count; hangs = @($_.Group | Where-Object EventCode -eq 1002).Count; last = Latest $_.Group } })
-    [ordered]@{ unexpected_shutdowns = [ordered]@{ count = $shutdowns.Count; last = Latest $shutdowns }
+    $from = (Get-Date).AddDays(-$Days)
+    $system = @(Events 'System' @(6008, 41, 1001, 7, 51, 153, 129) $from 200)
+    $application = @(Events 'Application' @(1000, 1002) $from 300)
+    $shutdowns = @($system | Where-Object { $_.Id -in 6008, 41 })
+    $bluescreens = @($system | Where-Object { $_.Id -eq 1001 -and $_.Provider -match 'BugCheck|WER-SystemErrorReporting' })
+    $disk = @($system | Where-Object { $_.Id -in 7, 51, 153, 129 })
+    $apps = @($application | Group-Object App | Sort-Object Count -Descending | Select-Object -First 8 | ForEach-Object {
+        [ordered]@{ app = $_.Name; crashes = @($_.Group | Where-Object Id -eq 1000).Count; hangs = @($_.Group | Where-Object Id -eq 1002).Count; last = Latest $_.Group } })
+    [ordered]@{ source = if ($script:eventlog -eq $false) { 'wmi' } else { 'eventlog' }; days = if ($script:eventlog -eq $false) { [Math]::Min($Days, 7) } else { $Days }
+                unexpected_shutdowns = [ordered]@{ count = $shutdowns.Count; last = Latest $shutdowns }
                 bluescreens = [ordered]@{ count = $bluescreens.Count; last = Latest $bluescreens }
                 disk_errors = [ordered]@{ count = $disk.Count; last = Latest $disk }
                 app_problems = $apps }
@@ -63,6 +85,18 @@ Section 'pending_reboot' {
 }
 
 Section 'updates' {
+    # "Installation Successful" (Windows Update client event 19): the newest 50, filtered on the PC.
+    if ($script:eventlog -ne $false) {
+        $installed = @(Events 'System' @(19) ([datetime]::MinValue) 50 'Microsoft-Windows-WindowsUpdateClient')
+        if ($script:eventlog) {
+            $recent = @($installed | Select-Object -First 6 | ForEach-Object {
+                $kb = if ($_.App -match 'KB\d{6,8}') { $Matches[0] } else { '' }
+                [ordered]@{ kb = $kb; description = $_.App; installed = $_.Time.ToString('yyyy-MM-dd') } })
+            return [ordered]@{ source = 'eventlog'; last_installed = if ($installed) { $installed[0].Time.ToString('yyyy-MM-dd') } else { $null }
+                               last_30_days = @($installed | Where-Object { $_.Time -ge (Get-Date).AddDays(-30) }).Count; recent = $recent }
+        }
+    }
+    if (!$Updates) { return [ordered]@{ skipped = $true } }  # The hotfix list is slow; read it when asked.
     $parsed = @(Get-WmiObject Win32_QuickFixEngineering @wmi | ForEach-Object {
         $date = $null
         foreach ($format in 'M/d/yyyy', 'MM/dd/yyyy', 'yyyyMMdd', 'd/M/yyyy') {
@@ -70,7 +104,7 @@ Section 'updates' {
         }
         if ($date) { [pscustomobject]@{ kb = [string]$_.HotFixID; description = [string]$_.Description; installed = $date } }
     } | Sort-Object installed -Descending)
-    [ordered]@{ last_installed = if ($parsed) { $parsed[0].installed.ToString('yyyy-MM-dd') } else { $null }
+    [ordered]@{ source = 'hotfix'; last_installed = if ($parsed) { $parsed[0].installed.ToString('yyyy-MM-dd') } else { $null }
                 last_30_days = @($parsed | Where-Object { $_.installed -ge (Get-Date).AddDays(-30) }).Count
                 recent = @($parsed | Select-Object -First 6 | ForEach-Object { [ordered]@{ kb = $_.kb; description = $_.description; installed = $_.installed.ToString('yyyy-MM-dd') } }) }
 }

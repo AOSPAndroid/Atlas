@@ -32,13 +32,13 @@ const checkup = days => ({ ok: true, computer: 'LAPTOP-01', checked_at: '2026-10
   session: { console_user: 'EXAMPLE\\INBOX0', users: ['EXAMPLE\\INBOX0'], last_boot: '2026-10-12T08:00:00Z', uptime_hours: 217, model: 'Latitude 7440' },
   events: { unexpected_shutdowns: { count: 1, last: '2026-10-18T07:00:00Z' }, bluescreens: { count: 0, last: null }, disk_errors: { count: 0, last: null },
     app_problems: [{ app: 'OUTLOOK.EXE', crashes: 4, hangs: 1, last: '2026-10-21T08:30:00Z' }, { app: 'Teams.exe', crashes: 0, hangs: 1, last: '2026-10-19T08:30:00Z' }] },
-  pending_reboot: { pending: true, reasons: ['Windows Update'] }, updates: null,
+  pending_reboot: { pending: true, reasons: ['Windows Update'] }, updates: { skipped: true },
   network: [{ name: 'Ethernet 2', description: 'Dock Ethernet', ip: ['10.1.2.3', 'fe80::1'], gateway: ['10.1.2.1'], dns: ['10.0.0.10'], mac: '00-11-22-33-44-55', dhcp: true, suffix: 'corp.example', speed_mbps: 100 }] });
 const keys = [{ id: '1A2B3C4D-0000-0000-0000-000000000001', created: '2025-01-05T10:00:00Z', password: '111111-222222-333333-444444-555555-666666-777777-888888' },
   { id: '9F8E7D6C-0000-0000-0000-000000000002', created: '2026-06-01T10:00:00Z', password: '999999-888888-777777-666666-555555-444444-333333-222222' }];
 
 (async () => {
-  const calls = [], pendingLookups = new Map(), notes = {};
+  const calls = [], pendingLookups = new Map(), notes = {}, checkups = new Set();
   const f = await fixture({ fetch: async (url, options = {}) => {
     url = String(url); const method = options.method || 'GET', body = options.body ? JSON.parse(options.body) : null;
     calls.push({ url, method, body });
@@ -58,7 +58,14 @@ const keys = [{ id: '1A2B3C4D-0000-0000-0000-000000000001', created: '2025-01-05
     if (url === '/api/kill') return response({ count: 1, results: [{ Process: 'Renderer.exe', PID: 42, state: 'terminated' }] });
     if (url === '/api/companion') return response({ online: true, capabilities: ['outlook.reply', 'outlook.open', 'open.url'] });
     if (url === '/api/companion/commands') return response({ id: 'c' + calls.length, kind: body.kind, state: 'done', result: {}, error: '' });
-    if (url.startsWith('/api/diagnose/LAPTOP-01?days=')) return response(checkup(Number(url.split('=')[1])));
+    if (url.startsWith('/api/diagnose/LAPTOP-01?')) {
+      // Like Atlas: a check-up is kept unless Check again (fresh) or the hotfix list (updates) is asked for.
+      const query = new URLSearchParams(url.split('?')[1]), days = Number(query.get('days')), key = days + ':' + query.has('updates');
+      const data = { ...checkup(days), cached: !query.has('fresh') && checkups.has(key), age_seconds: 240 };
+      checkups.add(key);
+      if (query.has('updates')) data.updates = { source: 'hotfix', last_installed: '2026-10-09', last_30_days: 2, recent: [{ kb: 'KB5044284', description: 'Security Update', installed: '2026-10-09' }] };
+      return response(data);
+    }
     if (url === '/api/support/message') return response({ computer: body.computer, pid: 11, seconds: body.seconds });
     if (url === '/api/support/restart') return response({ computer: body.computer, pid: 12, seconds: body.minutes * 60 });
     if (url === '/api/support/restart/cancel') return response({ computer: body.computer, pid: 13, cancelled: true });
@@ -370,7 +377,7 @@ const keys = [{ id: '1A2B3C4D-0000-0000-0000-000000000001', created: '2025-01-05
   await until(() => pane('checkup').querySelector('.inbox-work-findings'), 'check-up');
   assert.equal(fetched('/api/diagnose/LAPTOP-01?days=7').length, 1);
   const checked = [...pane('checkup').querySelectorAll('.inbox-work-tile')].map(t => [t.querySelector('small').textContent, t.querySelector('b').textContent, t.dataset.tone]);
-  assert.deepEqual(checked, [['Signed in', 'INBOX0', ''], ['Uptime', '9 days', 'warn'], ['Restart', 'Pending', 'bad'], ['Crashes', '1', 'warn'], ['Updates', '–', '']]);
+  assert.deepEqual(checked, [['Signed in', 'INBOX0', ''], ['Uptime', '9 days', 'warn'], ['Restart', 'Pending', 'bad'], ['Crashes', '1', 'warn'], ['Updates', 'Not read', '']]);
   assert.deepEqual([...pane('checkup').querySelectorAll('.inbox-work-findings li')].map(li => [li.dataset.tone, li.textContent]), [
     ['bad', 'Restart pending: Windows Update'], ['warn', 'Not restarted for 9 days'], ['warn', '1 unexpected shutdown in 7 days (power loss or freeze)'],
     ['warn', 'OUTLOOK.EXE: 4 crashes, 1 hang'], ['warn', 'Ethernet 2 at 100 Mbps: check the cable or the dock']]);
@@ -381,6 +388,17 @@ const keys = [{ id: '1A2B3C4D-0000-0000-0000-000000000001', created: '2025-01-05
   await until(() => fetched('/api/diagnose/LAPTOP-01?days=14').length === 1 && /in 14 days/.test(pane('checkup').textContent), 'check-up over 14 days');
   pane('checkup').querySelector('[data-work-checkup-copy]').click();
   await until(() => /^Check-up of LAPTOP-01[\s\S]*- Restart pending: Windows Update/.test(clipboard), 'check-up copied');
+  // Back to 7 days: the saved check-up, without asking the PC; Check again asks it; updates on request.
+  const stamp = () => pane('checkup').querySelector('.inbox-work-toolbar small')?.textContent ?? '';
+  const days7 = pane('checkup').querySelector('[data-work-checkup-days]');
+  days7.value = '7'; days7.dispatchEvent(new w.Event('change', { bubbles: true }));
+  await until(() => / min ago, saved/.test(stamp()), 'saved check-up');
+  assert.match(stamp(), /4 min ago, saved/);
+  pane('checkup').querySelector('[data-work-checkup-again]').click();
+  await until(() => fetched('/api/diagnose/LAPTOP-01?days=7&fresh=1').length === 1 && /checked/.test(stamp()) && !/saved/.test(stamp()), 'checked again');
+  pane('checkup').querySelector('[data-work-checkup-updates]').click();
+  await until(() => fetched('/api/diagnose/LAPTOP-01?days=7&updates=1').length === 1 && /2026/.test([...pane('checkup').querySelectorAll('.inbox-work-tile')].at(-1)?.textContent ?? ''), 'updates read');
+  assert(!pane('checkup').querySelector('[data-work-checkup-updates]'), 'Once read, updates need no button');
 
   // Message on screen and restart later: small forms under the PC tools; a restart can be cancelled.
   const form = () => d.querySelector('[data-work-form]');
@@ -425,12 +443,13 @@ const keys = [{ id: '1A2B3C4D-0000-0000-0000-000000000001', created: '2025-01-05
   const logged = () => [...pane('notes').querySelectorAll('.inbox-work-log li span')].map(n => n.textContent);
   assert.deepEqual(logged(), ['Reply prepared in Teams chat', 'Check-up of LAPTOP-01 (7 days): Restart pending: Windows Update; Not restarted for 9 days; 1 unexpected shutdown in 7 days (power loss or freeze); OUTLOOK.EXE: 4 crashes, 1 hang; Ethernet 2 at 100 Mbps: check the cable or the dock',
     'Check-up of LAPTOP-01 (14 days): Restart pending: Windows Update; Not restarted for 9 days; 1 unexpected shutdown in 14 days (power loss or freeze); OUTLOOK.EXE: 4 crashes, 1 hang; Ethernet 2 at 100 Mbps: check the cable or the dock',
+    'Check-up of LAPTOP-01 (7 days): Restart pending: Windows Update; Not restarted for 9 days; 1 unexpected shutdown in 7 days (power loss or freeze); OUTLOOK.EXE: 4 crashes, 1 hang; Ethernet 2 at 100 Mbps: check the cable or the dock',
     'Restart of LAPTOP-01 planned for ' + new Date(Date.now() + 1800e3).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), 'Planned restart of LAPTOP-01 cancelled',
     'Message shown on LAPTOP-01: "IT support is connecting to your PC now to look at your request."', 'Group Policy refresh started on LAPTOP-01']);
   const line = pane('notes').querySelector('[data-work-log-add]');
   line.elements.text.value = 'Called Alex, Outlook works after the restart';
   line.dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }));
-  await until(() => logged().length === 8, 'manual log line');
+  await until(() => logged().length === 9, 'manual log line');
   pane('notes').querySelector('[data-work-log-copy]').click();
   await until(() => /^Request: Alex Morgan\nFrom: Lair de Gourmont[\s\S]*User: Alex Morgan · INBOX0\nPC: LAPTOP-01\n\nWork done:\n[\s\S]*Called Alex, Outlook works after the restart$/.test(clipboard), 'ticket text');
   // The person note shows on their record.

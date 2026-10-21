@@ -4,10 +4,12 @@ import base64
 import json
 import re
 import tempfile
+import time
 import types
 import unittest
 from datetime import datetime
 from pathlib import Path
+from unittest.mock import patch
 
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
@@ -55,6 +57,7 @@ class SupportTools(unittest.TestCase):
                 raise HTTPException(403, 'Refresh the page before saving')
         app = FastAPI()
         support_tools.register(app, self.backend, check_token, Path(tmp.name) / 'support-notes.json')
+        support_tools.CACHE.clear(); self.addCleanup(support_tools.CACHE.clear)
         self.addCleanup(setattr, support_tools, 'notes', None)
         self.http = TestClient(app); self.addCleanup(self.http.close)
 
@@ -114,6 +117,27 @@ class SupportTools(unittest.TestCase):
         self.assertEqual(failed.status_code, 502)
         self.assertIn('RPC server unavailable', failed.json()['detail'])
         self.assertEqual(self.http.get('/api/diagnose/LAPTOP-0001?days=90').status_code, 422)
+
+    def test_a_check_up_is_kept_for_ten_minutes(self):
+        runs = []
+        original = self.backend.run
+        self.backend.run = lambda args, timeout=120: runs.append(args) or original(args, timeout)
+        first = self.http.get('/api/diagnose/laptop-0001').json()
+        again = self.http.get('/api/diagnose/LAPTOP-0001').json()
+        self.assertEqual((first['cached'], again['cached'], len(runs)), (False, True, 1), 'Coming back to the PC does not ask it again')
+        self.assertNotIn('-Updates', runs[0], 'The slow hotfix list is not read by default')
+        self.http.get('/api/diagnose/LAPTOP-0001?days=14')
+        self.assertEqual(len(runs), 2, 'Another period asks the PC')
+        self.assertFalse(self.http.get('/api/diagnose/LAPTOP-0001?fresh=true').json()['cached'], 'Check again asks the PC')
+        self.http.get('/api/diagnose/LAPTOP-0001?updates=true')
+        self.assertEqual(runs[-1][-1], '-Updates')
+        self.assertTrue(self.http.get('/api/diagnose/LAPTOP-0001').json()['cached'], 'A check-up with updates also answers one without')
+        self.assertEqual(len(runs), 4)
+        with patch.object(support_tools.time, 'monotonic', return_value=time.monotonic() + support_tools.CACHE_SECONDS + 1):
+            self.assertFalse(self.http.get('/api/diagnose/LAPTOP-0001').json()['cached'], 'After ten minutes the PC is asked again')
+        self.backend.check_up = {'ok': False, 'error': 'The PC did not answer any check'}
+        self.assertEqual(self.http.get('/api/diagnose/LAPTOP-0001?fresh=true').status_code, 502)
+        self.assertTrue(self.http.get('/api/diagnose/LAPTOP-0001').json()['cached'], 'A failed check-up never replaces a good one')
 
     def test_notes_on_people_and_pcs(self):
         self.assertEqual(self.http.get('/api/support/notes?user=person:1&machine=laptop-0001').json(), {'user': None, 'machine': None})
