@@ -1,6 +1,6 @@
 // Live Inbox request tools: health, performance, AD groups and deployment run beside the message
 // without switching to Workspace; the deployment panel moves in and back; "Back to Live Inbox"
-// after a Live Inbox button opens another page; Workspace is still used outside Live Inbox.
+// after a Live Inbox button opens another page; outside Live Inbox the same tools float over the page.
 // Support tools: check-up, message on screen, restart later, GPUpdate, unlock, BitLocker keys,
 // notes and the work log copied for the ticket.
 const assert = require('node:assert/strict');
@@ -81,15 +81,29 @@ const keys = [{ id: '1A2B3C4D-0000-0000-0000-000000000001', created: '2025-01-05
   await sleep(60);
   const actions = w.AtlasInboxActions;
 
-  // Outside Live Inbox (or before it has rendered) the Workspace tools are used as before.
+  // Outside Live Inbox (or before it has rendered) the tools float over the page; nothing changes page.
   await actions.run({ action: 'health', user: person, machine: 'LAPTOP-01' });
-  assert($('workspace').classList.contains('active'), 'Without Live Inbox on screen, Health opens Workspace');
+  assert($('workspace').classList.contains('active') && !$('inbox').classList.contains('active'));
+  assert($('inboxWork').classList.contains('inbox-work-floating') && $('inboxWork').parentNode === d.body, 'The tools float over Workspace');
+  assert.match($('inboxWork').querySelector('[data-work-where]').textContent, /over this page/);
+  // Floating tools stay open across pages; the deployment panel stays in Workspace while Workspace is on screen.
+  w.AtlasInboxWork.show('deploy');
+  assert.equal($('deploymentPanel').parentNode, $('workspace'));
+  assert.match(d.querySelector('[data-work-pane="deploy"]').textContent, /deployment panel is on this Workspace page/);
+  run("page('bulk')");
+  assert(!$('inboxWork').hidden && $('bulk').classList.contains('active'));
+  assert.equal($('deploymentPanel').closest('[data-work-pane]'), d.querySelector('[data-work-pane="deploy"]'), 'On another page Deploy brings the panel along');
+  run("page('workspace')");
+  assert.equal($('deploymentPanel').parentNode, $('workspace'), 'Back in Workspace, the panel is home');
 
   // Live Inbox as React renders it: the list and the message details in .inbox-grid.
   $('liveInbox').innerHTML = '<div class="live-inbox"><div class="inbox-grid"><div class="inbox-mail-list"></div><div class="inbox-context"><button id="openPerson">Open in Workspace</button></div></div></div>';
   $('openPerson').onclick = () => w.dispatchEvent(new w.CustomEvent('atlas:inbox-person', { detail: { id: 7 } }));
   run("page('inbox')");
   const grid = d.querySelector('.inbox-grid'), work = () => $('inboxWork'), pane = tab => d.querySelector(`[data-work-pane="${tab}"]`);
+  assert.equal(work().parentNode, grid, 'Open floating tools join the message as its third column');
+  assert(!work().classList.contains('inbox-work-floating'));
+  d.querySelector('[data-work-tab="health"]').click();
   const fetched = prefix => calls.filter(c => c.url.startsWith(prefix));
   calls.length = 0;
 
@@ -441,6 +455,6 @@ const keys = [{ id: '1A2B3C4D-0000-0000-0000-000000000001', created: '2025-01-05
   await sleep(100);
   assert.deepEqual(f.errors, []);
   w.close();
-  console.log('PASS: Live Inbox request tools run person (record, desk, devices), health, performance (End… confirmed), user and PC AD groups (filter, copy, compare with a colleague), deployment, software/services/specs and articles beside the message; replies (FR/EN templates, Outlook reply window, Teams chat) and Teams chat/call; request people and PCs one click each; check-up, message on screen, restart later (and cancel), GPUpdate, unlock, password expiry, BitLocker keys found by Key ID, other requests and deployments, notes and the work log copied for the ticket; lookup of anyone; the deployment panel moves in and back intact; Back to Live Inbox after a Live Inbox button; reboot confirmed; Workspace fallback outside Live Inbox');
+  console.log('PASS: Live Inbox request tools run person (record, desk, devices), health, performance (End… confirmed), user and PC AD groups (filter, copy, compare with a colleague), deployment, software/services/specs and articles beside the message; replies (FR/EN templates, Outlook reply window, Teams chat) and Teams chat/call; request people and PCs one click each; check-up, message on screen, restart later (and cancel), GPUpdate, unlock, password expiry, BitLocker keys found by Key ID, other requests and deployments, notes and the work log copied for the ticket; lookup of anyone; the deployment panel moves in and back intact; Back to Live Inbox after a Live Inbox button; reboot confirmed; outside Live Inbox the tools float over any page (across pages, the deployment panel stays home on Workspace) and dock in Live Inbox');
   process.exit(0);
 })().catch(error => { console.error(error); process.exit(1); });

@@ -1023,7 +1023,7 @@ window.AtlasContext = (() => {
     const identity = kind === "user" ? record.user_name || record.user_id || record.email || "" : record.name || record.machine_name || "";
     const ad = kind === "user" || AtlasUI.supportsWindows(record);
     return `data-atlas-context="${kind}"${ad ? ` data-ad-kind="${kind === "user" ? "user" : "computer"}" data-ad-identity="${AtlasUI.esc(identity)}"` : ""}` + attribute("identity", identity) + (kind === "user" ?
-      attribute("person", AtlasUI.personKey(record)) +
+      attribute("person", AtlasUI.personKey(record)) + attribute("id", /^\d+$/.test(String(record.id ?? "")) ? record.id : "") +
       attribute("name", record.full_name || record.name) + attribute("domain", AtlasUI.domainAccount(record)) + attribute("email", record.email) +
       attribute("department", record.department) + attribute("location", record.location) + attribute("manager", record.manager) : "");
   }
@@ -1062,12 +1062,36 @@ window.AtlasContext = (() => {
       reason: !available ? "Windows computer accounts only" : !identity ? "No AD account supplied" : "Live Active Directory requires local Admin",
       run: () => AtlasGroups.open(kind, identity, action)}));
   }
+  // Atlas Admin's tools over the page (inbox-workbench.js): health, check-up, groups, deploy, notes…
+  // without changing page. Not in the viewer, which has no tools.
+  function toolActions(kind, detail, context, available = true) {
+    if (!window.AtlasTools || window.AtlasReadOnly) return [];
+    const open = (tab, mode, extra = {}) => () => {
+      if (!window.AtlasTools.open({...detail, ...extra, ...(context ? {context} : {})}, tab, mode)) throw Error("The tools are available in Atlas Admin.");
+    };
+    if (kind === "user") return [
+      {id: "tools-person", label: "Person, desk & PCs", section: "Tools here", disabled: !detail.user?.id, reason: "Not in the Atlas directory", run: open("person")},
+      {id: "tools-user-groups", label: "Account & groups (unlock)", section: "Tools here", disabled: !detail.user?.user_name && !detail.user?.email, reason: "No AD account supplied", run: open("user-groups", "scan")},
+    ];
+    return [
+      ["tools-health", "Health check", "health", "scan"],
+      ["tools-checkup", "Check-up: crashes, restart, updates", "checkup", "scan"],
+      ["tools-performance", "Performance & processes", "performance", "scan"],
+      ["tools-groups", "PC groups & BitLocker keys", "machine-groups", "scan"],
+      ["tools-deploy", "Deploy software…", "deploy", "show"],
+      ["tools-message", "Message on screen…", "health", "quick", {form: "message"}],
+      ["tools-restart", "Restart later…", "health", "quick", {form: "restart"}],
+      ["tools-notes", "Notes", "notes", "show"],
+    ].map(([id, label, tab, mode, extra]) => ({id, label, section: "Tools here", disabled: !available, reason: "Windows tools require a PC", run: open(tab, mode, extra)}));
+  }
   function userActions(item) {
     const d = item.dataset, identity = d.adIdentity || d.contextIdentity || "", key = d.contextPerson || d.person;
+    const user = {id: Number(d.contextId) || undefined, user_name: identity, email: d.contextEmail || "", full_name: d.contextName || identity, department: d.contextDepartment || ""};
     const summary = ["Atlas · stored user record", d.contextName || identity,
       ...[["Account", identity], ["Domain account", d.contextDomain], ["Email", d.contextEmail], ["Department", d.contextDepartment], ["Office", d.contextLocation], ["Manager", d.contextManager]]
         .filter(([, value]) => value).map(([label, value]) => label + ": " + value), "From imported directory data; not a live sign-in check."].join("\n");
     return [
+      ...toolActions("user", {user}),
       ...groupActions("user", identity),
       {id: "user-devices", label: "Assigned devices & desks", section: "Inventory", disabled: !key, reason: "Open the full user record first", navigate: true,
         run: () => handlers.openPerson ? handlers.openPerson(key) : navigate({person: key})},
@@ -1085,6 +1109,7 @@ window.AtlasContext = (() => {
   function deviceActions(machine) {
     const name = machine.name || machine.machine_name || "";
     return [
+      ...toolActions("device", {machine: name.toUpperCase(), user: machine.user?.id ? machine.user : null}, machine.tools_context, AtlasUI.supportsWindows(machine) && !!name),
       ...groupActions("computer", name, AtlasUI.supportsWindows(machine)),
       {id: "inventory", label: "View inventory details", section: "Inventory", run: () => inventory(machine)},
       ...[["copy", "Copy device identity", name], ["copy-asset", "Copy asset tag", machine.asset_tag], ["copy-serial", "Copy serial number", machine.serial_number || machine.serial], ["report", "Copy stored inventory report", AtlasUI.machineReport(machine)]]
@@ -1164,7 +1189,7 @@ window.AtlasContext = (() => {
   document.addEventListener("scroll", e => {if (menu && !menu.contains(e.target)) close();}, true);
   window.addEventListener("resize", () => close());
   window.addEventListener("blur", () => close());
-  return {attributes, groupActions, userActions, deviceActions, inventory, copy, navigate, open, close,
+  return {attributes, groupActions, toolActions, userActions, deviceActions, inventory, copy, navigate, open, close,
     configure: value => {handlers = value;},
     bindDevice: (node, machine, extra = []) => {
       node.dataset.atlasContext = "device";

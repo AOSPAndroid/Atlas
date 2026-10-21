@@ -23,7 +23,8 @@ class ClipboardHistory(unittest.TestCase):
         self.root = Path(tmp.name); self.db = self.root / 'atlas.db'
         with connect(self.db) as c:
             schema(c)
-            for uid, name, email in [(1, 'Alex Morgan', 'alex@example.test'), (2, 'Sam Green', 'sam@example.test'), (3, 'Sam Green', 'sam2@example.test')]:
+            for uid, name, email in [(1, 'Alex Morgan', 'alex@example.test'), (2, 'Sam Green', 'sam@example.test'), (3, 'Sam Green', 'sam2@example.test'),
+                                     (4, 'Charles Nazarian', 'charles@example.test'), (5, 'Dupont, Marie', 'marie@example.test')]:
                 c.execute('INSERT INTO users(id,canonical_key,user_id,user_id_norm,full_name,full_name_norm,email,email_norm,department) VALUES(?,?,?,?,?,?,?,?,?)',
                           (uid, 'person:' + str(uid), 'X0100000' + str(uid), 'x0100000' + str(uid), name, name.lower(), email, email, 'Equities'))
             c.execute("INSERT INTO machines(id,machine_name,machine_name_norm,assigned_to,model_id,operational_status) VALUES(1,'LAPTOP-0001','laptop-0001','X01000001','Latitude 7450','Operational')")
@@ -63,6 +64,12 @@ class ClipboardHistory(unittest.TestCase):
         self.assertEqual(item['desks'], [{'desk': '02R015079', 'name': 'Alex Morgan', 'team': 'Equities', 'floor': 2, 'occupancy': 'assigned'}])
         self.assertEqual((item['tickets'], item['ips']), (['INC0045678'], ['10.40.12.7']))
         self.assertEqual(self.client.get('/api/clipboard').json()['items'][0]['id'], item['id'])
+
+    def test_names_as_outlook_and_people_write_them(self):
+        # An Outlook display name ("Last, First : Team"), a surname in capitals, a directory that keeps "Dupont, Marie".
+        item = self.post('Nazarian, Charles : Markets Pre Trade\nAlso DUPONT Marie and Marie Dupont, cc Morgan, Alex').json()
+        self.assertEqual([(u['full_name'], u['basis']) for u in item['users']], [('Charles Nazarian', 'name'), ('Dupont, Marie', 'name'), ('Alex Morgan', 'name')])
+        self.assertEqual(self.post('Hi Sam Green').json()['users'], [], 'A name two people share is still not guessed')
 
     def test_copying_again_moves_to_the_top_and_items_can_be_removed(self):
         first = self.post('LAPTOP-0001').json(); second = self.post('SPARE-PC-0042', 'paste').json()

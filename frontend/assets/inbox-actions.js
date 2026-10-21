@@ -1,6 +1,6 @@
 /* Live Inbox actions: a request's tools open beside the message (inbox-workbench.js), so the
    person, health, performance, AD groups, deployment and articles never leave Live Inbox.
-   Outside Live Inbox the normal Workspace tools are used. Every action needs a click. Reboots keep their
+   Outside Live Inbox the same tools float over the page. Every action needs a click. Reboots keep their
    confirmation, and nothing deploys until Install or Start queue is clicked. */
 (() => {
   const openQueue = () => document.querySelector("#queueDrawer")?.classList.add("open");

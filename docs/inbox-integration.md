@@ -109,6 +109,21 @@ list hides them. Done is kept by Atlas and, for Companion mail, also marks the e
 Outlook category **Atlas: done**. In **Person**, **Teams chat**, **Teams call** and **Email** open in
 your own Teams and Outlook through the Companion. See [companion.md](companion.md).
 
+**Everywhere else in Atlas Admin** the same tools open over the page instead of beside a
+message, so nothing changes page:
+
+- Right-click any machine or person (Workspace, Active Directory, search results, the clipboard
+  history…): **Tools here** offers **Health check**, **Check-up**, **Performance & processes**,
+  **PC groups & BitLocker keys**, **Deploy software…**, **Message on screen…**, **Restart later…**
+  and **Notes** for a PC, **Person, desk & PCs** and **Account & groups (unlock)** for a person.
+- In the **clipboard history**, each PC has **Health**, **Check-up** and **Tools**, each person
+  **Person** and **Groups**. The tools list everyone and every PC in the copy under **In this copy**
+  and open to the left of the history, which stays open. A copied PC name Atlas does not know (a
+  new or re-imaged PC) gets the same tools by name, and **Ping all** includes it.
+- The panel stays open as you move between pages, and joins the message as its third column when
+  you go to Live Inbox. On the Workspace page, **Deploy** uses the deployment panel already on the
+  page. **Esc** or × closes it. The work log of a copy is kept separately from a message's.
+
 When a Live Inbox button opens another page (a diagram, Workspace, Active
 Directory, Remote Admin), a **Back to Live Inbox** button appears at the bottom.
 On screens narrower than 1280 pixels the message list hides while the tools are

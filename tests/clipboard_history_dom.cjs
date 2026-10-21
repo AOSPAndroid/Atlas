@@ -1,5 +1,6 @@
 // Clipboard history drawer: capture, coloured entity chips, machine/people tables, bulk actions,
-// Ctrl+V on any page but Live Inbox, capture on returning to Atlas, right-click menus. Fictional data.
+// Ctrl+V on any page but Live Inbox, capture on returning to Atlas, right-click menus, and the tools
+// (health, check-up, person, groups) over the page for known and unknown PCs. Fictional data.
 const assert = require('node:assert/strict'), fs = require('node:fs');
 const { fixture } = require('./ui_fixture.cjs');
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -33,6 +34,8 @@ const enrich = (text, source, id) => ({ id, at: '2026-10-20T15:40:00', source, t
     }
     if (path.startsWith('/api/clipboard') && method === 'DELETE') { deletes.push(path); stored = path === '/api/clipboard' ? [] : stored.filter(i => !path.endsWith(i.id)); return response({ items: stored.length }); }
     if (path.startsWith('/api/ping/')) return response({ online: true });
+    if (path.startsWith('/api/diagnose/')) return response({ ok: true, computer: path.split('/').at(-1), days: 7, errors: [], session: { console_user: 'EXAMPLE\\alex', uptime_hours: 5 }, network: [] });
+    if (path === '/api/inbox/person/1') return response({ user: alex, machines: [{ name: 'LAPTOP-0001', windows_remote_supported: 1 }], desks: [] });
     return response({});
   } });
   const { w, run } = f, d = w.document, $ = id => d.getElementById(id);
@@ -69,14 +72,39 @@ const enrich = (text, source, id) => ({ id, at: '2026-10-20T15:40:00', source, t
   assert($('bulk').classList.contains('active'));
   assert(!$('clipboardDrawer').classList.contains('open'));
 
-  // Right-click a machine: the shared menu plus the Workspace tools.
+  // Right-click a machine: the tools over the page, the shared menu, and the Workspace pages.
   $('clipboardToggle').click(); await sleep(20);
   const row = d.querySelector('[data-clipboard-machine="LAPTOP-0001"]');
   row.dispatchEvent(new w.MouseEvent('contextmenu', { bubbles: true, clientX: 5, clientY: 5 }));
   const menu = d.querySelector('.atlas-ad-context');
   assert(menu, 'A context menu opens');
-  for (const label of ['See groups', 'Set as target', 'Open MSRA', 'Deploy software…']) assert(menu.textContent.includes(label), label);
+  for (const label of ['Health check', 'Check-up: crashes, restart, updates', 'Message on screen…', 'Deploy software…', 'See groups', 'Set as Workspace target', 'Open MSRA']) assert(menu.textContent.includes(label), label);
   d.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+
+  // Health, Check-up, Person and Groups open the tools over the page; the history stays open beside them.
+  const tools = () => $('inboxWork'), toolState = () => w.AtlasInboxWork.state();
+  const item = () => d.querySelector('.clipboard-item');
+  item().querySelector('[data-tool="health"][data-machine="LAPTOP-0001"]').click();
+  await until(() => tools() && !tools().hidden);
+  assert(tools().classList.contains('inbox-work-floating') && tools().parentNode === d.body, 'The tools float over the page');
+  assert.deepEqual([toolState().machine, toolState().user, toolState().tab, toolState().floating], ['LAPTOP-0001', 1, 'health', true]);
+  assert($('bulk').classList.contains('active') && $('clipboardDrawer').classList.contains('open'), 'No page change; the history stays open');
+  assert.deepEqual([...tools().querySelectorAll('[data-work-request] button')].map(b => b.textContent), ['Alex Morgan', 'LAPTOP-0001', 'GHOST-PC-9999'], 'Everyone and every PC in the copy');
+  assert.equal(tools().querySelector('[data-work-request] small').textContent, 'In this copy');
+  assert(tools().querySelector('[data-work-tab="reply"]').disabled, 'No message to reply to outside Live Inbox');
+  // A PC Atlas does not know still gets the Windows tools by name.
+  assert.match(item().querySelector('[data-clipboard-unknown="GHOST-PC-9999"]').textContent, /GHOST-PC-9999/);
+  item().querySelector('[data-tool="checkup"][data-machine="GHOST-PC-9999"]').click();
+  await until(() => toolState().machine === 'GHOST-PC-9999' && /EXAMPLE\\alex|alex/.test(tools().querySelector('[data-work-pane="checkup"]').textContent));
+  assert.equal(toolState().tab, 'checkup');
+  item().querySelector('[data-person="1"]').click();
+  await until(() => toolState().tab === 'person' && tools().querySelector('[data-work-pane="person"] .inbox-work-record'));
+  // The menu of an unknown PC has the same tools.
+  item().querySelector('[data-clipboard-unknown="GHOST-PC-9999"]').dispatchEvent(new w.MouseEvent('contextmenu', { bubbles: true, clientX: 5, clientY: 5 }));
+  [...d.querySelectorAll('.atlas-ad-context button')].find(b => b.textContent === 'Restart later…').click();
+  await until(() => toolState().machine === 'GHOST-PC-9999' && tools().querySelector('[data-work-schedule-restart]'));
+  tools().querySelector('[data-work-close]').click();
+  assert(tools().hidden);
 
   // Ctrl+V: recorded from any page except Live Inbox and text boxes.
   const paste = (target, text) => { const e = new w.Event('paste', { bubbles: true, cancelable: true }); e.clipboardData = { files: [], getData: t => (t === 'text/plain' ? text : '') }; target.dispatchEvent(e); return e; };
@@ -129,6 +157,6 @@ const enrich = (text, source, id) => ({ id, at: '2026-10-20T15:40:00', source, t
   assert.equal(deletes.at(-1), '/api/clipboard');
   assert.deepEqual(f.errors, []);
   w.close();
-  console.log('PASS: clipboard history captures, colours and tabulates machines/people/desks, bulk deploy and ping, right-click tools, Ctrl+V outside Live Inbox, quiet capture on return (once), Companion status and switch, delete and clear');
+  console.log('PASS: clipboard history captures, colours and tabulates machines/people/desks, bulk deploy and ping, right-click tools, health/check-up/person/groups over the page for known and unknown PCs, Ctrl+V outside Live Inbox, quiet capture on return (once), Companion status and switch, delete and clear');
   process.exit(0);
 })().catch(error => { console.error(error); process.exit(1); });

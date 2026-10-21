@@ -1,7 +1,9 @@
 /* Clipboard history: everything copied into Atlas, with what Atlas knows about it.
    Capture with the button, Ctrl+V on any page (outside text boxes) or, when allowed, automatically
    when you come back to Atlas. Each item lists its machines, people, desks, tickets and IPs, with
-   their actions (right-click a machine or person for the full menu) and bulk actions for lists. */
+   their actions (right-click a machine or person for the full menu) and bulk actions for lists.
+   Health, Check-up and the other tools open over the page (inbox-workbench.js), the history stays
+   open beside them; copied PC names Atlas does not know get the same tools by name. */
 (() => {
   const $ = (id) => document.getElementById(id);
   if (!$("clipboardDrawer")) return;
@@ -15,6 +17,21 @@
   const request = (url, options = {}) => window.AtlasClient.request(url, { atlasSilent: true, ...options });
   const json = (url, body, method = "POST") => request(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   const notify = (text) => (typeof toast === "function" ? toast(text) : null);
+  // A Windows computer name (15 characters at most) with letters and digits, e.g. PARPWMK30560566.
+  const pcName = (name) => /^[A-Za-z][A-Za-z0-9-]{5,14}$/.test(name) && /[0-9]/.test(name);
+  const unknownPcs = (item) => (item.unknown_machines || []).filter(pcName).map((name) => name.toUpperCase());
+  // Everyone and every PC in the copy, as the tools' "In this copy" chips.
+  function context(item) {
+    const machines = [...item.machines.filter((m) => window.AtlasUI.supportsWindows(m)).map((m) => ({ name: String(m.name).toUpperCase(), owner: m.user?.id ? m.user : undefined })),
+      ...unknownPcs(item).map((name) => ({ name }))];
+    const people = (item.users || []).map((u) => ({ user: u, label: u.full_name || u.name || u.user_name, role: "copied" }));
+    return { label: "In this copy", title: item.text.split(/\r?\n/).find((line) => line.trim())?.trim().slice(0, 120) || "Clipboard item", people, machines, log: "clipboard:" + item.id };
+  }
+  // The tools over the page; the clipboard history stays open beside them.
+  function tools(item, detail, tab, mode) {
+    if (!window.AtlasTools?.open({ ...detail, context: context(item) }, tab, mode)) throw Error("The tools are available in Atlas Admin.");
+  }
+  const toolButtons = (attribute, value) => `<button type="button" data-tool="health" ${attribute}="${esc(value)}">Health</button><button type="button" data-tool="checkup" ${attribute}="${esc(value)}">Check-up</button><button type="button" data-tool="tools" ${attribute}="${esc(value)}" title="Performance, groups, deploy, message, restart, notes…">Tools</button>`;
 
   function status(text, tone = "") {
     $("clipboardStatus").textContent = text;
@@ -43,7 +60,7 @@
   function machineRows(item) {
     return item.machines.map((m) => {
       const user = m.user ? `<span ${window.AtlasContext.attributes("user", m.user)} class="clipboard-person" tabindex="0">${esc(m.user.full_name || m.user.name || m.user.user_name)}</span>` : `<span class="clipboard-muted">${esc(m.assigned_user || m.last_logged_on_user || "No user recorded")}</span>`;
-      return `<tr data-clipboard-machine="${esc(m.name)}"><td><b>${esc(m.name)}</b>${m.written_as ? `<small class="clipboard-muted" title="Found despite look-alike characters"> read as ${esc(m.written_as)}</small>` : ""}</td><td>${user}</td><td>${esc(m.model_id || m.device_kind || "")}</td><td><span class="${String(m.operational_status || "").toLowerCase() === "operational" ? "status-ok" : "status-warn"}">${esc(m.operational_status || "Unknown")}</span></td><td class="clipboard-online" data-online="${esc(m.name)}"></td><td class="clipboard-row-actions"><button type="button" data-select="${esc(m.name)}">Select</button></td></tr>`;
+      return `<tr data-clipboard-machine="${esc(m.name)}"><td><b>${esc(m.name)}</b>${m.written_as ? `<small class="clipboard-muted" title="Found despite look-alike characters"> read as ${esc(m.written_as)}</small>` : ""}</td><td>${user}</td><td>${esc(m.model_id || m.device_kind || "")}</td><td><span class="${String(m.operational_status || "").toLowerCase() === "operational" ? "status-ok" : "status-warn"}">${esc(m.operational_status || "Unknown")}</span></td><td class="clipboard-online" data-online="${esc(m.name)}"></td><td class="clipboard-row-actions">${window.AtlasUI.supportsWindows(m) ? toolButtons("data-machine", m.name) : '<span class="clipboard-muted" title="Windows tools need a PC">Inventory only</span>'}</td></tr>`;
     }).join("");
   }
   function detail(item) {
@@ -53,19 +70,24 @@
       sections.push(`<section><h4>Machines <small>${item.machines.length}</small></h4><div class="clipboard-bulk">` +
         `<button type="button" data-bulk="deploy" ${windows.length ? "" : "disabled"}>Bulk deploy (${windows.length})</button>` +
         `<button type="button" data-bulk="script" ${windows.length ? "" : "disabled"}>Run a script</button>` +
-        `<button type="button" data-bulk="ping" ${windows.length ? "" : "disabled"}>Ping all</button>` +
+        `<button type="button" data-bulk="ping" ${windows.length + unknownPcs(item).length ? "" : "disabled"}>Ping all</button>` +
         `<button type="button" data-bulk="copy-machines">Copy names</button>` +
         `<button type="button" data-bulk="copy-users">Copy users</button></div>` +
         `<div class="clipboard-table"><table><thead><tr><th>Machine</th><th>User</th><th>Model</th><th>Inventory</th><th>Online</th><th></th></tr></thead><tbody>${machineRows(item)}</tbody></table></div></section>`);
     }
     if (item.users?.length)
       sections.push(`<section><h4>People <small>${item.users.length}</small></h4><div class="clipboard-bulk"><button type="button" data-bulk="copy-emails">Copy emails</button></div><div class="clipboard-table"><table><thead><tr><th>Name</th><th>Account</th><th>Email</th><th>Department</th><th></th></tr></thead><tbody>${item.users.map((u) =>
-        `<tr ${window.AtlasContext.attributes("user", u)} tabindex="0"><td><b>${esc(u.full_name || u.name)}</b></td><td>${esc(u.user_name)}</td><td>${esc(u.email)}</td><td>${esc(u.department)}</td><td class="clipboard-row-actions"><button type="button" data-person="${esc(u.id)}">Open</button></td></tr>`).join("")}</tbody></table></div></section>`);
+        `<tr ${window.AtlasContext.attributes("user", u)} tabindex="0"><td><b>${esc(u.full_name || u.name)}</b></td><td>${esc(u.user_name)}</td><td>${esc(u.email)}</td><td>${esc(u.department)}</td><td class="clipboard-row-actions"><button type="button" data-person="${esc(u.id)}" title="Record, desk and PCs">Person</button><button type="button" data-person-groups="${esc(u.id)}" ${u.user_name || u.email ? "" : "disabled"}>Groups</button></td></tr>`).join("")}</tbody></table></div></section>`);
     if (item.desks?.length)
       sections.push(`<section><h4>Desks <small>${item.desks.length}</small></h4><div class="clipboard-table"><table><thead><tr><th>Desk</th><th>Occupant</th><th>Team</th><th>Floor</th><th></th></tr></thead><tbody>${item.desks.map((d) =>
         `<tr><td><b>${esc(d.desk)}</b></td><td>${d.occupancy === "vacant" ? '<span class="clipboard-muted">Vacant</span>' : esc(d.name)}</td><td>${esc(d.team)}</td><td>${esc(d.floor)}</td><td class="clipboard-row-actions"><a href="/?desk=${encodeURIComponent(d.desk)}" target="_blank" rel="noopener">Map</a></td></tr>`).join("")}</tbody></table></div></section>`);
     const plain = (title, list, tone) => list?.length ? `<section><h4>${title} <small>${list.length}</small></h4><div class="clipboard-tags">${list.map((value) => `<button type="button" class="clipboard-chip clipboard-chip-${tone}" data-copy="${esc(value)}" title="Copy">${esc(value)}</button>`).join("")}</div></section>` : "";
-    sections.push(plain("Tickets", item.tickets, "ticket"), plain("IP addresses", item.ips, "ip"), plain("Not in Atlas", item.unknown_machines, "unknown"));
+    // PC names Atlas does not know may still be on the network: the Windows tools work by name.
+    const pcs = unknownPcs(item), other = (item.unknown_machines || []).filter((name) => !pcName(name));
+    if (pcs.length)
+      sections.push(`<section><h4>Not in Atlas <small>${pcs.length}</small></h4><p class="clipboard-muted">Not in the Atlas inventory; the PC tools still work by name.</p><div class="clipboard-table"><table><thead><tr><th>PC name</th><th>Online</th><th></th></tr></thead><tbody>${pcs.map((name) =>
+        `<tr data-clipboard-unknown="${esc(name)}" data-atlas-context="device" data-ad-kind="computer" data-ad-identity="${esc(name)}" tabindex="0"><td><b>${esc(name)}</b></td><td class="clipboard-online" data-online="${esc(name)}"></td><td class="clipboard-row-actions">${toolButtons("data-machine", name)}<button type="button" data-copy="${esc(name)}">Copy</button></td></tr>`).join("")}</tbody></table></div></section>`);
+    sections.push(plain("Tickets", item.tickets, "ticket"), plain("IP addresses", item.ips, "ip"), plain(pcs.length ? "Other words not in Atlas" : "Not in Atlas", other, "unknown"));
     return sections.join("") + `<details class="clipboard-text"><summary>Copied text</summary><pre>${esc(item.text)}</pre></details>` +
       `<div class="clipboard-item-actions"><button type="button" data-copy-text>Copy text</button><button type="button" data-refresh>Refresh data</button><button type="button" data-delete>Delete</button></div>`;
   }
@@ -87,27 +109,23 @@
       if (item.id === opened) bind(node, item);
     });
   }
-  // Machine rows get the full right-click menu (health, groups, deploy...) like everywhere in Atlas:
-  // the shared directory actions plus the Workspace tools, each selecting the machine first.
+  // Machine rows get the full right-click menu like everywhere in Atlas: the tools over the page
+  // (shared-ui.js), the directory actions, and the pages that need Workspace.
   function machineActions(m) {
     const windows = window.AtlasUI.supportsWindows(m);
-    const tool = (id, label, section, run) => ({ id, label, section, disabled: !windows, reason: "Windows tools require a PC",
-      run: async () => { $("clipboardDrawer").classList.remove("open"); setTarget(m.name, m.operational_status, false); await run(); } });
+    const tool = (id, label, section, run, leave = true) => ({ id, label, section, disabled: !windows, reason: "Windows tools require a PC",
+      run: async () => { if (leave) $("clipboardDrawer").classList.remove("open"); setTarget(m.name, m.operational_status, false); await run(); } });
     return [
-      tool("target", "Set as target", "Target & tools", () => page("workspace")),
-      tool("health", "Refresh health", "Target & tools", () => { page("workspace"); return refreshTargetHealth(); }),
+      tool("target", "Set as Workspace target", "Pages", () => page("workspace")),
+      tool("admin", "Remote Admin", "Pages", () => page("admin")),
       ...[["msra", "Open MSRA"], ["rdp", "Remote Desktop"], ["compmgmt", "Computer Management"], ["cshare", "Open C$"]]
-        .map(([id, label]) => tool(id, label, "Remote support", () => openTargetTool(id))),
-      tool("admin", "Remote Admin", "Remote support", () => page("admin")),
-      tool("deploy", "Deploy software…", "Deployment", () => { page("workspace"); openDeploymentPanel(); document.getElementById("pkgSearch")?.focus(); }),
-      tool("specs", "View specifications", "Reports", () => window.AtlasHealth.specs(m.name)),
-      tool("software", "Software inventory", "Reports", () => loadSoftware(m.name)),
+        .map(([id, label]) => tool(id, label, "Remote support", () => openTargetTool(id), false)),
     ];
   }
   function bind(node, item) {
     node.querySelectorAll("[data-clipboard-machine]").forEach((row) => {
       const machine = item.machines.find((m) => m.name === row.dataset.clipboardMachine);
-      if (machine && !row.dataset.atlasContext) window.AtlasContext.bindDevice(row, machine, machineActions(machine));
+      if (machine && !row.dataset.atlasContext) window.AtlasContext.bindDevice(row, { ...machine, tools_context: context(item) }, machineActions(machine));
     });
   }
   async function load() {
@@ -172,6 +190,7 @@
     companionStatus();
   }
   const machinesOf = (item) => item.machines.filter((m) => window.AtlasUI.supportsWindows(m)).map((m) => m.name);
+  const pingable = (item) => [...machinesOf(item), ...unknownPcs(item)];
   async function copy(text, label) {
     try { await navigator.clipboard.writeText(text); remember(SEEN, signature({ text })); notify(label + " copied"); }
     catch { notify("Clipboard unavailable"); }
@@ -196,14 +215,22 @@
     if (!item) return;
     const target = event.target.closest("button");
     if (!target) return;
-    if (target.dataset.select) { page("workspace"); setTarget(target.dataset.select); $("clipboardDrawer").classList.remove("open"); }
-    else if (target.dataset.person) { window.dispatchEvent(new CustomEvent("atlas:inbox-person", { detail: { id: Number(target.dataset.person) } })); $("clipboardDrawer").classList.remove("open"); }
+    const run = (work) => { try { work(); } catch (error) { status(error.message, "bad"); } };
+    if (target.dataset.tool && target.dataset.machine) {
+      const name = target.dataset.machine.toUpperCase(), known = item.machines.find((m) => String(m.name).toUpperCase() === name);
+      const [tab, mode] = { health: ["health", "scan"], checkup: ["checkup", "scan"], tools: ["health", "quick"] }[target.dataset.tool];
+      run(() => tools(item, { machine: name, user: known?.user?.id ? known.user : null }, tab, mode));
+    }
+    else if (target.dataset.person || target.dataset.personGroups) {
+      const user = item.users.find((u) => String(u.id) === (target.dataset.person || target.dataset.personGroups));
+      run(() => tools(item, { user }, target.dataset.person ? "person" : "user-groups", target.dataset.person ? "show" : "scan"));
+    }
     else if (target.dataset.copy) copy(target.dataset.copy, target.dataset.copy);
     else if ("copyText" in target.dataset) copy(item.text, "Text");
     else if (target.dataset.bulk === "copy-machines") copy(item.machines.map((m) => m.name).join("\n"), plural(item.machines.length, "machine name"));
     else if (target.dataset.bulk === "copy-users") copy(item.machines.map((m) => `${m.name}\t${m.user?.full_name || m.assigned_user || ""}\t${m.user?.email || ""}`).join("\n"), "Machines and users");
     else if (target.dataset.bulk === "copy-emails") copy(item.users.map((u) => u.email).filter(Boolean).join("; "), "Emails");
-    else if (target.dataset.bulk === "ping") ping(node, machinesOf(item));
+    else if (target.dataset.bulk === "ping") ping(node, pingable(item));
     else if (target.dataset.bulk === "deploy") {
       $("bulkTargets").value = machinesOf(item).join("\n");
       $("bulkTargets").dispatchEvent(new Event("input", { bubbles: true }));

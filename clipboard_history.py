@@ -25,7 +25,6 @@ SOURCES = ('button', 'paste', 'return', 'screenshot', 'inbox', 'companion')
 HOSTNAME = re.compile(r'(?<![A-Za-z0-9_-])([A-Za-z][A-Za-z0-9-]{4,29})(?![A-Za-z0-9_-])')
 EMAIL = re.compile(r'[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+')
 ACCOUNT = re.compile(r'(?<![A-Za-z0-9])(?:[A-Za-z]{1,3}\\)?[A-Za-z]{1,2}[0-9]{6,9}(?![A-Za-z0-9])')
-NAME = re.compile(r"\b([A-ZÀ-Ý][a-zà-ÿ'’-]+(?: [A-ZÀ-Ý][A-Za-zÀ-ÿ'’-]+){1,3})\b")
 DESK = re.compile(r'(?<![0-9A-Za-z])([0-9]{1,2})\s?([RB])\s?([0-9]{6})(?![0-9])', re.I)
 TICKET = re.compile(r'\b(?:INC|RITM|REQ|CHG|PRB|SCTASK|TASK)[0-9]{6,10}\b', re.I)
 IPV4 = re.compile(r'(?<![0-9.])(?:(?:25[0-5]|2[0-4][0-9]|1?[0-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1?[0-9]?[0-9])(?![0-9.])')
@@ -89,7 +88,10 @@ def find_machines(c, names):
 
 
 def find_users(c, text):
+    """People by email, account or name, as Live Inbox reads names: "Marie Dupont", "DUPONT Marie",
+    "Nazarian, Charles : Markets Pre Trade" (an Outlook display name). Only names one person has."""
     from directory_lookup import exact_users
+    from mail_inbox import name_candidates
     found = {}
     def add(rows, basis):
         if len(rows) == 1:
@@ -98,10 +100,17 @@ def find_users(c, text):
         add(exact_users(c, email, field='email'), 'email')
     for account in dict.fromkeys(ACCOUNT.findall(text)):
         add(exact_users(c, account), 'account')
-    for name in dict.fromkeys(NAME.findall(text)):
+    names = list(name_candidates(text, limit=1200))
+    by_name = {}
+    for start in range(0, len(names), 400):
+        chunk = names[start:start + 400]
+        for row in c.execute(f"select * from legacy_users where name_norm in ({','.join('?' * len(chunk))})", chunk):
+            by_name.setdefault(row['name_norm'], []).append(row)
+    for name in names:  # In the order they were written.
         if len(found) >= 100:
             break
-        add(exact_users(c, name, field='name'), 'name')
+        if name in by_name:
+            add(by_name[name], 'name')
     return list(found.values())[:100]
 
 

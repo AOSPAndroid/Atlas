@@ -5,7 +5,9 @@
    Remote Admin, Active Directory, Workspace and diagrams stay one click away, with a button back
    to Live Inbox. Support tools (support_tools.py): a PC check-up, a message on the PC's screen, a
    restart later, Group Policy refresh, account unlock, BitLocker recovery keys, shared notes on
-   people and PCs, and a work log of what was done for the request, ready to paste in the ticket. */
+   people and PCs, and a work log of what was done for the request, ready to paste in the ticket.
+   Outside Live Inbox the same tools float over the page (window.AtlasTools.open): the clipboard
+   history, right-click menus and anything else open them on a PC or a person without changing page. */
 (() => {
   // [id, label, what it needs]
   const TABS = [
@@ -54,7 +56,7 @@
     ["Please call us", "Please call the IT service desk when you see this message. Thank you."]];
   const LOG = "atlas.inbox.worklog";
   const state = { machine: "", user: null, tab: "health", done: {}, performance: null, groups: {}, docked: false,
-    request: null, person: null, document: "", article: null, results: null };
+    request: null, person: null, document: "", article: null, results: null, floating: false, context: null };
   let dock = null, home = null, back = null, inboxClick = false, lookupGeneration = 0, companionInfo = null;
   const drafts = new Map(), checkups = new Map();
 
@@ -64,6 +66,8 @@
   const machineName = (machine) => String(machine?.name || machine?.machine_name || "").toUpperCase();
   const windows = (machine) => window.AtlasUI?.supportsWindows ? window.AtlasUI.supportsWindows(machine) : true;
   const inbox = () => document.getElementById("inbox");
+  // The Live Inbox message the tools work on; none while they float over another page.
+  const req = () => (state.floating ? null : state.request);
   const pane = (tab) => dock.querySelector(`[data-work-pane="${tab}"]`);
   const number = (value) => (value === null || value === undefined || value === "" || !Number.isFinite(Number(value)) ? null : Number(value));
   const percent = (value) => (number(value) === null ? "–" : Math.round(number(value)) + "%");
@@ -80,7 +84,7 @@
   // Notes follow the directory person (canonical key) so they survive a directory rebuild.
   const noteKey = (user) => user?.canonical_key || (account(user) ? "account:" + account(user).toLowerCase() : "");
   const available = () => ({ machine: !!state.machine, user: !!state.user?.id, account: !!account(state.user), document: !!state.document,
-    message: !!state.request?.message, any: !!(state.machine || state.user?.id || state.request?.message) });
+    message: !!req()?.message, any: !!(state.machine || state.user?.id || req()?.message) });
 
   function build() {
     dock = document.createElement("aside");
@@ -88,7 +92,7 @@
     dock.className = "inbox-work";
     dock.hidden = true;
     dock.setAttribute("aria-label", "Request tools");
-    dock.innerHTML = `<div class="inbox-work-head"><div><small>Request tools · without leaving Live Inbox</small><h2 data-work-title></h2></div><button type="button" class="inbox-work-close" data-work-close aria-label="Close request tools" title="Close">×</button></div>
+    dock.innerHTML = `<div class="inbox-work-head"><div><small data-work-where>Request tools · without leaving Live Inbox</small><h2 data-work-title></h2></div><button type="button" class="inbox-work-close" data-work-close aria-label="Close request tools" title="Close">×</button></div>
 <div class="inbox-work-request" data-work-request hidden></div>
 <form class="inbox-work-lookup" data-work-lookup role="search"><input type="search" name="term" placeholder="Look up anyone: name, account, email or PC" aria-label="Look up a person or PC" autocomplete="off" spellcheck="false" /><button type="submit">Find</button></form>
 <div class="inbox-work-results" data-work-results hidden></div>
@@ -98,13 +102,18 @@
 ${TABS.map(([id]) => `<section class="inbox-work-pane" role="tabpanel" id="inboxWorkPane-${id}" data-work-pane="${id}" aria-labelledby="inboxWorkTab-${id}" hidden></section>`).join("")}`;
     pane("health").innerHTML = "<div data-work-health></div>";
     dock.addEventListener("click", (event) => click(event).catch((error) => toast(error.message)));
+    dock.addEventListener("keydown", (event) => { if (event.key === "Escape" && state.floating && !event.target.closest("input,textarea,select")) close(); });
+    // Floating tools sit left of an open drawer (clipboard, queue, deployments) so both stay usable.
+    const drawers = new MutationObserver(avoidDrawers);
+    document.querySelectorAll(".queue-drawer, .deployments-drawer").forEach((node) => drawers.observe(node, { attributes: true, attributeFilter: ["class"] }));
+    window.addEventListener("resize", avoidDrawers);
     dock.addEventListener("input", (event) => {
       if (event.target.matches("[data-work-filter]")) filterGroups(event.target);
-      if (event.target.matches("[data-work-reply]")) drafts.get(state.request.message.id).text = event.target.value;
+      if (event.target.matches("[data-work-reply]")) drafts.get(req().message.id).text = event.target.value;
       if (event.target.matches("[data-work-key-filter]")) filterKeys(event.target.value);
     });
     dock.addEventListener("change", (event) => {
-      if (event.target.matches("[data-work-reply-all]")) drafts.get(state.request.message.id).all = event.target.checked;
+      if (event.target.matches("[data-work-reply-all]")) drafts.get(req().message.id).all = event.target.checked;
       if (event.target.matches("[data-work-checkup-days]")) { state.checkupDays = Number(event.target.value); checkup().catch((error) => toast(error.message)); }
     });
     dock.addEventListener("submit", (event) => {
@@ -118,15 +127,16 @@ ${TABS.map(([id]) => `<section class="inbox-work-pane" role="tabpanel" id="inbox
     });
   }
 
-  /** Opens the tools beside the message; false when Live Inbox is not on screen (callers then use
-   *  Workspace). A missing machine or user keeps the current one; a different person without a
-   *  machine gets their own PC once their record has loaded. */
+  /** Opens the tools beside the Live Inbox message, or floating over any other page. A missing
+   *  machine or user keeps the current one; a different person without a machine gets their own PC
+   *  once their record has loaded. detail.context ({label, title, people, machines, log}) lists
+   *  who and what the opener holds (a clipboard item), one click each. False only in the viewer. */
   function open(detail = {}, tab = "health", mode = "show") {
-    const grid = document.querySelector("#liveInbox .inbox-grid");
-    if (!grid || !inbox()?.classList.contains("active")) return false;
+    if (window.AtlasReadOnly) return false;
     if (!dock) build();
-    // React owns .inbox-grid's two columns and never re-orders them, so the panel stays the last child.
-    if (dock.parentNode !== grid) grid.append(dock);
+    place();
+    if (detail.context !== undefined) state.context = detail.context;
+    else if (!state.floating) state.context = null;
     const user = detail.user === undefined ? state.user : detail.user;
     const samePerson = (user?.id ?? account(user)) === (state.user?.id ?? account(state.user));
     const machine = detail.machine === undefined ? (samePerson ? state.machine : "") : String(detail.machine || "").toUpperCase();
@@ -135,6 +145,8 @@ ${TABS.map(([id]) => `<section class="inbox-work-pane" role="tabpanel" id="inbox
     dock.hidden = false;
     renderRequest();
     show(tab, mode);
+    // Message on screen… and Restart later… from a menu open their form straight away.
+    if (detail.form && state.machine) actionForm(detail.form);
     // Their record, desk and PCs, ready in Person; it also picks their PC when none was given.
     if (user?.id && tab !== "person" && state.done.person !== user.id) loadPerson();
     return true;
@@ -166,6 +178,26 @@ ${TABS.map(([id]) => `<section class="inbox-work-pane" role="tabpanel" id="inbox
     refreshTabs();
     dock.querySelectorAll('[data-needs="machine"]').forEach((button) => { button.disabled = !machine; });
     renderRequest();
+  }
+
+  // Beside the message in Live Inbox; elsewhere a panel over the page, which stays open as you move
+  // between pages until it is closed.
+  function place() {
+    const grid = inbox()?.classList.contains("active") && document.querySelector("#liveInbox .inbox-grid");
+    // React owns .inbox-grid's two columns and never re-orders them, so the panel stays the last child.
+    if (grid) { if (dock.parentNode !== grid) grid.append(dock); }
+    else if (dock.parentNode !== document.body) document.body.append(dock);
+    state.floating = !grid;
+    dock.classList.toggle("inbox-work-floating", state.floating);
+    dock.setAttribute("aria-label", state.floating ? "Tools" : "Request tools");
+    dock.querySelector("[data-work-where]").textContent = state.floating ? "Tools · over this page, nothing changes page" : "Request tools · without leaving Live Inbox";
+    avoidDrawers();
+  }
+
+  function avoidDrawers() {
+    if (!dock || !state.floating) return;
+    const width = Math.max(0, ...[...document.querySelectorAll(".queue-drawer.open, .deployments-drawer.open")].map((node) => node.getBoundingClientRect().width));
+    dock.style.right = width && innerWidth - width >= 500 ? `${Math.round(width) + 8}px` : "";
   }
 
   function refreshTabs() {
@@ -249,7 +281,7 @@ ${TABS.map(([id]) => `<section class="inbox-work-pane" role="tabpanel" id="inbox
   }
 
   function renderReply() {
-    const detail = state.request, host = pane("reply"), message = detail.message, id = message.id;
+    const detail = req(), host = pane("reply"), message = detail.message, id = message.id;
     const draft = drafts.get(id) || { lang: FRENCH.test(`${message.subject} ${message.body}`) ? "fr" : "en", text: "", all: false };
     drafts.set(id, draft);
     const teams = message.channel === "teams" && message.content_kind === "notification";
@@ -264,7 +296,7 @@ ${TABS.map(([id]) => `<section class="inbox-work-pane" role="tabpanel" id="inbox
   }
 
   async function sendReply(how) {
-    const detail = state.request, message = detail.message, draft = drafts.get(message.id), note = pane("reply").querySelector("[data-work-reply-status]");
+    const detail = req(), message = detail.message, draft = drafts.get(message.id), note = pane("reply").querySelector("[data-work-reply-status]");
     const text = draft.text.trim();
     if (!text && how !== "outlook") return toast("Write the reply first.");
     note.textContent = "Opening…";
@@ -299,7 +331,8 @@ ${TABS.map(([id]) => `<section class="inbox-work-pane" role="tabpanel" id="inbox
 
   // Everyone and every PC in the selected message, one click each.
   function requestEntries() {
-    const detail = state.request;
+    if (state.context) return { people: state.context.people || [], machines: state.context.machines || [] };
+    const detail = req();
     if (!detail) return { people: [], machines: [] };
     const sender = detail.match?.user, named = (detail.analysis?.people || []).filter((p) => !p.ambiguous);
     const people = [...(sender ? [{ user: sender, label: fullName(sender), role: "sender" }] : []), ...named.map((p) => ({ user: p, label: fullName(p), role: "named" }))];
@@ -319,7 +352,7 @@ ${TABS.map(([id]) => `<section class="inbox-work-pane" role="tabpanel" id="inbox
     if (!host) return;
     const { people, machines } = requestEntries();
     host.hidden = people.length + machines.length < 2;
-    host.innerHTML = `<small>In this request</small>${people.map((p, i) => `<button type="button" data-work-person="${i}" aria-pressed="${p.user.id === state.user?.id}" title="${p.role === "sender" ? "Sender" : "Named in the message"}">${esc(p.label)}${p.role === "sender" ? " · sender" : ""}</button>`).join("")}${machines.map((m, i) => `<button type="button" data-work-machine="${i}" aria-pressed="${m.name === state.machine}" data-kind="machine">${esc(m.name)}</button>`).join("")}`;
+    host.innerHTML = `<small>${esc(state.context?.label || "In this request")}</small>${people.map((p, i) => `<button type="button" data-work-person="${i}" aria-pressed="${p.user.id === state.user?.id}" title="${{ sender: "Sender", named: "Named in the message" }[p.role] || "In the copied text"}">${esc(p.label)}${p.role === "sender" ? " · sender" : ""}</button>`).join("")}${machines.map((m, i) => `<button type="button" data-work-machine="${i}" aria-pressed="${m.name === state.machine}" data-kind="machine">${esc(m.name)}</button>`).join("")}`;
   }
 
   async function loadPerson() {
@@ -357,7 +390,7 @@ ${TABS.map(([id]) => `<section class="inbox-work-pane" role="tabpanel" id="inbox
 
   function renderPerson() {
     const { user, machines = [], desks = [], deployments = [], note: pinned } = state.person, host = pane("person");
-    const requests = (state.person.requests || []).filter((request) => request.id !== state.request?.message?.id);
+    const requests = (state.person.requests || []).filter((request) => request.id !== req()?.message?.id);
     const rows = RECORD.filter(([, key]) => user[key]).map(([label, key]) => [label, user[key]]);
     if (desks.length) rows.splice(Math.min(rows.length, 5), 0, ["Desk", desks.map((desk) => `${desk.id} (floor ${desk.floor})${/name/.test(desk.match || "") ? " · name match" : ""}`).join(", ")]);
     const links = user.email ? [["chat", "Teams chat"], ["call", "Teams call"], ["mail", "Email"]].map(([kind, label]) => `<button type="button" data-work-link="${kind}">${label}</button>`).join("") : "";
@@ -694,7 +727,7 @@ ${missing.length ? groupList(missing).replace('class="inbox-work-groups"', 'clas
   // Notes: shared notes on the person and the PC (kept by Atlas), and this request's work log
   // (kept in this browser), which "Copy for ticket" turns into text for the ticket.
   async function renderNotes(mode) {
-    const host = pane("notes"), who = noteKey(state.user), pc = state.machine, key = `${who}|${pc}|${state.request?.message?.id || ""}`;
+    const host = pane("notes"), who = noteKey(state.user), pc = state.machine, key = `${who}|${pc}|${logId()}`;
     if (mode !== "scan" && state.done.notes === key && host.querySelector("[data-work-log]")) return renderLog();
     state.done.notes = key;
     busy(host, "Loading notes…");
@@ -723,7 +756,7 @@ ${missing.length ? groupList(missing).replace('class="inbox-work-groups"', 'clas
   function worklog() {
     try { return JSON.parse(localStorage.getItem(LOG)) || {}; } catch { return {}; }
   }
-  const logId = () => String(state.request?.message?.id || "general");
+  const logId = () => String(state.context?.log || req()?.message?.id || "general");
 
   // What was done from these tools, for the message on screen; the latest 100 requests are kept.
   function logWork(text) {
@@ -738,8 +771,8 @@ ${missing.length ? groupList(missing).replace('class="inbox-work-groups"', 'clas
   function renderLog() {
     const host = dock && pane("notes").querySelector("[data-work-log]");
     if (!host) return;
-    const entries = worklog()[logId()] || [], message = state.request?.message;
-    host.innerHTML = `<div class="inbox-work-toolbar"><b>Work log${message ? " for this request" : ""} (${entries.length})</b><span><button type="button" class="primary" data-work-log-copy>Copy for ticket</button>${entries.length ? '<button type="button" data-work-log-clear>Clear</button>' : ""}</span></div>
+    const entries = worklog()[logId()] || [], message = req()?.message;
+    host.innerHTML = `<div class="inbox-work-toolbar"><b>Work log${message ? " for this request" : state.context ? " for this copy" : ""} (${entries.length})</b><span><button type="button" class="primary" data-work-log-copy>Copy for ticket</button>${entries.length ? '<button type="button" data-work-log-clear>Clear</button>' : ""}</span></div>
 ${entries.length ? `<ol class="inbox-work-log">${entries.map((entry) => `<li><time datetime="${esc(entry.at)}">${esc(clock(entry.at))}</time><span>${esc(entry.text)}</span></li>`).join("")}</ol>` : '<p class="inbox-work-muted">Check-ups, messages, restarts, unlocks, BitLocker keys and replies done from these tools are listed here.</p>'}
 <form class="inbox-work-lookup" data-work-log-add><input name="text" maxlength="300" placeholder="Add a line: called the user, problem confirmed…" aria-label="Add to the work log" autocomplete="off" /><button type="submit">Add</button></form>`;
   }
@@ -752,8 +785,8 @@ ${entries.length ? `<ol class="inbox-work-log">${entries.map((entry) => `<li><ti
   }
 
   function ticketText() {
-    const message = state.request?.message, user = state.request?.match?.user || state.user, entries = worklog()[logId()] || [];
-    return [message ? `Request: ${message.subject || "(no subject)"}` : "",
+    const message = req()?.message, user = req()?.match?.user || state.user, entries = worklog()[logId()] || [];
+    return [message ? `Request: ${message.subject || "(no subject)"}` : state.context?.title ? `About: ${state.context.title}` : "",
       message ? `From: ${message.sender_name || message.sender_address}${message.received_at ? ", " + new Date(message.received_at).toLocaleString() : ""}` : "",
       user ? `User: ${[fullName(user), user.user_name].filter((value, i, all) => value && all.indexOf(value) === i).join(" · ")}` : "",
       state.machine ? `PC: ${state.machine}` : "",
@@ -855,6 +888,13 @@ ${keys.length ? `<ul class="inbox-work-keys">${keys.map((key, i) => `<li data-ke
   function dockDeployment() {
     const panel = document.getElementById("deploymentPanel");
     if (!panel) return;
+    pane("deploy").querySelector("[data-work-deploy-note]")?.remove();
+    if (state.floating && document.getElementById("workspace")?.classList.contains("active")) {
+      undock();
+      pane("deploy").insertAdjacentHTML("afterbegin", `<p class="inbox-work-muted" data-work-deploy-note>The deployment panel is on this Workspace page, set to ${esc(state.machine)}.</p>`);
+      syncDeploymentPanel({ selection: true });
+      return panel.scrollIntoView?.({ block: "nearest" });
+    }
     if (!home) home = { parent: panel.parentNode, next: panel.nextSibling };
     if (panel.parentNode !== pane("deploy")) pane("deploy").append(panel);
     state.docked = true;
@@ -873,6 +913,7 @@ ${keys.length ? `<ul class="inbox-work-keys">${keys.map((key, i) => `<li data-ke
     invalidateLookup();
     undock();
     state.docked = false;
+    state.context = null;
     const host = dock.querySelector("[data-work-health]");
     if (host) window.AtlasHealth?.cancel(host);
     dock.hidden = true;
@@ -952,9 +993,9 @@ ${keys.length ? `<ul class="inbox-work-keys">${keys.map((key, i) => `<li data-ke
       return openLink(data.workLink === "mail" ? "mailto:" + email : teamsLink(data.workLink, email));
     }
     if (data.workLang || data.workTemplate) {
-      const draft = drafts.get(state.request.message.id);
+      const draft = drafts.get(req().message.id);
       if (data.workLang) { draft.lang = data.workLang; return renderReply(); }
-      draft.text = fill(REPLIES[draft.lang].find(([key]) => key === data.workTemplate)[2], state.request, draft.lang);
+      draft.text = fill(REPLIES[draft.lang].find(([key]) => key === data.workTemplate)[2], req(), draft.lang);
       const box = pane("reply").querySelector("[data-work-reply]");
       box.value = draft.text;
       return box.focus();
@@ -962,7 +1003,7 @@ ${keys.length ? `<ul class="inbox-work-keys">${keys.map((key, i) => `<li data-ke
     if ("workReplyOutlook" in data) return sendReply("outlook");
     if ("workReplyTeams" in data) return sendReply("teams");
     if ("workReplyMail" in data) return sendReply("mail");
-    if ("workReplyCopy" in data) return copy(drafts.get(state.request.message.id).text, "Reply");
+    if ("workReplyCopy" in data) return copy(drafts.get(req().message.id).text, "Reply");
     if ("workKbOpen" in data) return window.AtlasKnowledge.show(state.document);
     if ("workAd" in data) {
       const { kind, id } = state.groups[state.tab];
@@ -983,7 +1024,7 @@ ${keys.length ? `<ul class="inbox-work-keys">${keys.map((key, i) => `<li data-ke
     state.request = event.detail;
     renderRequest();
     if (dock) refreshTabs();
-    if (changed && dock && !dock.hidden && state.tab === "reply" && state.request?.message) renderReply();
+    if (changed && dock && !dock.hidden && state.tab === "reply" && req()?.message) renderReply();
     if (changed && dock && !dock.hidden && state.tab === "notes") renderNotes();
     // "Other requests" leaves out the message now on screen.
     if (changed && state.person) renderPerson();
@@ -1015,10 +1056,16 @@ ${keys.length ? `<ul class="inbox-work-keys">${keys.map((key, i) => `<li data-ke
   window.page = function (id) {
     const leaving = id !== "inbox" && !!inbox()?.classList.contains("active");
     // Back in Workspace before the switch, so the panel is never hidden with a package half chosen.
-    if (leaving) { invalidateLookup(); undock(false); }
+    if ((leaving && !state.floating) || (id === "workspace" && state.floating)) { if (!state.floating) invalidateLookup(); undock(false); }
     const result = original.apply(this, arguments);
+    const floating = dock && !dock.hidden && state.floating;
+    if (floating && id !== "inbox") {
+      try { if (state.tab === "deploy") show("deploy"); } catch (error) { toast(error.message); }
+    }
     if (id === "inbox") {
       returnButton(false);
+      // Floating tools join the message as its third column.
+      if (floating) { place(); state.context = null; refreshTabs(); renderRequest(); }
       try {
         // Deploy on screen takes the request's machine back; otherwise only re-dock when the target is unchanged.
         if (dock && !dock.hidden && state.docked) state.tab === "deploy" ? show("deploy") : S.target === state.machine && dockDeployment();
@@ -1029,5 +1076,7 @@ ${keys.length ? `<ul class="inbox-work-keys">${keys.map((key, i) => `<li data-ke
     return result;
   };
 
-  window.AtlasInboxWork = { open, close, show, isOpen: () => !!dock && !dock.hidden && dock.isConnected, state: () => ({ machine: state.machine, tab: state.tab, user: state.user?.id }) };
+  window.AtlasInboxWork = { open, close, show, isOpen: () => !!dock && !dock.hidden && dock.isConnected, state: () => ({ machine: state.machine, tab: state.tab, user: state.user?.id, floating: state.floating }) };
+  // The same tools from anywhere in Atlas Admin: the clipboard history, right-click menus, search.
+  window.AtlasTools = { open, close, isOpen: window.AtlasInboxWork.isOpen };
 })();

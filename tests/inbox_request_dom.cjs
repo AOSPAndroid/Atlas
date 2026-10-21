@@ -94,16 +94,19 @@ const analysis = {
   assert.deepEqual(reboots, [], 'Cancelled reboot does nothing');
   x.confirm = () => true; await actions.run({ action: 'reboot', user: person, machine: 'LAPTOP-01' });
   assert.deepEqual(reboots, ['LAPTOP-01']);
+  // AD groups open in the tools over the page, not on the Active Directory page.
   const shown = []; x.AtlasAD = { show: (...args) => shown.push(args) };
   await actions.run({ action: 'user-groups', user: person });
+  assert.deepEqual([x.AtlasInboxWork.state().tab, x.AtlasInboxWork.state().floating], ['user-groups', true]);
   await actions.run({ action: 'machine-groups', user: person, machine: 'LAPTOP-01' });
-  assert.deepEqual(shown, [['user', 'INBOX0'], ['computer', 'LAPTOP-01']]);
+  assert.deepEqual([x.AtlasInboxWork.state().tab, x.AtlasInboxWork.state().machine], ['machine-groups', 'LAPTOP-01']);
+  assert.deepEqual(shown, []);
   g.run("S.machines.push({ name: 'PHONE-01', device_kind: 'phone', windows_remote_supported: 0 })");
   await assert.rejects(actions.run({ action: 'deploy', user: person, machine: 'PHONE-01', pkg: { folder: 'Example App' } }), /inventory only/);
-  assert(calls.every(c => c.method === 'GET'), 'No deployment, queue or reboot request was sent by Atlas itself');
+  assert(calls.every(c => c.method === 'GET' || c.url === '/api/active-directory/lookup'), 'No deployment, queue or reboot request was sent by Atlas itself');
   x.AtlasReadOnly = { reason: 'Read only' };
   await assert.rejects(actions.run({ action: 'target', user: person, machine: 'LAPTOP-01' }), /Atlas Admin/);
   await sleep(300);
   x.close();
-  console.log('PASS: Live Inbox request card sends person/machine/package actions, named machines first, escaping, inventory-only guard; handler selects package and script, queues without deploying, confirms reboots, opens AD groups and refuses in Demo');
+  console.log('PASS: Live Inbox request card sends person/machine/package actions, named machines first, escaping, inventory-only guard; handler selects package and script, queues without deploying, confirms reboots, opens AD groups in the tools over the page and refuses in Demo');
 })().catch(error => { console.error(error); process.exit(1); });

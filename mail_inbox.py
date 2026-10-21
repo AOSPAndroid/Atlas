@@ -158,7 +158,9 @@ def name_candidates(text, limit=400):
                 for variant in variants:
                     found.setdefault(' '.join(variant).lower(), written)
                 if size == 2:
+                    # Directories keep "Dupont, Marie" too; either order may have been written.
                     found.setdefault(f'{window[1]}, {window[0]}'.lower(), written)
+                    found.setdefault(f'{window[0]}, {window[1]}'.lower(), written)
         if len(found) >= limit:
             break
     return found
