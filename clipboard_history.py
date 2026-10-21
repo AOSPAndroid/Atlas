@@ -80,10 +80,18 @@ def find_machines(c, names):
                 "join legacy_users u on u.id=a.user_id_ref where m.name in (%s) "
                 "order by a.relationship_type='assigned_to' desc" % ','.join('?' * len(chunk)), chunk):
             owners.setdefault(row['machine'], {**person(row), 'relationship': row['relationship_type'] if 'relationship_type' in row.keys() else ''})
+    # Citrix VDIs: their user comes from the Citrix export's assignments.
+    vdi_keys = [m['vdi_key'] for m in found if m.get('vdi_key')]
+    vdi_owners = {}
+    for start in range(0, len(vdi_keys), 400):
+        chunk = vdi_keys[start:start + 400]
+        for row in c.execute("select l.machine_key as vdi, u.* from vdi_links l join legacy_users u on u.canonical_key=l.user_key "
+                             "where l.machine_key in (%s) order by u.full_name" % ','.join('?' * len(chunk)), chunk):
+            vdi_owners.setdefault(row['vdi'], {**person(row), 'relationship': 'Citrix assignment'})
     out = []
     for machine in found:
         info = extra.get(machine['name'], {})
-        out.append({**machine, **{k: v for k, v in info.items() if v}, 'user': owners.get(machine['name'])})
+        out.append({**machine, **{k: v for k, v in info.items() if v}, 'user': owners.get(machine['name']) or vdi_owners.get(machine.get('vdi_key'))})
     return out
 
 
@@ -133,7 +141,7 @@ def enrich(c, text):
     names = list(written)
     machines = find_machines(c, names)
     from mail_inbox import lookalike_key
-    known = {m['name'].casefold() for m in machines} | {str(m.get('written_as', '')).casefold() for m in machines}
+    known = {m['name'].casefold() for m in machines} | {str(m.get(k) or '').casefold() for m in machines for k in ('written', 'written_as')}
     # A misread spelling of a machine already found (LAPT0P-OOO1 for LAPTOP-0001) is not unknown.
     lookalikes = {lookalike_key(m['name'].casefold()) for m in machines}
     users = find_users(c, text)

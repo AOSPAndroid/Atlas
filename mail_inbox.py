@@ -115,26 +115,80 @@ def lookalike_key(value):
 
 
 def mentioned_machines(connection, names):
+    """Machines Atlas knows by these names, found as Workspace search finds them: the inventory name,
+    its short name when the inventory keeps the full DNS or DOMAIN\\NAME form, the ServiceNow CI
+    name, and Citrix VDIs from the Citrix export. Names with no match are retried with look-alike
+    characters made equal, so a misread "GBRPWMK2O88I521" still finds GBRPWMK20881521. Each row keeps
+    how it was written ("written"); "written_as" marks a look-alike reading."""
+    from directory_lookup import MACHINE_SHORT_SQL
+    import vdi_data
+    names = list(dict.fromkeys(str(name).casefold() for name in names if name))
     if not names:
         return []
     columns = 'name,name_norm,device_kind,model_id,operational_status,windows_remote_supported'
-    rows = [dict(row) for row in connection.execute(
-        f'SELECT {columns} FROM legacy_machines WHERE name_norm IN (%s) ORDER BY name' % ','.join('?' * len(names)), names)]
-    found = {row['name_norm'] for row in rows}
-    # Names with no exact match are retried with look-alike characters made equal, so a misread
-    # "GBRPWMK2O88I521" still finds GBRPWMK20881521. Only machines in inventory are returned.
-    missing = {lookalike_key(name): name for name in names if name not in found}
+    rows, seen, missing = [], set(), set(names)
+
+    def add(row, written, lookalike=False):
+        missing.discard(written)
+        key = str(row.get('vdi_key') or row['name']).casefold()
+        if key in seen:
+            return
+        seen.add(key)
+        rows.append({**{k: v for k, v in row.items() if k not in ('name_norm', 'match_key')}, 'written': written.upper(),
+                     **({'written_as': written.upper()} if lookalike else {})})
+
+    def place(values):
+        return ','.join('?' * len(values))
+
+    for row in connection.execute(f'SELECT {columns} FROM legacy_machines WHERE name_norm IN ({place(names)}) ORDER BY name', names):
+        add(dict(row), row['name_norm'])
+    if missing:
+        # The inventory may keep "pc01.intranet.example" or "INTRANET\PC01" (and a ServiceNow CI name).
+        wanted = sorted(missing)
+        known = {row[1] for row in connection.execute('pragma table_info(machines)')}
+        ci = f' OR lower(source_ci) IN ({place(wanted)})' if 'source_ci' in known else ''
+        qualified = connection.execute("SELECT 1 FROM legacy_machines WHERE instr(machine_name,'.')>0 OR instr(machine_name,'\\')>0 LIMIT 1").fetchone()
+        if qualified or ci:
+            short = f'{MACHINE_SHORT_SQL} IN ({place(wanted)})' if qualified else '0'
+            for row in connection.execute(
+                    f'SELECT {columns},{MACHINE_SHORT_SQL} AS match_key{", lower(source_ci) AS ci_key" if ci else ""} FROM legacy_machines '
+                    f'WHERE {short}{ci} ORDER BY name LIMIT 200', [*(wanted if qualified else []), *(wanted if ci else [])]):
+                row = dict(row)
+                ci_key = row.pop('ci_key', None)
+                written = row['match_key'] if row['match_key'] in missing else ci_key
+                if written in missing:
+                    add(row, written)
+    vdi = vdi_data.exists(connection)
+
+    def citrix(record):
+        catalog = record.get('vdi_catalog') or ''
+        return {'name': record['name'], 'device_kind': 'vdi', 'model_id': 'Citrix VDI' + (' · ' + catalog if catalog else ''),
+                'operational_status': record.get('vdi_registration_state') or 'Citrix', 'windows_remote_supported': record.get('windows_remote_supported'),
+                **{k: record.get(k) for k in ('vdi_key', 'source_kind', 'vdi_power_state', 'vdi_delivery_group', 'vdi_assigned_users')}}
+    if missing and vdi:
+        wanted = sorted(missing)
+        for record in vdi_data._read_records(connection, 'select ' + vdi_data.READ_COLUMNS + f' from vdi_devices d where d.short_norm in ({place(wanted)}) '
+                                             f'or d.name_norm in ({place(wanted)}) order by d.name_norm limit 200', (*wanted, *wanted)):
+            for written in (str(record.get('vdi_short_name') or '').casefold(), str(record.get('name_norm') or '').casefold()):
+                if written in missing:
+                    add(citrix(record), written)
+                    break
     if missing:
         connection.create_function('atlas_lookalike', 1, lookalike_key, deterministic=True)
-        lengths = sorted({len(name) for name in missing.values()})
+        wanted = {lookalike_key(name): name for name in missing}
+        lengths = sorted({len(name) for name in wanted.values()})
         for row in connection.execute(
-                f'SELECT {columns} FROM legacy_machines WHERE length(name_norm) IN (%s) AND atlas_lookalike(name_norm) IN (%s) '
-                'ORDER BY name LIMIT 20' % (','.join('?' * len(lengths)), ','.join('?' * len(missing))),
-                (*lengths, *missing)):
-            if row['name_norm'] not in found:
-                found.add(row['name_norm'])
-                rows.append({**dict(row), 'written_as': missing[lookalike_key(row['name_norm'])].upper()})
-    return [{key: value for key, value in row.items() if key != 'name_norm'} for row in rows]
+                f'SELECT {columns} FROM legacy_machines WHERE length(name_norm) IN ({place(lengths)}) AND atlas_lookalike(name_norm) IN ({place(wanted)}) '
+                'ORDER BY name LIMIT 20', (*lengths, *wanted)):
+            add(dict(row), wanted[lookalike_key(row['name_norm'])], lookalike=True)
+        left = {key: name for key, name in wanted.items() if name in missing}
+        if left and vdi:
+            for record in vdi_data._read_records(connection, 'select ' + vdi_data.READ_COLUMNS + f' from vdi_devices d where length(d.short_norm) in ({place(lengths)}) '
+                                                 f'and atlas_lookalike(d.short_norm) in ({place(left)}) order by d.name_norm limit 20', (*lengths, *left)):
+                written = left.get(lookalike_key(str(record.get('vdi_short_name') or '').casefold()))
+                if written in missing:
+                    add(citrix(record), written, lookalike=True)
+    return rows
 
 
 # People named in a message, as people write them: "Marie Dupont", "DUPONT Marie", "Dupont, Marie",

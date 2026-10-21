@@ -24,7 +24,7 @@ function EmptyInbox({ title, children }) {
 const termKey = (text) => text.toLowerCase().replace(/[,\s]+/g, " ");
 function highlight(text, analysis, user) {
   const terms = new Map();
-  for (const m of analysis?.machines || []) for (const t of [m.name, m.written_as]) if (t) terms.set(termKey(t), { machine: m.name });
+  for (const m of analysis?.machines || []) for (const t of [m.name, m.written_as, m.written]) if (t) terms.set(termKey(t), { machine: m.name });
   for (const p of analysis?.people || []) terms.set(termKey(p.written), p.ambiguous ? { shared: p.candidates.length } : { person: p });
   if (!terms.size) return text;
   const pattern = new RegExp("(" + [...terms.keys()].sort((a, b) => b.length - a.length).map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/ /g, "[,\\s]+")).join("|") + ")", "i");

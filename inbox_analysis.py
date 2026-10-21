@@ -192,7 +192,7 @@ def analyse(subject, body, *, packages=(), documents=(), find_machines=lambda na
     # Machine names and email addresses are not product names: "EXAMPLE-DESKTOP-02" or
     # "alex@example.test" must not suggest "Example App".
     for machine in found:
-        for written in {str(machine.get('name', '')), str(machine.get('written_as') or '')} - {''}:
+        for written in {str(machine.get('name', '')), str(machine.get('written_as') or ''), str(machine.get('written') or '')} - {''}:
             text = re.sub(re.escape(written), ' ', text, flags=re.I)
     text = re.sub(r'[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+', ' ', text)
     words = plain(text)

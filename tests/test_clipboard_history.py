@@ -30,6 +30,16 @@ class ClipboardHistory(unittest.TestCase):
             c.execute("INSERT INTO machines(id,machine_name,machine_name_norm,assigned_to,model_id,operational_status) VALUES(1,'LAPTOP-0001','laptop-0001','X01000001','Latitude 7450','Operational')")
             c.execute("INSERT INTO machines(id,machine_name,machine_name_norm,model_id) VALUES(2,'SPARE-PC-0042','spare-pc-0042','OptiPlex 7020')")
             rebuild_links(c)
+            # A PC the inventory keeps under its DNS name, and Citrix VDIs from the Citrix export.
+            c.execute("INSERT INTO machines(id,machine_name,machine_name_norm,model_id,operational_status) VALUES(3,'PARPWMK30560566.intranet.example','parpwmk30560566.intranet.example','Precision 3280','Operational')")
+            import vdi_data
+            vdi_data.initialize(c)
+            for short in ('GBRNHTIBV000327', 'GBRNHTIBV000329', 'GBRNHTIBV000320'):
+                c.execute('insert into vdi_devices(machine_key,target_name,name_norm,short_name,short_norm,original_name,domain,catalog,delivery_group,user_display_names,'
+                          'maintenance_mode,user_change_persistence,power_state,registration_state,matching_issue,raw_json,source_rows_json,source,imported_at) '
+                          "values(?,?,?,?,?,?,'INTRANET','Single-session OS Machines','Paris VDI','','False','','On','Registered','','{}','[]','citrix.csv','2026-10-21T09:00:00')",
+                          ('netbios:intranet\\' + short.lower(), short, short.lower(), short, short.lower(), 'INTRANET\\' + short))
+            c.execute("insert into vdi_links values('netbios:intranet\\gbrnhtibv000327','person:4')")
             c.execute('create table official_records(id text primary key, body text)')
             c.execute("insert into official_records values('02R015079', ?)", (json.dumps({'name': 'Alex Morgan', 'team': 'Equities', 'floor': 2, 'occupancy': 'assigned'}),))
         test = self
@@ -64,6 +74,19 @@ class ClipboardHistory(unittest.TestCase):
         self.assertEqual(item['desks'], [{'desk': '02R015079', 'name': 'Alex Morgan', 'team': 'Equities', 'floor': 2, 'occupancy': 'assigned'}])
         self.assertEqual((item['tickets'], item['ips']), (['INC0045678'], ['10.40.12.7']))
         self.assertEqual(self.client.get('/api/clipboard').json()['items'][0]['id'], item['id'])
+
+    def test_machines_as_workspace_search_finds_them(self):
+        # The short name of a DNS name, Citrix VDIs (short and fully qualified), and a screenshot reading I as l.
+        for text, name, kind in [('PARPWMK30560566', 'PARPWMK30560566.intranet.example', None), ('GBRNHTIBV000327', 'GBRNHTIBV000327', 'vdi'),
+                                 ('GBRNHTIBV000329.INTRANET.BARCAPINT.COM', 'GBRNHTIBV000329', 'vdi'), ('Q GBRNHTlBV000320 · Single-session OS Machines 0', 'GBRNHTIBV000320', 'vdi')]:
+            item = self.post(text).json()
+            self.assertEqual(([m['name'] for m in item['machines']], item['unknown_machines']), ([name], []), text)
+            if kind:
+                self.assertEqual((item['machines'][0]['device_kind'], item['machines'][0]['model_id']), ('vdi', 'Citrix VDI · Single-session OS Machines'))
+        self.assertEqual(item['machines'][0]['written_as'], 'GBRNHTLBV000320', 'A look-alike reading is shown as such')
+        vdi = self.post('GBRNHTIBV000327').json()['machines'][0]
+        self.assertEqual(vdi['user']['full_name'], 'Charles Nazarian', 'A VDI user comes from the Citrix assignment')
+        self.assertEqual(self.post('GBRNHTIBV999999').json()['unknown_machines'], ['GBRNHTIBV999999'])
 
     def test_names_as_outlook_and_people_write_them(self):
         # An Outlook display name ("Last, First : Team"), a surname in capitals, a directory that keeps "Dupont, Marie".
